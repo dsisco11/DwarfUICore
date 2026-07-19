@@ -410,19 +410,67 @@ this fails, stop and discuss the architectural blocker.
 
 ### Phase 1 - Build the safe Busted host
 
-- ☐ Implement programmatic Busted construction, standard DSL registration,
+- ☑ Implement programmatic Busted construction, standard DSL registration,
   deterministic live-spec discovery, filters, event subscriptions, and repeat
   execution.
-- ☐ Add a Busted output handler that records ordinary Busted progress and
+- ☑ Add a Busted output handler that records ordinary Busted progress and
   failure details in the in-memory run object.
-- ☐ Implement run ownership, generation checks, state transitions, final
+- ☑ Implement run ownership, generation checks, state transitions, final
   result calculation, and retention of the most recent completed run.
-- ☐ Add `bootstrap.lua`, `status.lua`, and `abort.lua` entry points.
-- ☐ Prove passing, failing, erroring, pending, filtered, and malformed spec
+- ☑ Add `bootstrap.lua`, `status.lua`, and `abort.lua` entry points.
+- ☑ Prove passing, failing, erroring, pending, filtered, and malformed spec
   results match external Busted semantics.
 
 Exit: Busted suites run in-process and can be launched, observed, filtered, and
 aborted without affecting DF stability.
+
+#### Phase 1 implementation and evidence
+
+- `Tests/Automation/support/busted_host.lua` constructs `busted.core`, installs
+  the standard Busted DSL, exports `dy` only through Busted's isolated
+  environment, applies Busted's normal filter loader, discovers sorted
+  `*_live_spec.lua` files, and invokes `busted.execute` without loading
+  `busted.runner`.
+- `Tests/Automation/support/output_handler.lua` extends Busted's base output
+  handler. The retained run contains ordinary start/result lines, current test,
+  per-repeat counts, cross-repeat totals, failure/error details, and traces.
+- Run state is generation-owned and moves only through `starting`, `running`,
+  `cleaning`, and a terminal state. Queued callbacks verify both owner identity
+  and generation. Aborting invalidates the generation and cancels the startup
+  timeout. Unit coverage invokes a stale callback after abort and confirms it
+  cannot change the archived result.
+- A terminal result remains exclusively owned until its runner polls it. A live
+  delayed-poll run rejected a second runner with `has an unobserved passed
+  result`; the owning runner then retrieved the retained result successfully.
+  A separate live queued run rejected an overlapping active owner and was
+  subsequently aborted by the runner timeout path.
+- `bootstrap.lua`, `status.lua`, and `abort.lua` launch, incrementally report,
+  and cancel runs through stable `DWARFUI_AUTOMATION` summary lines. The
+  dedicated `Tools/Run-AutomationTests.ps1` is the only tool used to execute
+  the live specs; unit discovery remains separate.
+- The deliberate live result fixture reported exactly `1 success, 1 failure,
+  1 error, 1 pending`, with the Luassert failure and raw error recorded as
+  distinct detailed results. Standalone Busted 2.3 reported the same counts
+  and classifications for that fixture.
+- A temporary malformed live spec reported exactly `0 successes, 0 failures,
+  1 error, 0 pending`, matching standalone Busted's syntax-error result. The
+  malformed and deliberate-failure fixtures were removed after proof so the
+  default automation suite remains green.
+- Live include, exclude, exact-name, tag, and exclude-tag filters used Busted's
+  own filter loader. A two-repeat tagged run reported one success per repeat
+  and two total successes. The durable default discovery run reports one
+  passing `dy` isolation spec, and a second run proved repeat execution.
+- The live `dy` isolation spec confirmed `dy.protocol_version == 1` while
+  `rawget(_G, 'dy')` remained nil. This proves the helper is exported into the
+  spec environment without leaking into DFHack's process global table.
+- `Tests/automation_host_test.lua` passes ownership, unobserved-result, abort,
+  and stale-generation contracts. The complete unit suite passes with 70
+  successes and no failures, errors, or pending tests.
+- Final Lua syntax validation passed for 5 production and 29 test/support
+  files. Expanded and zip package verification also passed. The final default
+  live run (generation 24) passed through `Run-AutomationTests.ps1`.
+- The live Dwarf Fortress process remained responsive after passing, failing,
+  malformed, repeated, overlapping, and aborted runs.
 
 ### Phase 2 - Build scheduler and cleanup foundations
 
@@ -452,8 +500,8 @@ assert, capture, and clean a real live DFHack UI.
 
 ### Phase 4 - Add the supported runner
 
-- ☐ Add `Tools/Run-AutomationTests.ps1` with connectivity checks, dependency
-  bootstrap, filters, polling, timeout, progress forwarding, and exit status.
+- ☐ Harden `Tools/Run-AutomationTests.ps1` with dependency installation and the
+  remaining unattended-run diagnostics and recovery contracts.
 - ☐ Keep automation discovery separate from `Run-UnitTests.ps1`.
 - ☐ Add safe overlay fixture staging and unconditional `finally` cleanup.
 - ☐ Prove the runner handles no game, incompatible Lua dependency, active run,

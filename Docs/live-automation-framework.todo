@@ -533,16 +533,39 @@ state after any supported termination path.
 
 ### Phase 3 - Add live UI interaction primitives
 
-- ☐ Add approved fixture loading and first-render synchronization.
-- ☐ Add native `view_id` lookup, view inspection, and view-tree capture.
-- ☐ Add scoped virtual pointer set/move/clear operations.
-- ☐ Add keyboard, click, and string input through `gui.simulateInput()`.
-- ☐ Add render-generation waits without direct lifecycle calls.
-- ☐ Add screen-cell capture and automatic diagnostics on interaction failure.
-- ☐ Prove screen dismissal, focus, pause state, and pointer restoration.
+- ☑ Add approved fixture loading and first-render synchronization.
+- ☑ Add native `view_id` lookup, view inspection, and view-tree capture.
+- ☑ Add scoped virtual pointer set/move/clear operations.
+- ☑ Add keyboard, click, and string input through `gui.simulateInput()`.
+- ☑ Add render-generation waits without direct lifecycle calls.
+- ☑ Add screen-cell capture and automatic diagnostics on interaction failure.
+- ☑ Prove screen dismissal, focus, pause state, and pointer restoration.
 
 Exit: an ordinary Busted spec can show, find, hover, click, type, wait, inspect,
 assert, capture, and clean a real live DFHack UI.
+
+#### Phase 3 implementation and evidence
+
+- `fixture_loader.lua` accepts only allowlisted relative fixture names and
+  `dy.show_fixture()` waits for the fixture's first real render. The interaction
+  fixture is a test-owned `gui.ZScreen` with instrumented render generation.
+- `dy.get()`, `dy.inspect()`, and `dy.capture_view_tree()` operate on the live
+  propagated `view_id` index and retain stable inspection data. `dy.capture_screen()`
+  reads bounded DFHack screen cells for test diagnostics.
+- The scoped pointer adapter temporarily replaces only `dfhack.screen.getMousePos`,
+  checks ownership before restoration, and restores both the pointer function and
+  temporary native mouse coordinates during input.
+- `dy.press()`, `dy.click()`, and `dy.type()` use `gui.simulateInput()` with the
+  shown screen's native viewscreen. Render waits observe later real render passes;
+  specs do not call screen lifecycle methods directly.
+- `Tests/Automation/specs/interaction_live_spec.lua` passed through
+  `Tools/Run-AutomationTests.ps1 -Spec interaction_live_spec.lua` on generation 35:
+  1 success, 0 failures, 0 errors, and `cleanup_confirmed=true`. It proved native
+  view lookup, inspection, hover, left click, string and key input, cell capture,
+  screen dismissal, active focus, pause restoration, and pointer restoration.
+- The local Busted suite passed with 87 successes and no failures, errors, or
+  pending tests. Lua 5.4.6 syntax validation passed for 5 production and 40
+  test/support files; `git diff --check` passed.
 
 ### Phase 4 - Add the supported runner
 

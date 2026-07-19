@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: in progress (Phases 0-5 complete)
+Status: in progress (Phases 0-6 complete)
 
 ## Goal
 
@@ -697,29 +697,74 @@ expanded and zip packages.
 
 ## Phase 6 - Prove normal-screen and overlay host integration
 
-- ☐ Add a minimal test/demo `gui.ZScreen` host that constructs content, a
+- ☑ Add a minimal test/demo `gui.ZScreen` host that constructs content, a
   renderer, and one agent for its root.
-- ☐ Update the screen agent before the root render pass and render the tooltip
+- ☑ Update the screen agent before the root render pass and render the tooltip
   above ordinary content.
-- ☐ Add a minimal test/demo `overlay.OverlayWidget` host with an offset and
+- ☑ Add a minimal test/demo `overlay.OverlayWidget` host with an offset and
   tightly clipped body.
-- ☐ Update the overlay agent at the correct overlay render seam.
-- ☐ Render the overlay tooltip after normal overlay content so it can extend
+- ☑ Update the overlay agent at the correct overlay render seam.
+- ☑ Render the overlay tooltip after normal overlay content so it can extend
   beyond the clipped panel using screen-relative placement.
-- ☐ Verify an overlay tooltip does not share pointer state or text with a
+- ☑ Verify an overlay tooltip does not share pointer state or text with a
   normal screen or another overlay instance.
-- ☐ Verify open/nested windows block underlying targets within their frame but
+- ☑ Verify open/nested windows block underlying targets within their frame but
   not outside it.
-- ☐ Verify dynamic row tooltips clear over padding, separators, blank rows, and
+- ☑ Verify dynamic row tooltips clear over padding, separators, blank rows, and
   removed records.
-- ☐ Document the explicit screen-host and overlay-host integration recipes in
+- ☑ Document the explicit screen-host and overlay-host integration recipes in
   `README.md` before considering the parity API stable.
-- ☐ Keep these recipes explicit even if they appear repetitive; the one-call
+- ☑ Keep these recipes explicit even if they appear repetitive; the one-call
   registration proposal is evaluated only after the parity gate.
+
+### Phase 6 implementation and evidence
+
+`Tests/tooltip_host_integration_test.lua` defines minimal controlled subclasses
+of `gui.ZScreen` and `overlay.OverlayWidget` using the real DwarfUI extension,
+pointer, text, renderer, and agent modules. The screen host adds ordinary
+content followed by its renderer, owns one agent for itself, updates that agent
+in `onRender()`, and then invokes the inherited screen render. Its event trace
+proves agent update occurs first, ordinary content renders next, and the
+tooltip renders last through the screen painter.
+
+The overlay host uses an offset eight-by-four frame to model a tightly clipped
+panel. It adds only ordinary content as a subview, assigns the separately owned
+renderer a `parent_view` for invalidation, updates its agent at the beginning of
+`onRenderFrame()`, completes the inherited overlay render, and renders the
+tooltip afterward with the original parent painter. The test proves ordinary
+content receives the clipped overlay painter while the tooltip receives the
+parent painter, uses `root.frame_parent_rect` for screen-relative layout, and
+extends beyond the overlay's clipped right edge.
+
+The six focused host specs also create one normal screen and two simultaneous
+overlay instances. Each retains its own target, text, renderer, agent, and
+pointer context; clearing one overlay leaves the other two unchanged. A nested
+window scenario proves the inner window blocks its frame, the outer window
+blocks the remainder of its frame, and an underlying target wins outside both.
+A dynamic terminal-row callback proves text appears only over a current record
+and clears over horizontal padding, a separator row, a blank row, and a record
+removed while the pointer remains stationary.
+
+`README.md` now contains the two complete explicit integration recipes. The
+screen recipe constructs tooltip-bearing content only after importing the
+facade, attaches the renderer last, constructs one root-bound agent, and updates
+before the inherited `onRender()`. The overlay recipe deliberately keeps the
+renderer outside clipped subviews, updates in `onRenderFrame()`, and renders the
+tooltip after the inherited `render()`. The documentation repeats the required
+steps and explicitly defers registration-only lifecycle ownership to the later
+post-parity evaluation.
+
+The focused Busted run passed all six host-integration specs. The complete
+suite passed 54 specs with zero failures, errors, or pending cases.
+`./Tools/Build.ps1 -LiveReload:$false` syntax-checked four production files and
+12 test/support files with Lua 5.4.6 without invoking a live command.
+`./Tools/Publish.ps1` repeated the build and independently verified both the
+expanded and zip packages. These are automated host-characterization results;
+the separate live DFHack gates remain in Phase 7.
 
 ### Phase 6 exit criteria
 
-- ☐ Both supported root types have working, documented, isolated integration
+- ☑ Both supported root types have working, documented, isolated integration
   paths with automated characterization coverage.
 
 ## Phase 7 - Close the behavioral-parity port
@@ -888,6 +933,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 5 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 48 specs; zero failures, errors, or pending cases |
 | 2026-07-18 | 5 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 11 test/support files syntax-checked; no live command |
 | 2026-07-18 | 5 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-18 | 6 | Focused test | Busted filter for tooltip host integration | passed | 6 screen/overlay integration specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 6 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 54 specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 6 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 12 test/support files syntax-checked; no live command |
+| 2026-07-18 | 6 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
 | | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
 | | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
 | | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |

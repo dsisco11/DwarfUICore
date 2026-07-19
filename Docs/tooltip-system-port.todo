@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: in progress (Phases 0-2 complete)
+Status: in progress (Phases 0-3 complete)
 
 ## Goal
 
@@ -465,33 +465,69 @@ unrelated command contract.
 
 ## Phase 3 - Port generic text and widget-extension contracts
 
-- ☐ Extract a standalone `wrap_text(text, width)` helper into
+- ☑ Extract a standalone `wrap_text(text, width)` helper into
   `dwarfui/text.lua` without importing SoulSearch layout, stats, glyph, filter,
   or descriptor modules.
-- ☐ Add focused wrapping tests for normal text, narrow widths, empty input, and
+- ☑ Add focused wrapping tests for normal text, narrow widths, empty input, and
   multiple lines.
-- ☐ Port the idempotent attribute-installation helper using DwarfUI names and
+- ☑ Port the idempotent attribute-installation helper using DwarfUI names and
   errors.
-- ☐ Add `tooltip=DEFAULT_NIL` to the common `widgets.Widget` contract.
-- ☐ Add `pointer_policy='target'`, `on_pointer_enter=DEFAULT_NIL`,
+- ☑ Add `tooltip=DEFAULT_NIL` to the common `widgets.Widget` contract.
+- ☑ Add `pointer_policy='target'`, `on_pointer_enter=DEFAULT_NIL`,
   `on_pointer_update=DEFAULT_NIL`, and `on_pointer_leave=DEFAULT_NIL` to the
   common widget contract.
-- ☐ Set `widgets.Panel` to `pointer_policy='pass'`.
-- ☐ Set `widgets.Window` to `pointer_policy='block'`.
-- ☐ Set `widgets.TextButton` back to `pointer_policy='target'` so its internal
+- ☑ Set `widgets.Panel` to `pointer_policy='pass'`.
+- ☑ Set `widgets.Window` to `pointer_policy='block'`.
+- ☑ Set `widgets.TextButton` back to `pointer_policy='target'` so its internal
   `HotkeyLabel` does not steal ownership.
-- ☐ Preserve an already-installed compatible attribute and fail clearly on an
+- ☑ Preserve an already-installed compatible attribute and fail clearly on an
   incompatible default instead of overwriting it.
-- ☐ Verify native descendants accept static tooltip constructor values and
+- ☑ Verify native descendants accept static tooltip constructor values and
   direct runtime mutation.
-- ☐ Verify repeated module loads are idempotent and do not replace DFHack
+- ☑ Verify repeated module loads are idempotent and do not replace DFHack
   classes.
-- ☐ Add Busted coverage for inheritance, constructor assignment, mutation,
+- ☑ Add Busted coverage for inheritance, constructor assignment, mutation,
   clearing, reload idempotence, class defaults, and collision failures.
+
+### Phase 3 implementation and evidence
+
+`dwarfui/text.lua` now exports only the standalone `wrap_text(text, width)`
+helper required by tooltip presentation. It preserves the source behavior:
+input is converted to whitespace-delimited words, wrapping occurs only at word
+boundaries, words wider than the requested width remain intact, and empty or
+whitespace-only input produces one empty line. It imports no layout, stats,
+glyph, filter, descriptor, or other application module.
+
+Importing `dwarfui/widget_extensions.lua` installs the declarative contracts on
+the existing `gui.widgets` classes. `Widget` receives `tooltip`, the four
+pointer fields, and the terminal default. `Panel`, `Window`, and `TextButton`
+receive `pass`, `block`, and `target` overrides respectively. The installer
+uses `rawget` so only a class's own declaration is compared, preserves an exact
+compatible default, returns whether any declaration changed, and raises a
+DwarfUI-owned incompatible-contract error without overwriting a collision.
+Repeated imports operate on the supplied native classes rather than replacing
+them.
+
+`Tests/text_test.lua` contains four focused specs for normal wrapping, narrow
+widths with an overlong word, empty/nil/whitespace input, and input containing a
+line break. `Tests/widget_extensions_test.lua` contains five specs covering
+inherited constructor values across native descendants, direct mutation and
+both clearing forms, callback constructor values, class-specific defaults,
+compatible preinstallation, repeated module loads, preserved class identity,
+and tooltip plus pointer collision failures. The Phase 2 package-contract test
+now supplies a controlled `gui.widgets` module and `DEFAULT_NIL` when executing
+the implemented extension.
+
+Focused Busted runs passed all four text specs and all five widget-extension
+specs. The complete Busted run passed 17 specs with zero failures or errors.
+`./Tools/Build.ps1 -LiveReload:$false` syntax-checked four production files and
+nine test/support files with Lua 5.4.6 without invoking a live command.
+`./Tools/Publish.ps1` repeated the build and independently verified both the
+expanded package and zip package before creating `DwarfUI-0.1.0.zip`.
 
 ### Phase 3 exit criteria
 
-- ☐ DwarfUI can install the declarative widget and pointer attributes safely,
+- ☑ DwarfUI can install the declarative widget and pointer attributes safely,
   and its text helper has no SoulSearch dependency.
 
 ## Phase 4 - Port the generic per-root pointer dispatcher
@@ -744,6 +780,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 7 test/support files syntax-checked |
 | 2026-07-18 | 2 | Expanded package | `./Tools/Publish.ps1` | passed | `dist/DwarfUI/` manifest and hashes match all 5 source files |
 | 2026-07-18 | 2 | Zip package | `./Tools/Publish.ps1` | passed | `dist/DwarfUI-0.1.0.zip` independently extracted; flat 5-file manifest matches source |
+| 2026-07-18 | 3 | Focused test | Busted filters for text and widget extensions | passed | 4 text specs and 5 widget-extension specs passed |
+| 2026-07-18 | 3 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 17 specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 3 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 9 test/support files syntax-checked; no live command |
+| 2026-07-18 | 3 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
 | | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
 | | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
 | | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |

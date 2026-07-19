@@ -25,6 +25,21 @@ local function contains(text, expected)
     assert.is_truthy(text:find(expected, 1, true))
 end
 
+local function load_public_module(package_path)
+    local options
+    if package_path == 'scripts_modinstalled/dwarfui/widget_extensions.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        options = {
+            globals={DEFAULT_NIL=default_nil},
+            require_modules={
+                ['gui.widgets']=widget_harness.widgets(nil, default_nil),
+            },
+        }
+    end
+    return module_loader.load(repo_root, 'src/' .. package_path, options)
+end
+
 describe('DwarfUI package contract', function()
     it('publishes the expected metadata', function()
         local info = read_source('info.txt')
@@ -47,8 +62,7 @@ describe('DwarfUI package contract', function()
             contains(source, '--@ module=true')
             assert.is_nil(source:lower():find('soulsearch', 1, true))
 
-            local _, module_result = module_loader.load(
-                repo_root, 'src/' .. package_path)
+            local _, module_result = load_public_module(package_path)
             assert.equals('table', type(module_result), package_path)
         end
     end)

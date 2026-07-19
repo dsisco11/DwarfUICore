@@ -99,6 +99,7 @@ if (-not ($sourceManifest.RelativePath | Where-Object { $_ -like 'scripts_modins
 Assert-MatchesSource -Expected $sourceManifest `
     -Actual (Get-Manifest -Root $expandedDirectoryPath) `
     -Label 'Expanded package'
+Write-Host 'Expanded package verification passed.'
 
 $extractRoot = Join-Path ([IO.Path]::GetTempPath()) "DFHackModVerify-$([guid]::NewGuid())"
 try {
@@ -106,6 +107,7 @@ try {
     Assert-MatchesSource -Expected $sourceManifest `
         -Actual (Get-Manifest -Root $extractRoot) `
         -Label 'Zip package'
+    Write-Host 'Zip package verification passed.'
 }
 finally {
     if (Test-Path -LiteralPath $extractRoot) {
@@ -113,4 +115,4 @@ finally {
     }
 }
 
-Write-Host 'Package verification passed.'
+Write-Host 'All package verification passed.'

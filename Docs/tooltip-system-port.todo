@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: in progress (Phases 0-1 complete)
+Status: in progress (Phases 0-2 complete)
 
 ## Goal
 
@@ -388,24 +388,70 @@ syntax-checked zero production files and six test/support Lua files with Lua
 
 ## Phase 2 - Create the installable DwarfUI package and public namespace
 
-- ☐ Add `src/info.txt` with DwarfUI metadata and an initial displayed version.
-- ☐ Create `src/scripts_modinstalled/dwarfui/` as the shared public module
+- ☑ Add `src/info.txt` with DwarfUI metadata and an initial displayed version.
+- ☑ Create `src/scripts_modinstalled/dwarfui/` as the shared public module
   namespace.
-- ☐ Add the smallest public facade/module placeholders needed for test-first
+- ☑ Add the smallest public facade/module placeholders needed for test-first
   implementation without exposing SoulSearch names.
-- ☐ Ensure public modules use `--@ module=true` and stable return tables.
-- ☐ Decide whether internal implementation helpers are necessary; keep the
+- ☑ Ensure public modules use `--@ module=true` and stable return tables.
+- ☑ Decide whether internal implementation helpers are necessary; keep the
   ordinary downstream import path under `dwarfui/...` either way.
-- ☐ Verify `Tools/Check-LuaSyntax.ps1` includes production and test Lua files.
-- ☐ Verify `Tools/Publish.ps1` and `Tools/VerifyPackage.ps1` accept a package
+- ☑ Verify `Tools/Check-LuaSyntax.ps1` includes production and test Lua files.
+- ☑ Verify `Tools/Publish.ps1` and `Tools/VerifyPackage.ps1` accept a package
   containing public library modules without requiring an unrelated command.
-- ☐ Run `./Tools/Build.ps1 -LiveReload:$false` and record the result.
-- ☐ Run `./Tools/Publish.ps1` and record expanded-package and archive manifest
+- ☑ Run `./Tools/Build.ps1 -LiveReload:$false` and record the result.
+- ☑ Run `./Tools/Publish.ps1` and record expanded-package and archive manifest
   verification separately.
+
+### Phase 2 implementation and evidence
+
+`src/info.txt` defines the initial package identity as ID `dwarfui`, name
+`DwarfUI`, and displayed version `0.1.0`. Its description reflects DwarfUI's
+hybrid role: reusable DFHack UI infrastructure plus its own user-facing
+interface enhancements.
+
+The stable downstream namespace is rooted directly at
+`src/scripts_modinstalled/dwarfui/`:
+
+- `dwarfui/text`
+- `dwarfui/widget_extensions`
+- `dwarfui/pointer`
+- `dwarfui/tooltip`
+
+Each file uses `--@ module=true` and returns a module table. The tables are
+intentionally empty placeholders in this phase: later phases add the documented
+functions and classes without changing downstream import paths. No
+`internal/dwarfui` layer is justified while the modules contain no private
+implementation helpers. A private layer may be introduced later only for a
+concrete implementation need; the public imports above remain unchanged.
+
+`Tests/package_contract_test.lua` protects the exact package metadata, public
+paths, module annotations, table return contracts, and absence of SoulSearch
+references. Together with the five Phase 1 infrastructure cases, the full
+LuaUnit run passed eight tests with zero failures.
+
+`./Tools/Build.ps1 -LiveReload:$false` used Lua 5.4.6 and syntax-checked four
+production modules plus seven test/support files. This proves
+`Check-LuaSyntax.ps1` includes both trees; no live command was invoked.
+
+`./Tools/Publish.ps1` rebuilt the same source and created:
+
+- `dist/DwarfUI-0.1.0.zip`
+- `dist/DwarfUI/`
+
+`VerifyPackage.ps1` now reports its two manifest gates separately. The expanded
+package comparison passed, then the independently extracted zip comparison
+passed. Both contain exactly five source-relative files: `info.txt` and the
+four public modules. An independent path/hash audit also matched source to the
+expanded package and matched the same five flat paths in the zip. There is no
+nested package root, top-level `dwarfui.lua` command, `internal/` directory, or
+SoulSearch path/text. Passing both package gates without a command proves that
+the publisher and verifier accept public module packages without imposing an
+unrelated command contract.
 
 ### Phase 2 exit criteria
 
-- ☐ DwarfUI builds and packages as an installable DFHack mod with a stable
+- ☑ DwarfUI builds and packages as an installable DFHack mod with a stable
   public Lua namespace and no SoulSearch runtime dependency.
 
 ## Phase 3 - Port generic text and widget-extension contracts
@@ -685,8 +731,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 1 | Failure contract | Opt-in failing smoke case through child PowerShell process | passed | Expected test failed with assertion context and traceback; process exit code 1 |
 | 2026-07-18 | 1 | Targeted test | Forwarded LuaUnit test name | passed | Exactly 1 selected test passed |
 | 2026-07-18 | 1 | Local build | `./Tools/Build.ps1` | passed | Lua 5.4.6; 0 production and 6 test/support files syntax-checked |
-| | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Package scaffold syntax |
-| | 2 | Package | `./Tools/Publish.ps1` | pending | Expanded and archive manifests |
+| 2026-07-18 | 2 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 8 tests; metadata, public paths, module tables, and no SoulSearch references covered |
+| 2026-07-18 | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 7 test/support files syntax-checked |
+| 2026-07-18 | 2 | Expanded package | `./Tools/Publish.ps1` | passed | `dist/DwarfUI/` manifest and hashes match all 5 source files |
+| 2026-07-18 | 2 | Zip package | `./Tools/Publish.ps1` | passed | `dist/DwarfUI-0.1.0.zip` independently extracted; flat 5-file manifest matches source |
 | | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
 | | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
 | | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |

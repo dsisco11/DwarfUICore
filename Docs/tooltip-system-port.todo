@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: planned
+Status: in progress (Phase 0 complete)
 
 ## Goal
 
@@ -94,6 +94,8 @@ src/
 `dwarfui/pointer` is intentionally reusable by later DwarfUI systems such as
 context menus. `dwarfui/tooltip` is the normal downstream facade and imports the
 required widget extensions before tooltip-bearing widgets are constructed.
+This layout covers the tooltip port only; it is not an exhaustive layout for
+DwarfUI's own commands, overlays, and other user-facing UI additions.
 
 ## Non-goals for the parity port
 
@@ -116,33 +118,181 @@ required widget extensions before tooltip-bearing widgets are constructed.
 
 ## Phase 0 - Freeze the source contract and establish the port boundary
 
-- ☐ Record the SoulSearch revision, branch, and worktree status used as the port
+- ☑ Record the SoulSearch revision, branch, and worktree status used as the port
   source.
-- ☐ Record the active sibling DFHack source/version used for widget and
+- ☑ Record the active sibling DFHack source/version used for widget and
   lifecycle API verification.
-- ☐ Inventory every production dependency imported by the four source-system
+- ☑ Inventory every production dependency imported by the four source-system
   modules.
-- ☐ Classify dependencies as generic and portable, SoulSearch-specific and to
+- ☑ Classify dependencies as generic and portable, SoulSearch-specific and to
   be replaced, or temporary diagnostics and to be excluded.
-- ☐ Confirm that only `wrap_text()` is needed from SoulSearch's `ui_format.lua`.
-- ☐ Audit the active DFHack `gui.widgets` classes for collisions with
+- ☑ Confirm that only `wrap_text()` is needed from SoulSearch's `ui_format.lua`.
+- ☑ Audit the active DFHack `gui.widgets` classes for collisions with
   `tooltip`, `pointer_policy`, `on_pointer_enter`, `on_pointer_update`, and
   `on_pointer_leave`.
-- ☐ Audit native `widgets.TooltipLabel` and any newer tooltip APIs; document why
+- ☑ Audit native `widgets.TooltipLabel` and any newer tooltip APIs; document why
   they do or do not replace any source-system layer.
-- ☐ Record the current SoulSearch test names covering widget extensions,
+- ☑ Record the current SoulSearch test names covering widget extensions,
   pointer dispatch, agent behavior, and rendering.
-- ☐ Record the historical callback-contract regression in the acceptance list:
+- ☑ Record the historical callback-contract regression in the acceptance list:
   defclass pointer methods receive local coordinates after `self` and must not
   declare an extra target parameter.
-- ☐ Decide and document whether DwarfUI is a library-only mod or also exposes a
-  user-facing command.
-- ☐ Align `Tools/Build.ps1` live-reload behavior with that decision; a
-  library-only build must not assume that `dwarfui reload` exists.
+- ☑ Decide and document DwarfUI's package role and whether the current checkout
+  exposes a reloadable command.
+- ☑ Align `Tools/Build.ps1` live-reload behavior with the current command
+  contract; the build must not assume that `dwarfui reload` exists before a
+  real reload entry point is implemented.
+
+### Phase 0 source snapshot
+
+The port source is SoulSearch commit
+`2f098c8e91fc36635706e4e20a4b7839918e3214` on branch
+`refactor-for-handsoff-install` (commit date 2026-07-18, subject
+`refactor: the attribute definitions to use shorter string names`). The
+tooltip source and focused test paths are clean at that revision. The
+SoulSearch worktree also contains unrelated user changes in:
+
+- `Tests/filter_defaults_test.lua`
+- `Tests/role_presets_test.lua`
+- `src/scripts_modinstalled/internal/soulsearch/role_presets.lua`
+
+Those dirty files are outside the tooltip source boundary and must not be
+copied, reverted, or treated as port evidence.
+
+The DFHack API source is the sibling `dfhack-53.15-r1` checkout at commit
+`b12f73a323863761992faf93f15a70a3e8ad2acd`, tagged `53.15-r1`, in detached-HEAD
+state. Its relevant `library/lua/gui` sources are clean. The checkout has
+untracked generated Visual Studio/CMake files under `build/`; they do not alter
+the audited Lua widget contracts.
+
+### Phase 0 dependency classification
+
+| Source module | Dependency | Classification and port action |
+|---|---|---|
+| `ui/widget_extensions.lua` | `require('gui.widgets')`, `DEFAULT_NIL` | Generic DFHack API; retain. Rename SoulSearch errors and exports to DwarfUI. |
+| `ui/pointer_dispatcher.lua` | DFHack view rectangles, `visible`, `active`, `subviews`, and `dfhack.screen.getMousePos()` | Generic pointer infrastructure; port independently as `dwarfui/pointer.lua`. It has no tooltip dependency. |
+| `ui/tooltip_agent.lua` | `ui/pointer_dispatcher.lua`, `dfhack.screen.getMousePos()` | Generic core; port with the pointer module path rewritten to DwarfUI. |
+| `ui/tooltip_agent.lua` | debug buffer, view/path formatting, signature suppression, optional logger | Temporary SoulSearch diagnostics; exclude from the parity port. |
+| `ui_tooltip.lua` | `require('gui')`, `require('gui.widgets')`, pens/colors, `defclass`, screen size, layout/invalidation | Generic DFHack rendering API; retain with DwarfUI names. |
+| `ui_tooltip.lua` | `ui/widget_extensions.lua` | Generic contract installer; rewrite to the DwarfUI module. |
+| `ui_tooltip.lua` | `ui_format.wrap_text()` | Replace with a standalone `dwarfui/text.lua` helper. |
+
+`ui_tooltip.lua` calls only `ui_format.wrap_text()` from SoulSearch formatting.
+The rest of `ui_format.lua` depends on SoulSearch layout, stats layout, glyphs,
+filter constants, descriptors, and presentation rules and is outside the port.
+No other SoulSearch-specific production module is required by the four core
+modules after the module-path and text-wrapper replacements above.
+
+Host composition is acceptance evidence, not a copied dependency:
+`ui/main_screen.lua` demonstrates `gui.ZScreen` ordering, while
+`soulsearch-stats-overlay.lua` demonstrates offset/clipped overlay ordering.
+SoulSearch's `tooltip_debug_log`, `soulsearch-tooltip-log.lua`, and retained
+debug-message accessors are explicitly excluded.
+
+### Phase 0 active DFHack API audit
+
+The active `gui.widgets.Widget.ATTRS`, `Panel.ATTRS`, `Window.ATTRS`, and
+`TextButton` definitions contain none of the proposed `tooltip`,
+`pointer_policy`, `on_pointer_enter`, `on_pointer_update`, or
+`on_pointer_leave` contracts. The names are collision-free for DFHack 53.15-r1.
+The port will still keep SoulSearch's idempotent compatible-default check so a
+later DFHack version or another loaded library cannot be overwritten silently.
+
+The two native classes with tooltip names do not replace the system:
+
+- `widgets.TooltipLabel` is a `WrappedLabel` whose `show_tooltip` attribute only
+  controls label visibility. It does not resolve a hovered descendant, own
+  per-root pointer state, follow the screen mouse, block modal fall-through, or
+  clear/redraw an old mouse-relative frame.
+- `widgets.DimensionsTooltip` is a map-selection `ResizingPanel` that derives a
+  `WxHxZ` label from a map anchor and follows the mouse. It does not provide a
+  declarative tooltip attribute, generic widget hit testing, pointer lifecycle
+  callbacks, modal semantics, dynamic terminal ownership, or root isolation.
+  Its `Panel`-based layout and DFHack badge sizing also differ from the required
+  lightweight presentation widget.
+
+No newer generic declarative-hover or pointer-agent API is present in the
+active `library/lua/gui` sources.
+
+The audited host lifecycle is sufficient for the explicit parity design:
+`gui.View:addviews()` sets `parent_view` and appends children,
+`View:renderSubviews()` renders them in insertion order, and `gui.Screen`
+provides `invalidate()`, `onRender()`, `onDismiss()`, and `onDestroy()` seams.
+`overlay.OverlayWidget` inherits `widgets.Panel` and is rendered and updated by
+the overlay framework. The active `View` API has no matching public
+`removeviews()` helper. Automatic attachment, render-loop ownership, and
+unregistration therefore remain deliberately deferred to the Phase 8
+lifecycle evaluation; Phase 0 does not assume those operations are safe.
+
+### Phase 0 focused SoulSearch test inventory
+
+Widget-extension tests:
+
+- `widget extensions: native descendants inherit declarative tooltip`
+- `widget extensions: incompatible tooltip attribute fails clearly`
+- `widget extensions: pointer attributes use native class defaults and reload safely`
+- `widget extensions: incompatible pointer attribute fails clearly`
+- `widget extensions: every native-widget host imports the extension`
+
+Pointer-dispatcher tests:
+
+- `pointer dispatcher: policies, reverse overlap, and local coordinates`
+- `pointer dispatcher: target controls retain ownership over implementation children`
+- `pointer dispatcher: windows block frames while preserving child targets`
+- `pointer dispatcher: clipping, eligibility, none, and root isolation`
+- `pointer dispatcher: evaluated ancestors and one mouse sample clear targets`
+- `pointer dispatcher: transitions update terminal widgets and clear removed targets`
+- `pointer dispatcher: nested modal blocks only its own frame`
+
+Tooltip-agent tests:
+
+- `tooltip agent: reads only the selected target and current mutation`
+- `tooltip agent: supplies the root parent rectangle to the renderer`
+- `tooltip agent: targets a native widget declared with static text`
+- `tooltip agent: presents terminal-owned dynamic text after pointer update`
+- `tooltip agent: hides for blocked and excluded targets without parent fallback`
+- `tooltip agent: rejects invalid text and keeps root state isolated`
+- `tooltip agent: diagnostics expose resolver transitions and suppress stable samples`
+
+The diagnostics test records source behavior but will not move to DwarfUI; it
+tests the explicitly excluded temporary logger. The source-scanning
+widget-extension host test must be rewritten around DwarfUI's public import
+contract instead of retaining SoulSearch file paths.
+
+Tooltip-renderer tests:
+
+- `Tooltip renderer: renders supplied current text immediately and wraps it`
+- `Tooltip renderer: clamps placement and stays hidden without text`
+
+The callback regression is a locked acceptance case. `PointerDispatcher`
+invokes an attribute callback as `target.on_pointer_update(target, x, y)`, which
+maps to `self, x, y` for a defclass method. The corrected SoulSearch method is
+therefore `FilterActionList:on_pointer_update(x, y)`. Declaring
+`on_pointer_update(target, x, y)` after the colon shifts the local coordinates
+and previously caused live hover flicker. Phase 4 must retain a defclass-level
+regression test for this exact contract.
+
+### Phase 0 package and build decision
+
+DwarfUI is a hybrid DFHack mod. It provides reusable UI infrastructure under
+the `dwarfui/...` namespace and will also provide its own user-facing commands,
+overlays, popouts, panels, and other UI additions. The tooltip port establishes
+shared infrastructure; it does not define the complete role or contents of the
+mod.
+
+The current checkout does not yet contain production scripts or a real
+`dwarfui reload` entry point. `Tools/Build.ps1` therefore defaults `LiveReload`
+to `$false` so the normal VS Code Build task does not invoke a nonexistent
+command. This is a current-bootstrap constraint, not a permanent package-role
+policy.
+The existing reload code remains available as an explicit
+`-LiveReload:$true` option. Once DwarfUI has an actual reload/bootstrap command
+for its shared modules and its own UI additions, the default and VS Code task
+should be reevaluated against that real lifecycle contract.
 
 ### Phase 0 exit criteria
 
-- ☐ The exact source revision, portable behavior, excluded diagnostics,
+- ☑ The exact source revision, portable behavior, excluded diagnostics,
   dependency replacements, DFHack API assumptions, and build/reload contract
   are recorded before production code is copied.
 
@@ -462,6 +612,9 @@ phase complete from an unrecorded or inferred run.
 
 | Date | Phase | Layer | Command or scenario | Result | Evidence/notes |
 |---|---:|---|---|---|---|
+| 2026-07-18 | 0 | Source audit | SoulSearch and DFHack checkout inspection | passed | SoulSearch `2f098c8`; DFHack `53.15-r1`/`b12f73a`; unrelated dirty paths recorded |
+| 2026-07-18 | 0 | Contract audit | Imports, GUI attributes, native tooltip classes, and focused test inventory | passed | All four core imports classified; all 21 focused test names recorded; no active attribute-name collision |
+| 2026-07-18 | 0 | Tooling policy | PowerShell parse of `Tools/Build.ps1` | passed | Hybrid mod currently has no reload entry point; `LiveReload` defaults to `$false` until a real command exists |
 | | 1 | Local test | `./Tools/Run-UnitTests.ps1` | pending | LuaUnit via LuaRocks baseline |
 | | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Package scaffold syntax |
 | | 2 | Package | `./Tools/Publish.ps1` | pending | Expanded and archive manifests |

@@ -2,7 +2,10 @@
 param(
     [string] $LuaCompiler = $env:DFHACK_LUAC,
     [string] $RequiredLuaVersion = $env:DFHACK_LUA_VERSION,
-    [bool] $LiveReload = $true,
+    # DwarfUI does not expose a `dwarfui reload` command yet. Keep command-based
+    # reload available as an explicit opt-in once its shared modules and
+    # user-facing UI additions have a real reload entry point.
+    [bool] $LiveReload = $false,
     [string] $SourceDir = 'src',
     [string] $DFHackRunner = $env:DFHACK_RUNNER,
     [string] $DwarfFortressRoot = $env:DWARF_FORTRESS_ROOT,

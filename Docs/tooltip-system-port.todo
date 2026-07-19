@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: in progress (Phases 0-4 complete)
+Status: in progress (Phases 0-5 complete)
 
 ## Goal
 
@@ -609,36 +609,90 @@ expanded and zip packages.
 
 ## Phase 5 - Port tooltip presentation and explicit per-root agent wiring
 
-- ☐ Port the renderer as a DwarfUI `widgets.Widget` with DwarfUI class names.
-- ☐ Preserve the black background, white text, interior frame, inset, immediate
+- ☑ Port the renderer as a DwarfUI `widgets.Widget` with DwarfUI class names.
+- ☑ Preserve the black background, white text, interior frame, inset, immediate
   display, and hidden initial state.
-- ☐ Preserve wrapping with a maximum content width of 60 cells and available
+- ☑ Preserve wrapping with a maximum content width of 60 cells and available
   screen-width clamping.
-- ☐ Preserve mouse-relative placement and full screen-edge clamping.
-- ☐ Preserve immediate label clearing and parent invalidation on mouse-out or
+- ☑ Preserve mouse-relative placement and full screen-edge clamping.
+- ☑ Preserve immediate label clearing and parent invalidation on mouse-out or
   tooltip changes.
-- ☐ Pass the host's layout parent rectangle into `updateLayout()` where
+- ☑ Pass the host's layout parent rectangle into `updateLayout()` where
   required by offset/clipped roots.
-- ☐ Keep the renderer and its subtree excluded with `pointer_policy='none'`.
-- ☐ Port `TooltipAgent` with one `PointerContext`, root, and renderer per agent.
-- ☐ Read the mouse once per agent update and use the same coordinates for hit
+- ☑ Keep the renderer and its subtree excluded with `pointer_policy='none'`.
+- ☑ Port `TooltipAgent` with one `PointerContext`, root, and renderer per agent.
+- ☑ Read the mouse once per agent update and use the same coordinates for hit
   testing and placement.
-- ☐ Dispatch pointer transitions before reading the current target's tooltip so
+- ☑ Dispatch pointer transitions before reading the current target's tooltip so
   dynamic controls can update their text for the current local coordinates.
-- ☐ Read only a selected target's current `tooltip`; do not fall back to an
+- ☑ Read only a selected target's current `tooltip`; do not fall back to an
   ancestor or cache stale text.
-- ☐ Reject non-string, non-nil tooltip values clearly without invoking them.
-- ☐ Exclude the SoulSearch debug-message buffer, resolver-path formatting,
+- ☑ Reject non-string, non-nil tooltip values clearly without invoking them.
+- ☑ Exclude the SoulSearch debug-message buffer, resolver-path formatting,
   command script, and always-on logging.
-- ☐ Add renderer tests for wrapping, placement, clamping, layout updates,
+- ☑ Add renderer tests for wrapping, placement, clamping, layout updates,
   visibility, redraw invalidation, text mutation, and hidden rendering.
-- ☐ Add agent tests for static text, dynamic text, clearing, blockers, excluded
+- ☑ Add agent tests for static text, dynamic text, clearing, blockers, excluded
   targets, invalid types, one mouse sample, layout-parent forwarding, and
   isolation between roots.
 
+### Phase 5 implementation and evidence
+
+`dwarfui/tooltip.lua` is now the public presentation facade. It imports the
+DwarfUI widget extensions before declaring `TooltipRenderer`, a plain
+`widgets.Widget` rather than a `Panel` or `Window`. Its default contract is
+hidden and noninteractive, with an interior frame, one-cell inset, parsed black
+background pen, parsed white-on-black label pen, and `pointer_policy='none'` on
+both renderer and label. Hidden rendering returns before the base render path.
+
+`TooltipRenderer:set_tooltip()` updates text immediately, wraps to the lesser of
+60 content cells and available screen width, sizes the inset label and outer
+frame, places the frame two cells right and one cell below the mouse, and clamps
+all four screen edges. Visible updates call `updateLayout()` with the supplied
+host parent rectangle. Text, position, or visibility changes invalidate the
+owning view; empty text, nil text, or missing mouse coordinates clear the label
+immediately and leave hidden rendering inert.
+
+The same facade exports the explicit `TooltipAgent`. Each agent owns its root,
+one root-bound `PointerContext`, and one renderer. `update()` reads the mouse
+once, dispatches the exact sampled coordinates, then reads only the selected
+terminal target's current `tooltip` so pointer callbacks can mutate it first.
+It accepts strings, treats nil and empty strings as absent, and rejects every
+other type without invoking function-valued providers. It forwards the same
+mouse coordinates plus `root.frame_parent_rect` to the renderer.
+
+To make the one-read contract true even when the mouse is absent,
+`PointerDispatcher.sample` now distinguishes omitted coordinates from two
+explicit nil coordinates: direct callers with no coordinate arguments still
+sample once, while an agent forwarding a completed nil/nil sample does not
+resample. The Phase 4 pointer suite includes a regression for both paths.
+
+`Tests/tooltip_test.lua` contains six renderer specs and ten agent specs. The
+renderer cases cover the exact class, pens, frame, inset, exclusion, hidden
+state, immediate display, available-width and 60-cell wrapping, placement,
+four-edge clamping, layout-parent identity, frame painting, text mutation,
+invalidation, clearing, and hidden rendering. The agent cases cover ownership,
+static and native-widget text, current mutation, both clearing forms, dynamic
+callback text, blockers, excluded targets, no ancestor fallback, invalid
+function and number values, provider non-invocation, one mouse read including
+nil coordinates, identical placement coordinates, layout-parent forwarding,
+and isolation between two roots and renderers.
+
+The source-contract spec also proves that the facade contains no SoulSearch
+name, debug-message buffer, debug logger, resolver path formatter, or printing
+surface. No command or diagnostic module was added to the four-file public
+package.
+
+Focused Busted runs passed all six renderer specs and all ten agent specs. The
+complete suite passed 48 specs with zero failures, errors, or pending cases.
+`./Tools/Build.ps1 -LiveReload:$false` syntax-checked four production files and
+11 test/support files with Lua 5.4.6 without invoking a live command.
+`./Tools/Publish.ps1` repeated the build and independently verified both the
+expanded and zip packages.
+
 ### Phase 5 exit criteria
 
-- ☐ The explicit DwarfUI agent and renderer reproduce the source system's
+- ☑ The explicit DwarfUI agent and renderer reproduce the source system's
   tooltip behavior without SoulSearch-specific code or diagnostics.
 
 ## Phase 6 - Prove normal-screen and overlay host integration
@@ -830,6 +884,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 4 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 32 specs; zero failures, errors, or pending cases |
 | 2026-07-18 | 4 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 10 test/support files syntax-checked; no live command |
 | 2026-07-18 | 4 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-18 | 5 | Focused test | Busted filters for tooltip renderer and agent | passed | 6 renderer specs and 10 agent specs passed |
+| 2026-07-18 | 5 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 48 specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 5 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 11 test/support files syntax-checked; no live command |
+| 2026-07-18 | 5 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
 | | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
 | | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
 | | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |

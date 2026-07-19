@@ -251,6 +251,10 @@ describe('DwarfUI pointer dispatcher', function()
         assert.equals(2, samples)
         assert.equals('miss', result.kind)
         assert.is_nil(context.target)
+
+        result = pointer.PointerDispatcher.sample(context, nil, nil)
+        assert.equals(2, samples)
+        assert.equals('miss', result.kind)
     end)
 
     it('clears stale targets after every eligibility and reachability change', function()

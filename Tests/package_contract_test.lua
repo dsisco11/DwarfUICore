@@ -36,6 +36,37 @@ local function load_public_module(package_path)
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
         }
+    elseif package_path == 'scripts_modinstalled/dwarfui/tooltip.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        options = {
+            globals={
+                COLOR_BLACK='black',
+                COLOR_WHITE='white',
+                DEFAULT_NIL=default_nil,
+                defclass=widget_harness.defclass,
+                dfhack={
+                    pen={parse=function(value) return value end},
+                    screen={
+                        getMousePos=function() return nil, nil end,
+                        getWindowSize=function() return 80, 25 end,
+                    },
+                },
+            },
+            require_modules={
+                gui={FRAME_INTERIOR='interior', paint_frame=function() end},
+                ['gui.widgets']=widgets,
+            },
+            reqscript={
+                ['dwarfui/widget_extensions']={},
+                ['dwarfui/pointer']={
+                    PointerContext={new=function() return {} end},
+                    PointerDispatcher={sample=function() return {kind='miss'} end},
+                },
+                ['dwarfui/text']={wrap_text=function() return {''} end},
+            },
+        }
     end
     return module_loader.load(repo_root, 'src/' .. package_path, options)
 end

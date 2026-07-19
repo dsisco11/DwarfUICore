@@ -106,13 +106,14 @@ function PointerDispatcher.resolve(root, x, y)
 end
 
 ---@param context table
----@param x? integer
----@param y? integer
+---@param ... integer Optional x and y coordinates. When omitted, samples once.
 ---@return table
-function PointerDispatcher.sample(context, x, y)
+function PointerDispatcher.sample(context, ...)
     assert(context and context.root,
         'DwarfUI PointerDispatcher.sample requires a PointerContext.')
-    if x == nil or y == nil then
+    local coordinate_count = select('#', ...)
+    local x, y = ...
+    if coordinate_count == 0 then
         x, y = dfhack.screen.getMousePos()
     end
     if x == nil or y == nil then

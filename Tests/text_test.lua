@@ -1,4 +1,8 @@
-local text = require('dwarfui.text')
+local module_loader = require('support.module_loader')
+local repo_root = require('support.repo_root')
+
+local _, text = module_loader.load(
+    repo_root, 'src/scripts_modinstalled/dwarfui/text.lua')
 
 describe('DwarfUI text helpers', function()
     it('wraps normal text at word boundaries', function()

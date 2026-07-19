@@ -8,7 +8,7 @@ local overlay = require('plugins.overlay')
 local pointer = reqscript('dwarfui/pointer')
 local tooltip = reqscript('dwarfui/tooltip')
 
-local API_VERSION = 1
+API_VERSION = 1
 local SERVICE_SLOT = 'tooltip_service'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
@@ -319,7 +319,7 @@ end
 ---Registration is valid before attachment; detached widgets are simply skipped.
 ---@param widget table
 ---@return boolean created
-local function register(widget)
+function register(widget)
     assert(type(widget) == 'table',
         'DwarfUI tooltip registration requires a widget table.')
     if service.registrations[widget] then
@@ -335,7 +335,7 @@ end
 ---Explicitly removes a registration; weak cleanup makes this optional.
 ---@param widget table
 ---@return boolean removed
-local function unregister(widget)
+function unregister(widget)
     local removed = service.registrations[widget] ~= nil
     if not removed then return false end
     service.registrations[widget] = nil
@@ -346,7 +346,7 @@ end
 
 ---Returns observable singleton state for lifecycle probes.
 ---@return table diagnostics
-local function get_diagnostics()
+function get_diagnostics()
     return {
         api_version=API_VERSION,
         registration_count=registration_count(),
@@ -365,10 +365,3 @@ if service.screen then
     if previous_screen:isActive() then previous_screen:dismiss() end
 end
 if registration_count() > 0 then ensure_screen() end
-
-return {
-    API_VERSION=API_VERSION,
-    get_diagnostics=get_diagnostics,
-    register=register,
-    unregister=unregister,
-}

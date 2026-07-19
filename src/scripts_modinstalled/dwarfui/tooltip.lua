@@ -16,7 +16,7 @@ local TEXT = dfhack.pen.parse{fg=COLOR_WHITE, bg=COLOR_BLACK}
 -- A moving tooltip is presentation layered over a host, not a Panel or Window.
 -- Keeping it a plain Widget avoids their global layout/redraw lifecycle inside
 -- the host's render pass.
-local TooltipRenderer = defclass(nil, widgets.Widget)
+TooltipRenderer = defclass(nil, widgets.Widget)
 TooltipRenderer.ATTRS{
     frame={l=0, t=0, w=1, h=3},
     frame_style=gui.FRAME_INTERIOR,
@@ -105,7 +105,7 @@ function TooltipRenderer:onRenderFrame(dc, rect)
     gui.paint_frame(dc, rect, self.frame_style)
 end
 
-local TooltipAgent = {}
+TooltipAgent = {}
 TooltipAgent.__index = TooltipAgent
 
 ---@param root gui.View
@@ -149,23 +149,16 @@ function TooltipAgent:update()
     return result
 end
 
-local M = {
-    TooltipRenderer=TooltipRenderer,
-    TooltipAgent=TooltipAgent,
-}
-
 ---Registers a widget with the process-wide singleton tooltip service.
 ---@param widget table
 ---@return boolean created
-function M.register(widget)
+function register(widget)
     return reqscript('dwarfui/tooltip_registration').register(widget)
 end
 
 ---Explicitly unregisters a widget; weak lifetime cleanup makes this optional.
 ---@param widget table
 ---@return boolean removed
-function M.unregister(widget)
+function unregister(widget)
     return reqscript('dwarfui/tooltip_registration').unregister(widget)
 end
-
-return M

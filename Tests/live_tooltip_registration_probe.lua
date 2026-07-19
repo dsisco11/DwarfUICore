@@ -16,7 +16,7 @@ LiveTooltipProbeScreen.ATTRS{
 function LiveTooltipProbeScreen:init()
     self.target = widgets.Label{
         frame={l=0, t=0, r=0, b=0},
-        text='',
+        text='Live tooltip target',
         tooltip='Live static tooltip',
     }
     ---Updates live tooltip text from pointer-local coordinates.

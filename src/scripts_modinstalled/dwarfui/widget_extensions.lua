@@ -2,8 +2,6 @@
 
 local widgets = require('gui.widgets')
 
-local M = {}
-
 local function install_attribute(class, name, default, description)
     local attrs = assert(class and class.ATTRS,
         'DwarfUI requires ' .. description .. '.ATTRS.')
@@ -18,14 +16,14 @@ local function install_attribute(class, name, default, description)
     return false
 end
 
-function M.install_tooltip_attribute()
+function install_tooltip_attribute()
     local widget = assert(widgets.Widget,
         'DwarfUI requires gui.widgets.Widget for tooltip attributes.')
     return install_attribute(widget, 'tooltip', DEFAULT_NIL,
         'gui.widgets.Widget')
 end
 
-function M.install_pointer_attributes()
+function install_pointer_attributes()
     local changed = false
     local widget = assert(widgets.Widget,
         'DwarfUI requires gui.widgets.Widget for pointer attributes.')
@@ -55,7 +53,5 @@ function M.install_pointer_attributes()
     return changed
 end
 
-M.install_tooltip_attribute()
-M.install_pointer_attributes()
-
-return M
+install_tooltip_attribute()
+install_pointer_attributes()

@@ -47,7 +47,7 @@ function M.load(repo_root, relative_path, options)
     local chunk, err = loadfile(join_path(repo_root, relative_path), 't', environment)
     assert(chunk, err)
     local module_result = chunk()
-    return environment, module_result
+    return environment, module_result or environment
 end
 
 return M

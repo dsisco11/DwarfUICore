@@ -66,6 +66,10 @@ local function load_public_module(package_path)
                     PointerDispatcher={sample=function() return {kind='miss'} end},
                 },
                 ['dwarfui/text']={wrap_text=function() return {''} end},
+                ['dwarfui/tooltip_registration']={
+                    register=function() return true end,
+                    unregister=function() return true end,
+                },
             },
         }
     elseif package_path ==

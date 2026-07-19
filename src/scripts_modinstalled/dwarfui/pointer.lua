@@ -78,7 +78,7 @@ local function resolve_view(view, x, y)
     return miss()
 end
 
-local PointerContext = {}
+PointerContext = {}
 PointerContext.__index = PointerContext
 
 ---@param root gui.View
@@ -88,7 +88,7 @@ function PointerContext.new(root)
     return setmetatable({root=root, target=nil, result=miss()}, PointerContext)
 end
 
-local PointerDispatcher = {}
+PointerDispatcher = {}
 
 ---@param root gui.View
 ---@param x integer
@@ -141,10 +141,3 @@ function PointerDispatcher.sample(context, ...)
     context.result = result
     return result
 end
-
-local M = {
-    PointerContext=PointerContext,
-    PointerDispatcher=PointerDispatcher,
-}
-
-return M

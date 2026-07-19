@@ -1,11 +1,9 @@
 --@ module=true
 
-local M = {}
-
 ---@param text any
 ---@param width integer
 ---@return string[]
-function M.wrap_text(text, width)
+function wrap_text(text, width)
     local lines = {}
     local line = ''
     for word in tostring(text or ''):gmatch('%S+') do
@@ -21,5 +19,3 @@ function M.wrap_text(text, width)
     if line ~= '' then table.insert(lines, line) end
     return #lines > 0 and lines or {''}
 end
-
-return M

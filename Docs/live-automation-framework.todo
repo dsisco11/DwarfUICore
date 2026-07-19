@@ -1,0 +1,484 @@
+# In-Process Live Automation Framework Plan
+
+## Goal
+
+Run Busted automation specs inside DFHack's core Lua context so tests can
+interact directly with the live game, real UI objects, real input dispatch, and
+the real frame/render loop.
+
+Busted remains the test framework. It owns:
+
+- `describe`, `it`, `before_each`, `after_each`, `setup`, and `teardown`;
+- Luassert assertions, spies, mocks, and stubs;
+- test discovery, filtering, ordering, and reporting; and
+- test success, failure, error, and pending status.
+
+DwarfUI supplies only the live interaction layer and the safe host needed to
+run Busted without blocking or terminating Dwarf Fortress:
+
+- test-owned UI fixtures;
+- widget lookup through native `view_id` values;
+- controlled pointer and input operations;
+- coroutine-based waits for actual frames and render passes;
+- live state inspection and screen capture; and
+- guaranteed restoration of screens, registrations, patches, timers, and
+  temporary overlays.
+
+There is no inter-process test protocol, JSON mailbox, socket server, remote
+object model, second assertion API, or Cypress-style replacement test DSL.
+
+## Intended test shape
+
+```lua
+describe('live singleton tooltip service', function()
+    local screen
+
+    before_each(function()
+        dy.reset()
+        screen = dy.show_fixture('tooltip_screen')
+    end)
+
+    after_each(function()
+        dy.reset()
+    end)
+
+    it('shows dynamic text over a registered control', function()
+        local target = dy.get(screen, 'tooltip_target')
+
+        dy.move_pointer_to(target)
+        dy.wait_for_render(screen)
+
+        local diagnostics = dy.tooltip_diagnostics()
+        assert.equals(target, diagnostics.target)
+        assert.equals('Dynamic tooltip 0,0', diagnostics.tooltip_text)
+    end)
+end)
+```
+
+The automation helper exports `dy` into the isolated Busted spec environment in
+the same way Busted exports `assert`. Tests do not import an interaction module
+or access its methods through another name. `dy` is not installed into DFHack's
+process-wide `_G` table.
+
+The test body, hooks, and assertions above are ordinary Busted code. `dy`
+methods return live objects or plain values and raise operational errors when
+an action cannot be performed. They do not decide whether product behavior is
+correct.
+
+## Architecture
+
+```text
+Tools/Run-AutomationTests.ps1
+        |
+        | dfhack-run lua -f bootstrap.lua <run options>
+        v
+DFHack core Lua context
+  automation host
+    |
+    +-- programmatic Busted 2.3 instance
+    |     +-- normal Busted specs and Luassert
+    |     +-- Busted event-based reporting
+    |
+    +-- suite coroutine
+    |     +-- live action
+    |     +-- yield for frame/render/input completion
+    |     +-- dfhack.timeout callback resumes coroutine
+    |
+    +-- cleanup registry and in-memory run status
+```
+
+The initial `dfhack-run` command starts the suite coroutine and returns without
+waiting on the DF thread. The PowerShell runner polls an in-memory status
+endpoint through short `dfhack-run` commands until Busted reports completion.
+Polling output is a small stable text status such as `RUNNING`, `PASSED`, or
+`FAILED`; it is orchestration, not the test protocol. Detailed results remain
+in the in-game run object and are printed by the final status call.
+
+Optional failure artifacts may be written under `.test-results/live/`, but
+files are never used to coordinate test execution.
+
+## Proven and unproven seams
+
+### Confirmed from the installed versions
+
+- DFHack 53.15-r1 provides `dfhack.timeout(..., 'frames', ...)` in the core Lua
+  context.
+- DFHack provides `gui.simulateInput()`, `dfhack.screen.getMousePos()`, and
+  `dfhack.screen.readTile()`.
+- `gui.View:addviews()` indexes descendants by native `view_id`.
+- Busted 2.3.0 executes test bodies and hooks through protected Lua calls and
+  exposes programmatic core, loader, filter, execute, event, and output-handler
+  modules.
+- Lua 5.4 can yield and resume across `xpcall`, allowing the entire Busted
+  execution stack to remain suspended while DFHack advances frames.
+
+### Mandatory feasibility gates
+
+- The repository-local LuaSystem, LuaFileSystem, and terminal DLLs must load in
+  DFHack's Lua 5.4 runtime without ABI conflicts.
+- A Busted test coroutine must yield from inside a test and resume on a later
+  `dfhack.timeout` frame while preserving Busted context and Luassert failure
+  classification.
+- `before_each`, `after_each`, `finally`, and suite teardown must still execute
+  correctly around yielded tests and failures after resume.
+- Busted must be invoked programmatically without any path that calls
+  `os.exit`, changes the process working directory globally, or blocks the DF
+  thread.
+
+Failure of one gate stops implementation for discussion. It does not authorize
+silently replacing the architecture with file or socket IPC.
+
+## Busted host design
+
+Do not call `require('busted.runner')`. Its CLI-oriented failure path can call
+`os.exit`, which is acceptable for standalone `lua.exe` but unsafe inside
+Dwarf Fortress.
+
+Build a small in-process host from Busted's supported internal components:
+
+1. Construct `require('busted.core')()`.
+2. Register the standard Busted DSL through `require('busted')(busted)`.
+3. Load the dedicated automation helper and call `busted.export('dy', dy)` so
+   every spec accesses the driver through the same `dy.*` surface.
+4. Apply Busted's normal filter loader to the requested names/tags.
+5. Load the explicitly discovered automation spec files.
+6. Subscribe to Busted test/failure/error/suite events.
+7. Attach a Busted output handler that records normal Busted results in the
+   in-memory run object instead of writing asynchronously to a vanished
+   `dfhack-run` connection.
+8. Execute with `require('busted.execute')(busted)` inside the suite coroutine.
+9. Publish Busted's normal exit event, calculate the final status from Busted
+   events, clean live state, and retain the completed run for status queries.
+
+This adapter is hosting and reporting glue only. It must not implement its own
+test tree, hook ordering, assertion handling, failure classification, or retry
+semantics.
+
+## Coroutine and frame scheduling contract
+
+The suite starts in one coroutine owned by the automation host. Synchronous
+Busted execution continues normally until a `dy` method needs the game loop.
+
+For a frame-dependent operation:
+
+1. Validate that the caller is the active suite coroutine.
+2. Register any required observation state and cleanup action.
+3. Schedule a callback with `dfhack.timeout(1, 'frames', callback)`.
+4. Yield a private operation token from the suite coroutine.
+5. Observe the requested condition on later frame callbacks.
+6. Resume the same coroutine with either a result or an operational error.
+7. Let Busted/Luassert classify any subsequent assertion normally.
+
+Only the scheduler may resume the suite coroutine. It rejects nested waits,
+stale callbacks, callbacks from a prior run generation, and resume attempts
+after cancellation.
+
+Every wait has both a frame budget and a wall-clock deadline. Timeout errors
+include the operation name, current focus, active screen, elapsed frames, and
+the last observed value. The scheduler never performs a blocking sleep on the
+DF thread.
+
+Automation specs must not manually call `onRender()`, `onIdle()`, or
+`updateLayout()` to make behavior appear live. Synchronization waits for DFHack
+to invoke the real lifecycle.
+
+## Initial `dy` API
+
+### Lifecycle and fixtures
+
+- `dy.reset()` dismisses all test-owned screens, unregisters test controls,
+  restores patches and overlay states, cancels timers, and waits until cleanup
+  is visible.
+- `dy.show_fixture(name, options)` loads an approved fixture below
+  `Tests/Automation/fixtures`, shows it, and waits for its first real render.
+- `dy.dismiss(screen)` dismisses a test-owned screen and waits until inactive.
+- `dy.wait_frames(count)` yields for actual raw frames and works while the
+  game is paused.
+- `dy.wait_for_render(view, previous_generation)` waits for an instrumented
+  fixture render generation to advance.
+
+Fixture names are relative identifiers. Absolute paths, parent traversal, and
+arbitrary module evaluation are rejected.
+
+### Selection and inspection
+
+- `dy.get(root, view_id)` uses DFHack's native propagated `view_id` index and
+  returns the actual live widget object.
+- `dy.inspect(view)` returns a stable diagnostic table containing class,
+  visibility, activity, focus, frame, body, text, and tooltip fields.
+- Feature-specific read-only adapters may expose shared service diagnostics,
+  such as `dy.tooltip_diagnostics()`.
+- `dy.capture_view_tree(root, name)` records view ids, classes, visibility,
+  activity, focus, and rectangles for diagnostics.
+
+Because specs execute inside the same Lua context, no opaque handles,
+serialization whitelist, or remote object lifetime layer is necessary.
+
+### Pointer and input
+
+- `dy.set_pointer(x, y)` installs a suite-scoped virtual result for
+  `dfhack.screen.getMousePos()`.
+- `dy.move_pointer_to(view, anchor)` derives coordinates from the live
+  `frame_body`; center is the default anchor.
+- `dy.clear_pointer()` restores the exact original mouse function.
+- `dy.press(keys, screen)` sends supported keys through
+  `gui.simulateInput()` and waits for the next relevant render.
+- `dy.click(view, button)` moves the virtual pointer, sends the supported
+  mouse key, and waits for the resulting render.
+- `dy.type(text, screen)` uses DFHack's supported `_STRING` input path.
+
+Virtual pointer control is necessary for unattended tests and mirrors what a
+browser automation driver does. It is a scoped reversible test adapter, not a
+production input mode.
+
+### Readiness and capture
+
+- `dy.wait_until(description, query, options)` repeatedly evaluates a
+  read-only query between frames and returns its final value. It raises only on
+  operational timeout; product expectations remain explicit Busted assertions.
+- `dy.capture_screen(name)` reads the cell buffer through
+  `dfhack.screen.readTile()` and stores character and pen information.
+- Interaction errors automatically include focus, screen stack, current
+  fixture tree, and scheduler state.
+
+Pixel screenshots and golden-image comparison are deferred. DFHack's cell
+buffer is stable across focus and scaling conditions; OS screenshots are not.
+
+## Run ownership, status, and cancellation
+
+Store the active run under `dfhack.dwarfui.automation` with:
+
+- protocol version and unique run id;
+- suite coroutine and generation;
+- state: `starting`, `running`, `cleaning`, `passed`, `failed`, or `aborted`;
+- Busted counts, current test, output lines, failures, and traces;
+- frame and wall-clock timestamps;
+- cleanup registry and outstanding wait; and
+- last status-poll timestamp.
+
+Only one run may be active. A start request fails clearly when a compatible run
+is already executing or an incompatible host version owns the slot.
+
+`Tests/Automation/status.lua <run-id>` reads this in-memory object and emits:
+
+- one stable machine-readable summary line for PowerShell;
+- incremental or final Busted output when requested; and
+- cleanup diagnostics if the host is not idle after completion.
+
+`Tests/Automation/abort.lua <run-id>` invalidates the generation, cancels the
+outstanding timeout, unwinds registered cleanup actions, marks the run aborted,
+and leaves DF usable. A frame-based lease performs the same cleanup if status
+polling stops for a bounded interval because the PowerShell process disappeared.
+
+## Isolation and safety
+
+- The default automation suite may create test-owned UI and read live state but
+  must not mutate persistent fortress data.
+- Mutation specs, if introduced later, live separately and require an explicit
+  `-AllowWorldMutation` switch. They are outside this plan's completion gate.
+- Every shown screen, registration, global patch, timeout, overlay state change,
+  and temporary script is pushed onto an idempotent LIFO cleanup stack.
+- Busted `before_each`/`after_each` hooks call `dy.reset()`, and the automation
+  host independently runs emergency cleanup after suite failure, abort, or
+  lease expiry.
+- The pointer adapter verifies that the function it restores is still the one
+  it replaced; conflicting external patches fail rather than being overwritten.
+- Test overlays use unique default-disabled fixture names. The PowerShell
+  runner verifies exact staging paths and removes plus rescans them in `finally`.
+- Tests restore the initial pause state, focus/screen stack, enabled overlays,
+  and DwarfUI registrations they changed.
+- Suite code never calls `os.exit`, never replaces process-wide `io` or `os`
+  functions, and never blocks the DF thread.
+
+## Repository layout
+
+```text
+Tools/
+  Run-AutomationTests.ps1
+Tests/
+  Automation/
+    bootstrap.lua
+    status.lua
+    abort.lua
+    helper.lua
+    support/
+      busted_host.lua
+      scheduler.lua
+      dy.lua
+      output_handler.lua
+      cleanup.lua
+      diagnostics.lua
+    fixtures/
+      tooltip_screen.lua
+      tooltip_overlay.lua
+    specs/
+      automation_host_live_spec.lua
+      tooltip_screen_live_spec.lua
+      tooltip_overlay_live_spec.lua
+Docs/
+  live-automation-framework.todo
+.test-results/
+  live/
+```
+
+Automation specs use `*_live_spec.lua`, so the existing unit runner's
+`test_*.lua`/`*_test.lua` discovery cannot accidentally execute them outside
+DFHack. The automation bootstrap discovers only the live suffix beneath the
+approved specs root.
+
+## PowerShell runner
+
+`Tools/Run-AutomationTests.ps1` is the supported entry point. It should:
+
+1. Reuse `Tools/Common.ps1` and `Resolve-DFHackRunner`, including `GAME_ROOT`
+   and `MOD_COMMAND_RUNNER` support.
+2. Ensure the pinned Busted/LuaRocks dependencies already used by unit tests are
+   installed.
+3. Verify DFHack connectivity and report version, world/map state, and focus.
+4. Generate a run id and invoke `bootstrap.lua` through `dfhack-run lua -f`.
+5. Poll `status.lua` without blocking DFHack, forwarding Busted progress and
+   honoring a wall-clock suite timeout.
+6. Return zero only when Busted completes with no failures or errors and live
+   cleanup is confirmed.
+7. In `finally`, call `abort.lua` when the run is unfinished and remove any
+   safely staged overlay fixture.
+8. Retain diagnostic artifacts while using no files for test coordination.
+
+The runner does not launch Dwarf Fortress, load a save, move the physical
+mouse, or convert a cleanup failure into a passing result.
+
+## Implementation phases
+
+### Phase 0 - Prove in-process Busted feasibility
+
+- ☐ Add a throwaway bootstrap that prepends the repository-local LuaRocks Lua
+  and native-library paths inside DFHack.
+- ☐ Prove `system`, `lfs`, `busted.core`, `busted`, and `luassert` load without
+  ABI or global-environment conflicts.
+- ☐ Run one passing and one deliberately failing Busted test programmatically
+  without `busted.runner`, `os.exit`, or process working-directory changes.
+- ☐ Run Busted execution inside a coroutine; yield from a test, resume it from
+  `dfhack.timeout(..., 'frames', ...)`, and prove the following assertion is
+  classified correctly.
+- ☐ Prove yielded `before_each`, test, `finally`, `after_each`, and suite
+  teardown ordering on success and failure.
+- ☐ Confirm DF continues rendering and accepting input throughout the spike.
+- ☐ Remove the throwaway spike or promote only the proven pieces.
+
+Exit: Busted safely suspends across real DF frames inside the core context. If
+this fails, stop and discuss the architectural blocker.
+
+### Phase 1 - Build the safe Busted host
+
+- ☐ Implement programmatic Busted construction, standard DSL registration,
+  deterministic live-spec discovery, filters, event subscriptions, and repeat
+  execution.
+- ☐ Add a Busted output handler that records ordinary Busted progress and
+  failure details in the in-memory run object.
+- ☐ Implement run ownership, generation checks, state transitions, final
+  result calculation, and retention of the most recent completed run.
+- ☐ Add `bootstrap.lua`, `status.lua`, and `abort.lua` entry points.
+- ☐ Prove passing, failing, erroring, pending, filtered, and malformed spec
+  results match external Busted semantics.
+
+Exit: Busted suites run in-process and can be launched, observed, filtered, and
+aborted without affecting DF stability.
+
+### Phase 2 - Build scheduler and cleanup foundations
+
+- ☐ Implement single-owner coroutine scheduling and frame/wall-clock budgets.
+- ☐ Add `wait_frames`, `wait_until`, cancellation, stale-callback rejection,
+  and actionable timeout errors.
+- ☐ Implement the idempotent LIFO cleanup registry and per-test `dy.reset()`.
+- ☐ Add lease expiry driven by status polling and emergency cleanup.
+- ☐ Prove cleanup after a passing test, assertion failure after resume,
+  interaction error, suite abort, expired lease, and repeated reset.
+
+Exit: asynchronous live interactions cannot strand a coroutine or leak live
+state after any supported termination path.
+
+### Phase 3 - Add live UI interaction primitives
+
+- ☐ Add approved fixture loading and first-render synchronization.
+- ☐ Add native `view_id` lookup, view inspection, and view-tree capture.
+- ☐ Add scoped virtual pointer set/move/clear operations.
+- ☐ Add keyboard, click, and string input through `gui.simulateInput()`.
+- ☐ Add render-generation waits without direct lifecycle calls.
+- ☐ Add screen-cell capture and automatic diagnostics on interaction failure.
+- ☐ Prove screen dismissal, focus, pause state, and pointer restoration.
+
+Exit: an ordinary Busted spec can show, find, hover, click, type, wait, inspect,
+assert, capture, and clean a real live DFHack UI.
+
+### Phase 4 - Add the supported runner
+
+- ☐ Add `Tools/Run-AutomationTests.ps1` with connectivity checks, dependency
+  bootstrap, filters, polling, timeout, progress forwarding, and exit status.
+- ☐ Keep automation discovery separate from `Run-UnitTests.ps1`.
+- ☐ Add safe overlay fixture staging and unconditional `finally` cleanup.
+- ☐ Prove the runner handles no game, incompatible Lua dependency, active run,
+  Busted failure, host error, timeout, user abort, and cleanup failure clearly.
+- ☐ Document interactive and unattended invocation.
+
+Exit: one command runs in-process live Busted specs and returns a trustworthy
+automation result.
+
+### Phase 5 - Migrate existing tooltip probes
+
+- ☐ Convert normal-screen targeting and dynamic text to a Busted live spec.
+- ☐ Convert modal blocking, input forwarding, and service z-order recovery.
+- ☐ Convert enabled, focus-mismatched, and disabled overlay scenarios.
+- ☐ Replace controlled manual `onRender()` calls with real render waits.
+- ☐ Express all product expectations through Luassert.
+- ☐ Delete superseded `Tests/live_*probe.lua` scripts only after equivalent
+  automation specs pass.
+- ☐ Confirm the migrated suite does not require the physical mouse over DF.
+
+Exit: the Phase 9 scenarios execute through in-process Busted and leave no
+temporary screen, pointer patch, registration, overlay, timer, or host run.
+
+### Phase 6 - Harden the reusable framework
+
+- ☐ Unit-test discovery, filtering, scheduler transitions, cleanup ordering,
+  output collection, path validation, and status formatting outside DFHack.
+- ☐ Live-test host conflicts, stale callback generations, lease recovery,
+  injected fixture failures, and cleanup diagnostics.
+- ☐ Document how later DwarfUI features add fixtures and live specs without
+  extending the test framework itself.
+- ☐ Document the read-only default and explicit future mutation boundary.
+- ☐ Record local unit and in-process live Busted results as separate evidence
+  layers.
+
+Exit: later DwarfUI work can add live automation specs without creating new ad
+hoc probes or new communication infrastructure.
+
+## Basic acceptance criteria
+
+- ☐ Busted and Luassert remain the sole test structure and assertion system.
+- ☐ Busted runs inside DFHack's core Lua context without `os.exit` or blocking
+  the game thread.
+- ☐ Tests yield across real frames and resume inside the original Busted
+  execution context.
+- ☐ Specs never call UI lifecycle methods manually to imitate live behavior.
+- ☐ The framework can show, locate, hover, click, type, wait, inspect, and
+  capture live UI state.
+- ☐ Passing, failing, pending, filtered, and erroring specs retain Busted's
+  normal classifications.
+- ☐ Cleanup succeeds after pass, assertion failure, operational error, abort,
+  timeout, and lost runner.
+- ☐ Default automation does not mutate persistent fortress state.
+- ☐ No files or sockets are used to coordinate tests.
+- ☐ `Run-AutomationTests.ps1` returns nonzero for any Busted failure, host
+  failure, timeout, or unconfirmed cleanup.
+- ☐ Migrated tooltip automation passes without the physical mouse over the game
+  window.
+
+## Deferred capabilities
+
+- Launching or restarting Dwarf Fortress.
+- Automatically loading or restoring saves.
+- Parallel Busted workers or multiple simultaneous live suites.
+- CSS-like selectors beyond native `view_id`.
+- Pixel screenshots and golden-image comparison.
+- Persistent-world mutation tests.
+- Packaging the host as a standalone cross-project DFHack testing product.

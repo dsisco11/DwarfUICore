@@ -1,0 +1,499 @@
+# Tooltip System Port and Registration API Evaluation
+
+Status: planned
+
+## Goal
+
+Port SoulSearch's declarative tooltip and pointer-target system into DwarfUI as
+reusable DFHack Lua infrastructure. Preserve the proven behavior first, publish
+it behind DwarfUI-owned modules, and validate it in both normal `gui.ZScreen`
+and `overlay.OverlayWidget` hosts.
+
+After the parity port is complete and independently proven, reevaluate the
+explicit tooltip-agent host wiring. Determine whether the downstream API can be
+reduced to one registration call, ideally:
+
+```lua
+local tooltip = reqscript('dwarfui/tooltip')
+tooltip.register(my_widget)
+```
+
+In the ideal contract, DwarfUI discovers or creates the correct per-root agent,
+attaches the renderer and update behavior, tracks the widget lifecycle, clears
+removed targets, and unregisters automatically. This is a post-port hypothesis,
+not a prerequisite for behavioral parity.
+
+## Source system
+
+The current SoulSearch implementation is split across these production files:
+
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui/widget_extensions.lua`
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui/pointer_dispatcher.lua`
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui/tooltip_agent.lua`
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui_tooltip.lua`
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui_format.lua`
+- `../SoulSearch/src/scripts_modinstalled/internal/soulsearch/ui/main_screen.lua`
+- `../SoulSearch/src/scripts_modinstalled/soulsearch-stats-overlay.lua`
+
+The corresponding focused tests are:
+
+- `../SoulSearch/Tests/widget_extensions_test.lua`
+- `../SoulSearch/Tests/pointer_dispatcher_test.lua`
+- `../SoulSearch/Tests/tooltip_agent_test.lua`
+- `../SoulSearch/Tests/ui_tooltip_test.lua`
+
+## Locked architectural decisions for the parity port
+
+- The port is a tooltip system, not just a tooltip renderer widget.
+- Pointer targeting remains generic infrastructure with no dependency on
+  tooltip presentation.
+- Pointer state remains isolated per independently rendered root.
+- A widget owns its current tooltip text through a mutable `tooltip` attribute.
+- `nil` and an empty string mean no tooltip; non-string values are invalid.
+- Tooltip text is read on every update so runtime mutation is immediately
+  observable without a provider callback or subscription.
+- Tooltip lookup stops at the selected terminal target and never falls back to
+  an ancestor.
+- Pointer eligibility is independent of whether a widget currently has tooltip
+  text.
+- Overlapping siblings resolve in reverse render order.
+- Hidden, inactive, clipped, or excluded widgets cannot become targets.
+- Panels pass pointer targeting through by default; windows block their frame
+  by default; terminal controls own their hit region by default.
+- Composite terminal controls such as `TextButton` retain ownership instead of
+  allowing an internal implementation child to steal the target.
+- The tooltip renderer and its complete subtree use `pointer_policy='none'`.
+- The moving renderer remains a plain `widgets.Widget`; it must not introduce a
+  `Panel` or `Window` layout lifecycle into the render pass.
+- The renderer preserves immediate display, wrapping, screen-edge clamping,
+  mouse-relative placement, pens, and immediate mouse-out removal.
+- Callback attributes use `(target, local_x, local_y)`. A defclass method invoked
+  through that attribute is declared `function Class:on_pointer_update(x, y)`;
+  it must not declare a second target parameter after `self`.
+- The parity implementation retains explicit per-root agent construction and
+  update wiring until the post-port evaluation proves a safe replacement.
+- LuaUnit is installed and executed through LuaRocks. It is not vendored into
+  this repository.
+- Local automation and live DFHack verification are separate evidence layers.
+  Passing LuaUnit/build/package checks does not close live screen or overlay
+  behavior gates.
+
+## Intended module layout
+
+```text
+src/
+  info.txt
+  scripts_modinstalled/
+    dwarfui/
+      pointer.lua
+      text.lua
+      tooltip.lua
+      widget_extensions.lua
+```
+
+`dwarfui/pointer` is intentionally reusable by later DwarfUI systems such as
+context menus. `dwarfui/tooltip` is the normal downstream facade and imports the
+required widget extensions before tooltip-bearing widgets are constructed.
+
+## Non-goals for the parity port
+
+- Do not migrate or modify SoulSearch while establishing the DwarfUI package
+  unless that consumer migration is separately requested.
+- Do not port SoulSearch-specific filter, stats, descriptor, layout, glyph, or
+  window modules.
+- Do not port `soulsearch-tooltip-log.lua`, the retained debug-message buffer,
+  resolver-path formatting, or always-on diagnostic logging.
+- Do not add delayed display, focus-triggered display, animations, rich text,
+  Escape dismissal, or new tooltip content.
+- Do not introduce parent tooltip aggregation, tooltip getter callbacks, or
+  ancestor fallback.
+- Do not make process-global pointer state.
+- Do not assume that automatic registration is safe before the explicit-host
+  implementation has passed both screen and overlay live checks.
+- Do not silently monkey-patch consumer lifecycle or render methods during the
+  registration API evaluation. Any such prototype must be isolated, tested,
+  and compared with less invasive attachment seams.
+
+## Phase 0 - Freeze the source contract and establish the port boundary
+
+- ☐ Record the SoulSearch revision, branch, and worktree status used as the port
+  source.
+- ☐ Record the active sibling DFHack source/version used for widget and
+  lifecycle API verification.
+- ☐ Inventory every production dependency imported by the four source-system
+  modules.
+- ☐ Classify dependencies as generic and portable, SoulSearch-specific and to
+  be replaced, or temporary diagnostics and to be excluded.
+- ☐ Confirm that only `wrap_text()` is needed from SoulSearch's `ui_format.lua`.
+- ☐ Audit the active DFHack `gui.widgets` classes for collisions with
+  `tooltip`, `pointer_policy`, `on_pointer_enter`, `on_pointer_update`, and
+  `on_pointer_leave`.
+- ☐ Audit native `widgets.TooltipLabel` and any newer tooltip APIs; document why
+  they do or do not replace any source-system layer.
+- ☐ Record the current SoulSearch test names covering widget extensions,
+  pointer dispatch, agent behavior, and rendering.
+- ☐ Record the historical callback-contract regression in the acceptance list:
+  defclass pointer methods receive local coordinates after `self` and must not
+  declare an extra target parameter.
+- ☐ Decide and document whether DwarfUI is a library-only mod or also exposes a
+  user-facing command.
+- ☐ Align `Tools/Build.ps1` live-reload behavior with that decision; a
+  library-only build must not assume that `dwarfui reload` exists.
+
+### Phase 0 exit criteria
+
+- ☐ The exact source revision, portable behavior, excluded diagnostics,
+  dependency replacements, DFHack API assumptions, and build/reload contract
+  are recorded before production code is copied.
+
+## Phase 1 - Establish LuaUnit and repository test infrastructure
+
+- ☐ Retain `Tools/Run-UnitTests.ps1` as the supported test entry point.
+- ☐ Verify the runner installs the pinned LuaUnit rock into `.luarocks` via
+  LuaRocks when it is absent.
+- ☐ Verify repeated test runs reuse the local rock tree and do not vendor
+  generated dependency files into source control.
+- ☐ Add `Tests/run.lua` to load the newline-delimited
+  `DFHACK_LUA_TEST_FILES` suite list produced by `Run-UnitTests.ps1`.
+- ☐ Add a repository-root helper for deterministic production and test paths.
+- ☐ Add a module-loading harness that can execute DFHack `--@ module=true`
+  files with controlled globals and `reqscript` dependencies.
+- ☐ Add a minimal widget harness that models `defclass`, inherited `ATTRS`,
+  subviews, layout rectangles, clipping, rendering, and invalidation.
+- ☐ Keep the harness limited to behavior required by the tooltip system; do not
+  copy SoulSearch-specific fake widgets or environment state.
+- ☐ Add one smoke suite proving LuaUnit discovery, setup, assertion reporting,
+  and nonzero failure exit codes.
+- ☐ Run `./Tools/Run-UnitTests.ps1` and record the baseline result.
+
+### Phase 1 exit criteria
+
+- ☐ LuaUnit is reproducibly installed through LuaRocks and the DwarfUI test
+  runner can discover and execute isolated production-module tests.
+
+## Phase 2 - Create the installable DwarfUI package and public namespace
+
+- ☐ Add `src/info.txt` with DwarfUI metadata and an initial displayed version.
+- ☐ Create `src/scripts_modinstalled/dwarfui/` as the shared public module
+  namespace.
+- ☐ Add the smallest public facade/module placeholders needed for test-first
+  implementation without exposing SoulSearch names.
+- ☐ Ensure public modules use `--@ module=true` and stable return tables.
+- ☐ Decide whether internal implementation helpers are necessary; keep the
+  ordinary downstream import path under `dwarfui/...` either way.
+- ☐ Verify `Tools/Check-LuaSyntax.ps1` includes production and test Lua files.
+- ☐ Verify `Tools/Publish.ps1` and `Tools/VerifyPackage.ps1` accept a package
+  containing public library modules without requiring an unrelated command.
+- ☐ Run `./Tools/Build.ps1 -LiveReload:$false` and record the result.
+- ☐ Run `./Tools/Publish.ps1` and record expanded-package and archive manifest
+  verification separately.
+
+### Phase 2 exit criteria
+
+- ☐ DwarfUI builds and packages as an installable DFHack mod with a stable
+  public Lua namespace and no SoulSearch runtime dependency.
+
+## Phase 3 - Port generic text and widget-extension contracts
+
+- ☐ Extract a standalone `wrap_text(text, width)` helper into
+  `dwarfui/text.lua` without importing SoulSearch layout, stats, glyph, filter,
+  or descriptor modules.
+- ☐ Add focused wrapping tests for normal text, narrow widths, empty input, and
+  multiple lines.
+- ☐ Port the idempotent attribute-installation helper using DwarfUI names and
+  errors.
+- ☐ Add `tooltip=DEFAULT_NIL` to the common `widgets.Widget` contract.
+- ☐ Add `pointer_policy='target'`, `on_pointer_enter=DEFAULT_NIL`,
+  `on_pointer_update=DEFAULT_NIL`, and `on_pointer_leave=DEFAULT_NIL` to the
+  common widget contract.
+- ☐ Set `widgets.Panel` to `pointer_policy='pass'`.
+- ☐ Set `widgets.Window` to `pointer_policy='block'`.
+- ☐ Set `widgets.TextButton` back to `pointer_policy='target'` so its internal
+  `HotkeyLabel` does not steal ownership.
+- ☐ Preserve an already-installed compatible attribute and fail clearly on an
+  incompatible default instead of overwriting it.
+- ☐ Verify native descendants accept static tooltip constructor values and
+  direct runtime mutation.
+- ☐ Verify repeated module loads are idempotent and do not replace DFHack
+  classes.
+- ☐ Add LuaUnit coverage for inheritance, constructor assignment, mutation,
+  clearing, reload idempotence, class defaults, and collision failures.
+
+### Phase 3 exit criteria
+
+- ☐ DwarfUI can install the declarative widget and pointer attributes safely,
+  and its text helper has no SoulSearch dependency.
+
+## Phase 4 - Port the generic per-root pointer dispatcher
+
+- ☐ Port `PointerContext` as state owned by one supplied root.
+- ☐ Port `PointerDispatcher.resolve(root, x, y)` with explicit `target`,
+  `blocked`, and `miss` results.
+- ☐ Port `PointerDispatcher.sample(context, x, y)` with optional single mouse
+  sampling through `dfhack.screen.getMousePos()`.
+- ☐ Treat the supplied root as a traversal boundary and search its subviews in
+  reverse render order.
+- ☐ Respect evaluated `visible` and `active` state across the ancestor chain.
+- ☐ Respect clipped body rectangles for normal target hit testing.
+- ☐ Use the complete window frame for blocking, including borders and empty
+  interior.
+- ☐ Keep `target` controls terminal even when they have implementation
+  subviews.
+- ☐ Keep `pass` containers transparent when no descendant wins.
+- ☐ Keep `none` widgets and their complete subtree excluded.
+- ☐ Emit leave and enter when the selected target changes, followed by update
+  for the current target.
+- ☐ Supply coordinates local to the terminal target.
+- ☐ Clear the current target when it becomes hidden, inactive, clipped, moved,
+  removed, or unreachable from the root.
+- ☐ Add LuaUnit coverage for overlap, clipping, visibility, evaluated state,
+  terminal composites, transparent panels, explicit blockers, window borders,
+  nested modal windows, missing mouse coordinates, target removal, callbacks,
+  and isolation between two roots.
+- ☐ Add a defclass-based regression test proving method-style
+  `on_pointer_update(x, y)` receives correct local coordinates after `self`.
+
+### Phase 4 exit criteria
+
+- ☐ Each independently rendered root resolves one terminal target, blocker, or
+  miss and maintains correct pointer transitions without tooltip-specific
+  hierarchy traversal.
+
+## Phase 5 - Port tooltip presentation and explicit per-root agent wiring
+
+- ☐ Port the renderer as a DwarfUI `widgets.Widget` with DwarfUI class names.
+- ☐ Preserve the black background, white text, interior frame, inset, immediate
+  display, and hidden initial state.
+- ☐ Preserve wrapping with a maximum content width of 60 cells and available
+  screen-width clamping.
+- ☐ Preserve mouse-relative placement and full screen-edge clamping.
+- ☐ Preserve immediate label clearing and parent invalidation on mouse-out or
+  tooltip changes.
+- ☐ Pass the host's layout parent rectangle into `updateLayout()` where
+  required by offset/clipped roots.
+- ☐ Keep the renderer and its subtree excluded with `pointer_policy='none'`.
+- ☐ Port `TooltipAgent` with one `PointerContext`, root, and renderer per agent.
+- ☐ Read the mouse once per agent update and use the same coordinates for hit
+  testing and placement.
+- ☐ Dispatch pointer transitions before reading the current target's tooltip so
+  dynamic controls can update their text for the current local coordinates.
+- ☐ Read only a selected target's current `tooltip`; do not fall back to an
+  ancestor or cache stale text.
+- ☐ Reject non-string, non-nil tooltip values clearly without invoking them.
+- ☐ Exclude the SoulSearch debug-message buffer, resolver-path formatting,
+  command script, and always-on logging.
+- ☐ Add renderer tests for wrapping, placement, clamping, layout updates,
+  visibility, redraw invalidation, text mutation, and hidden rendering.
+- ☐ Add agent tests for static text, dynamic text, clearing, blockers, excluded
+  targets, invalid types, one mouse sample, layout-parent forwarding, and
+  isolation between roots.
+
+### Phase 5 exit criteria
+
+- ☐ The explicit DwarfUI agent and renderer reproduce the source system's
+  tooltip behavior without SoulSearch-specific code or diagnostics.
+
+## Phase 6 - Prove normal-screen and overlay host integration
+
+- ☐ Add a minimal test/demo `gui.ZScreen` host that constructs content, a
+  renderer, and one agent for its root.
+- ☐ Update the screen agent before the root render pass and render the tooltip
+  above ordinary content.
+- ☐ Add a minimal test/demo `overlay.OverlayWidget` host with an offset and
+  tightly clipped body.
+- ☐ Update the overlay agent at the correct overlay render seam.
+- ☐ Render the overlay tooltip after normal overlay content so it can extend
+  beyond the clipped panel using screen-relative placement.
+- ☐ Verify an overlay tooltip does not share pointer state or text with a
+  normal screen or another overlay instance.
+- ☐ Verify open/nested windows block underlying targets within their frame but
+  not outside it.
+- ☐ Verify dynamic row tooltips clear over padding, separators, blank rows, and
+  removed records.
+- ☐ Document the explicit screen-host and overlay-host integration recipes in
+  `README.md` before considering the parity API stable.
+- ☐ Keep these recipes explicit even if they appear repetitive; the one-call
+  registration proposal is evaluated only after the parity gate.
+
+### Phase 6 exit criteria
+
+- ☐ Both supported root types have working, documented, isolated integration
+  paths with automated characterization coverage.
+
+## Phase 7 - Close the behavioral-parity port
+
+- ☐ Run the complete `./Tools/Run-UnitTests.ps1` suite and record the passing
+  test count.
+- ☐ Run `./Tools/Build.ps1 -LiveReload:$false` and record the compiled Lua file
+  count.
+- ☐ Run `./Tools/Publish.ps1` and record archive plus expanded-package
+  verification.
+- ☐ Run `git diff --check`.
+- ☐ Install the DwarfUI package in a live DFHack environment.
+- ☐ Verify static and dynamically mutated tooltip text in the normal screen
+  host.
+- ☐ Verify wrapping, edge clamping, topmost rendering, and immediate mouse-out
+  removal in the normal screen host.
+- ☐ Verify the same behaviors in the offset/clipped overlay host.
+- ☐ Verify window and nested-modal blocking in live DFHack.
+- ☐ Verify two simultaneous roots do not share target, text, renderer, or
+  lifecycle state.
+- ☐ Reload or recreate hosts repeatedly and verify there are no duplicate
+  attribute, stale class, or stale target failures.
+- ☐ Record local automation and live DFHack results as separate evidence rows.
+- ☐ Declare the parity port complete before beginning Phase 8.
+
+### Phase 7 exit criteria
+
+- ☐ The explicit-host DwarfUI implementation is independently usable,
+  packaged, locally green, and live-proven in both screen and overlay roots.
+
+## Phase 8 - Reevaluate a registration-only downstream API
+
+This phase begins only after Phase 7 is complete. Its purpose is to measure and
+challenge the explicit integration contract, not to presume that automatic
+lifecycle interception is safe.
+
+- ☐ Inventory every explicit action currently required of a downstream screen
+  or overlay: extension import, renderer construction, subview attachment,
+  agent construction, update call, render ordering, and teardown.
+- ☐ Define the desired one-call contract precisely, including whether
+  `register(widget)` accepts a root host, an arbitrary descendant, or both.
+- ☐ Define success as no required downstream renderer construction, render-loop
+  update call, manual teardown, or unregistration call.
+- ☐ Determine when an arbitrary widget has enough layout/parent information to
+  identify its independently rendered root reliably.
+- ☐ Determine how registration behaves before attachment, after reparenting,
+  after removal, while hidden, and after destruction.
+- ☐ Determine how one agent is shared when multiple widgets register under the
+  same root.
+- ☐ Determine how separate screen and overlay roots remain isolated.
+- ☐ Determine how overlay-specific topmost rendering and clipping escape can be
+  preserved without consumer-supplied render ordering.
+- ☐ Determine how the agent receives a continuous update tick without silently
+  replacing or wrapping consumer methods in an unsafe or order-dependent way.
+- ☐ Audit DFHack lifecycle hooks for supported attach, layout, render, dismiss,
+  destroy, and subview-removal seams.
+- ☐ Evaluate weak-key registries for automatic cleanup without making pointer
+  target state process-global.
+- ☐ Specify behavior for duplicate registration, registration after an agent
+  already exists, repeated reloads, and conflicting DwarfUI versions.
+- ☐ Specify how a target currently under the pointer is cleared when its widget
+  unregisters or disappears.
+- ☐ Prototype the smallest viable automatic-registration design behind an
+  experimental module/API; do not replace the explicit stable API yet.
+- ☐ Add lifecycle probes and tests for normal destruction, dismissal,
+  reparenting, removal without dismissal, overlay disable/reload, garbage
+  collection, and duplicate registration.
+- ☐ Compare the prototype with the explicit host model for correctness,
+  invasiveness, render ordering, hidden global state, reload safety, and error
+  clarity.
+- ☐ Record a decision: adopt automatic registration, adopt it only for a
+  narrower supported host type, or retain explicit host wiring.
+
+### Phase 8 exit criteria
+
+- ☐ A written, evidence-backed decision explains whether a one-call
+  registration API can safely own attachment, updates, isolation, teardown, and
+  unregistration for screens and overlays.
+
+## Phase 9 - Conditionally implement the registration decision
+
+If Phase 8 rejects automatic registration, mark the inapplicable implementation
+items as such, retain the explicit API, and document the rejected alternatives.
+
+- ☐ Freeze the accepted public API and supported host/widget types.
+- ☐ If accepted, implement one-call registration without removing the explicit
+  API until compatibility and lifecycle tests pass.
+- ☐ Ensure registration discovers or creates exactly one agent per independently
+  rendered root.
+- ☐ Ensure the agent attaches its renderer at the correct z-order and render
+  seam for each supported host type.
+- ☐ Ensure update scheduling starts with the first registration and stops when
+  the root has no registrations or is destroyed.
+- ☐ Ensure widget removal, host dismissal/destruction, overlay disable, and
+  reload trigger automatic cleanup.
+- ☐ Ensure cleanup clears the current pointer target and visible tooltip before
+  references are released.
+- ☐ Make duplicate registration idempotent or return a clear documented result.
+- ☐ Keep registries weak where practical and prove that they do not retain dead
+  hosts or widgets.
+- ☐ Preserve per-root isolation; a convenience registry must not become a
+  process-global pointer context.
+- ☐ Preserve an explicit low-level construction path for unusual hosts unless
+  Phase 8 proves it unnecessary.
+- ☐ Add regression coverage comparing explicit and automatic paths against the
+  same pointer and rendering acceptance scenarios.
+- ☐ Repeat normal-screen and overlay live checks with the accepted API.
+- ☐ Remove the experimental label only after all accepted lifecycle cases pass.
+
+### Phase 9 exit criteria
+
+- ☐ The accepted downstream API is stable, documented, reload-safe, and proven
+  not to leak agents, renderers, widgets, targets, or lifecycle hooks.
+
+## Phase 10 - Documentation, downstream handoff, and project closure
+
+- ☐ Document the final declarative tooltip attribute and pointer callback
+  contracts.
+- ☐ Document static tooltip declarations and dynamic
+  `on_pointer_update` mutation with correct callback signatures.
+- ☐ Document `target`, `pass`, `block`, and `none` policies with screen and
+  modal examples.
+- ☐ Document the final explicit and/or registration-only integration APIs.
+- ☐ Clearly identify any unsupported automatic-registration host types and the
+  explicit fallback for them.
+- ☐ Document DwarfUI installation as a downstream mod dependency.
+- ☐ Prepare a separate SoulSearch consumer-migration plan rather than changing
+  its private implementation implicitly.
+- ☐ Update `Docs/project.todo` only after the final accepted DwarfUI API and
+  required local/live evidence are complete.
+- ☐ Record final validation evidence below.
+
+### Phase 10 exit criteria
+
+- ☐ DwarfUI's tooltip system has a documented public contract, a clear
+  downstream migration path, and a project tracker that matches proven status.
+
+## Execution evidence
+
+Keep local automation and live DFHack proof in separate rows. Do not mark a
+phase complete from an unrecorded or inferred run.
+
+| Date | Phase | Layer | Command or scenario | Result | Evidence/notes |
+|---|---:|---|---|---|---|
+| | 1 | Local test | `./Tools/Run-UnitTests.ps1` | pending | LuaUnit via LuaRocks baseline |
+| | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Package scaffold syntax |
+| | 2 | Package | `./Tools/Publish.ps1` | pending | Expanded and archive manifests |
+| | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
+| | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
+| | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |
+| | 7 | Live DFHack | Normal `gui.ZScreen` host | pending | Static/dynamic/modal/reload checks |
+| | 7 | Live DFHack | Offset/clipped overlay host | pending | Z-order/clipping/isolation checks |
+| | 8 | Evaluation | Registration lifecycle probes | pending | Decision evidence |
+| | 9 | Live DFHack | Accepted final API | pending | Screen/overlay lifecycle checks |
+
+## Final acceptance criteria
+
+- ☐ DwarfUI packages the tooltip system without a SoulSearch runtime
+  dependency.
+- ☐ LuaUnit is installed and run through LuaRocks using the repository test
+  tooling.
+- ☐ Any compatible DFHack widget can declare static tooltip text without a
+  tooltip-specific subclass.
+- ☐ A terminal control can dynamically replace or clear its tooltip and the
+  renderer observes the change on the next update.
+- ☐ Pointer targeting is generic, clipping-aware, modal-aware, and independent
+  of tooltip text.
+- ☐ Tooltip lookup never invokes a provider or falls back to an ancestor.
+- ☐ The renderer never becomes its own pointer target.
+- ☐ Normal screens and overlays maintain isolated agents, targets, text, and
+  lifecycle state.
+- ☐ Mouse-out, widget removal, host teardown, and reload do not leave stale
+  visible text or retained pointer targets.
+- ☐ Local LuaUnit/build/package checks pass and are reported separately from
+  live DFHack screen/overlay proof.
+- ☐ The registration-only API has been evaluated only after parity completion,
+  and the accepted design is backed by lifecycle evidence.
+- ☐ The final downstream integration contract requires no manual lifecycle work
+  beyond what the Phase 8/9 evidence found unavoidable.

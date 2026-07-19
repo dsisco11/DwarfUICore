@@ -1,128 +1,134 @@
-local luaunit = require('luaunit')
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
-local tests = {}
-
-function tests:setUp()
-    self.setup_completed = true
+local function contains(text, expected)
+    assert.is_truthy(text:find(expected, 1, true))
 end
 
-function tests:test_luaunit_setup_root_and_discovery()
-    luaunit.assertTrue(self.setup_completed)
-    luaunit.assertNotNil(luaunit)
-
-    local todo = assert(io.open(
-        repo_root .. '/Docs/tooltip-system-port.todo', 'r'))
-    todo:close()
-
-    local files = assert(os.getenv('LUA_TEST_FILES'),
-        'runner did not provide discovered test files')
-    luaunit.assertStrContains(files, 'infrastructure_smoke_test.lua')
-    luaunit.assertNotStrContains(files, 'Tests\\support\\module_loader.lua')
-    luaunit.assertNotStrContains(files, 'Tests/support/module_loader.lua')
-    luaunit.assertNotStrContains(files, 'Tests\\run.lua')
-    luaunit.assertNotStrContains(files, 'Tests/run.lua')
+local function excludes(text, unexpected)
+    assert.is_nil(text:find(unexpected, 1, true))
 end
 
-function tests:test_module_loader_isolates_globals_and_dependencies()
-    luaunit.assertNil(rawget(_G, 'GLOBAL_OFFSET'))
-    luaunit.assertNil(rawget(_G, 'result'))
+describe('Busted test infrastructure', function()
+    local setup_completed
 
-    local environment, returned = module_loader.load(
-        repo_root,
-        'Tests/fixtures/module_target.lua',
-        {
-            globals={GLOBAL_OFFSET=4},
-            reqscript={['fixture/scripted']={value=2}},
-            require_modules={['fixture.required']={value=3}},
-        })
+    before_each(function()
+        setup_completed = true
+    end)
 
-    luaunit.assertEquals(9, environment.result)
-    luaunit.assertEquals(9, returned.result)
-    luaunit.assertNil(rawget(_G, 'GLOBAL_OFFSET'))
-    luaunit.assertNil(rawget(_G, 'result'))
-end
+    it('runs setup and sees deterministic discovery', function()
+        assert.is_true(setup_completed)
 
-function tests:test_module_loader_rejects_uncontrolled_reqscript()
-    local ok, err = pcall(module_loader.load,
-        repo_root,
-        'Tests/fixtures/module_target.lua',
-        {
-            globals={GLOBAL_OFFSET=4},
-            reqscript={},
-            require_modules={['fixture.required']={value=3}},
-        })
+        local todo = assert(io.open(
+            repo_root .. '/Docs/tooltip-system-port.todo', 'r'))
+        todo:close()
 
-    luaunit.assertFalse(ok)
-    luaunit.assertStrContains(tostring(err),
-        'unexpected reqscript: fixture/scripted')
-end
+        local files = assert(os.getenv('LUA_TEST_FILES'),
+            'runner did not provide discovered test files')
+        contains(files, 'infrastructure_smoke_test.lua')
+        excludes(files, 'Tests\\support\\module_loader.lua')
+        excludes(files, 'Tests/support/module_loader.lua')
+        excludes(files, 'Tests\\run.lua')
+        excludes(files, 'Tests/run.lua')
+    end)
 
-function tests:test_widget_harness_models_tooltip_primitives()
-    local default_nil = widget_harness.default_nil()
-    local widgets = widget_harness.widgets(nil, default_nil)
-    widgets.Widget.ATTRS{visible=true, active=true, tooltip=default_nil}
-    widgets.Panel.ATTRS{pointer_policy='pass'}
-    widgets.TextButton.ATTRS{pointer_policy='target'}
+    it('isolates module globals and dependencies', function()
+        assert.is_nil(rawget(_G, 'GLOBAL_OFFSET'))
+        assert.is_nil(rawget(_G, 'result'))
 
-    local button = widgets.TextButton{
-        view_id='action',
-        frame={l=2, t=1, w=4, h=2},
-        tooltip='Action tooltip',
-    }
-    local overflow = widgets.Label{
-        view_id='overflow',
-        frame={l=6, t=3, w=4, h=1},
-    }
-    local panel = widgets.Panel{
-        frame={l=1, t=1, w=8, h=5},
-        subviews={button, overflow},
-    }
-    local root = widgets.Widget{frame={l=0, t=0, w=12, h=8}}
-    root:addviews{panel}
-    root:updateLayout(widget_harness.rect(0, 0, 12, 8))
+        local environment, returned = module_loader.load(
+            repo_root,
+            'Tests/fixtures/module_target.lua',
+            {
+                globals={GLOBAL_OFFSET=4},
+                reqscript={['fixture/scripted']={value=2}},
+                require_modules={['fixture.required']={value=3}},
+            })
 
-    luaunit.assertEquals('pass', panel.pointer_policy)
-    luaunit.assertEquals('target', button.pointer_policy)
-    luaunit.assertTrue(button.visible)
-    luaunit.assertEquals('Action tooltip', button.tooltip)
-    luaunit.assertIs(panel, button.parent_view)
-    luaunit.assertIs(button, panel.subviews.action)
-    luaunit.assertEquals({3, 2}, {button.frame_body.x1, button.frame_body.y1})
-    luaunit.assertTrue(button.frame_body:inClipGlobalXY(3, 2))
-    luaunit.assertFalse(button.frame_body:inClipGlobalXY(8, 2))
-    luaunit.assertEquals({1, 1}, {button.frame_body:localXY(4, 3)})
-    luaunit.assertEquals(10, overflow.frame_body.x2)
-    luaunit.assertEquals(8, overflow.frame_body.clip_x2)
-    luaunit.assertTrue(overflow.frame_body:inClipGlobalXY(8, 4))
-    luaunit.assertFalse(overflow.frame_body:inClipGlobalXY(9, 4))
+        assert.equals(9, environment.result)
+        assert.equals(9, returned.result)
+        assert.is_nil(rawget(_G, 'GLOBAL_OFFSET'))
+        assert.is_nil(rawget(_G, 'result'))
+    end)
 
-    root:render({})
-    luaunit.assertEquals(1, root.render_count)
-    luaunit.assertEquals(1, panel.render_count)
-    luaunit.assertEquals(1, button.render_count)
-    luaunit.assertEquals(1, overflow.render_count)
-    root:invalidate()
-    luaunit.assertEquals(1, root.invalidation_count)
+    it('rejects an uncontrolled reqscript', function()
+        local ok, err = pcall(module_loader.load,
+            repo_root,
+            'Tests/fixtures/module_target.lua',
+            {
+                globals={GLOBAL_OFFSET=4},
+                reqscript={},
+                require_modules={['fixture.required']={value=3}},
+            })
 
-    local Tooltip = widget_harness.defclass(nil, widgets.Widget)
-    Tooltip.ATTRS{tooltip='Default tooltip'}
-    function Tooltip:init()
-        self:addviews{widgets.Label{view_id='text', text='Tooltip body'}}
-    end
-    local tooltip = Tooltip{frame={l=0, t=0, w=6, h=2}}
-    luaunit.assertEquals('Default tooltip', tooltip.tooltip)
-    luaunit.assertEquals('Tooltip body', tooltip.subviews.text.text)
-    luaunit.assertIs(tooltip, tooltip.subviews.text.parent_view)
-end
+        assert.is_false(ok)
+        contains(tostring(err), 'unexpected reqscript: fixture/scripted')
+    end)
 
-function tests:test_opt_in_failure_path()
-    if os.getenv('LUAUNIT_SMOKE_FORCE_FAILURE') == '1' then
-        luaunit.assertEquals('actual value', 'expected value',
-            'intentional LuaUnit smoke failure')
-    end
-end
+    it('models the tooltip widget primitives', function()
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        widgets.Widget.ATTRS{visible=true, active=true, tooltip=default_nil}
+        widgets.Panel.ATTRS{pointer_policy='pass'}
+        widgets.TextButton.ATTRS{pointer_policy='target'}
 
-return tests
+        local button = widgets.TextButton{
+            view_id='action',
+            frame={l=2, t=1, w=4, h=2},
+            tooltip='Action tooltip',
+        }
+        local overflow = widgets.Label{
+            view_id='overflow',
+            frame={l=6, t=3, w=4, h=1},
+        }
+        local panel = widgets.Panel{
+            frame={l=1, t=1, w=8, h=5},
+            subviews={button, overflow},
+        }
+        local root = widgets.Widget{frame={l=0, t=0, w=12, h=8}}
+        root:addviews{panel}
+        root:updateLayout(widget_harness.rect(0, 0, 12, 8))
+
+        assert.equals('pass', panel.pointer_policy)
+        assert.equals('target', button.pointer_policy)
+        assert.is_true(button.visible)
+        assert.equals('Action tooltip', button.tooltip)
+        assert.is.equal(panel, button.parent_view)
+        assert.is.equal(button, panel.subviews.action)
+        assert.same({3, 2}, {button.frame_body.x1, button.frame_body.y1})
+        assert.is_true(button.frame_body:inClipGlobalXY(3, 2))
+        assert.is_false(button.frame_body:inClipGlobalXY(8, 2))
+        assert.same({1, 1}, {button.frame_body:localXY(4, 3)})
+        assert.equals(10, overflow.frame_body.x2)
+        assert.equals(8, overflow.frame_body.clip_x2)
+        assert.is_true(overflow.frame_body:inClipGlobalXY(8, 4))
+        assert.is_false(overflow.frame_body:inClipGlobalXY(9, 4))
+
+        root:render({})
+        assert.equals(1, root.render_count)
+        assert.equals(1, panel.render_count)
+        assert.equals(1, button.render_count)
+        assert.equals(1, overflow.render_count)
+        root:invalidate()
+        assert.equals(1, root.invalidation_count)
+
+        local Tooltip = widget_harness.defclass(nil, widgets.Widget)
+        Tooltip.ATTRS{tooltip='Default tooltip'}
+        function Tooltip:init()
+            self:addviews{widgets.Label{
+                view_id='text', text='Tooltip body'}}
+        end
+        local tooltip = Tooltip{frame={l=0, t=0, w=6, h=2}}
+        assert.equals('Default tooltip', tooltip.tooltip)
+        assert.equals('Tooltip body', tooltip.subviews.text.text)
+        assert.is.equal(tooltip, tooltip.subviews.text.parent_view)
+    end)
+
+    it('exposes a deliberate failure path', function()
+        if os.getenv('LUA_TEST_FORCE_FAILURE') == '1' then
+            assert.equals('expected value', 'actual value',
+                'intentional Busted smoke failure')
+        end
+    end)
+end)

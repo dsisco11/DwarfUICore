@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(ValueFromRemainingArguments)]
-    [string[]] $LuaUnitArgs
+    [string[]] $BustedArgs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +9,8 @@ Set-StrictMode -Version Latest
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $rockTree = Join-Path $projectRoot '.luarocks'
-$luaUnitVersion = '3.5-1'
+$bustedVersion = '2.3.0-1'
+$luaSystemVersion = '0.3.0-2'
 $testFileEnvironmentVariable = 'LUA_TEST_FILES'
 
 if (-not (Get-Command luarocks -ErrorAction SilentlyContinue)) {
@@ -21,12 +22,21 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($luaVersion)) {
     throw 'Could not determine the Lua version.'
 }
 
-& luarocks show luaunit $luaUnitVersion --tree $rockTree *> $null
+& luarocks show luasystem $luaSystemVersion --tree $rockTree *> $null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Installing LuaUnit $luaUnitVersion into .luarocks..."
-    & luarocks install luaunit $luaUnitVersion --tree $rockTree
+    Write-Host "Installing LuaSystem $luaSystemVersion into .luarocks..."
+    & luarocks install luasystem $luaSystemVersion --tree $rockTree
     if ($LASTEXITCODE -ne 0) {
-        throw "LuaRocks failed to install LuaUnit $luaUnitVersion."
+        throw "LuaRocks failed to install LuaSystem $luaSystemVersion."
+    }
+}
+
+& luarocks show busted $bustedVersion --tree $rockTree *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Installing Busted $bustedVersion into .luarocks..."
+    & luarocks install busted $bustedVersion --tree $rockTree
+    if ($LASTEXITCODE -ne 0) {
+        throw "LuaRocks failed to install Busted $bustedVersion."
     }
 }
 
@@ -49,6 +59,7 @@ if ($testFiles.Count -eq 0) {
 }
 
 $oldLuaPath = [Environment]::GetEnvironmentVariable('LUA_PATH', 'Process')
+$oldLuaCPath = [Environment]::GetEnvironmentVariable('LUA_CPATH', 'Process')
 $oldTestFiles = [Environment]::GetEnvironmentVariable($testFileEnvironmentVariable, 'Process')
 
 function Restore-ProcessEnvironmentVariable {
@@ -85,18 +96,30 @@ try {
         $luaPathEntries += $oldLuaPath
     }
     Set-Item -LiteralPath Env:LUA_PATH -Value ($luaPathEntries -join ';')
-    # Tests/run.lua consumes this newline-delimited discovered suite list. Keeping
-    # the contract DFHack-neutral lets the runner be reused by other Lua projects.
+    $luaCPathEntries = @((Join-Path $rockTree "lib\lua\$luaVersion\?.dll"))
+    if ($null -ne $oldLuaCPath) {
+        $luaCPathEntries += $oldLuaCPath
+    }
+    Set-Item -LiteralPath Env:LUA_CPATH -Value ($luaCPathEntries -join ';')
+
+    # The Busted helper validates this newline-delimited discovered suite list.
+    # Keeping the contract project-neutral lets the runner be reused elsewhere.
     Set-Item -LiteralPath "Env:$testFileEnvironmentVariable" -Value ($testFiles -join "`n")
 
-    & lua (Join-Path $projectRoot 'Tests/run.lua') @LuaUnitArgs
+    $bustedLauncher = Join-Path $rockTree 'bin\busted'
+    if (-not (Test-Path -LiteralPath $bustedLauncher -PathType Leaf)) {
+        throw "Busted launcher was not installed at $bustedLauncher"
+    }
+    $helper = Join-Path $testsRoot 'run.lua'
+    & lua $bustedLauncher --helper $helper @BustedArgs @testFiles
     $testExitCode = $LASTEXITCODE
 }
 finally {
     Restore-ProcessEnvironmentVariable -Name 'LUA_PATH' -Value $oldLuaPath
+    Restore-ProcessEnvironmentVariable -Name 'LUA_CPATH' -Value $oldLuaCPath
     Restore-ProcessEnvironmentVariable -Name $testFileEnvironmentVariable -Value $oldTestFiles
 }
 
 if ($testExitCode -ne 0) {
-    throw "LuaUnit tests failed with exit code $testExitCode."
+    throw "Busted tests failed with exit code $testExitCode."
 }

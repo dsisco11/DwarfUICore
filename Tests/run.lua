@@ -16,11 +16,9 @@ package.path = table.concat({
     package.path,
 }, ';')
 
-local luaunit = require('luaunit')
-
--- Run-UnitTests.ps1 owns deterministic discovery. Keeping its file list in an
--- environment variable leaves LuaUnit's command-line arguments untouched for
--- targeted cases, verbosity, and output format selection.
+-- Run-UnitTests.ps1 owns deterministic discovery. This Busted helper verifies
+-- the same file list before any specs execute while leaving Busted's command-
+-- line arguments available for filtering, verbosity, and output selection.
 local discovered_files = assert(os.getenv('LUA_TEST_FILES'),
     'LUA_TEST_FILES must be provided by Tools/Run-UnitTests.ps1')
 local normalized_tests_root = tests_root:gsub('\\', '/') .. '/'
@@ -30,17 +28,4 @@ for path in discovered_files:gmatch('[^\r\n]+') do
     assert(normalized_path:sub(1, #normalized_tests_root) ==
         normalized_tests_root,
         'discovered test is outside Tests/: ' .. path)
-
-    local relative_path = normalized_path:sub(#normalized_tests_root + 1)
-    local module_name = relative_path:gsub('%.lua$', ''):gsub('/', '.')
-    local suite = require(module_name)
-    assert(type(suite) == 'table',
-        module_name .. ' must return a LuaUnit test table')
-
-    local global_name = 'Test_' .. module_name:gsub('[^%w]', '_')
-    assert(_G[global_name] == nil,
-        'duplicate LuaUnit suite name: ' .. global_name)
-    _G[global_name] = suite
 end
-
-os.exit(luaunit.LuaUnit.run())

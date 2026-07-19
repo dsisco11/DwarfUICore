@@ -72,10 +72,10 @@ The corresponding focused tests are:
   it must not declare a second target parameter after `self`.
 - The parity implementation retains explicit per-root agent construction and
   update wiring until the post-port evaluation proves a safe replacement.
-- LuaUnit is installed and executed through LuaRocks. It is not vendored into
+- Busted is installed and executed through LuaRocks. It is not vendored into
   this repository.
 - Local automation and live DFHack verification are separate evidence layers.
-  Passing LuaUnit/build/package checks does not close live screen or overlay
+  Passing Busted/build/package checks does not close live screen or overlay
   behavior gates.
 
 ## Intended module layout
@@ -296,15 +296,15 @@ should be reevaluated against that real lifecycle contract.
   dependency replacements, DFHack API assumptions, and build/reload contract
   are recorded before production code is copied.
 
-## Phase 1 - Establish LuaUnit and repository test infrastructure
+## Phase 1 - Establish Busted and repository test infrastructure
 
 - ☑ Retain `Tools/Run-UnitTests.ps1` as the supported test entry point.
-- ☑ Verify the runner installs the pinned LuaUnit rock into `.luarocks` via
+- ☑ Verify the runner installs the pinned Busted rock into `.luarocks` via
   LuaRocks when it is absent.
 - ☑ Verify repeated test runs reuse the local rock tree and do not vendor
   generated dependency files into source control.
-- ☑ Add `Tests/run.lua` to load the newline-delimited
-  `LUA_TEST_FILES` suite list produced by `Run-UnitTests.ps1`.
+- ☑ Add `Tests/run.lua` as a Busted helper that validates the newline-delimited
+  `LUA_TEST_FILES` spec list produced by `Run-UnitTests.ps1`.
 - ☑ Add a repository-root helper for deterministic production and test paths.
 - ☑ Add a module-loading harness that can execute DFHack `--@ module=true`
   files with controlled globals and `reqscript` dependencies.
@@ -312,32 +312,41 @@ should be reevaluated against that real lifecycle contract.
   subviews, layout rectangles, clipping, rendering, and invalidation.
 - ☑ Keep the harness limited to behavior required by the tooltip system; do not
   copy SoulSearch-specific fake widgets or environment state.
-- ☑ Add one smoke suite proving LuaUnit discovery, setup, assertion reporting,
+- ☑ Add one smoke suite proving Busted discovery, setup, assertion reporting,
   and nonzero failure exit codes.
 - ☑ Run `./Tools/Run-UnitTests.ps1` and record the baseline result.
 
 ### Phase 1 implementation and evidence
 
 `Tools/Run-UnitTests.ps1` remains the sole supported test entry point. It pins
-LuaUnit to `3.5-1`, checks that exact rock in the repository-local `.luarocks`
-tree, installs it with LuaRocks only when absent, discovers sorted
+Busted to `2.3.0-1`, checks that exact rock in the repository-local `.luarocks`
+tree, and installs it with LuaRocks only when absent. On this Windows toolchain
+the runner first pins LuaSystem to `0.3.0-2`; newer LuaSystem releases require
+Windows virtual-terminal constants that are absent from the installed MinGW
+SDK, while `0.3.0-2` satisfies Busted's declared `>= 0.2.0` dependency.
+
+The runner discovers sorted
 `test_*.lua`/`*_test.lua` files, and supplies their newline-delimited paths in
-`LUA_TEST_FILES`. It temporarily composes `LUA_PATH` from the local rock,
-test, and future production roots and restores process environment values in a
-`finally` block.
+`LUA_TEST_FILES`. It invokes Busted's repository-local launcher with
+`Tests/run.lua` as its helper and the discovered files as explicit inputs. It
+temporarily composes `LUA_PATH` and `LUA_CPATH` from the local rock, test, and
+future production roots and restores process environment values in a `finally`
+block.
 
 All repository environment-variable contracts use neutral capability names,
 not DFHack or project prefixes. Test discovery uses `LUA_TEST_FILES`, the
-opt-in runner failure probe uses `LUAUNIT_SMOKE_FORCE_FAILURE`, and build
+opt-in runner failure probe uses `LUA_TEST_FORCE_FAILURE`, and build
 configuration uses `LUA_COMPILER`, `LUA_REQUIRED_VERSION`,
 `MOD_COMMAND_RUNNER`, and `GAME_ROOT`. `LUA_PATH` is Lua's standard module-path
-variable and is preserved and restored by the runner.
+variable, and `LUA_CPATH` is Lua's standard native-module path; both are
+preserved and restored by the runner.
 
 `Tests/run.lua` derives `Tests/`, the repository root, and
 `src/scripts_modinstalled/` from its own file location. It validates that every
-discovered path remains inside `Tests/`, loads each returned LuaUnit suite under
-a deterministic global name, leaves LuaUnit CLI arguments untouched, and exits
-with LuaUnit's result code.
+discovered path remains inside `Tests/` before Busted loads the native
+`describe`/`it` specs. Forwarded Busted CLI arguments remain available for
+filtering and output selection, and Busted's result becomes the process exit
+code.
 
 The generic support boundary is:
 
@@ -354,36 +363,36 @@ state, or other domain fixtures were copied. `Tests/fixtures/module_target.lua`
 is a DFHack-style `--@ module=true` fixture used to prove controlled globals
 and script/module dependencies without reaching a live DFHack installation.
 
-`infrastructure_smoke_test.lua` contains five cases covering LuaUnit `setUp`,
+`infrastructure_smoke_test.lua` contains five Busted specs covering
+`before_each`,
 repository-root resolution, deterministic discovery exclusions, isolated
 module execution, rejection of an undeclared `reqscript`, all required widget
 harness primitives, and an environment-gated deliberate assertion failure.
 
-Validation on 2026-07-18 used Lua 5.4.6 and LuaRocks 3.9.2 from the installed
-Lua toolchain. With no DwarfUI `.luarocks` tree, the first normal-access run
-installed exactly `luaunit 3.5-1` through LuaRocks and passed all five tests.
-The restricted sandbox attempt immediately before it hit LuaRocks' manifest
-loading bug and made no successful installation claim; rerunning with normal
-network/system access completed the required bootstrap.
+The project originally established LuaUnit, but the 2026-07-18 testing decision
+was superseded before Phase 3: all committed specs and the runner were migrated
+to native Busted. Validation used Lua 5.4.6 and LuaRocks 3.9.2. The first Busted
+bootstrap exposed an incompatible automatically selected LuaSystem `0.7.1-1`;
+after adding the compatible pin, LuaRocks installed Busted `2.3.0-1`, LuaSystem
+`0.3.0-2`, and remaining dependencies into the ignored `.luarocks` tree.
 
-A second run printed no installation step, passed the same five tests, and
-`luarocks show luaunit 3.5-1 --tree .luarocks` resolved the module at
-`.luarocks/share/lua/5.4/luaunit.lua`. `git check-ignore` attributes that path
-to `.gitignore`'s `.luarocks/` rule, and the dependency tree does not appear in
-Git status or under package source.
+A second run printed no installation step and passed all eight current specs.
+`luarocks show busted 2.3.0-1 --tree .luarocks` and
+`luarocks show luasystem 0.3.0-2 --tree .luarocks` resolve both pinned rocks in
+the repository-local tree. `.gitignore` excludes that dependency tree from Git
+and package source.
 
-The environment-gated failure probe ran the supported PowerShell entry point in
-a child process and produced exit code 1. LuaUnit reported
-`Test_infrastructure_smoke_test.test_opt_in_failure_path`, the intentional
-message, expected and actual values, and a traceback. After clearing the opt-in
-flag, the final full run passed five tests with zero failures. A forwarded
-target name also ran exactly one selected test successfully. The default build
-syntax-checked zero production files and six test/support Lua files with Lua
-5.4.6; production modules intentionally begin in Phase 2.
+The environment-gated failure probe ran the supported PowerShell entry point
+and produced exit code 1. Busted reported the named spec, intentional message,
+expected and actual values, and source line. After clearing the opt-in flag, the
+full run passed eight specs with zero failures or errors. A forwarded Busted
+`--filter` also ran exactly one selected spec successfully. The earlier Phase 1
+build syntax-checked zero production files and six test/support Lua files with
+Lua 5.4.6; production modules intentionally began in Phase 2.
 
 ### Phase 1 exit criteria
 
-- ☑ LuaUnit is reproducibly installed through LuaRocks and the DwarfUI test
+- ☑ Busted is reproducibly installed through LuaRocks and the DwarfUI test
   runner can discover and execute isolated production-module tests.
 
 ## Phase 2 - Create the installable DwarfUI package and public namespace
@@ -427,8 +436,8 @@ concrete implementation need; the public imports above remain unchanged.
 
 `Tests/package_contract_test.lua` protects the exact package metadata, public
 paths, module annotations, table return contracts, and absence of SoulSearch
-references. Together with the five Phase 1 infrastructure cases, the full
-LuaUnit run passed eight tests with zero failures.
+references. Together with the five Phase 1 infrastructure cases, the current
+Busted run passes eight specs with zero failures or errors.
 
 `./Tools/Build.ps1 -LiveReload:$false` used Lua 5.4.6 and syntax-checked four
 production modules plus seven test/support files. This proves
@@ -477,7 +486,7 @@ unrelated command contract.
   direct runtime mutation.
 - ☐ Verify repeated module loads are idempotent and do not replace DFHack
   classes.
-- ☐ Add LuaUnit coverage for inheritance, constructor assignment, mutation,
+- ☐ Add Busted coverage for inheritance, constructor assignment, mutation,
   clearing, reload idempotence, class defaults, and collision failures.
 
 ### Phase 3 exit criteria
@@ -507,7 +516,7 @@ unrelated command contract.
 - ☐ Supply coordinates local to the terminal target.
 - ☐ Clear the current target when it becomes hidden, inactive, clipped, moved,
   removed, or unreachable from the root.
-- ☐ Add LuaUnit coverage for overlap, clipping, visibility, evaluated state,
+- ☐ Add Busted coverage for overlap, clipping, visibility, evaluated state,
   terminal composites, transparent panels, explicit blockers, window borders,
   nested modal windows, missing mouse coordinates, target removal, callbacks,
   and isolation between two roots.
@@ -726,10 +735,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 0 | Source audit | SoulSearch and DFHack checkout inspection | passed | SoulSearch `2f098c8`; DFHack `53.15-r1`/`b12f73a`; unrelated dirty paths recorded |
 | 2026-07-18 | 0 | Contract audit | Imports, GUI attributes, native tooltip classes, and focused test inventory | passed | All four core imports classified; all 21 focused test names recorded; no active attribute-name collision |
 | 2026-07-18 | 0 | Tooling policy | PowerShell parse of `Tools/Build.ps1` | passed | Hybrid mod currently has no reload entry point; `LiveReload` defaults to `$false` until a real command exists |
-| 2026-07-18 | 1 | Dependency bootstrap | `./Tools/Run-UnitTests.ps1` with absent `.luarocks` | passed | LuaRocks installed exact LuaUnit `3.5-1`; 5 tests passed |
-| 2026-07-18 | 1 | Dependency reuse | Second `./Tools/Run-UnitTests.ps1` plus `luarocks show` | passed | No reinstall; local LuaUnit `3.5-1` resolved; 5 tests passed |
-| 2026-07-18 | 1 | Failure contract | Opt-in failing smoke case through child PowerShell process | passed | Expected test failed with assertion context and traceback; process exit code 1 |
-| 2026-07-18 | 1 | Targeted test | Forwarded LuaUnit test name | passed | Exactly 1 selected test passed |
+| 2026-07-18 | 1 | Dependency bootstrap | `./Tools/Run-UnitTests.ps1` with Busted absent | passed | LuaRocks installed exact Busted `2.3.0-1` and compatible LuaSystem `0.3.0-2`; 8 specs passed |
+| 2026-07-18 | 1 | Dependency reuse | Second `./Tools/Run-UnitTests.ps1` plus `luarocks show` | passed | No reinstall; both pinned rocks resolved locally; 8 specs passed |
+| 2026-07-18 | 1 | Failure contract | `LUA_TEST_FORCE_FAILURE=1` through supported runner | passed | Named Busted spec failed with assertion context and source line; process exit code 1 |
+| 2026-07-18 | 1 | Targeted test | Forwarded Busted `--filter` | passed | Exactly 1 selected spec passed |
 | 2026-07-18 | 1 | Local build | `./Tools/Build.ps1` | passed | Lua 5.4.6; 0 production and 6 test/support files syntax-checked |
 | 2026-07-18 | 2 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 8 tests; metadata, public paths, module tables, and no SoulSearch references covered |
 | 2026-07-18 | 2 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 7 test/support files syntax-checked |
@@ -747,7 +756,7 @@ phase complete from an unrecorded or inferred run.
 
 - ☐ DwarfUI packages the tooltip system without a SoulSearch runtime
   dependency.
-- ☐ LuaUnit is installed and run through LuaRocks using the repository test
+- ☐ Busted is installed and run through LuaRocks using the repository test
   tooling.
 - ☐ Any compatible DFHack widget can declare static tooltip text without a
   tooltip-specific subclass.
@@ -761,7 +770,7 @@ phase complete from an unrecorded or inferred run.
   lifecycle state.
 - ☐ Mouse-out, widget removal, host teardown, and reload do not leave stale
   visible text or retained pointer targets.
-- ☐ Local LuaUnit/build/package checks pass and are reported separately from
+- ☐ Local Busted/build/package checks pass and are reported separately from
   live DFHack screen/overlay proof.
 - ☐ The registration-only API has been evaluated only after parity completion,
   and the accepted design is backed by lifecycle evidence.

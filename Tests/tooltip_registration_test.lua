@@ -3,7 +3,7 @@ local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
 local REGISTRATION_PATH =
-    'src/scripts_modinstalled/dwarfui/tooltip_registration_experimental.lua'
+    'src/scripts_modinstalled/dwarfui/tooltip_registration.lua'
 
 ---Creates the minimal painter surface required by the tooltip renderer.
 ---@param state table
@@ -102,10 +102,22 @@ local function load_environment(state)
             local config = overlay_state.config[name]
             return config and config.enabled or false
         end,
+        normalize_list=function(value)
+            return type(value) == 'table' and value or {value}
+        end,
+        simplify_viewscreen_name=function(value)
+            return value
+        end,
     }
 
     local dfhack = {
         dwarfui={},
+        gui={
+            getDFViewscreen=function() return {focus=state.focus or 'dwarfmode'} end,
+            matchFocusString=function(focus, viewscreen)
+                return focus == viewscreen.focus
+            end,
+        },
         pen={parse=function(value) return value end},
         timeout=function(_, _, callback)
             state.timeout_count = (state.timeout_count or 0) + 1
@@ -171,6 +183,7 @@ local function load_environment(state)
         load_registration=load_registration,
         overlay=overlay,
         OverlayWidget=OverlayWidget,
+        tooltip=tooltip,
         state=state,
         widgets=widgets,
     }
@@ -247,6 +260,30 @@ describe('singleton tooltip registration', function()
         screen:onRender()
         assert.is.equal(other, registration.get_diagnostics().target)
         assert.equals('Other root', screen.renderer.tooltip_text)
+    end)
+
+    it('excludes registered controls below the current native screen', function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local registration = env.load_registration()
+        local current = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Current screen')
+        local covered = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Covered screen')
+        local current_root = env.widgets.Panel{subviews={current}}
+        local covered_root = env.widgets.Panel{subviews={covered}}
+        current_root._native = {name='current'}
+        covered_root._native = {name='covered'}
+        layout(current_root, env.state)
+        layout(covered_root, env.state)
+        registration.register(current)
+        registration.register(covered)
+        local screen = registration.get_diagnostics().screen
+        screen._native = {parent=current_root._native}
+
+        screen:onRender()
+
+        assert.is.equal(current, registration.get_diagnostics().target)
+        assert.equals('Current screen', screen.renderer.tooltip_text)
     end)
 
     it('honors modal blocking in the registered control root', function()
@@ -360,6 +397,7 @@ describe('singleton tooltip registration', function()
             {l=1, t=1, w=5, h=2}, 'Overlay')
         local root = env.OverlayWidget{
             name='test-overlay',
+            viewscreens='dwarfmode',
             subviews={child},
         }
         layout(root, env.state)
@@ -378,6 +416,11 @@ describe('singleton tooltip registration', function()
 
         overlay_state.config[root.name].enabled = true
         overlay_state.db[root.name] = {widget=env.OverlayWidget{name=root.name}}
+        screen:onRender()
+        assert.is_nil(registration.get_diagnostics().target)
+
+        overlay_state.db[root.name] = {widget=root}
+        env.state.focus = 'title'
         screen:onRender()
         assert.is_nil(registration.get_diagnostics().target)
     end)
@@ -416,12 +459,12 @@ describe('singleton tooltip registration', function()
         assert.equals(1, second_diagnostics.renderer_count)
         assert.is_not.equal(first_screen, second_diagnostics.screen)
         assert.is_false(first_screen:isActive())
-        assert.equals(2, second_module.API_VERSION)
+        assert.equals(1, second_module.API_VERSION)
 
-        env.dfhack.dwarfui.tooltip_service_experimental.api_version = 999
+        env.dfhack.dwarfui.tooltip_service.api_version = 999
         assert.has_error(function() env.load_registration() end,
-            'Conflicting experimental DwarfUI tooltip service versions: ' ..
-            'process has 999, requested 2.')
+            'Conflicting DwarfUI tooltip service versions: ' ..
+            'process has 999, requested 1.')
     end)
 
     it('recreates an externally dismissed service while registrations remain', function()
@@ -439,6 +482,48 @@ describe('singleton tooltip registration', function()
         assert.is_true(replacement:isActive())
         assert.equals(1, env.state.timeout_count)
         assert.equals(1, registration.get_diagnostics().renderer_count)
+    end)
+
+    it('matches explicit-agent dynamic targeting and removal behavior', function()
+        local explicit_env = load_environment{mouse_x=2, mouse_y=2}
+        local explicit_target = target(explicit_env.widgets,
+            {l=1, t=1, w=6, h=3}, nil)
+        ---Updates explicit tooltip text from pointer-local coordinates.
+        explicit_target.on_pointer_update = function(self, x, y)
+            self.tooltip = ('Dynamic %d,%d'):format(x, y)
+        end
+        local explicit_root = explicit_env.widgets.Panel{
+            subviews={explicit_target},
+        }
+        layout(explicit_root, explicit_env.state)
+        local explicit_renderer = explicit_env.tooltip.TooltipRenderer{}
+        local explicit_agent = explicit_env.tooltip.TooltipAgent.new(
+            explicit_root, explicit_renderer)
+        explicit_agent:update()
+        local expected_text = explicit_renderer.tooltip_text
+        explicit_root.subviews = {}
+        explicit_agent:update()
+        assert.is_false(explicit_renderer.visible)
+
+        local automatic_env = load_environment{mouse_x=2, mouse_y=2}
+        local registration = automatic_env.load_registration()
+        local automatic_target = target(automatic_env.widgets,
+            {l=1, t=1, w=6, h=3}, nil)
+        ---Updates automatic tooltip text from pointer-local coordinates.
+        automatic_target.on_pointer_update = function(self, x, y)
+            self.tooltip = ('Dynamic %d,%d'):format(x, y)
+        end
+        local automatic_root = automatic_env.widgets.Panel{
+            subviews={automatic_target},
+        }
+        layout(automatic_root, automatic_env.state)
+        registration.register(automatic_target)
+        local screen = registration.get_diagnostics().screen
+        screen:onRender()
+        assert.equals(expected_text, screen.renderer.tooltip_text)
+        automatic_root.subviews = {}
+        screen:onRender()
+        assert.is_false(screen.renderer.visible)
     end)
 
     it('dismisses after explicit removal and weakly releases dead controls', function()

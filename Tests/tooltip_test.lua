@@ -50,6 +50,10 @@ local function load_tooltip(state)
     local _, pointer = module_loader.load(repo_root, pointer_path, {
         globals={dfhack=dfhack},
     })
+    local registration = state.registration_service or {
+        register=function() return true end,
+        unregister=function() return true end,
+    }
     local _, tooltip = module_loader.load(repo_root, tooltip_path, {
         globals={
             COLOR_BLACK='black',
@@ -62,6 +66,7 @@ local function load_tooltip(state)
         reqscript={
             ['dwarfui/widget_extensions']=extensions,
             ['dwarfui/pointer']=pointer,
+            ['dwarfui/tooltip_registration']=registration,
             ['dwarfui/text']=text,
         },
     })
@@ -105,6 +110,25 @@ local function renderer_spy()
 end
 
 describe('DwarfUI tooltip renderer', function()
+    it('delegates stable registration through the tooltip facade', function()
+        local state = {registration_service={}}
+        state.registration_service.register = function(widget)
+            state.registered = widget
+            return true
+        end
+        state.registration_service.unregister = function(widget)
+            state.unregistered = widget
+            return true
+        end
+        local tooltip = load_tooltip(state)
+        local widget = {}
+
+        assert.is_true(tooltip.register(widget))
+        assert.is.equal(widget, state.registered)
+        assert.is_true(tooltip.unregister(widget))
+        assert.is.equal(widget, state.unregistered)
+    end)
+
     it('is a hidden plain Widget with the required pens and exclusion policy', function()
         local state = {}
         local tooltip, widgets, pointer = load_tooltip(state)

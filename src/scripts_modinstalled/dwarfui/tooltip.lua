@@ -154,4 +154,18 @@ local M = {
     TooltipAgent=TooltipAgent,
 }
 
+---Registers a widget with the process-wide singleton tooltip service.
+---@param widget table
+---@return boolean created
+function M.register(widget)
+    return reqscript('dwarfui/tooltip_registration').register(widget)
+end
+
+---Explicitly unregisters a widget; weak lifetime cleanup makes this optional.
+---@param widget table
+---@return boolean removed
+function M.unregister(widget)
+    return reqscript('dwarfui/tooltip_registration').unregister(widget)
+end
+
 return M

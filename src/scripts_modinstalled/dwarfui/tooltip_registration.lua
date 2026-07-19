@@ -1,20 +1,20 @@
 --@ module=true
 
--- This module is a Phase 8 experiment, not yet a stable public API. It models
--- the intended invariant that at most one tooltip is visible process-wide.
+-- Process-wide singleton tooltip registration. At most one tooltip is visible,
+-- regardless of how many controls or independently rendered roots register.
 
 local gui = require('gui')
 local overlay = require('plugins.overlay')
 local pointer = reqscript('dwarfui/pointer')
 local tooltip = reqscript('dwarfui/tooltip')
 
-local API_VERSION = 2
-local SERVICE_SLOT = 'tooltip_service_experimental'
+local API_VERSION = 1
+local SERVICE_SLOT = 'tooltip_service'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 local service = dfhack.dwarfui[SERVICE_SLOT]
 if service and service.api_version ~= API_VERSION then
-    error(('Conflicting experimental DwarfUI tooltip service versions: ' ..
+    error(('Conflicting DwarfUI tooltip service versions: ' ..
         'process has %s, requested %s.'):format(
             tostring(service.api_version), tostring(API_VERSION)))
 end
@@ -94,6 +94,21 @@ local function ancestors_are_eligible(widget)
     return true
 end
 
+---Returns whether an overlay declares the current underlying viewscreen.
+---@param root table
+---@return boolean
+local function overlay_matches_current_viewscreen(root)
+    local current = dfhack.gui.getDFViewscreen(true)
+    if not current then return false end
+    for _, focus in ipairs(overlay.normalize_list(root.viewscreens)) do
+        if focus == 'all' or dfhack.gui.matchFocusString(
+                overlay.simplify_viewscreen_name(focus), current) then
+            return true
+        end
+    end
+    return false
+end
+
 ---Returns whether a root is currently owned by an active rendering framework.
 ---@param root table
 ---@return boolean
@@ -104,7 +119,8 @@ local function root_is_presented(root)
         end
         local overlay_state = overlay.get_state()
         local entry = overlay_state.db[root.name]
-        return entry ~= nil and entry.widget == root
+        return entry ~= nil and entry.widget == root and
+            overlay_matches_current_viewscreen(root)
     end
     if root._native and service.screen and service.screen._native then
         return root._native == service.screen._native.parent
@@ -305,7 +321,7 @@ end
 ---@return boolean created
 local function register(widget)
     assert(type(widget) == 'table',
-        'Experimental DwarfUI tooltip registration requires a widget table.')
+        'DwarfUI tooltip registration requires a widget table.')
     if service.registrations[widget] then
         ensure_screen()
         return false

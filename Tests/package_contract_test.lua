@@ -7,6 +7,7 @@ local public_modules = {
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
     'dwarfui/tooltip.lua',
+    'dwarfui/tooltip_registration.lua',
 }
 
 local function source_path(relative_path)
@@ -65,6 +66,46 @@ local function load_public_module(package_path)
                     PointerDispatcher={sample=function() return {kind='miss'} end},
                 },
                 ['dwarfui/text']={wrap_text=function() return {''} end},
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/tooltip_registration.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        local widgets = widget_harness.widgets(nil, default_nil)
+        widgets.Widget.ATTRS{visible=true, active=true}
+        ---@class tests.PackageContractZScreen
+        local ZScreen = widget_harness.defclass(nil, widgets.Widget)
+        ---@class tests.PackageContractOverlay
+        local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
+        options = {
+            globals={
+                defclass=widget_harness.defclass,
+                dfhack={
+                    dwarfui={},
+                    gui={
+                        getDFViewscreen=function() return nil end,
+                        matchFocusString=function() return false end,
+                    },
+                    screen={getMousePos=function() return nil, nil end},
+                    timeout=function() end,
+                },
+            },
+            require_modules={
+                gui={ZScreen=ZScreen, Painter={new=function() return {} end}},
+                ['plugins.overlay']={
+                    OverlayWidget=OverlayWidget,
+                    get_state=function() return {config={}, db={}} end,
+                    isOverlayEnabled=function() return false end,
+                    normalize_list=function(value) return {value} end,
+                    simplify_viewscreen_name=function(value) return value end,
+                },
+            },
+            reqscript={
+                ['dwarfui/pointer']={PointerDispatcher={resolve=function()
+                    return {kind='miss'}
+                end}},
+                ['dwarfui/tooltip']={TooltipRenderer=function() return {} end},
             },
         }
     end

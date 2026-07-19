@@ -8,8 +8,8 @@ process-wide.
 
 The renderer is therefore not owned by each consumer root. One transparent,
 screen-sized `gui.ZScreen` owns one renderer and arbitrates every registered
-control. The executable prototype remains experimental until Phase 9 completes
-compatibility and live DFHack checks.
+control. Phase 9 promoted the prototype after compatibility tests and live
+DFHack screen and overlay checks passed.
 
 Phase 8 was entered under the explicit Phase 7 waiver recorded in
 `Docs/tooltip-system-port.todo`. All evidence in this decision is local
@@ -37,12 +37,11 @@ the complete parent screen stack, samples registered controls once, and renders
 the single tooltip afterward with a full-screen painter. This makes tooltip
 placement independent of a consumer root's clipping rectangle.
 
-## Registration contract evaluated by the prototype
+## Stable registration contract
 
 ```lua
-local tooltips = reqscript(
-    'dwarfui/tooltip_registration_experimental')
-tooltips.register(widget)
+local tooltip = reqscript('dwarfui/tooltip')
+tooltip.register(widget)
 ```
 
 - `register(widget)` accepts an arbitrary widget, including an unattached one.
@@ -128,9 +127,8 @@ does not need to follow consumer render roots. A screen-rooted singleton removes
 the unsafe renderer insertion/removal and host-method interception that caused
 the earlier rejection.
 
-Phase 9 must keep the current explicit API available until live DFHack proves
-that the transparent service screen remains topmost, forwards all input, does
-not disrupt focus-sensitive overlays, excludes enabled overlays that are not
-rendered on the current viewscreen, and recreates cleanly across reload. The
-cross-root tie-break must also remain documented and deterministic. Subject to
-those gates, consumers should need only `register(widget)`.
+Phase 9 retained the explicit API and promoted `tooltip.register(widget)` after
+live DFHack proved that the transparent service screen remains topmost,
+forwards input, honors modal blockers, escapes overlay clipping, excludes
+focus-mismatched and disabled overlays, and cleans up registrations. The
+cross-root tie-break remains documented and deterministic.

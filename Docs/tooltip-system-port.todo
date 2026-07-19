@@ -857,7 +857,7 @@ transparent full-screen `gui.ZScreen` can own the only renderer. The DFHack
 53.15-r1 audit confirms supported seams for parent-first rendering, full-screen
 layout, unconditional input forwarding, parent logic, and z-order raising.
 
-`dwarfui/tooltip_registration_experimental` now accepts arbitrary controls in
+`dwarfui/tooltip_registration` now accepts arbitrary controls in
 one weak-key registry. It recomputes roots from `parent_view`, uses native
 pointer traversal and modal blocking within each root, applies a documented
 registration-order tie-break across independent roots, and draws the winner
@@ -884,35 +884,67 @@ compatibility gates pass.
 If Phase 8 rejects automatic registration, mark the inapplicable implementation
 items as such, retain the explicit API, and document the rejected alternatives.
 
-- ☐ Freeze the accepted public API and supported host/widget types.
-- ☐ If accepted, implement one-call registration without removing the explicit
+- ☑ Freeze the accepted public API and supported host/widget types.
+- ☑ If accepted, implement one-call registration without removing the explicit
   API until compatibility and lifecycle tests pass.
-- ☐ Ensure registration discovers or creates exactly one process-wide service
-  screen, agent, and renderer.
-- ☐ Ensure the service screen renders the singleton tooltip above the complete
+- ☑ Ensure registration discovers or creates exactly one process-wide service
+  screen, target resolver, and renderer.
+- ☑ Ensure the service screen renders the singleton tooltip above the complete
   parent stack without claiming input or focus-sensitive behavior.
-- ☐ Ensure update scheduling starts with the first registration and stops when
+- ☑ Ensure update scheduling starts with the first registration and stops when
   the weak registry becomes empty.
-- ☐ Ensure widget removal, reparenting, host changes, service-screen dismissal,
+- ☑ Ensure widget removal, reparenting, host changes, service-screen dismissal,
   and reload trigger automatic retargeting or cleanup.
-- ☐ Ensure cleanup clears the current pointer target and visible tooltip before
+- ☑ Ensure cleanup clears the current pointer target and visible tooltip before
   references are released.
-- ☐ Make duplicate registration idempotent or return a clear documented result.
-- ☐ Keep control registrations weak and prove that they do not retain dead
+- ☑ Make duplicate registration idempotent or return a clear documented result.
+- ☑ Keep control registrations weak and prove that they do not retain dead
   widgets or roots.
-- ☐ Enforce one process-wide current target and renderer; never display
+- ☑ Enforce one process-wide current target and renderer; never display
   simultaneous tooltips from separate roots.
-- ☐ Preserve an explicit low-level construction path for unusual hosts unless
+- ☑ Preserve an explicit low-level construction path for unusual hosts unless
   Phase 8 proves it unnecessary.
-- ☐ Add regression coverage comparing explicit and automatic paths against the
+- ☑ Add regression coverage comparing explicit and automatic paths against the
   same pointer and rendering acceptance scenarios.
-- ☐ Repeat normal-screen, modal, overlay, input, focus, and z-order live checks
+- ☑ Repeat normal-screen, modal, overlay, input, focus, and z-order live checks
   with the accepted API.
-- ☐ Remove the experimental label only after all accepted lifecycle cases pass.
+- ☑ Remove the experimental label only after all accepted lifecycle cases pass.
+
+### Phase 9 implementation and evidence
+
+`dwarfui/tooltip_registration` is the stable process-wide service module.
+`dwarfui/tooltip` exposes `register(widget)` and `unregister(widget)` as the
+supported high-level facade while retaining `TooltipRenderer` and
+`TooltipAgent` for unusual explicit hosts. Registration is idempotent, weak,
+valid before attachment, and limited to one current target and renderer across
+all roots.
+
+The public files remain ordinary DFHack mod script modules under
+`scripts_modinstalled`: they declare `--@ module=true`, export public names in
+their script environments, and import one another with `reqscript()`. A live
+loader probe caught and rejected an attempted `mkmodule()`/`require()`
+conversion because DFHack only searches `hack/lua` for required libraries, not
+mod script paths. The corrected contract resolves the active workspace module
+and exposes the stable facade in DFHack 53.15-r1.
+
+Thirteen focused singleton specs cover cardinality, arbitration, native-screen
+and overlay eligibility, modal blocking, attachment, reparenting, removal,
+hidden ancestors, clipping, input forwarding, z-order recovery, reload/version
+handling, screen recreation, explicit/automatic parity, and weak cleanup. The
+complete local suite passes 68 specs.
+
+Live DFHack probes passed normal-screen targeting, immediate dynamic text,
+modal blocking, unchanged input forwarding, supported service-screen raising,
+explicit cleanup, enabled overlay targeting, full-screen presentation beyond a
+narrow overlay clip, focus-mismatch exclusion and recovery, and disabled
+overlay exclusion. Controlled pointer coordinates were taken from each live
+target's `frame_body` because `dfhack-run` correctly reports no mouse position
+when the physical pointer is outside the game window. The temporary overlay was
+disabled, removed from `hack/scripts`, and rescanned out after validation.
 
 ### Phase 9 exit criteria
 
-- ☐ The accepted downstream API is stable, documented, reload-safe, and proven
+- ☑ The accepted downstream API is stable, documented, reload-safe, and proven
   not to leak agents, renderers, widgets, targets, or lifecycle hooks.
 
 ## Phase 10 - Documentation, downstream handoff, and project closure
@@ -987,7 +1019,13 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-19 | 8 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 5 production and 13 test/support files syntax-checked; no live command |
 | 2026-07-19 | 8 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
 | 2026-07-19 | 8 | Decision | Explicit per-root hosting versus singleton screen-rooted registration | passed | Adopt singleton automatic registration for Phase 9; preserve explicit API until live compatibility gates pass |
-| | 9 | Live DFHack | Accepted final API | pending | Screen/overlay lifecycle checks |
+| 2026-07-19 | 9 | Focused test | Busted filter for singleton tooltip registration | passed | 13 lifecycle, targeting, framework-eligibility, reload, parity, and cleanup specs |
+| 2026-07-19 | 9 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 68 specs; zero failures, errors, or pending cases |
+| 2026-07-19 | 9 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 5 production and 19 test/support files syntax-checked; no live command |
+| 2026-07-19 | 9 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-19 | 9 | Live DFHack | `module=true` public facade | passed | Workspace `dwarfui/tooltip.lua` resolved through `reqscript`; registration and explicit classes exported |
+| 2026-07-19 | 9 | Live DFHack | Normal screen, modal, input, and z-order probe | passed | Singleton targeted dynamic text, modal blocked it, input forwarded unchanged, service raised, and cleanup restored the prior process state |
+| 2026-07-19 | 9 | Live DFHack | Enabled/focus-mismatched/disabled overlay probes | passed | One renderer escaped the overlay clip; focus mismatch and disable cleared eligibility; temporary overlay removed and rescanned out |
 
 ## Final acceptance criteria
 

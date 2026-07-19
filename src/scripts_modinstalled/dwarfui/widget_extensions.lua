@@ -16,6 +16,8 @@ local function install_attribute(class, name, default, description)
     return false
 end
 
+---Installs the declarative tooltip attribute on all DFHack widgets.
+---@return boolean changed
 function install_tooltip_attribute()
     local widget = assert(widgets.Widget,
         'DwarfUI requires gui.widgets.Widget for tooltip attributes.')
@@ -23,6 +25,8 @@ function install_tooltip_attribute()
         'gui.widgets.Widget')
 end
 
+---Installs pointer policies and callbacks on the relevant widget classes.
+---@return boolean changed
 function install_pointer_attributes()
     local changed = false
     local widget = assert(widgets.Widget,

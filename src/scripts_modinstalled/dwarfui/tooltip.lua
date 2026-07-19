@@ -16,6 +16,7 @@ local TEXT = dfhack.pen.parse{fg=COLOR_WHITE, bg=COLOR_BLACK}
 -- A moving tooltip is presentation layered over a host, not a Panel or Window.
 -- Keeping it a plain Widget avoids their global layout/redraw lifecycle inside
 -- the host's render pass.
+---@class dwarfui.TooltipRenderer: gui.widgets.Widget
 TooltipRenderer = defclass(nil, widgets.Widget)
 TooltipRenderer.ATTRS{
     frame={l=0, t=0, w=1, h=3},
@@ -28,6 +29,7 @@ TooltipRenderer.ATTRS{
     visible=false,
 }
 
+---Constructs the hidden renderer and its text label.
 function TooltipRenderer:init()
     self.visible = false
     self.tooltip_text = nil
@@ -93,11 +95,16 @@ function TooltipRenderer:set_tooltip(
     end
 end
 
+---Renders only while the renderer owns visible tooltip text.
+---@param dc gui.Painter
 function TooltipRenderer:render(dc)
     if not self.visible then return end
     TooltipRenderer.super.render(self, dc)
 end
 
+---Paints the tooltip background and interior frame.
+---@param dc gui.Painter
+---@param rect gui.ViewRect
 function TooltipRenderer:onRenderFrame(dc, rect)
     if self.frame_background then
         dc:fill(rect, self.frame_background)
@@ -105,6 +112,10 @@ function TooltipRenderer:onRenderFrame(dc, rect)
     gui.paint_frame(dc, rect, self.frame_style)
 end
 
+---@class dwarfui.TooltipAgent
+---@field root gui.View
+---@field pointer_context dwarfui.PointerContext
+---@field renderer dwarfui.TooltipRenderer
 TooltipAgent = {}
 TooltipAgent.__index = TooltipAgent
 

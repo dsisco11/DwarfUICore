@@ -78,6 +78,10 @@ local function resolve_view(view, x, y)
     return miss()
 end
 
+---@class dwarfui.PointerContext
+---@field root gui.View
+---@field target gui.View|nil
+---@field result table
 PointerContext = {}
 PointerContext.__index = PointerContext
 
@@ -88,6 +92,7 @@ function PointerContext.new(root)
     return setmetatable({root=root, target=nil, result=miss()}, PointerContext)
 end
 
+---@class dwarfui.PointerDispatcher
 PointerDispatcher = {}
 
 ---@param root gui.View

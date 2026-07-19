@@ -229,7 +229,7 @@ local function update_service()
     return result or {kind='miss'}
 end
 
----@class dwarfui.ExperimentalTooltipServiceScreen: gui.ZScreen
+---@class dwarfui.TooltipServiceScreen: gui.ZScreen
 ---@field renderer table
 TooltipServiceScreen = defclass(TooltipServiceScreen, gui.ZScreen)
 TooltipServiceScreen.ATTRS{

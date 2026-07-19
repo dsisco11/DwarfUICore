@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string] $LuaCompiler = $env:DFHACK_LUAC,
-    [string] $RequiredLuaVersion = $env:DFHACK_LUA_VERSION,
+    [string] $LuaCompiler = $env:LUA_COMPILER,
+    [string] $RequiredLuaVersion = $env:LUA_REQUIRED_VERSION,
     [string] $SourceDir = 'src',
     [string] $TestsDir = 'Tests',
     [switch] $IncludeTests
@@ -16,7 +16,7 @@ if (-not $LuaCompiler) {
 
 $compiler = Get-Command $LuaCompiler -ErrorAction SilentlyContinue
 if (-not $compiler) {
-    throw "Lua compiler was not found: $LuaCompiler. Install luac.exe on PATH, set DFHACK_LUAC, or pass -LuaCompiler."
+    throw "Lua compiler was not found: $LuaCompiler. Install luac.exe on PATH, set LUA_COMPILER, or pass -LuaCompiler."
 }
 
 $version = (& $compiler.Source -v 2>&1 | Out-String)

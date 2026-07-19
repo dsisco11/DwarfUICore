@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $rockTree = Join-Path $projectRoot '.luarocks'
 $luaUnitVersion = '3.5-1'
-$testFileEnvironmentVariable = 'DFHACK_LUA_TEST_FILES'
+$testFileEnvironmentVariable = 'LUA_TEST_FILES'
 
 if (-not (Get-Command luarocks -ErrorAction SilentlyContinue)) {
     throw 'LuaRocks was not found on PATH.'

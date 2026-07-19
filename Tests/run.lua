@@ -21,8 +21,8 @@ local luaunit = require('luaunit')
 -- Run-UnitTests.ps1 owns deterministic discovery. Keeping its file list in an
 -- environment variable leaves LuaUnit's command-line arguments untouched for
 -- targeted cases, verbosity, and output format selection.
-local discovered_files = assert(os.getenv('DFHACK_LUA_TEST_FILES'),
-    'DFHACK_LUA_TEST_FILES must be provided by Tools/Run-UnitTests.ps1')
+local discovered_files = assert(os.getenv('LUA_TEST_FILES'),
+    'LUA_TEST_FILES must be provided by Tools/Run-UnitTests.ps1')
 local normalized_tests_root = tests_root:gsub('\\', '/') .. '/'
 
 for path in discovered_files:gmatch('[^\r\n]+') do

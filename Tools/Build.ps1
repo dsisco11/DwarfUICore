@@ -1,14 +1,14 @@
 [CmdletBinding()]
 param(
-    [string] $LuaCompiler = $env:DFHACK_LUAC,
-    [string] $RequiredLuaVersion = $env:DFHACK_LUA_VERSION,
+    [string] $LuaCompiler = $env:LUA_COMPILER,
+    [string] $RequiredLuaVersion = $env:LUA_REQUIRED_VERSION,
     # DwarfUI does not expose a `dwarfui reload` command yet. Keep command-based
     # reload available as an explicit opt-in once its shared modules and
     # user-facing UI additions have a real reload entry point.
     [bool] $LiveReload = $false,
     [string] $SourceDir = 'src',
-    [string] $DFHackRunner = $env:DFHACK_RUNNER,
-    [string] $DwarfFortressRoot = $env:DWARF_FORTRESS_ROOT,
+    [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
+    [string] $DwarfFortressRoot = $env:GAME_ROOT,
     [string] $ReloadOutputPath,
     [string] $EnvFile = '.env.local'
 )
@@ -31,10 +31,10 @@ if (-not [IO.Path]::IsPathRooted($resolvedEnvFile)) {
 }
 Import-EnvironmentFile -Path $resolvedEnvFile -AllowMissing
 
-$processLuaCompiler = [Environment]::GetEnvironmentVariable('DFHACK_LUAC', 'Process')
-$processRequiredLuaVersion = [Environment]::GetEnvironmentVariable('DFHACK_LUA_VERSION', 'Process')
-$processDFHackRunner = [Environment]::GetEnvironmentVariable('DFHACK_RUNNER', 'Process')
-$processDwarfFortressRoot = [Environment]::GetEnvironmentVariable('DWARF_FORTRESS_ROOT', 'Process')
+$processLuaCompiler = [Environment]::GetEnvironmentVariable('LUA_COMPILER', 'Process')
+$processRequiredLuaVersion = [Environment]::GetEnvironmentVariable('LUA_REQUIRED_VERSION', 'Process')
+$processDFHackRunner = [Environment]::GetEnvironmentVariable('MOD_COMMAND_RUNNER', 'Process')
+$processDwarfFortressRoot = [Environment]::GetEnvironmentVariable('GAME_ROOT', 'Process')
 
 if (-not $LuaCompiler) {
     $LuaCompiler = if ($processLuaCompiler) {

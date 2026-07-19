@@ -17,7 +17,7 @@ function tests:test_luaunit_setup_root_and_discovery()
         repo_root .. '/Docs/tooltip-system-port.todo', 'r'))
     todo:close()
 
-    local files = assert(os.getenv('DFHACK_LUA_TEST_FILES'),
+    local files = assert(os.getenv('LUA_TEST_FILES'),
         'runner did not provide discovered test files')
     luaunit.assertStrContains(files, 'infrastructure_smoke_test.lua')
     luaunit.assertNotStrContains(files, 'Tests\\support\\module_loader.lua')
@@ -119,7 +119,7 @@ function tests:test_widget_harness_models_tooltip_primitives()
 end
 
 function tests:test_opt_in_failure_path()
-    if os.getenv('DWARFUI_LUAUNIT_SMOKE_FORCE_FAILURE') == '1' then
+    if os.getenv('LUAUNIT_SMOKE_FORCE_FAILURE') == '1' then
         luaunit.assertEquals('actual value', 'expected value',
             'intentional LuaUnit smoke failure')
     end

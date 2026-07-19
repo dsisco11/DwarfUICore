@@ -113,5 +113,5 @@ function Resolve-DFHackRunner {
         return $command.Source
     }
 
-    throw 'Could not find dfhack-run.exe. Set DFHACK_RUNNER, pass -DFHackRunner, or pass -DwarfFortressRoot.'
+    throw 'Could not find dfhack-run.exe. Set MOD_COMMAND_RUNNER, pass -DFHackRunner, or pass -DwarfFortressRoot.'
 }

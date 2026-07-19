@@ -43,9 +43,14 @@ end
 local probe
 local cover
 local registered = false
+local original_get_mouse_pos
 
 ---Dismisses every live object created by this probe.
 local function cleanup()
+    if original_get_mouse_pos then
+        dfhack.screen.getMousePos = original_get_mouse_pos
+        original_get_mouse_pos = nil
+    end
     if registered and probe then
         tooltip.unregister(probe.target)
         registered = false
@@ -55,6 +60,8 @@ local function cleanup()
 end
 
 local ok, err = xpcall(function()
+    local initial_registration_count =
+        registration.get_diagnostics().registration_count
     probe = LiveTooltipProbeScreen{}
     probe:show()
     expect(tooltip.register(probe.target),
@@ -62,11 +69,20 @@ local ok, err = xpcall(function()
     registered = true
 
     local diagnostics = registration.get_diagnostics()
-    expect(diagnostics.registration_count == 1,
-        'singleton registry did not contain exactly one control')
+    expect(diagnostics.registration_count == initial_registration_count + 1,
+        'singleton registry did not add exactly one control')
     expect(diagnostics.renderer_count == 1,
         'singleton service did not contain exactly one renderer')
+    local probe_x = probe.target.frame_body.x1
+    local probe_y = probe.target.frame_body.y1
+    diagnostics.screen:onIdle()
+    expect(diagnostics.screen:hasFocus(),
+        'existing service screen did not raise above the new probe screen')
+    original_get_mouse_pos = dfhack.screen.getMousePos
+    dfhack.screen.getMousePos = function() return probe_x, probe_y end
     diagnostics.screen:onRender()
+    dfhack.screen.getMousePos = original_get_mouse_pos
+    original_get_mouse_pos = nil
     diagnostics = registration.get_diagnostics()
     expect(diagnostics.target == probe.target,
         'live screen target was not selected')
@@ -75,6 +91,23 @@ local ok, err = xpcall(function()
     expect(diagnostics.screen.renderer.tooltip_text:match(
         '^Live dynamic tooltip %d+,%d+$') ~= nil,
         'live dynamic pointer mutation was not presented immediately')
+
+    local blocker = widgets.Window{
+        frame={l=probe_x, t=probe_y, w=12, h=3},
+        title='Modal probe',
+    }
+    probe:addviews{blocker}
+    probe:updateLayout()
+    original_get_mouse_pos = dfhack.screen.getMousePos
+    dfhack.screen.getMousePos = function() return probe_x, probe_y end
+    diagnostics.screen:onRender()
+    dfhack.screen.getMousePos = original_get_mouse_pos
+    original_get_mouse_pos = nil
+    expect(registration.get_diagnostics().target == nil,
+        'live modal window did not block the underlying tooltip target')
+    expect(not diagnostics.screen.renderer.visible,
+        'live modal blocker left the underlying tooltip visible')
+    blocker.visible = false
 
     local forwarded
     local original_forward = diagnostics.screen.sendInputToParent
@@ -98,8 +131,12 @@ local ok, err = xpcall(function()
     expect(tooltip.unregister(probe.target),
         'public tooltip.unregister() did not remove the control')
     registered = false
-    expect(registration.get_diagnostics().renderer_count == 0,
-        'service renderer survived final unregistration')
+    local final_diagnostics = registration.get_diagnostics()
+    expect(final_diagnostics.registration_count == initial_registration_count,
+        'screen probe registration survived explicit unregistration')
+    expect(final_diagnostics.renderer_count ==
+        (initial_registration_count > 0 and 1 or 0),
+        'service renderer lifecycle did not match remaining registrations')
 end, debug.traceback)
 
 cleanup()

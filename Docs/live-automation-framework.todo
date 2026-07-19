@@ -474,16 +474,62 @@ aborted without affecting DF stability.
 
 ### Phase 2 - Build scheduler and cleanup foundations
 
-- ☐ Implement single-owner coroutine scheduling and frame/wall-clock budgets.
-- ☐ Add `wait_frames`, `wait_until`, cancellation, stale-callback rejection,
+- ☑ Implement single-owner coroutine scheduling and frame/wall-clock budgets.
+- ☑ Add `wait_frames`, `wait_until`, cancellation, stale-callback rejection,
   and actionable timeout errors.
-- ☐ Implement the idempotent LIFO cleanup registry and per-test `dy.reset()`.
-- ☐ Add lease expiry driven by status polling and emergency cleanup.
-- ☐ Prove cleanup after a passing test, assertion failure after resume,
+- ☑ Implement the idempotent LIFO cleanup registry and per-test `dy.reset()`.
+- ☑ Add lease expiry driven by status polling and emergency cleanup.
+- ☑ Prove cleanup after a passing test, assertion failure after resume,
   interaction error, suite abort, expired lease, and repeated reset.
 
 Exit: asynchronous live interactions cannot strand a coroutine or leak live
 state after any supported termination path.
+
+#### Phase 2 implementation and evidence
+
+- `Tests/Automation/support/scheduler.lua` owns the sole suite coroutine and
+  is the only component that resumes it. Each wait has an exact generation and
+  operation token, one outstanding-operation slot, a raw-frame budget, and an
+  independent monotonic wall-clock deadline. Cancellation removes the DFHack
+  timer without resuming a discarded coroutine, and stale callbacks only
+  increment retained scheduler diagnostics.
+- `dy.wait_frames()` and `dy.wait_until()` now suspend ordinary Busted tests
+  across `dfhack.timeout(..., 'frames', ...)` callbacks. Operational errors
+  report the operation, current focus, active viewscreen, elapsed frames and
+  milliseconds, budgets, last observed value, and query failure where
+  applicable. Product expectations remain ordinary Luassert assertions.
+- `Tests/Automation/support/cleanup.lua` supplies an owned, idempotent LIFO
+  registry. It releases explicitly transferred resources, executes every
+  remaining action even when one fails, retains cleanup failure details, and
+  makes repeated `dy.reset()` calls safe. The host independently drains the
+  same registry during completion, explicit abort, and lease expiry.
+- Status polls renew a frame-driven lease. Loss of polling invalidates the run
+  generation, cancels startup and outstanding-wait timers, discards the suite
+  coroutine reference, performs emergency cleanup, and archives an `aborted`
+  result. Terminal status includes `cleanup_confirmed`, and
+  `Tools/Run-AutomationTests.ps1` rejects a nominal pass without that
+  confirmation.
+- The local Busted suite passed with 83 successes and no failures, errors, or
+  pending tests. Scheduler contracts cover sole ownership, nested waits,
+  frame and wall deadlines, query errors, cancellation, and stale callbacks;
+  cleanup contracts cover strict LIFO order, repeated reset, continued cleanup
+  after failure, release, registry ownership, host abort, and lease expiry.
+- The clean in-process suite passed generation 31 with 6 successes and
+  `cleanup_confirmed=true`. A two-repeat run passed generation 32 with 12 total
+  successes, proving scheduler and cleanup reuse across ordinary Busted
+  repeats.
+- A temporary failure-only live spec produced exactly one Luassert failure
+  after a two-frame resume and one interaction error. Generation 26 retained
+  both ordinary Busted classifications, emitted both per-test cleanup markers,
+  and finished `cleanup_confirmed=true`.
+- A runner-timeout proof aborted generation 27 while its test was suspended.
+  Retained status showed the outstanding resource cleanup marker and
+  `cleanup_confirmed=true`. A lost-poller proof aborted generation 29 after a
+  109 ms lease expiry with the same cleanup marker and confirmation. Both
+  temporary proof specs were removed; default discovery remains green.
+- Lua 5.4.6 syntax validation passed for 5 production and 34 test/support
+  files. All live executions used only `Tools/Run-AutomationTests.ps1`; direct
+  follow-up status reads only inspected the retained in-memory abort result.
 
 ### Phase 3 - Add live UI interaction primitives
 

@@ -14,6 +14,10 @@ param(
     [int] $PollIntervalMilliseconds = 100,
     [ValidateRange(1, 100000)]
     [int] $StartupDelayFrames = 1,
+    [ValidateRange(100, 60000)]
+    [int] $LeaseTimeoutMilliseconds = 5000,
+    [ValidateRange(1, 100000)]
+    [int] $LeaseCheckFrames = 30,
     [string] $RunId,
     [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
     [string] $DwarfFortressRoot = $env:GAME_ROOT,
@@ -85,6 +89,11 @@ function ConvertFrom-AutomationSummary {
     return [pscustomobject]@{
         Line = $line
         State = $fields.state
+        CleanupConfirmed = if ($fields.ContainsKey('cleanup_confirmed')) {
+            $fields.cleanup_confirmed -eq 'true'
+        } else {
+            $false
+        }
         OutputCount = if ($fields.ContainsKey('output_count')) {
             [int]$fields.output_count
         } else {
@@ -176,12 +185,15 @@ Add-AutomationOptions $bootstrapArguments 'tag' $Tag
 Add-AutomationOptions $bootstrapArguments 'exclude-tag' $ExcludeTag
 $bootstrapArguments.Add("--repeat=$Repeat")
 $bootstrapArguments.Add("--defer-frames=$StartupDelayFrames")
+$bootstrapArguments.Add("--lease-timeout-ms=$LeaseTimeoutMilliseconds")
+$bootstrapArguments.Add("--lease-check-frames=$LeaseCheckFrames")
 if ($Spec) { $bootstrapArguments.Add("--spec=$Spec") }
 
 $started = $false
 $finished = $false
 $outputOffset = 0
 $finalState = $null
+$cleanupConfirmed = $false
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
 try {
@@ -201,11 +213,15 @@ try {
         $summary = ConvertFrom-AutomationSummary $statusResult.Output
         $outputOffset = $summary.OutputCount
         $finalState = $summary.State
+        $cleanupConfirmed = $summary.CleanupConfirmed
     }
 
     $finished = $true
     if ($finalState -ne 'passed') {
         throw "Automation run finished with state '$finalState'."
+    }
+    if (-not $cleanupConfirmed) {
+        throw 'Automation run passed without confirmed live-state cleanup.'
     }
 }
 finally {

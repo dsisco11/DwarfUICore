@@ -109,13 +109,15 @@ files are never used to coordinate test execution.
 - Busted 2.3.0 executes test bodies and hooks through protected Lua calls and
   exposes programmatic core, loader, filter, execute, event, and output-handler
   modules.
-- Lua 5.4 can yield and resume across `xpcall`, allowing the entire Busted
-  execution stack to remain suspended while DFHack advances frames.
+- The installed DFHack core context runs Lua 5.3. Its coroutine can yield and
+  resume across Busted's protected calls while DFHack advances real frames.
 
 ### Mandatory feasibility gates
 
-- The repository-local LuaSystem, LuaFileSystem, and terminal DLLs must load in
-  DFHack's Lua 5.4 runtime without ABI conflicts.
+- The repository-local Busted, Luassert, and Penlight Lua sources must load in
+  DFHack's Lua 5.3 runtime. Native dependencies built for the unit runner's Lua
+  5.4 ABI are not loaded; the automation host supplies narrow DFHack-native
+  `system` and `lfs` adapters instead.
 - A Busted test coroutine must yield from inside a test and resume on a later
   `dfhack.timeout` frame while preserving Busted context and Luassert failure
   classification.
@@ -305,6 +307,8 @@ Tests/
       busted_host.lua
       scheduler.lua
       dy.lua
+      system_adapter.lua
+      lfs_adapter.lua
       output_handler.lua
       cleanup.lua
       diagnostics.lua
@@ -328,12 +332,15 @@ approved specs root.
 
 ## PowerShell runner
 
-`Tools/Run-AutomationTests.ps1` is the supported entry point. It should:
+`Tools/Run-AutomationTests.ps1` is the only supported automation-test entry
+point. Automation specs are never run through `Run-UnitTests.ps1`. The
+automation runner should:
 
 1. Reuse `Tools/Common.ps1` and `Resolve-DFHackRunner`, including `GAME_ROOT`
    and `MOD_COMMAND_RUNNER` support.
-2. Ensure the pinned Busted/LuaRocks dependencies already used by unit tests are
-   installed.
+2. Ensure the pinned pure-Lua Busted/Luassert/Penlight sources are installed
+   and expose them with the DFHack-native `system` and `lfs` adapters. Do not
+   alter the unit runner's Lua 5.4 dependency tree.
 3. Verify DFHack connectivity and report version, world/map state, and focus.
 4. Generate a run id and invoke `bootstrap.lua` through `dfhack-run lua -f`.
 5. Poll `status.lua` without blocking DFHack, forwarding Busted progress and
@@ -351,22 +358,55 @@ mouse, or convert a cleanup failure into a passing result.
 
 ### Phase 0 - Prove in-process Busted feasibility
 
-- ☐ Add a throwaway bootstrap that prepends the repository-local LuaRocks Lua
-  and native-library paths inside DFHack.
-- ☐ Prove `system`, `lfs`, `busted.core`, `busted`, and `luassert` load without
+- ☑ Add a throwaway bootstrap that prepends the repository-local LuaRocks Lua
+  paths inside DFHack and tests the native dependency boundary.
+- ☑ Prove `system`, `lfs`, `busted.core`, `busted`, and `luassert` load without
   ABI or global-environment conflicts.
-- ☐ Run one passing and one deliberately failing Busted test programmatically
+- ☑ Run one passing and one deliberately failing Busted test programmatically
   without `busted.runner`, `os.exit`, or process working-directory changes.
-- ☐ Run Busted execution inside a coroutine; yield from a test, resume it from
+- ☑ Run Busted execution inside a coroutine; yield from a test, resume it from
   `dfhack.timeout(..., 'frames', ...)`, and prove the following assertion is
   classified correctly.
-- ☐ Prove yielded `before_each`, test, `finally`, `after_each`, and suite
+- ☑ Prove yielded `before_each`, test, `finally`, `after_each`, and suite
   teardown ordering on success and failure.
-- ☐ Confirm DF continues rendering and accepting input throughout the spike.
-- ☐ Remove the throwaway spike or promote only the proven pieces.
+- ☑ Confirm DF continues rendering and accepting input throughout the spike.
+- ☑ Remove the throwaway spike and promote only the proven compatibility
+  adapters.
 
 Exit: Busted safely suspends across real DF frames inside the core context. If
 this fails, stop and discuss the architectural blocker.
+
+#### Phase 0 implementation and evidence
+
+- Live runtime: DFHack 53.15-r1 reported Lua 5.3. The unit dependency tree uses
+  Lua 5.4.6, and its `system/core.dll` and `lfs.dll` link against `lua54.dll`.
+  Loading those DLLs in DFHack correctly failed the ABI gate.
+- Proven dependency strategy: reuse the pinned pure-Lua Busted 2.3.0, Luassert,
+  and Penlight sources, with promoted DFHack adapters at
+  `Tests/Automation/support/system_adapter.lua` and
+  `Tests/Automation/support/lfs_adapter.lua`. The live module report was
+  `system:table,lfs:table,busted.core:table,busted:table,luassert:table`.
+- Programmatic execution used `busted.core`, `busted`, a base output handler,
+  and `busted.execute`; it did not load `busted.runner`. Busted reported exactly
+  `1 success, 1 expected failure, 0 errors, 0 pending`, and Luassert classified
+  the assertion after resume as the deliberate test failure.
+- The observed yielded order was suite setup; first `before_each`, passing test,
+  passing `finally`, and `after_each`; second `before_each`, failing test,
+  failing `finally`, and `after_each`; then suite teardown. Every entry recorded
+  both its pre-yield and post-resume marker in that order.
+- The game rendered five times while the suite was suspended and delivered one
+  simulated native input event to the live test screen. Teardown dismissed the
+  screen, no inspected Busted DSL globals changed, and the working directory
+  remained unchanged.
+- `Tools/Check-LuaSyntax.ps1 -SourceDir src -IncludeTests` passed for 5
+  production and 23 test/support files before removal of the disposable spike.
+  It passed again for the remaining 5 production and 21 test/support files.
+- The existing unit suite remained separate and passed with 68 successes and
+  no failures, errors, or pending tests.
+- The disposable bootstrap and status reporter were removed after the proof.
+  The supported runner remains a separate later deliverable and will be
+  `Tools/Run-AutomationTests.ps1`; this feasibility command is not a supported
+  automation-test entry point.
 
 ### Phase 1 - Build the safe Busted host
 

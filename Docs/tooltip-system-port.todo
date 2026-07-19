@@ -1,6 +1,6 @@
 # Tooltip System Port and Registration API Evaluation
 
-Status: in progress (Phases 0-3 complete)
+Status: in progress (Phases 0-4 complete)
 
 ## Goal
 
@@ -532,36 +532,78 @@ expanded package and zip package before creating `DwarfUI-0.1.0.zip`.
 
 ## Phase 4 - Port the generic per-root pointer dispatcher
 
-- ☐ Port `PointerContext` as state owned by one supplied root.
-- ☐ Port `PointerDispatcher.resolve(root, x, y)` with explicit `target`,
+- ☑ Port `PointerContext` as state owned by one supplied root.
+- ☑ Port `PointerDispatcher.resolve(root, x, y)` with explicit `target`,
   `blocked`, and `miss` results.
-- ☐ Port `PointerDispatcher.sample(context, x, y)` with optional single mouse
+- ☑ Port `PointerDispatcher.sample(context, x, y)` with optional single mouse
   sampling through `dfhack.screen.getMousePos()`.
-- ☐ Treat the supplied root as a traversal boundary and search its subviews in
+- ☑ Treat the supplied root as a traversal boundary and search its subviews in
   reverse render order.
-- ☐ Respect evaluated `visible` and `active` state across the ancestor chain.
-- ☐ Respect clipped body rectangles for normal target hit testing.
-- ☐ Use the complete window frame for blocking, including borders and empty
+- ☑ Respect evaluated `visible` and `active` state across the ancestor chain.
+- ☑ Respect clipped body rectangles for normal target hit testing.
+- ☑ Use the complete window frame for blocking, including borders and empty
   interior.
-- ☐ Keep `target` controls terminal even when they have implementation
+- ☑ Keep `target` controls terminal even when they have implementation
   subviews.
-- ☐ Keep `pass` containers transparent when no descendant wins.
-- ☐ Keep `none` widgets and their complete subtree excluded.
-- ☐ Emit leave and enter when the selected target changes, followed by update
+- ☑ Keep `pass` containers transparent when no descendant wins.
+- ☑ Keep `none` widgets and their complete subtree excluded.
+- ☑ Emit leave and enter when the selected target changes, followed by update
   for the current target.
-- ☐ Supply coordinates local to the terminal target.
-- ☐ Clear the current target when it becomes hidden, inactive, clipped, moved,
+- ☑ Supply coordinates local to the terminal target.
+- ☑ Clear the current target when it becomes hidden, inactive, clipped, moved,
   removed, or unreachable from the root.
-- ☐ Add Busted coverage for overlap, clipping, visibility, evaluated state,
+- ☑ Add Busted coverage for overlap, clipping, visibility, evaluated state,
   terminal composites, transparent panels, explicit blockers, window borders,
   nested modal windows, missing mouse coordinates, target removal, callbacks,
   and isolation between two roots.
-- ☐ Add a defclass-based regression test proving method-style
+- ☑ Add a defclass-based regression test proving method-style
   `on_pointer_update(x, y)` receives correct local coordinates after `self`.
+
+### Phase 4 implementation and evidence
+
+`dwarfui/pointer.lua` now exports `PointerContext` and `PointerDispatcher`
+without importing tooltip presentation. Each context retains only its supplied
+root, current terminal target, and latest explicit result. `resolve(root,x,y)`
+treats the root as a traversal boundary and returns one of three result shapes:
+`{kind='target',target=...,x=...,y=...}`, `{kind='blocked',blocker=...}`, or
+`{kind='miss'}`.
+
+Resolution evaluates `visible` and `active` at every visited ancestor, limits
+normal targeting to clipped body rectangles, and traverses subviews from last
+to first to match render order. A `target` is terminal, a `pass` container is
+transparent after its descendants miss, and `none` excludes the entire
+subtree. A `block` view resolves descendants through its body but blocks its
+complete frame, including borders and empty interior. This preserves nested
+modal behavior without allowing an underlying sibling to win inside a blocking
+frame.
+
+`sample(context,x,y)` uses supplied coordinates when complete; otherwise it
+calls `dfhack.screen.getMousePos()` exactly once. It resolves the context's root,
+emits leave then enter when ownership changes, emits update for the selected
+target, and stores the new result. Callback invocation supplies the target as
+the receiver followed by terminal-local coordinates. Any miss or blocker clears
+the selected target, including misses caused by hidden, inactive, clipped,
+moved, removed, or otherwise unreachable views.
+
+`Tests/pointer_test.lua` contains 15 focused Busted specs. They cover context
+initialization; explicit result shapes; root boundaries; reverse overlap;
+terminal composites; transparent panels; excluded subtrees; target and root
+clipping; full window frames; nested modals; evaluated visibility and activity;
+ordered callbacks and local coordinates; optional one-sample mouse lookup;
+missing coordinates; each stale-target cause; two-root isolation; tooltip-
+independent targeting; and a harness `defclass` method declared as
+`on_pointer_update(x,y)` that receives `self` and the correct coordinates.
+
+The focused dispatcher run passed all 15 specs. The complete Busted run passed
+32 specs with zero failures, errors, or pending cases.
+`./Tools/Build.ps1 -LiveReload:$false` syntax-checked four production files and
+ten test/support files with Lua 5.4.6 without invoking a live command.
+`./Tools/Publish.ps1` repeated the build and independently verified both the
+expanded and zip packages.
 
 ### Phase 4 exit criteria
 
-- ☐ Each independently rendered root resolves one terminal target, blocker, or
+- ☑ Each independently rendered root resolves one terminal target, blocker, or
   miss and maintains correct pointer transitions without tooltip-specific
   hierarchy traversal.
 
@@ -784,6 +826,10 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 3 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 17 specs; zero failures, errors, or pending cases |
 | 2026-07-18 | 3 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 9 test/support files syntax-checked; no live command |
 | 2026-07-18 | 3 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-18 | 4 | Focused test | Busted filter for DwarfUI pointer dispatcher | passed | 15 dispatcher specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 4 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 32 specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 4 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 10 test/support files syntax-checked; no live command |
+| 2026-07-18 | 4 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
 | | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
 | | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
 | | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |

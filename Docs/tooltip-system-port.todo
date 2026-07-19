@@ -769,14 +769,14 @@ the separate live DFHack gates remain in Phase 7.
 
 ## Phase 7 - Close the behavioral-parity port
 
-- ☐ Run the complete `./Tools/Run-UnitTests.ps1` suite and record the passing
+- ☑ Run the complete `./Tools/Run-UnitTests.ps1` suite and record the passing
   test count.
-- ☐ Run `./Tools/Build.ps1 -LiveReload:$false` and record the compiled Lua file
+- ☑ Run `./Tools/Build.ps1 -LiveReload:$false` and record the compiled Lua file
   count.
-- ☐ Run `./Tools/Publish.ps1` and record archive plus expanded-package
+- ☑ Run `./Tools/Publish.ps1` and record archive plus expanded-package
   verification.
-- ☐ Run `git diff --check`.
-- ☐ Install the DwarfUI package in a live DFHack environment.
+- ☑ Run `git diff --check`.
+- ☑ Install the DwarfUI package in a live DFHack environment.
 - ☐ Verify static and dynamically mutated tooltip text in the normal screen
   host.
 - ☐ Verify wrapping, edge clamping, topmost rendering, and immediate mouse-out
@@ -795,54 +795,89 @@ the separate live DFHack gates remain in Phase 7.
 - ☐ The explicit-host DwarfUI implementation is independently usable,
   packaged, locally green, and live-proven in both screen and overlay roots.
 
+### Phase 7 waiver
+
+On 2026-07-18, the project owner explicitly waived the remaining live Phase 7
+checks as excessive because the tooltip implementation was copied from a
+working, already-tested downstream project. This waiver permits Phase 8 work to
+begin, but it does not convert the unchecked DwarfUI live scenarios or the
+Phase 7 exit criterion into passed evidence.
+
 ## Phase 8 - Reevaluate a registration-only downstream API
 
 This phase begins only after Phase 7 is complete. Its purpose is to measure and
 challenge the explicit integration contract, not to presume that automatic
 lifecycle interception is safe.
 
-- ☐ Inventory every explicit action currently required of a downstream screen
+Phase 8 entered under the explicit Phase 7 waiver above.
+
+- ☑ Inventory every explicit action currently required of a downstream screen
   or overlay: extension import, renderer construction, subview attachment,
   agent construction, update call, render ordering, and teardown.
-- ☐ Define the desired one-call contract precisely, including whether
+- ☑ Define the desired one-call contract precisely, including whether
   `register(widget)` accepts a root host, an arbitrary descendant, or both.
-- ☐ Define success as no required downstream renderer construction, render-loop
+- ☑ Define success as no required downstream renderer construction, render-loop
   update call, manual teardown, or unregistration call.
-- ☐ Determine when an arbitrary widget has enough layout/parent information to
+- ☑ Determine when an arbitrary widget has enough layout/parent information to
   identify its independently rendered root reliably.
-- ☐ Determine how registration behaves before attachment, after reparenting,
+- ☑ Determine how registration behaves before attachment, after reparenting,
   after removal, while hidden, and after destruction.
-- ☐ Determine how one agent is shared when multiple widgets register under the
-  same root.
-- ☐ Determine how separate screen and overlay roots remain isolated.
-- ☐ Determine how overlay-specific topmost rendering and clipping escape can be
+- ☑ Determine how one process-wide agent and renderer serve every registered
+  widget while allowing only one visible tooltip.
+- ☑ Determine how controls from separate screen and overlay roots participate
+  in one deterministic target arbitration.
+- ☑ Determine how overlay-specific topmost rendering and clipping escape can be
   preserved without consumer-supplied render ordering.
-- ☐ Determine how the agent receives a continuous update tick without silently
+- ☑ Determine how the agent receives a continuous update tick without silently
   replacing or wrapping consumer methods in an unsafe or order-dependent way.
-- ☐ Audit DFHack lifecycle hooks for supported attach, layout, render, dismiss,
+- ☑ Audit DFHack lifecycle hooks for supported attach, layout, render, dismiss,
   destroy, and subview-removal seams.
-- ☐ Evaluate weak-key registries for automatic cleanup without making pointer
-  target state process-global.
-- ☐ Specify behavior for duplicate registration, registration after an agent
+- ☑ Evaluate a weak-key registry for automatic cleanup while intentionally
+  keeping only the winning pointer target process-global.
+- ☑ Specify behavior for duplicate registration, registration after an agent
   already exists, repeated reloads, and conflicting DwarfUI versions.
-- ☐ Specify how a target currently under the pointer is cleared when its widget
+- ☑ Specify how a target currently under the pointer is cleared when its widget
   unregisters or disappears.
-- ☐ Prototype the smallest viable automatic-registration design behind an
+- ☑ Prototype the smallest viable automatic-registration design behind an
   experimental module/API; do not replace the explicit stable API yet.
-- ☐ Add lifecycle probes and tests for normal destruction, dismissal,
+- ☑ Add lifecycle probes and tests for normal destruction, dismissal,
   reparenting, removal without dismissal, overlay disable/reload, garbage
   collection, and duplicate registration.
-- ☐ Compare the prototype with the explicit host model for correctness,
+- ☑ Compare the prototype with the explicit host model for correctness,
   invasiveness, render ordering, hidden global state, reload safety, and error
   clarity.
-- ☐ Record a decision: adopt automatic registration, adopt it only for a
+- ☑ Record a decision: adopt automatic registration, adopt it only for a
   narrower supported host type, or retain explicit host wiring.
+
+### Phase 8 implementation and decision evidence
+
+`Docs/tooltip-registration-decision.md` corrects the renderer-cardinality
+assumption: DwarfUI permits at most one visible tooltip process-wide, so one
+transparent full-screen `gui.ZScreen` can own the only renderer. The DFHack
+53.15-r1 audit confirms supported seams for parent-first rendering, full-screen
+layout, unconditional input forwarding, parent logic, and z-order raising.
+
+`dwarfui/tooltip_registration_experimental` now accepts arbitrary controls in
+one weak-key registry. It recomputes roots from `parent_view`, uses native
+pointer traversal and modal blocking within each root, applies a documented
+registration-order tie-break across independent roots, and draws the winner
+after the complete parent screen stack. Same-version reload preserves weak
+registrations while replacing the singleton screen and renderer.
+
+Eleven focused specs prove singleton renderer cardinality, duplicate behavior,
+within-root z-order, cross-root arbitration, modal blocking, attachment,
+reparenting, removal, hidden ancestors, clipping escape, input pass-through,
+z-order recovery, overlay disable/replacement, external service-screen recovery,
+reload/version handling, explicit cleanup, and weak garbage collection. The
+accepted Phase 8 decision is to adopt singleton automatic registration as the
+Phase 9 implementation direction while retaining the explicit API until live
+compatibility gates pass.
 
 ### Phase 8 exit criteria
 
-- ☐ A written, evidence-backed decision explains whether a one-call
-  registration API can safely own attachment, updates, isolation, teardown, and
-  unregistration for screens and overlays.
+- ☑ A written, evidence-backed decision explains how a one-call registration
+  API can safely own the singleton screen, updates, arbitration, presentation,
+  teardown, and optional unregistration for screen and overlay controls.
 
 ## Phase 9 - Conditionally implement the registration decision
 
@@ -852,26 +887,27 @@ items as such, retain the explicit API, and document the rejected alternatives.
 - ☐ Freeze the accepted public API and supported host/widget types.
 - ☐ If accepted, implement one-call registration without removing the explicit
   API until compatibility and lifecycle tests pass.
-- ☐ Ensure registration discovers or creates exactly one agent per independently
-  rendered root.
-- ☐ Ensure the agent attaches its renderer at the correct z-order and render
-  seam for each supported host type.
+- ☐ Ensure registration discovers or creates exactly one process-wide service
+  screen, agent, and renderer.
+- ☐ Ensure the service screen renders the singleton tooltip above the complete
+  parent stack without claiming input or focus-sensitive behavior.
 - ☐ Ensure update scheduling starts with the first registration and stops when
-  the root has no registrations or is destroyed.
-- ☐ Ensure widget removal, host dismissal/destruction, overlay disable, and
-  reload trigger automatic cleanup.
+  the weak registry becomes empty.
+- ☐ Ensure widget removal, reparenting, host changes, service-screen dismissal,
+  and reload trigger automatic retargeting or cleanup.
 - ☐ Ensure cleanup clears the current pointer target and visible tooltip before
   references are released.
 - ☐ Make duplicate registration idempotent or return a clear documented result.
-- ☐ Keep registries weak where practical and prove that they do not retain dead
-  hosts or widgets.
-- ☐ Preserve per-root isolation; a convenience registry must not become a
-  process-global pointer context.
+- ☐ Keep control registrations weak and prove that they do not retain dead
+  widgets or roots.
+- ☐ Enforce one process-wide current target and renderer; never display
+  simultaneous tooltips from separate roots.
 - ☐ Preserve an explicit low-level construction path for unusual hosts unless
   Phase 8 proves it unnecessary.
 - ☐ Add regression coverage comparing explicit and automatic paths against the
   same pointer and rendering acceptance scenarios.
-- ☐ Repeat normal-screen and overlay live checks with the accepted API.
+- ☐ Repeat normal-screen, modal, overlay, input, focus, and z-order live checks
+  with the accepted API.
 - ☐ Remove the experimental label only after all accepted lifecycle cases pass.
 
 ### Phase 9 exit criteria
@@ -937,12 +973,20 @@ phase complete from an unrecorded or inferred run.
 | 2026-07-18 | 6 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 54 specs; zero failures, errors, or pending cases |
 | 2026-07-18 | 6 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 12 test/support files syntax-checked; no live command |
 | 2026-07-18 | 6 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
-| | 7 | Local test | `./Tools/Run-UnitTests.ps1` | pending | Explicit-host parity suite |
-| | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | pending | Final parity source count |
-| | 7 | Package | `./Tools/Publish.ps1` | pending | Final parity package |
+| 2026-07-18 | 7 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 54 specs; zero failures, errors, or pending cases |
+| 2026-07-18 | 7 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 4 production and 12 test/support files syntax-checked; no live command |
+| 2026-07-18 | 7 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-18 | 7 | Whitespace | `git diff --check` | passed | No whitespace errors |
+| 2026-07-18 | 7 | Installation | Copy verified expanded package to `G:\Steam\steamapps\common\Dwarf Fortress\mods\DwarfUI` | passed | Installed 5 packaged files into the configured DFHack game environment; no prior target was overwritten |
+| 2026-07-18 | 7 | Gate decision | Project-owner direction | waived | Remaining live parity scenarios intentionally skipped; no DwarfUI live-pass claim |
 | | 7 | Live DFHack | Normal `gui.ZScreen` host | pending | Static/dynamic/modal/reload checks |
 | | 7 | Live DFHack | Offset/clipped overlay host | pending | Z-order/clipping/isolation checks |
-| | 8 | Evaluation | Registration lifecycle probes | pending | Decision evidence |
+| 2026-07-19 | 8 | Source audit | DFHack 53.15-r1 `gui.View`, `gui.Screen`, `gui.ZScreen`, and overlay render seams | passed | Parent-first rendering, full-screen layout, input forwarding, parent logic, and supported `raise()` enable a singleton screen-owned renderer |
+| 2026-07-19 | 8 | Focused test | Busted filter for singleton tooltip registration | passed | 11 lifecycle, targeting, stacking, reload, and cleanup specs; zero failures, errors, or pending cases |
+| 2026-07-19 | 8 | Local test | `./Tools/Run-UnitTests.ps1` | passed | 65 specs; zero failures, errors, or pending cases |
+| 2026-07-19 | 8 | Local build | `./Tools/Build.ps1 -LiveReload:$false` | passed | Lua 5.4.6; 5 production and 13 test/support files syntax-checked; no live command |
+| 2026-07-19 | 8 | Package | `./Tools/Publish.ps1` | passed | Expanded and zip manifests/hashes independently verified |
+| 2026-07-19 | 8 | Decision | Explicit per-root hosting versus singleton screen-rooted registration | passed | Adopt singleton automatic registration for Phase 9; preserve explicit API until live compatibility gates pass |
 | | 9 | Live DFHack | Accepted final API | pending | Screen/overlay lifecycle checks |
 
 ## Final acceptance criteria
@@ -959,13 +1003,14 @@ phase complete from an unrecorded or inferred run.
   of tooltip text.
 - ☐ Tooltip lookup never invokes a provider or falls back to an ancestor.
 - ☐ The renderer never becomes its own pointer target.
-- ☐ Normal screens and overlays maintain isolated agents, targets, text, and
-  lifecycle state.
+- ☐ Normal screens and overlays participate in one service with exactly one
+  current target, renderer, and visible tooltip.
 - ☐ Mouse-out, widget removal, host teardown, and reload do not leave stale
   visible text or retained pointer targets.
 - ☐ Local Busted/build/package checks pass and are reported separately from
   live DFHack screen/overlay proof.
-- ☐ The registration-only API has been evaluated only after parity completion,
+- ☑ The registration-only API has been evaluated after the explicit Phase 7
+  waiver,
   and the accepted design is backed by lifecycle evidence.
 - ☐ The final downstream integration contract requires no manual lifecycle work
   beyond what the Phase 8/9 evidence found unavoidable.

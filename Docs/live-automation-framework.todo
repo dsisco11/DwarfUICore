@@ -263,9 +263,14 @@ is already executing or an incompatible host version owns the slot.
 
 `Tests/Automation/status.lua <run-id>` reads this in-memory object and emits:
 
-- one stable machine-readable summary line for PowerShell;
+- one canonical `DWARFUI_AUTOMATION_JSON` stdout report for PowerShell;
 - incremental or final Busted output when requested; and
 - cleanup diagnostics if the host is not idle after completion.
+
+The JSON report is a terminal/status representation of the in-memory run, not
+an inter-process test-control protocol. It contains the protocol and run id,
+state, terminal marker, Busted counts, failure details, host diagnostics, and
+cleanup confirmation. Human-readable output remains supplemental.
 
 `Tests/Automation/abort.lua <run-id>` invalidates the generation, cancels the
 outstanding timeout, unwinds registered cleanup actions, marks the run aborted,
@@ -569,16 +574,53 @@ assert, capture, and clean a real live DFHack UI.
 
 ### Phase 4 - Add the supported runner
 
-- ☐ Harden `Tools/Run-AutomationTests.ps1` with dependency installation and the
+- ☑ Harden `Tools/Run-AutomationTests.ps1` with dependency installation and the
   remaining unattended-run diagnostics and recovery contracts.
-- ☐ Keep automation discovery separate from `Run-UnitTests.ps1`.
-- ☐ Add safe overlay fixture staging and unconditional `finally` cleanup.
-- ☐ Prove the runner handles no game, incompatible Lua dependency, active run,
+- ☑ Keep automation discovery separate from `Run-UnitTests.ps1`.
+- ☑ Add safe overlay fixture staging and unconditional `finally` cleanup.
+- ☑ Prove the runner handles no game, incompatible Lua dependency, active run,
   Busted failure, host error, timeout, user abort, and cleanup failure clearly.
-- ☐ Document interactive and unattended invocation.
+- ☑ Document interactive and unattended invocation.
 
 Exit: one command runs in-process live Busted specs and returns a trustworthy
 automation result.
+
+#### Phase 4 implementation and evidence
+
+- The in-process host emits a canonical `DWARFUI_AUTOMATION_JSON` report on
+  bootstrap, status, and abort. It includes protocol and run identity, state,
+  terminal flag, Busted counts, current test, failure details, host diagnostics,
+  and cleanup confirmation. JSON is stdout reporting only; it is not a file,
+  mailbox, or test-coordination channel.
+- `Run-AutomationTests.ps1` consumes the JSON report, validates the protocol and
+  requested run id on every response, and rejects malformed reports, nonpassing
+  terminal states, and unconfirmed cleanup. A timeout performs an abort and
+  requires the returned JSON report to confirm `aborted` plus cleanup.
+- The runner installs pinned Busted 2.3.0-1 pure-Lua sources only when absent,
+  then verifies the required Busted, Luassert, and DFHack adapter files. It does
+  not change the unit runner's dependency path or discovery rules.
+- `-OverlayFixture <name>` accepts only an approved lowercase fixture name,
+  stages it under a unique run-owned file in DFHack's exact GUI script directory,
+  requires an in-process overlay-rescan success marker, and removes that exact
+  file plus rescans again in `finally`. The supplied `runner_probe` fixture is
+  default-disabled and does not mutate fortress state.
+- Interactive usage: `Tools/Run-AutomationTests.ps1 -Spec interaction_live_spec.lua`.
+  Use `-Filter`, `-Name`, `-Tag`, `-ExcludeTag`, or `-Repeat` for Busted's normal
+  selection and repetition controls. Use `-OverlayFixture runner_probe` only when
+  exercising overlay staging.
+- Unattended usage: invoke the same script from automation with an explicit
+  `-TimeoutSeconds`; success requires a passing Busted report and confirmed
+  cleanup. The process exits nonzero for unavailable DFHack, invalid or
+  incompatible dependencies, overlap/host/Busted failures, timeout, user abort,
+  cleanup failure, or a malformed/mismatched JSON report.
+- Current evidence: the no-game path rejected a missing game root with a clear
+  DFHack-runner resolution error. The JSON interaction run passed generation 36
+  with 1 success and `cleanup_confirmed=true`. The staging run passed generation
+  39 with 1 success, emitted successful rescans before and after execution, and
+  left no `dwarfui_automation_*.lua` file in the live DFHack GUI script directory.
+  Existing host and cleanup contracts cover active-run rejection, Busted and host
+  errors, timeout-driven abort, explicit abort, and cleanup failure; all force a
+  nonpassing terminal report.
 
 ### Phase 5 - Migrate existing tooltip probes
 

@@ -624,17 +624,42 @@ automation result.
 
 ### Phase 5 - Migrate existing tooltip probes
 
-- ☐ Convert normal-screen targeting and dynamic text to a Busted live spec.
-- ☐ Convert modal blocking, input forwarding, and service z-order recovery.
-- ☐ Convert enabled, focus-mismatched, and disabled overlay scenarios.
-- ☐ Replace controlled manual `onRender()` calls with real render waits.
-- ☐ Express all product expectations through Luassert.
-- ☐ Delete superseded `Tests/live_*probe.lua` scripts only after equivalent
+- ☑ Convert normal-screen targeting and dynamic text to a Busted live spec.
+- ☑ Convert modal blocking, input forwarding, and service z-order recovery.
+- ☑ Convert enabled, focus-mismatched, and disabled overlay scenarios.
+- ☑ Replace controlled manual `onRender()` calls with real render waits.
+- ☑ Express all product expectations through Luassert.
+- ☑ Delete superseded `Tests/live_*probe.lua` scripts only after equivalent
   automation specs pass.
-- ☐ Confirm the migrated suite does not require the physical mouse over DF.
+- ☑ Confirm the migrated suite does not require the physical mouse over DF.
 
 Exit: the Phase 9 scenarios execute through in-process Busted and leave no
 temporary screen, pointer patch, registration, overlay, timer, or host run.
+
+#### Phase 5 implementation and evidence
+
+- `tooltip_live_spec.lua` uses test-owned normal and modal screens to verify
+  dynamic target text, modal blocking, service input forwarding, transparent
+  mouse behavior, and recovery above a subsequently opened screen. It uses the
+  scoped `dy` virtual pointer and public tooltip registration API; no physical
+  mouse position is required.
+- `tooltip_overlay_live_spec.lua` uses the runner-staged `tooltip_probe`
+  overlay to verify an enabled overlay target, tooltip placement outside the
+  overlay clip, focus mismatch, and disabled-overlay rejection. It creates
+  real screen-stack transitions to obtain renders; neither migrated spec calls
+  `onRender()`, `onIdle()`, or `updateLayout()` directly.
+- All expectations are Luassert assertions. The former manual registrations,
+  overlay, and disabled-overlay probe scripts were deleted, along with the
+  temporary overlay source that supported them. `live_environment_probe.lua`
+  remains because it is an environment diagnostic, not a tooltip probe.
+- Live validation used only `Tools/Run-AutomationTests.ps1`: normal-screen
+  generation 59 passed 3 successes with 0 failures, 0 errors, and
+  `cleanup_confirmed=true`; staged-overlay generation 60 passed 1 success with
+  0 failures, 0 errors, and `cleanup_confirmed=true`. The overlay runner
+  completed its pre-run and final rescans successfully.
+- Local validation remained separate: Lua 5.4.6 syntax validation passed for
+  5 production and 42 test/support files, and the unit suite passed with
+  88 successes, 0 failures, 0 errors, and 0 pending. `git diff --check` passed.
 
 ### Phase 6 - Harden the reusable framework
 

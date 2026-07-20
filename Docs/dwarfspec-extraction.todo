@@ -1,0 +1,506 @@
+# DwarfSpec Standalone Library Extraction Plan
+
+Status: not started
+
+## Goal
+
+Extract the live DFHack automation framework currently implemented inside
+DwarfUI into a standalone repository and publish it as the `dwarfspec`
+LuaRocks package.
+
+DwarfSpec remains an in-process Busted host. Busted continues to own test
+discovery, structure, hooks, assertions, and result classification. DwarfSpec
+supplies only the live-game host, frame-aware scheduling, reversible UI
+interaction helpers, cleanup, reporting, and the external command that starts
+and observes a run through `dfhack-run`.
+
+The public automation object is renamed from `dy` to `ds`. Consumer tests use
+ordinary Busted syntax and access live-game operations through `ds.*`:
+
+```lua
+describe('live tooltip behavior', function()
+    it('shows text for the hovered control', function()
+        local screen = ds.show_fixture('tooltip_screen')
+        local target = ds.get(screen, 'tooltip_target')
+
+        ds.move_pointer_to(target)
+        ds.wait_for_render(screen)
+
+        assert.equals('Expected tooltip', ds.tooltip_diagnostics().tooltip_text)
+    end)
+end)
+```
+
+The intended developer workflow is:
+
+```text
+1. Declare dwarfspec as a test dependency.
+2. Run `luarocks test --prepare` once to install test dependencies.
+3. Add specs under the conventional DwarfSpec spec directory.
+4. Start DF/DFHack and run `dwarfspec` from the project root.
+```
+
+Projects that dedicate their rockspec test command to live automation may map
+`luarocks test` directly to `dwarfspec`. No consumer-specific PowerShell runner
+is required.
+
+## Locked decisions
+
+- The repository, product, and documentation name is `DwarfSpec`.
+- The LuaRocks package and Lua module namespace are lowercase `dwarfspec`.
+- The public Busted-environment export is `ds`; `dy` is removed without a
+  compatibility alias.
+- `ds` is exported into each isolated Busted spec environment and is not added
+  to DFHack's process-wide `_G` table.
+- Busted remains in-process inside DFHack's core Lua context.
+- DwarfSpec does not implement a second test loop, hook system, assertion API,
+  or test-result classification system.
+- DwarfSpec is a pure-Lua package compatible with the Lua syntax supported by
+  DFHack's embedded Lua 5.3 runtime.
+- Native Lua modules built for an external Lua ABI are not loaded into DFHack.
+  The proven DFHack-native `system` and `lfs` adapters remain part of the host.
+- DwarfSpec installs a cross-platform `dwarfspec` command through LuaRocks.
+- `Tools/Run-AutomationTests.ps1` is retired only after the installed command
+  proves equivalent success, failure, timeout, abort, reporting, staging, and
+  cleanup behavior against DwarfUI.
+- Consumer projects own their product specs, product fixtures, and optional
+  overlay fixtures. DwarfSpec owns only framework behavior and generic
+  framework fixtures.
+- The default consumer layout is convention-based and requires no DwarfSpec
+  configuration file.
+- Local/package verification and live DFHack verification remain separate
+  evidence layers.
+- Every Lua module and function introduced or moved during the extraction has
+  a triple-dash LuaDoc prose comment describing its responsibility and
+  lifecycle contract.
+
+## Default consumer contract
+
+```text
+<project>/
+  spec/
+    dwarfspec/
+      *_spec.lua
+      fixtures/
+        *.lua
+      overlay_fixtures/
+        *.lua
+  dwarfspec.lua                 optional overrides only
+  <project>-<version>.rockspec
+```
+
+Defaults:
+
+- specs: `spec/dwarfspec/**/*_spec.lua`;
+- screen fixtures: `spec/dwarfspec/fixtures/*.lua`;
+- overlay fixtures: `spec/dwarfspec/overlay_fixtures/*.lua`;
+- results: `.test-results/dwarfspec/`;
+- DFHack runner lookup: explicit `DFHACK_RUNNER`, then
+  `DFHACK_ROOT/hack/dfhack-run`, then `PATH`; and
+- one active DwarfSpec run per DFHack process.
+
+An optional `dwarfspec.lua` may override paths, timeouts, or fixture settings.
+It must not be required for the normal install-write-run workflow.
+
+Fixture identifiers remain relative names. Absolute paths, parent traversal,
+and files outside the resolved consumer roots are rejected. The standalone
+library must not contain a central allowlist of consumer-specific fixtures.
+
+## Target DwarfSpec repository layout
+
+```text
+DwarfSpec/
+  README.md
+  LICENSE
+  CHANGELOG.md
+  dwarfspec-0.1.0-1.rockspec
+  bin/
+    dwarfspec
+  src/
+    dwarfspec/
+      cli.lua
+      config.lua
+      project.lua
+      runner.lua
+      bootstrap.lua
+      status.lua
+      abort.lua
+      busted_host.lua
+      ds.lua
+      scheduler.lua
+      cleanup.lua
+      diagnostics.lua
+      fixture_loader.lua
+      pointer_adapter.lua
+      output_handler.lua
+      system_adapter.lua
+      lfs_adapter.lua
+  spec/
+    unit/
+      *_spec.lua
+    dwarfspec/
+      *_spec.lua
+      fixtures/
+        *.lua
+      overlay_fixtures/
+        *.lua
+  docs/
+    configuration.md
+    writing-tests.md
+    architecture.md
+```
+
+The exact internal filenames may be simplified during extraction, but the
+separation between the external command, in-process host, public `ds` surface,
+and consumer-owned tests must remain explicit.
+
+## Source ownership and transfer matrix
+
+### Move to DwarfSpec
+
+- `Tests/Automation/support/busted_host.lua`
+- `Tests/Automation/support/cleanup.lua`
+- `Tests/Automation/support/diagnostics.lua`
+- `Tests/Automation/support/dy.lua`, renamed to `src/dwarfspec/ds.lua`
+- `Tests/Automation/support/fixture_loader.lua`, generalized for consumer roots
+- `Tests/Automation/support/lfs_adapter.lua`
+- `Tests/Automation/support/output_handler.lua`
+- `Tests/Automation/support/pointer_adapter.lua`
+- `Tests/Automation/support/scheduler.lua`
+- `Tests/Automation/support/system_adapter.lua`
+- `Tests/Automation/bootstrap.lua`
+- `Tests/Automation/status.lua`
+- `Tests/Automation/abort.lua`
+- Generic framework unit tests currently named `Tests/automation_*_test.lua`
+- Generic live host, scheduler, cleanup, interaction, and isolation specs
+- Generic live fixtures used only to prove DwarfSpec behavior
+- The reusable orchestration behavior currently implemented by
+  `Tools/Run-AutomationTests.ps1`
+
+### Remain in DwarfUI as DwarfSpec consumer coverage
+
+- Tooltip screen fixtures and tooltip product specs
+- Tooltip overlay fixtures and tooltip overlay product specs
+- DwarfUI-specific diagnostic adapters such as tooltip service inspection
+- DwarfUI product modules and ordinary unit tests
+- DwarfUI package/build verification
+
+### Remove from DwarfUI after installed-package parity
+
+- Copied DwarfSpec host/support files
+- Generic DwarfSpec framework tests and fixtures
+- `Tools/Run-AutomationTests.ps1`
+- DwarfUI-branded automation run namespaces, JSON prefixes, and temporary file
+  names
+- Documentation that describes the framework as DwarfUI-owned
+
+## Branding and namespace migration
+
+The extraction must update more than the public method prefix:
+
+| Current contract | DwarfSpec contract |
+|---|---|
+| `dy.*` | `ds.*` |
+| `support/dy.lua` | `dwarfspec/ds.lua` |
+| `busted.export('dy', dy)` | `busted.export('ds', ds)` |
+| `install_dy_lifecycle()` | `install_ds_lifecycle()` |
+| `dy_export_live_spec.lua` | `ds_export_spec.lua` |
+| `dfhack.dwarfui.automation` | `dfhack.dwarfspec` |
+| `DWARFUI_AUTOMATION_JSON` | `DWARFSPEC_JSON` |
+| `dwarfui_automation_*` temporary names | `dwarfspec_*` temporary names |
+| `.test-results/live/` | `.test-results/dwarfspec/` |
+| `Run-AutomationTests.ps1` | installed `dwarfspec` command |
+
+Error messages, diagnostics, comments, examples, test descriptions, report
+fields, and documentation must use DwarfSpec terminology. A repository-wide
+audit must prove there are no remaining `dy`, DwarfUI-owned automation
+namespace, or old JSON-prefix references in active code after migration.
+
+## LuaRocks consumer declaration
+
+The official test-only dependency shape is:
+
+```lua
+rockspec_format = '3.0'
+
+test_dependencies = {
+    'dwarfspec ~> 0.1',
+}
+```
+
+Projects that want `luarocks test` to run DwarfSpec directly may add:
+
+```lua
+test = {
+    type = 'command',
+    command = 'dwarfspec',
+}
+```
+
+Projects that already use the single rockspec `test` entry for local unit
+tests keep that entry and invoke `dwarfspec` directly for live automation.
+`luarocks test --prepare` remains the standard way to install declared
+test-only dependencies without replacing the existing test command.
+
+## Implementation phases
+
+### Phase 0 - Freeze the extraction boundary
+
+- ☐ Record the DwarfUI source commit and clean/dirty state used for extraction.
+- ☐ Inventory every automation file, module import, environment variable,
+  temporary path, result prefix, and DwarfUI-specific callback.
+- ☐ Classify every file as DwarfSpec-owned, DwarfUI-consumer-owned, shared only
+  during migration, or obsolete after cutover.
+- ☐ Identify generic specs and fixtures that become DwarfSpec self-tests.
+- ☐ Identify tooltip-specific specs, fixtures, and adapters that remain in
+  DwarfUI.
+- ☐ Record the currently passing local unit and live automation baselines.
+- ☐ Record the exact Busted, Luassert, Penlight, Lua, and DFHack versions used
+  by the baseline.
+- ☐ Audit the existing code for implicit DwarfUI repository paths and convert
+  each into an explicit package or consumer-project input in the design.
+- ☐ Confirm the new repository owner, remote URL, license, copyright notice,
+  initial version, and release destination before publishing anything.
+
+Exit: every current automation artifact has one recorded destination and the
+pre-extraction baseline can be reproduced.
+
+### Phase 1 - Create the standalone repository safely
+
+- ☐ Create the DwarfSpec repository separately from the active DwarfUI
+  workspace.
+- ☐ Preserve relevant file history with a filtered clone or subtree extraction
+  performed against a disposable clone; do not rewrite DwarfUI history.
+- ☐ Add the target directory layout, README, license, changelog, and repository
+  development instructions.
+- ☐ Establish Lua 5.3-compatible formatting and syntax checks.
+- ☐ Establish a local Busted unit-test command for DwarfSpec's own code.
+- ☐ Move generic framework modules and tests without changing behavior.
+- ☐ Keep the first extraction commit mechanically reviewable and separate from
+  later renaming and packaging changes where practical.
+- ☐ Confirm no DwarfUI product modules or tooltip-specific fixtures were copied
+  into DwarfSpec.
+
+Exit: DwarfSpec has an independent build and unit-test baseline containing
+only reusable framework code.
+
+### Phase 2 - Rename the public API from `dy` to `ds`
+
+- ☐ Rename the driver module, local symbols, parameters, lifecycle installer,
+  specs, and documentation from `dy` to `ds`.
+- ☐ Export `ds` through Busted's isolated environment.
+- ☐ Prove `rawget(_G, 'ds')` and `rawget(_G, 'dy')` are both `nil` during a
+  running live spec.
+- ☐ Install automatic root `before_each` and `after_each` hooks through
+  `ds.reset()`.
+- ☐ Update operational errors such as invalid waits and cleanup failures to use
+  `ds` terminology.
+- ☐ Update every moved generic spec to call `ds.*`.
+- ☐ Update every retained DwarfUI live spec to call `ds.*`.
+- ☐ Remove the old `dy` export and module completely; do not retain an alias.
+- ☐ Add regression coverage that fails if `dy` becomes available again.
+- ☐ Run a complete text and filename audit for the old public name.
+
+Exit: the framework and DwarfUI consumer tests expose only `ds.*`, with no
+process-global export or compatibility alias.
+
+### Phase 3 - Generalize package and consumer boundaries
+
+- ☐ Replace DwarfUI-relative bootstrap, support, spec, fixture, overlay, and
+  result paths with resolved DwarfSpec package and consumer-project roots.
+- ☐ Discover the project root from an explicit CLI option or current working
+  directory without assuming a DwarfUI layout.
+- ☐ Implement the zero-configuration default directories documented above.
+- ☐ Add optional `dwarfspec.lua` configuration loading with schema validation
+  and actionable errors.
+- ☐ Generalize fixture loading so approved relative names resolve beneath the
+  consumer fixture root without a library-owned product allowlist.
+- ☐ Generalize overlay fixture staging beneath the consumer overlay-fixture
+  root while retaining traversal checks, unique names, rescans, and guaranteed
+  removal.
+- ☐ Provide an explicit extension seam for consumer diagnostic adapters so
+  DwarfUI can expose tooltip diagnostics without adding product knowledge to
+  DwarfSpec.
+- ☐ Move active-run ownership to `dfhack.dwarfspec` and reject incompatible or
+  overlapping hosts clearly.
+- ☐ Rename status reports, result paths, temporary files, and diagnostic labels
+  to DwarfSpec branding.
+- ☐ Preserve generation checks, lease recovery, idempotent LIFO cleanup, and
+  stale-callback rejection.
+
+Exit: DwarfSpec can run a minimal fixture project that contains no DwarfUI
+paths, modules, or branding.
+
+### Phase 4 - Replace the PowerShell runner with the DwarfSpec command
+
+- ☐ Implement a Lua CLI entry point installed as `dwarfspec`.
+- ☐ Support `dwarfspec --help`, project-root selection, spec filters, timeouts,
+  overlay fixtures, result-directory selection, and an explicit abort path.
+- ☐ Resolve `dfhack-run` through `DFHACK_RUNNER`, `DFHACK_ROOT`, or `PATH` and
+  print the resolved executable in verbose diagnostics.
+- ☐ Verify DFHack connectivity before starting a run and report a concise
+  actionable error when DFHack is not running.
+- ☐ Locate DwarfSpec's installed bootstrap modules without copying them into
+  the consumer repository or permanent DFHack script directories.
+- ☐ Start the in-process host, poll native JSON status reports, stream Busted
+  progress, enforce the wall-clock timeout, and preserve final diagnostics.
+- ☐ Return zero only for a passing Busted result with confirmed cleanup.
+- ☐ Return nonzero for dependency, connection, discovery, host, Busted,
+  timeout, abort, malformed-report, and cleanup failures.
+- ☐ Preserve safe overlay staging and final rescans without requiring
+  PowerShell.
+- ☐ Test command discovery, quoting, paths with spaces, exit-code propagation,
+  interruption, and cleanup on Windows and at least one Unix-like environment.
+- ☐ Keep `Run-AutomationTests.ps1` available only as a temporary parity oracle
+  until the installed command passes all equivalent cases.
+
+Exit: a developer can run the same live suite with `dwarfspec` and receives
+the same or better diagnostics and exit behavior as the old runner.
+
+### Phase 5 - Package DwarfSpec with LuaRocks
+
+- ☐ Add a rockspec using rockspec format 3.0 and an initial version such as
+  `0.1.0-1`.
+- ☐ Declare the supported Lua versions and DwarfSpec's runtime dependency on
+  the compatible Busted release.
+- ☐ Install all public/internal Lua modules under the `dwarfspec.*` namespace.
+- ☐ Install the `dwarfspec` command with `build.install.bin`.
+- ☐ Keep the rock platform-independent and verify it builds as an `.all.rock`.
+- ☐ Ensure modules loaded inside DFHack are pure Lua and never resolve external
+  Lua 5.4 native libraries in the Lua 5.3 process.
+- ☐ Run `luarocks lint` and build both source and binary rocks.
+- ☐ Install the built rock into an empty temporary rock tree.
+- ☐ Prove `require('dwarfspec.ds')`, CLI help, configuration discovery, and
+  Busted dependency resolution from the clean tree.
+- ☐ Prove an installation made through an external Lua 5.4 toolchain can still
+  launch the Lua 5.3-compatible in-process DFHack host through its pure-Lua
+  paths and adapters.
+- ☐ Document installation from a local rock, development rock server, and the
+  public LuaRocks server.
+- ☐ Add a release checklist covering version revision, changelog, pack, clean
+  install, live proof, tag, upload, and post-upload install verification.
+
+Exit: a clean machine with LuaRocks can install DwarfSpec and receive both the
+library modules and working `dwarfspec` command.
+
+### Phase 6 - Convert DwarfUI into the first external consumer
+
+- ☐ Add a DwarfUI rockspec or update its existing dependency metadata to
+  declare `dwarfspec ~> 0.1` as a `test_dependency`.
+- ☐ Move retained DwarfUI live specs and fixtures into the default consumer
+  layout, or document any intentional DwarfUI path overrides.
+- ☐ Register the DwarfUI tooltip diagnostic adapter through DwarfSpec's
+  consumer extension seam.
+- ☐ Run every DwarfUI live spec through the locally installed DwarfSpec rock,
+  not through source files reachable from the sibling DwarfSpec checkout.
+- ☐ Prove screen fixtures, overlay fixtures, pointer input, render waits,
+  tooltip diagnostics, failure reporting, and automatic setup/teardown.
+- ☐ Prove the DwarfSpec package can be absent from DwarfUI's production package
+  payload and is needed only by developers/tests.
+- ☐ Remove generic framework modules, tests, fixtures, and copied dependencies
+  from DwarfUI after parity is established.
+- ☐ Delete `Tools/Run-AutomationTests.ps1` after the installed command passes
+  the full DwarfUI suite plus deliberate failure, timeout, abort, and cleanup
+  cases.
+- ☐ Update DwarfUI documentation to describe it as a DwarfSpec consumer and
+  link to DwarfSpec for framework documentation.
+- ☐ Verify the DwarfUI production package contains no DwarfSpec framework or
+  automation-test files.
+
+Exit: DwarfUI consumes DwarfSpec exactly as an unrelated project would and no
+longer owns a private copy or private runner.
+
+### Phase 7 - Validate installation and release readiness
+
+- ☐ From a clean temporary project, declare DwarfSpec only through
+  `test_dependencies`, run `luarocks test --prepare`, write one spec, and run
+  it with `dwarfspec`.
+- ☐ In a second clean project, configure `test.command = 'dwarfspec'` and prove
+  `luarocks test` installs dependencies and executes the live suite.
+- ☐ Prove a project with an existing local Busted `test` entry can keep it and
+  run DwarfSpec independently.
+- ☐ Verify deterministic discovery and filtering across nested spec paths.
+- ☐ Verify pass, assertion failure, operational error, pending, malformed spec,
+  filter-no-match, timeout, explicit abort, lost runner, and cleanup failure.
+- ☐ Verify no run leaves screens, pointer patches, timers, overlays, staged
+  scripts, run ownership, or Busted globals behind.
+- ☐ Verify the physical mouse need not be over the game window.
+- ☐ Verify package uninstall removes DwarfSpec's modules and command without
+  touching consumer specs, fixtures, reports, DFHack, or game data.
+- ☐ Publish the initial release only after the clean-project and DwarfUI
+  installed-package proofs pass.
+- ☐ Tag the proven source commit and record the published rock checksum and
+  DwarfUI consumer revision.
+
+Exit: the published package supports the promised install-write-run workflow
+and DwarfUI passes against the same artifact available to other projects.
+
+## Verification matrix
+
+| Layer | Required proof |
+|---|---|
+| DwarfSpec syntax | All shipped and test Lua parses under Lua 5.3; external tooling also passes under Lua 5.4. |
+| DwarfSpec unit | Discovery, filters, configuration, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
+| Rock metadata | Rockspec lint, source rock build, `.all.rock` build, clean-tree install, module load, and command installation pass. |
+| Generic live | In-process Busted host, `ds` isolation, frame yields, pointer/input operations, cleanup, failure, timeout, abort, and lease recovery pass in DFHack. |
+| DwarfUI local | Existing DwarfUI unit, syntax, build, and package checks pass independently of live automation. |
+| DwarfUI live | Tooltip screen and overlay specs pass through the installed DwarfSpec rock with confirmed cleanup. |
+| Consumer smoke | A clean example project installs DwarfSpec only as a declared test dependency and runs without a repository-specific runner. |
+| Release artifact | A fresh install of the uploaded rock reproduces CLI, generic live, and DwarfUI consumer results. |
+
+## Basic acceptance criteria
+
+- ☐ DwarfSpec exists in its own repository with reusable framework code and no
+  DwarfUI product knowledge.
+- ☐ The public automation surface is exclusively `ds.*`.
+- ☐ `ds` is available inside isolated Busted spec environments and absent from
+  process-wide globals.
+- ☐ Busted remains the sole test structure, hook, assertion, and result system.
+- ☐ The package installs through LuaRocks as a pure-Lua library and installs a
+  working `dwarfspec` command.
+- ☐ Consumers can declare DwarfSpec through `test_dependencies`.
+- ☐ The default install-write-run workflow requires no consumer-specific
+  PowerShell, shell, batch, or Lua runner script.
+- ☐ DwarfSpec resolves and invokes the supported `dfhack-run` bridge without
+  exposing transport details to test authors.
+- ☐ Consumer specs and fixtures are discovered from safe conventional roots.
+- ☐ Product-specific diagnostics are supplied through an extension seam and
+  do not leak into the DwarfSpec package.
+- ☐ DwarfUI passes all retained live specs against an installed DwarfSpec rock.
+- ☐ Failure, timeout, abort, and lost-runner paths all produce nonzero status
+  and confirmed cleanup.
+- ☐ The DwarfUI production package does not contain DwarfSpec or live-test
+  development files.
+- ☐ The old `dy` API, DwarfUI automation namespace, JSON prefix, private host
+  copy, and PowerShell runner are removed after parity.
+- ☐ The published rock can be installed and exercised from a clean project.
+
+## Stop-and-discuss blockers
+
+Stop before broadening or changing the architecture if any of the following is
+encountered:
+
+- the new repository destination, ownership, license, or publication target is
+  unavailable or ambiguous;
+- LuaRocks cannot install a reliable `dwarfspec` command on a supported host
+  without requiring a consumer-owned wrapper;
+- the installed rock cannot expose its pure-Lua Busted dependencies safely to
+  DFHack's Lua 5.3 context;
+- launching an installed bootstrap requires permanently copying DwarfSpec into
+  DFHack or the consumer repository;
+- consumer fixture discovery cannot preserve the current path-safety and
+  cleanup contracts;
+- the cross-platform Lua CLI cannot reproduce timeout, interruption, JSON
+  reporting, overlay staging, or exit-code behavior of the current runner; or
+- DwarfUI only passes while importing files directly from a sibling DwarfSpec
+  checkout instead of the installed rock.
+
+## Deferred capabilities
+
+- Launching, restarting, or automatically updating Dwarf Fortress or DFHack.
+- Automatically loading or restoring a save.
+- Parallel live suites or multiple simultaneous runs in one DFHack process.
+- Persistent-world mutation tests.
+- Pixel screenshots and golden-image comparison.
+- CSS-like selectors beyond the live DFHack object and `view_id` contracts.
+- A `dy` compatibility package or migration shim.

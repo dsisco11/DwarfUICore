@@ -17,7 +17,7 @@ local function find_staged_overlay()
 end
 
 local overlay_name, overlay_entry = find_staged_overlay()
-local active_run = assert(dfhack.dwarfui.automation.active_run)
+local active_run = assert(dfhack.dwarfspec.active_run)
 if not overlay_entry then
     if active_run.options.spec == 'tooltip_overlay_live_spec.lua' then
         error('tooltip overlay spec requires -OverlayFixture tooltip_probe')

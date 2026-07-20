@@ -111,7 +111,7 @@ local function load_environment(state)
     }
 
     local dfhack = {
-        dwarfui={},
+        dwarfspec={},
         gui={
             getDFViewscreen=function() return {focus=state.focus or 'dwarfmode'} end,
             matchFocusString=function(focus, viewscreen)

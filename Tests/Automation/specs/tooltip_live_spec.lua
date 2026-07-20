@@ -8,20 +8,20 @@ local tooltip = reqscript('dwarfui/tooltip')
 local function restart_service_for_target(target)
     tooltip.unregister(target)
     assert.is_true(tooltip.register(target))
-    dy.wait_frames(2)
+    ds.wait_frames(2)
 end
 
 describe('live singleton tooltip service', function()
     local screen
 
     before_each(function()
-        screen = dy.show_fixture('tooltip_screen')
+        screen = ds.show_fixture('tooltip_screen')
     end)
 
     it('targets normal screens and presents dynamic text after real renders',
             function()
-        local target = dy.get(screen, 'tooltip_target')
-        local mouse_x, mouse_y = dy.move_pointer_to(target)
+        local target = ds.get(screen, 'tooltip_target')
+        local mouse_x, mouse_y = ds.move_pointer_to(target)
 
         restart_service_for_target(target)
 
@@ -37,28 +37,28 @@ describe('live singleton tooltip service', function()
 
     it('blocks targets covered by a modal screen through real rendering',
             function()
-        dy.dismiss(screen)
-        screen = dy.show_fixture('tooltip_screen', {blocker_visible=true})
-        local target = dy.get(screen, 'tooltip_target')
-        dy.move_pointer_to(target)
+        ds.dismiss(screen)
+        screen = ds.show_fixture('tooltip_screen', {blocker_visible=true})
+        local target = ds.get(screen, 'tooltip_target')
+        ds.move_pointer_to(target)
         restart_service_for_target(target)
         assert.is_nil(registration.get_diagnostics().target)
         assert.is_false(registration.get_diagnostics().screen.renderer.visible)
     end)
 
     it('z-order recovery forwards input over a newly opened screen', function()
-        local target = dy.get(screen, 'tooltip_target')
-        dy.move_pointer_to(target)
+        local target = ds.get(screen, 'tooltip_target')
+        ds.move_pointer_to(target)
         restart_service_for_target(target)
         local diagnostics = registration.get_diagnostics()
         assert.equals(target, diagnostics.target)
-        dy.send_input('CUSTOM_A', diagnostics.screen)
+        ds.send_input('CUSTOM_A', diagnostics.screen)
         assert.equals('CUSTOM_A', screen.last_key)
         assert.is_false(diagnostics.screen:isMouseOver())
 
-        local cover = dy.show_fixture('cover_screen')
-        dy.wait_frames(2)
+        local cover = ds.show_fixture('cover_screen')
+        ds.wait_frames(2)
         assert.is_true(diagnostics.screen:hasFocus())
-        dy.dismiss(cover)
+        ds.dismiss(cover)
     end)
 end)

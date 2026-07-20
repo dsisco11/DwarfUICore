@@ -42,9 +42,9 @@ end
 
 ---Creates a genuine screen-stack transition so the service renders naturally.
 local function refresh_tooltip_service()
-    local cover = dy.show_fixture('cover_screen')
-    dy.wait_frames(2)
-    dy.dismiss(cover)
+    local cover = ds.show_fixture('cover_screen')
+    ds.wait_frames(2)
+    ds.dismiss(cover)
 end
 
 describe('live singleton tooltip overlay eligibility', function()
@@ -55,15 +55,15 @@ describe('live singleton tooltip overlay eligibility', function()
 
     before_each(function()
         original_viewscreens = widget.viewscreens
-        screen = dy.show_fixture('cover_screen')
+        screen = ds.show_fixture('cover_screen')
     end)
 
     after_each(function()
         widget.viewscreens = original_viewscreens
         overlay.get_state().config[overlay_name].enabled = true
         tooltip.unregister(target)
-        if screen and screen:isActive() then dy.dismiss(screen) end
-        dy.wait_frames(2)
+        if screen and screen:isActive() then ds.dismiss(screen) end
+        ds.wait_frames(2)
     end)
 
     it('uses enabled overlays and rejects focus-mismatched and disabled roots',
@@ -71,13 +71,13 @@ describe('live singleton tooltip overlay eligibility', function()
         assert.is_true(overlay.isOverlayEnabled(overlay_name))
         assert.equals(widget, overlay.get_state().db[overlay_name].widget)
         assert.is_true(matches_live_viewscreen(widget))
-        dy.wait_until('staged overlay layout', function()
+        ds.wait_until('staged overlay layout', function()
             return target.frame_body and target.frame_body.height > 0
         end)
-        dy.move_pointer_to(target, 'top_left')
+        ds.move_pointer_to(target, 'top_left')
         tooltip.unregister(target)
         assert.is_true(tooltip.register(target))
-        dy.wait_frames(2)
+        ds.wait_frames(2)
 
         local diagnostics = registration.get_diagnostics()
         assert.equals(target, diagnostics.target)

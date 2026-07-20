@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: in progress (Phases 0-1 complete)
+Status: in progress (Phases 0-2 complete)
 
 ## Goal
 
@@ -574,23 +574,62 @@ only reusable framework code.
 
 ### Phase 2 - Rename the public API from `dy` to `ds`
 
-- ☐ Rename the driver module, local symbols, parameters, lifecycle installer,
+- ☑ Rename the driver module, local symbols, parameters, lifecycle installer,
   specs, and documentation from `dy` to `ds`.
-- ☐ Export `ds` through Busted's isolated environment.
-- ☐ Prove `rawget(_G, 'ds')` and `rawget(_G, 'dy')` are both `nil` during a
+- ☑ Export `ds` through Busted's isolated environment.
+- ☑ Prove `rawget(_G, 'ds')` and `rawget(_G, 'dy')` are both `nil` during a
   running live spec.
-- ☐ Install automatic root `before_each` and `after_each` hooks through
+- ☑ Install automatic root `before_each` and `after_each` hooks through
   `ds.reset()`.
-- ☐ Update operational errors such as invalid waits and cleanup failures to use
+- ☑ Update operational errors such as invalid waits and cleanup failures to use
   `ds` terminology.
-- ☐ Update every moved generic spec to call `ds.*`.
-- ☐ Update every retained DwarfUI live spec to call `ds.*`.
-- ☐ Remove the old `dy` export and module completely; do not retain an alias.
-- ☐ Add regression coverage that fails if `dy` becomes available again.
-- ☐ Run a complete text and filename audit for the old public name.
+- ☑ Update every moved generic spec to call `ds.*`.
+- ☑ Update every retained DwarfUI live spec to call `ds.*`.
+- ☑ Remove the old `dy` export and module completely; do not retain an alias.
+- ☑ Add regression coverage that fails if `dy` becomes available again.
+- ☑ Run a complete text and filename audit for the old public name.
 
 Exit: the framework and DwarfUI consumer tests expose only `ds.*`, with no
 process-global export or compatibility alias.
+
+#### Phase 2 rename and verification evidence
+
+- DwarfSpec commit: `153fccc6b40bff715d7e34cf346a1b924dca0b94`
+  (`feat: rename automation driver to ds`).
+- `Tests/Automation/support/dy.lua` and
+  `Tests/Automation/specs/dy_export_live_spec.lua` were removed in favor of
+  `ds.lua` and `ds_export_live_spec.lua`. There is no compatibility alias.
+- The host now creates and exports `ds` through `busted.export('ds', ds)` and
+  installs root Busted `before_each` and `after_each` callbacks with
+  `install_ds_lifecycle()`. Both callbacks call `ds.reset()`.
+- The export regression spec asserts that `ds.protocol_version` is available
+  to the isolated spec while both `rawget(_G, 'ds')` and
+  `rawget(_G, 'dy')` are `nil`. This is the sole intentional active-code
+  reference to the old name.
+- All moved generic live specs and all retained DwarfUI tooltip live specs now
+  call `ds.*`. Operational validation and cleanup messages likewise use the
+  `ds` name.
+- Local Busted results after the rename:
+
+```text
+DwarfSpec: 25 successes / 0 failures / 0 errors / 0 pending
+DwarfUI:   93 successes / 0 failures / 0 errors / 0 pending
+```
+
+- The focused live `ds_export_live_spec.lua` run passed with
+  `1 success / 0 failures / 0 errors / 0 pending` and
+  `cleanup_confirmed=true`.
+- Active automation source/filename audits in both repositories found no old
+  `dy` module, export, lifecycle name, or public call. The only match is the
+  negative global assertion in `ds_export_live_spec.lua`; `git diff --check`
+  passed for both rename sets.
+- A full live DwarfUI suite was also attempted. Twelve tests, including the
+  `ds` export and retained tooltip modal spec, passed before two pre-existing
+  environment-sensitive expectations failed: the focused timeout expected
+  `dwarfmode/Default` while the live target reported `dfhack/lua/launcher`,
+  and the physical tooltip probe found no target. Those conditions do not
+  concern the public API rename; the focused global-boundary proof above is
+  the Phase 2 live gate.
 
 ### Phase 3 - Generalize package and consumer boundaries
 

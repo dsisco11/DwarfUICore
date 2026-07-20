@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: not started
+Status: in progress (Phase 0 complete)
 
 ## Goal
 
@@ -305,24 +305,203 @@ Contracts:
 
 ### Phase 0 - Freeze the extraction boundary
 
-- ☐ Record the DwarfUI source commit and clean/dirty state used for extraction.
-- ☐ Inventory every automation file, module import, environment variable,
+- ☑ Record the DwarfUI source commit and clean/dirty state used for extraction.
+- ☑ Inventory every automation file, module import, environment variable,
   temporary path, result prefix, and DwarfUI-specific callback.
-- ☐ Classify every file as DwarfSpec-owned, DwarfUI-consumer-owned, shared only
+- ☑ Classify every file as DwarfSpec-owned, DwarfUI-consumer-owned, shared only
   during migration, or obsolete after cutover.
-- ☐ Identify generic specs and fixtures that become DwarfSpec self-tests.
-- ☐ Identify tooltip-specific specs, fixtures, and adapters that remain in
+- ☑ Identify generic specs and fixtures that become DwarfSpec self-tests.
+- ☑ Identify tooltip-specific specs, fixtures, and adapters that remain in
   DwarfUI.
-- ☐ Record the currently passing local unit and live automation baselines.
-- ☐ Record the exact Busted, Luassert, Penlight, Lua, and DFHack versions used
+- ☑ Record the currently passing local unit and live automation baselines.
+- ☑ Record the exact Busted, Luassert, Penlight, Lua, and DFHack versions used
   by the baseline.
-- ☐ Audit the existing code for implicit DwarfUI repository paths and convert
+- ☑ Audit the existing code for implicit DwarfUI repository paths and convert
   each into an explicit package or consumer-project input in the design.
-- ☐ Confirm the new repository owner, remote URL, license, copyright notice,
+- ☑ Confirm the new repository owner, remote URL, license, copyright notice,
   initial version, and release destination before publishing anything.
 
 Exit: every current automation artifact has one recorded destination and the
 pre-extraction baseline can be reproduced.
+
+#### Phase 0 source snapshot
+
+- Source repository: `https://github.com/dsisco11/DwarfUI.git`.
+- Branch: `main`.
+- Commit: `ba9c1e00e587d206a66b8dff1386eb90e426a2ea`.
+- Commit date: `2026-07-19T21:13:02-07:00`.
+- Commit subject: `docs: update DwarfSpec command list`.
+- `git status --short` was empty before this evidence was written. The only
+  subsequent modification is this planning document.
+- The snapshot contains no `LICENSE`, `COPYING`, `NOTICE`, SPDX identifier,
+  copyright line, or license declaration in tracked project files.
+
+#### Phase 0 artifact classification
+
+All 33 current automation artifacts are accounted for below. DwarfSpec-owned
+files move to the new repository and their original DwarfUI copies become
+obsolete after installed-rock parity. DwarfUI-consumer files remain in DwarfUI
+and adopt the new `Tests/**/*_spec.ds.lua` and importable-fixture conventions.
+
+| Current artifact | Ownership and destination |
+|---|---|
+| `Tests/automation_cleanup_test.lua` | DwarfSpec unit coverage; move and convert to the new repository's unit-spec naming. |
+| `Tests/automation_host_test.lua` | DwarfSpec unit coverage; move and rebrand host paths and namespace. |
+| `Tests/automation_interaction_support_test.lua` | DwarfSpec unit coverage; move with fixture-import and pointer contracts. |
+| `Tests/automation_output_handler_test.lua` | DwarfSpec unit coverage; move with Busted reporting host. |
+| `Tests/automation_scheduler_test.lua` | DwarfSpec unit coverage; move with scheduler. |
+| `Tests/automation_status_test.lua` | DwarfSpec unit coverage; move and rename JSON/status contracts. |
+| `Tests/Automation/abort.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `Tests/Automation/bootstrap.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `Tests/Automation/status.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `Tests/Automation/fixtures/cover_screen.lua` | Generic DwarfSpec self-test fixture; move and remove tooltip-specific prose from its generic covering-screen role. |
+| `Tests/Automation/fixtures/failing_screen.lua` | Generic DwarfSpec self-test fixture; move as `*.fixture.lua`. |
+| `Tests/Automation/fixtures/interaction_screen.lua` | Generic DwarfSpec interaction fixture; move as `*.fixture.lua`. It uses only DFHack GUI APIs. |
+| `Tests/Automation/fixtures/tooltip_screen.lua` | DwarfUI consumer fixture; retain with DwarfUI tooltip imports and rename as `Tests/**/fixtures/*.fixture.lua`. |
+| `Tests/Automation/overlay_fixtures/runner_probe.lua` | Generic DwarfSpec CLI/staging fixture; move as a framework self-test fixture. |
+| `Tests/Automation/overlay_fixtures/tooltip_probe.lua` | DwarfUI consumer fixture; retain because it imports `dwarfui/tooltip`. |
+| `Tests/Automation/specs/dy_export_live_spec.lua` | Generic DwarfSpec self-test; move and rename to an `ds` isolation `*_spec.ds.lua`. |
+| `Tests/Automation/specs/framework_hardening_live_spec.lua` | Generic DwarfSpec host-resilience self-test; move, remove repository-relative loads, and rename. |
+| `Tests/Automation/specs/interaction_live_spec.lua` | Generic DwarfSpec interaction self-test; move and rename. |
+| `Tests/Automation/specs/scheduler_cleanup_live_spec.lua` | Generic DwarfSpec scheduler/cleanup self-test; move and rename. |
+| `Tests/Automation/specs/tooltip_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
+| `Tests/Automation/specs/tooltip_overlay_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
+| `Tests/Automation/support/busted_host.lua` | DwarfSpec host implementation; move and publish under `dwarfspec.*`. |
+| `Tests/Automation/support/cleanup.lua` | DwarfSpec cleanup implementation; move. |
+| `Tests/Automation/support/diagnostics.lua` | DwarfSpec generic diagnostics; move. |
+| `Tests/Automation/support/dy.lua` | DwarfSpec public driver; move and hard-rename to `ds.lua`. |
+| `Tests/Automation/support/fixture_loader.lua` | DwarfSpec fixture importer; move and replace the fixed DwarfUI fixture root. |
+| `Tests/Automation/support/lfs_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
+| `Tests/Automation/support/output_handler.lua` | DwarfSpec Busted output adapter; move. |
+| `Tests/Automation/support/pointer_adapter.lua` | DwarfSpec scoped pointer/input adapter; move. |
+| `Tests/Automation/support/scheduler.lua` | DwarfSpec frame-aware scheduler; move. |
+| `Tests/Automation/support/system_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
+| `Tools/Run-AutomationTests.ps1` | Shared migration-only parity oracle; replace with the installed `dwarfspec` command and delete after parity. |
+| `Docs/live-automation-framework.todo` | Migration-only historical design/evidence; replace active usage documentation with DwarfSpec docs and retain only as history or archive it after cutover. |
+
+The generic DwarfSpec live self-test set is therefore the current export,
+framework-hardening, interaction, and scheduler/cleanup specs plus the cover,
+failing, interaction, and runner-probe fixtures. The DwarfUI consumer set is
+the two tooltip specs plus the tooltip screen and tooltip overlay fixtures.
+
+#### Phase 0 import and runtime dependency inventory
+
+| Dependency or seam | Current users | Extraction disposition |
+|---|---|---|
+| `busted.core`, `busted`, `busted.modules.filter_loader`, `busted.modules.test_file_loader`, `busted.execute` | `busted_host.lua` | DwarfSpec runtime dependency and in-process host. |
+| `busted.outputHandlers.base` | `output_handler.lua` | DwarfSpec reporting adapter. |
+| `luassert`, Penlight, Say, Mediator, Lua CLI Args, Lua Term | Transitive Busted source dependencies | Installed transitively by the DwarfSpec rock; only Lua-compatible source is exposed inside DFHack. |
+| `system`, `lfs` | Busted/Penlight seams | DwarfSpec supplies the proven DFHack-native adapters instead of loading Lua 5.4 DLLs into Lua 5.3. |
+| `json` | `busted_host.lua` | DFHack-native `require('json').encode`; retain inside the live host. |
+| `gui`, `gui.widgets` | Generic and product fixtures plus `ds` input operations | DFHack runtime API; retain as live-only imports. |
+| `plugins.overlay` | Overlay staging/product coverage | DFHack runtime API; generic staging moves to DwarfSpec while tooltip behavior remains in DwarfUI. |
+| `dwarfui/tooltip`, `dwarfui/tooltip_registration` | Tooltip screen fixture, tooltip overlay fixture, and two tooltip specs | DwarfUI consumer-only imports; never move into DwarfSpec. |
+| `Tools/Common.ps1` `Import-EnvironmentFile()` and `Resolve-DFHackRunner()` | PowerShell runner | The file remains DwarfUI-owned. The cross-platform CLI independently implements the documented configuration and runner-resolution contract. |
+| Repository-relative `loadfile()` calls | Unit tests, entry points, host, `dy`, hardening spec | Replace moved code with installed `dwarfspec.*` modules and pass the consumer project root explicitly. |
+
+There is no current DwarfUI callback injected into the generic `dy` object.
+Tooltip specs import DwarfUI modules directly. The future
+`Tests/dwarfspec/*.lua` custom-command contract is therefore a new consumer
+extension seam, not a migration of an existing hidden callback.
+
+#### Phase 0 options, environment, paths, and identifiers
+
+Current external runner parameters are `Filter`, `FilterOut`, `Name`, `Tag`,
+`ExcludeTag`, `Repeat`, `Spec`, `TimeoutSeconds`,
+`PollIntervalMilliseconds`, `StartupDelayFrames`,
+`LeaseTimeoutMilliseconds`, `LeaseCheckFrames`, `RunId`, `OverlayFixture`,
+`DFHackRunner`, `DwarfFortressRoot`, and `EnvFile`. The bootstrap accepts
+`filter`, `filter-out`, `name`, `tag`, `exclude-tag`, `repeat`, `seed`,
+`defer-frames`, `lease-timeout-ms`, `lease-check-frames`, and `spec`; the current
+PowerShell runner always uses the bootstrap's default seed of `1`.
+
+| Current implicit contract | Current value | Required standalone input or owner |
+|---|---|---|
+| Repository root | Derived from `Tests/Automation/bootstrap.lua`'s source path | CLI resolves the consumer project root; installed modules resolve their own rock location independently. |
+| Live spec root/suffix | `Tests/Automation/specs/**/*_live_spec.lua` | Consumer convention `Tests/**/*_spec.ds.lua`. |
+| Screen fixture root | `Tests/Automation/fixtures/<name>.lua` | Explicit import; recommended `Tests/**/fixtures/*.fixture.lua`, with no mandatory root. |
+| Overlay fixture root | `Tests/Automation/overlay_fixtures/<name>.lua` | Explicit importable fixture definition owned by the consumer or DwarfSpec self-tests. |
+| Host/support paths | `Tests/Automation/{bootstrap,status,abort,support}/...` | Installed `dwarfspec.*` modules and CLI-owned entry points. |
+| Busted source root | `.luarocks/share/lua/5.4` | Resolve the DwarfSpec rock's LuaRocks dependencies; do not assume a project-local tree or hardcoded Lua directory. |
+| Native dependency root | `.luarocks/lib/lua/5.4` for local tests | External unit tooling only; never prepend this native directory inside DFHack Lua 5.3. |
+| Runner configuration file | `.env.local`, defaulted by `EnvFile` | Optional project configuration under `Tests/dwarfspec/*.lua`, CLI options, and documented environment variables. |
+| Runner executable | `MOD_COMMAND_RUNNER`, parameter, `GAME_ROOT/hack/dfhack-run.exe`, or `PATH` | `DFHACK_RUNNER`, `DFHACK_ROOT/hack/dfhack-run`, or `PATH`; legacy names may be accepted only through an explicit migration policy. |
+| Game/DFHack root | `GAME_ROOT` | Explicit CLI/config/environment input for temporary overlay staging; do not infer it from the consumer repository. |
+| Staged overlay directory | `<GAME_ROOT>/hack/scripts/gui` | Explicit validated DFHack installation path; stage only a unique run-owned file. |
+| Staged overlay filename | `dwarfui_automation_<run-id>_<fixture>.lua` | DwarfSpec-owned `dwarfspec_<run-id>_<fixture>.lua` name with exact-path deletion. |
+| Run identifier | `dwarfui-<32 hex characters>` | DwarfSpec-owned run id. |
+| In-process ownership | `dfhack.dwarfui.automation` | `dfhack.dwarfspec`. |
+| Human report prefix | `DWARFUI_AUTOMATION` | `DWARFSPEC`. |
+| JSON report prefix | `DWARFUI_AUTOMATION_JSON` | `DWARFSPEC_JSON`. |
+| Overlay rescan marker | `DWARFUI_OVERLAY_RESCAN_OK` | DwarfSpec-owned marker. |
+| Optional result path | `.test-results/live/` appears only in the old plan; the current runner writes no coordination or report files | `.test-results/dwarfspec/` for optional artifacts only. |
+| Package globals | Host prepends `package.path`, sets `package.preload.system/lfs`, `package.loaded.system/lfs`, and clears `package.loaded.busted` | DwarfSpec owns a documented, repeat-safe dependency bootstrap and must restore or deliberately retain each process-wide change under an explicit lifecycle contract. |
+| Temporary live resources | Test screens, pointer-function patch, native mouse position, DFHack timeouts, overlay enable/focus changes, cleanup entries, and active-run lease | DwarfSpec run-scoped cleanup; product-specific tooltip registration restoration remains in DwarfUI specs/fixtures. |
+
+#### Phase 0 reproducible baseline
+
+Local toolchain and dependency versions:
+
+- Lua `5.4.6` from the registered per-user Lua installation;
+- LuaRocks `3.9.2`;
+- Busted `2.3.0-1`;
+- Luassert `1.9.0-1`;
+- Penlight `1.15.0-1`;
+- LuaSystem `0.3.0-2`; and
+- LuaFileSystem `1.9.0-1`.
+
+The shell did not initially contain the registered Lua installation on
+`PATH`; the unmodified runner therefore stopped with `LuaRocks was not found on
+PATH`. Prepending the registered Lua `bin` directory for that process and
+running `Tools/Run-UnitTests.ps1` produced:
+
+```text
+93 successes / 0 failures / 0 errors / 0 pending
+```
+
+Live target versions reported through the configured `dfhack-run` executable:
+
+- DFHack `53.15-r1`;
+- Dwarf Fortress `v0.53.15 win64 STEAM`;
+- embedded `Lua 5.3`; and
+- `dfhack.is_core_context == true`.
+
+`Tools/Run-AutomationTests.ps1` ran the default live suite as protocol 1,
+generation 1, and produced:
+
+```text
+14 successes / 0 failures / 0 errors / 0 pending
+state=passed cleanup_confirmed=true
+```
+
+The separate installed-overlay command
+`Tools/Run-AutomationTests.ps1 -Spec tooltip_overlay_live_spec.lua
+-OverlayFixture tooltip_probe` ran as generation 2 and produced:
+
+```text
+1 success / 0 failures / 0 errors / 0 pending
+state=passed cleanup_confirmed=true
+```
+
+The runner reported successful rescans before and after the overlay run. A
+direct post-run audit found zero `dwarfui_automation_*.lua` files in the live
+DFHack GUI script directory.
+
+#### Phase 0 publication contract
+
+- Repository owner: `dsisco11`.
+- Canonical remote: `https://github.com/dsisco11/DwarfSpec.git`.
+- License: MIT, selected by the owner on 2026-07-19.
+- Copyright notice: `Copyright (c) 2026 David Sisco`.
+- Initial rock version: `0.1.0-1`.
+- Release destination: LuaRocks.org.
+
+The owner and canonical remote follow the current DwarfUI origin. Git history
+attributes every current DwarfUI commit, including every automation artifact,
+to `David Sisco <dsisco11@gmail.com>`; the copyright notice uses that recorded
+contributor name rather than the `Sisco++` mod display name. The new repository
+does not yet exist. This contract records the destination for the repository
+creation work and does not itself create a remote or publish an artifact.
 
 ### Phase 1 - Create the standalone repository safely
 

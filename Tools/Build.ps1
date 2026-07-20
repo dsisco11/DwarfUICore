@@ -64,7 +64,7 @@ $sourcePath = if ([IO.Path]::IsPathRooted($SourceDir)) {
 }
 
 & $syntaxCheck -LuaCompiler $LuaCompiler -RequiredLuaVersion $RequiredLuaVersion `
-    -SourceDir $sourcePath -IncludeTests
+    -SourceDir $sourcePath -Includetests
 if ($LASTEXITCODE -ne 0) {
     throw 'Lua syntax check failed.'
 }

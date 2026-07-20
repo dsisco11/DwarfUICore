@@ -27,10 +27,10 @@ describe('Busted test infrastructure', function()
         local files = assert(os.getenv('LUA_TEST_FILES'),
             'runner did not provide discovered test files')
         contains(files, 'infrastructure_smoke_test.lua')
-        excludes(files, 'Tests\\support\\module_loader.lua')
-        excludes(files, 'Tests/support/module_loader.lua')
-        excludes(files, 'Tests\\run.lua')
-        excludes(files, 'Tests/run.lua')
+        excludes(files, 'tests\\support\\module_loader.lua')
+        excludes(files, 'tests/support/module_loader.lua')
+        excludes(files, 'tests\\run.lua')
+        excludes(files, 'tests/run.lua')
     end)
 
     it('isolates module globals and dependencies', function()
@@ -39,7 +39,7 @@ describe('Busted test infrastructure', function()
 
         local environment, returned = module_loader.load(
             repo_root,
-            'Tests/fixtures/module_target.lua',
+            'tests/fixtures/module_target.lua',
             {
                 globals={GLOBAL_OFFSET=4},
                 reqscript={['fixture/scripted']={value=2}},
@@ -55,7 +55,7 @@ describe('Busted test infrastructure', function()
     it('rejects an uncontrolled reqscript', function()
         local ok, err = pcall(module_loader.load,
             repo_root,
-            'Tests/fixtures/module_target.lua',
+            'tests/fixtures/module_target.lua',
             {
                 globals={GLOBAL_OFFSET=4},
                 reqscript={},

@@ -36,7 +36,7 @@ The intended developer workflow is:
 ```text
 1. Declare dwarfspec as a test dependency.
 2. Run `luarocks test --prepare` once to install test dependencies.
-3. Add specs beneath `Tests/` with the `*_spec.ds.lua` suffix.
+3. Add specs beneath `tests/` with the `*_spec.ds.lua` suffix.
 4. Start DF/DFHack and run `dwarfspec run` from the project root.
 ```
 
@@ -66,7 +66,7 @@ PowerShell runner is required.
 - `dwarfspec list`, `dwarfspec run`, and `dwarfspec run <glob>` are required
   first-class commands. Listing and selection use the same canonical test
   identities and glob-matching rules.
-- `Tools/Run-AutomationTests.ps1` is retired only after the installed command
+- `Tools/Run-Automationtests.ps1` is retired only after the installed command
   proves equivalent success, failure, timeout, abort, reporting, staging, and
   cleanup behavior against DwarfUI.
 - Consumer projects own their product specs, product fixtures, and optional
@@ -74,13 +74,13 @@ PowerShell runner is required.
   framework fixtures.
 - The default consumer layout is convention-based and requires no DwarfSpec
   configuration file.
-- DwarfSpec live specs are discovered only as `Tests/**/*_spec.ds.lua`.
-- `Tests/` is the canonical consumer test root; nested DwarfSpec framework
-  directories use lowercase names such as `Tests/automation/`.
+- DwarfSpec live specs are discovered only as `tests/**/*_spec.ds.lua`.
+- `tests/` is the canonical consumer test root; nested DwarfSpec framework
+  directories use lowercase names such as `tests/automation/`.
 - Global configuration and custom command modules live under
-  `Tests/dwarfspec/*.lua`.
+  `tests/dwarfspec/*.lua`.
 - Fixtures may live in any importable location. The recommended co-located
-  convention is `Tests/**/fixtures/*.fixture.lua`.
+  convention is `tests/**/fixtures/*.fixture.lua`.
 - Local/package verification and live DFHack verification remain separate
   evidence layers.
 - Every Lua module and function introduced or moved during the extraction has
@@ -91,7 +91,7 @@ PowerShell runner is required.
 
 ```text
 <project>/
-  Tests/
+  tests/
     dwarfspec/
       config.lua                  optional global configuration
       <custom-command>.lua        optional custom command modules
@@ -104,16 +104,16 @@ PowerShell runner is required.
 
 Defaults:
 
-- live specs: `Tests/**/*_spec.ds.lua`;
-- global configuration and custom commands: `Tests/dwarfspec/*.lua`;
-- recommended fixture placement: `Tests/**/fixtures/*.fixture.lua`;
+- live specs: `tests/**/*_spec.ds.lua`;
+- global configuration and custom commands: `tests/dwarfspec/*.lua`;
+- recommended fixture placement: `tests/**/fixtures/*.fixture.lua`;
 - results: `.test-results/dwarfspec/`;
 - DFHack runner lookup: explicit `DFHACK_RUNNER`, then
   `DFHACK_ROOT/hack/dfhack-run`, then `PATH`; and
 - one active DwarfSpec run per DFHack process.
 
-`Tests/dwarfspec/config.lua` is the conventional global configuration module.
-Other Lua modules directly under `Tests/dwarfspec/` may register project-wide
+`tests/dwarfspec/config.lua` is the conventional global configuration module.
+Other Lua modules directly under `tests/dwarfspec/` may register project-wide
 custom `ds` commands. DwarfSpec must define and test deterministic loading,
 validation, duplicate-command handling, and failure reporting for these files.
 The entire directory is optional for projects that use the defaults and define
@@ -122,7 +122,7 @@ no custom commands.
 Fixtures are imported explicitly by a spec or custom command; DwarfSpec does
 not discover and execute every `*.fixture.lua` file. A fixture may live in any
 location reachable through the supported import mechanism, including a shared
-test-support package. `Tests/**/fixtures/*.fixture.lua` is the recommended
+test-support package. `tests/**/fixtures/*.fixture.lua` is the recommended
 co-located naming convention, not a mandatory fixture root or global
 allowlist.
 
@@ -155,7 +155,7 @@ DwarfSpec/
       output_handler.lua
       system_adapter.lua
       lfs_adapter.lua
-  Tests/
+  tests/
     dwarfspec/
       config.lua
     unit/
@@ -179,25 +179,25 @@ and consumer-owned tests must remain explicit.
 
 ### Move to DwarfSpec
 
-- `Tests/automation/support/busted_host.lua`
-- `Tests/automation/support/cleanup.lua`
-- `Tests/automation/support/diagnostics.lua`
-- `Tests/automation/support/dy.lua`, renamed to `src/dwarfspec/ds.lua`
-- `Tests/automation/support/fixture_loader.lua`, generalized for explicitly
+- `tests/automation/support/busted_host.lua`
+- `tests/automation/support/cleanup.lua`
+- `tests/automation/support/diagnostics.lua`
+- `tests/automation/support/dy.lua`, renamed to `src/dwarfspec/ds.lua`
+- `tests/automation/support/fixture_loader.lua`, generalized for explicitly
   imported fixtures
-- `Tests/automation/support/lfs_adapter.lua`
-- `Tests/automation/support/output_handler.lua`
-- `Tests/automation/support/pointer_adapter.lua`
-- `Tests/automation/support/scheduler.lua`
-- `Tests/automation/support/system_adapter.lua`
-- `Tests/automation/bootstrap.lua`
-- `Tests/automation/status.lua`
-- `Tests/automation/abort.lua`
-- Generic framework unit tests currently named `Tests/automation_*_test.lua`
+- `tests/automation/support/lfs_adapter.lua`
+- `tests/automation/support/output_handler.lua`
+- `tests/automation/support/pointer_adapter.lua`
+- `tests/automation/support/scheduler.lua`
+- `tests/automation/support/system_adapter.lua`
+- `tests/automation/bootstrap.lua`
+- `tests/automation/status.lua`
+- `tests/automation/abort.lua`
+- Generic framework unit tests currently named `tests/automation_*_test.lua`
 - Generic live host, scheduler, cleanup, interaction, and isolation specs
 - Generic live fixtures used only to prove DwarfSpec behavior
 - The reusable orchestration behavior currently implemented by
-  `Tools/Run-AutomationTests.ps1`
+  `Tools/Run-Automationtests.ps1`
 
 ### Remain in DwarfUI as DwarfSpec consumer coverage
 
@@ -211,7 +211,7 @@ and consumer-owned tests must remain explicit.
 
 - Copied DwarfSpec host/support files
 - Generic DwarfSpec framework tests and fixtures
-- `Tools/Run-AutomationTests.ps1`
+- `Tools/Run-Automationtests.ps1`
 - DwarfUI-branded automation run namespaces, JSON prefixes, and temporary file
   names
 - Documentation that describes the framework as DwarfUI-owned
@@ -231,7 +231,7 @@ The extraction must update more than the public method prefix:
 | `DWARFUI_AUTOMATION_JSON` | `DWARFSPEC_JSON` |
 | `dwarfui_automation_*` temporary names | `dwarfspec_*` temporary names |
 | `.test-results/live/` | `.test-results/dwarfspec/` |
-| `Run-AutomationTests.ps1` | installed `dwarfspec` command |
+| `Run-Automationtests.ps1` | installed `dwarfspec` command |
 
 Error messages, diagnostics, comments, examples, test descriptions, report
 fields, and documentation must use DwarfSpec terminology. A repository-wide
@@ -343,42 +343,42 @@ pre-extraction baseline can be reproduced.
 All 33 current automation artifacts are accounted for below. DwarfSpec-owned
 files move to the new repository and their original DwarfUI copies become
 obsolete after installed-rock parity. DwarfUI-consumer files remain in DwarfUI
-and adopt the new `Tests/**/*_spec.ds.lua` and importable-fixture conventions.
+and adopt the new `tests/**/*_spec.ds.lua` and importable-fixture conventions.
 
 | Current artifact | Ownership and destination |
 |---|---|
-| `Tests/automation_cleanup_test.lua` | DwarfSpec unit coverage; move and convert to the new repository's unit-spec naming. |
-| `Tests/automation_host_test.lua` | DwarfSpec unit coverage; move and rebrand host paths and namespace. |
-| `Tests/automation_interaction_support_test.lua` | DwarfSpec unit coverage; move with fixture-import and pointer contracts. |
-| `Tests/automation_output_handler_test.lua` | DwarfSpec unit coverage; move with Busted reporting host. |
-| `Tests/automation_scheduler_test.lua` | DwarfSpec unit coverage; move with scheduler. |
-| `Tests/automation_status_test.lua` | DwarfSpec unit coverage; move and rename JSON/status contracts. |
-| `Tests/automation/abort.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
-| `Tests/automation/bootstrap.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
-| `Tests/automation/status.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
-| `Tests/automation/fixtures/cover_screen.lua` | Generic DwarfSpec self-test fixture; move and remove tooltip-specific prose from its generic covering-screen role. |
-| `Tests/automation/fixtures/failing_screen.lua` | Generic DwarfSpec self-test fixture; move as `*.fixture.lua`. |
-| `Tests/automation/fixtures/interaction_screen.lua` | Generic DwarfSpec interaction fixture; move as `*.fixture.lua`. It uses only DFHack GUI APIs. |
-| `Tests/automation/fixtures/tooltip_screen.lua` | DwarfUI consumer fixture; retain with DwarfUI tooltip imports and rename as `Tests/**/fixtures/*.fixture.lua`. |
-| `Tests/automation/overlay_fixtures/runner_probe.lua` | Generic DwarfSpec CLI/staging fixture; move as a framework self-test fixture. |
-| `Tests/automation/overlay_fixtures/tooltip_probe.lua` | DwarfUI consumer fixture; retain because it imports `dwarfui/tooltip`. |
-| `Tests/automation/specs/dy_export_live_spec.lua` | Generic DwarfSpec self-test; move and rename to an `ds` isolation `*_spec.ds.lua`. |
-| `Tests/automation/specs/framework_hardening_live_spec.lua` | Generic DwarfSpec host-resilience self-test; move, remove repository-relative loads, and rename. |
-| `Tests/automation/specs/interaction_live_spec.lua` | Generic DwarfSpec interaction self-test; move and rename. |
-| `Tests/automation/specs/scheduler_cleanup_live_spec.lua` | Generic DwarfSpec scheduler/cleanup self-test; move and rename. |
-| `Tests/automation/specs/tooltip_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
-| `Tests/automation/specs/tooltip_overlay_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
-| `Tests/automation/support/busted_host.lua` | DwarfSpec host implementation; move and publish under `dwarfspec.*`. |
-| `Tests/automation/support/cleanup.lua` | DwarfSpec cleanup implementation; move. |
-| `Tests/automation/support/diagnostics.lua` | DwarfSpec generic diagnostics; move. |
-| `Tests/automation/support/dy.lua` | DwarfSpec public driver; move and hard-rename to `ds.lua`. |
-| `Tests/automation/support/fixture_loader.lua` | DwarfSpec fixture importer; move and replace the fixed DwarfUI fixture root. |
-| `Tests/automation/support/lfs_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
-| `Tests/automation/support/output_handler.lua` | DwarfSpec Busted output adapter; move. |
-| `Tests/automation/support/pointer_adapter.lua` | DwarfSpec scoped pointer/input adapter; move. |
-| `Tests/automation/support/scheduler.lua` | DwarfSpec frame-aware scheduler; move. |
-| `Tests/automation/support/system_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
-| `Tools/Run-AutomationTests.ps1` | Shared migration-only parity oracle; replace with the installed `dwarfspec` command and delete after parity. |
+| `tests/automation_cleanup_test.lua` | DwarfSpec unit coverage; move and convert to the new repository's unit-spec naming. |
+| `tests/automation_host_test.lua` | DwarfSpec unit coverage; move and rebrand host paths and namespace. |
+| `tests/automation_interaction_support_test.lua` | DwarfSpec unit coverage; move with fixture-import and pointer contracts. |
+| `tests/automation_output_handler_test.lua` | DwarfSpec unit coverage; move with Busted reporting host. |
+| `tests/automation_scheduler_test.lua` | DwarfSpec unit coverage; move with scheduler. |
+| `tests/automation_status_test.lua` | DwarfSpec unit coverage; move and rename JSON/status contracts. |
+| `tests/automation/abort.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `tests/automation/bootstrap.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `tests/automation/status.lua` | DwarfSpec installed host entry point; move under `dwarfspec.*`. |
+| `tests/automation/fixtures/cover_screen.lua` | Generic DwarfSpec self-test fixture; move and remove tooltip-specific prose from its generic covering-screen role. |
+| `tests/automation/fixtures/failing_screen.lua` | Generic DwarfSpec self-test fixture; move as `*.fixture.lua`. |
+| `tests/automation/fixtures/interaction_screen.lua` | Generic DwarfSpec interaction fixture; move as `*.fixture.lua`. It uses only DFHack GUI APIs. |
+| `tests/automation/fixtures/tooltip_screen.lua` | DwarfUI consumer fixture; retain with DwarfUI tooltip imports and rename as `tests/**/fixtures/*.fixture.lua`. |
+| `tests/automation/overlay_fixtures/runner_probe.lua` | Generic DwarfSpec CLI/staging fixture; move as a framework self-test fixture. |
+| `tests/automation/overlay_fixtures/tooltip_probe.lua` | DwarfUI consumer fixture; retain because it imports `dwarfui/tooltip`. |
+| `tests/automation/specs/dy_export_live_spec.lua` | Generic DwarfSpec self-test; move and rename to an `ds` isolation `*_spec.ds.lua`. |
+| `tests/automation/specs/framework_hardening_live_spec.lua` | Generic DwarfSpec host-resilience self-test; move, remove repository-relative loads, and rename. |
+| `tests/automation/specs/interaction_live_spec.lua` | Generic DwarfSpec interaction self-test; move and rename. |
+| `tests/automation/specs/scheduler_cleanup_live_spec.lua` | Generic DwarfSpec scheduler/cleanup self-test; move and rename. |
+| `tests/automation/specs/tooltip_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
+| `tests/automation/specs/tooltip_overlay_live_spec.lua` | DwarfUI consumer product spec; retain and rename to `*_spec.ds.lua`. |
+| `tests/automation/support/busted_host.lua` | DwarfSpec host implementation; move and publish under `dwarfspec.*`. |
+| `tests/automation/support/cleanup.lua` | DwarfSpec cleanup implementation; move. |
+| `tests/automation/support/diagnostics.lua` | DwarfSpec generic diagnostics; move. |
+| `tests/automation/support/dy.lua` | DwarfSpec public driver; move and hard-rename to `ds.lua`. |
+| `tests/automation/support/fixture_loader.lua` | DwarfSpec fixture importer; move and replace the fixed DwarfUI fixture root. |
+| `tests/automation/support/lfs_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
+| `tests/automation/support/output_handler.lua` | DwarfSpec Busted output adapter; move. |
+| `tests/automation/support/pointer_adapter.lua` | DwarfSpec scoped pointer/input adapter; move. |
+| `tests/automation/support/scheduler.lua` | DwarfSpec frame-aware scheduler; move. |
+| `tests/automation/support/system_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
+| `Tools/Run-Automationtests.ps1` | Shared migration-only parity oracle; replace with the installed `dwarfspec` command and delete after parity. |
 | `Docs/live-automation-framework.todo` | Migration-only historical design/evidence; replace active usage documentation with DwarfSpec docs and retain only as history or archive it after cutover. |
 
 The generic DwarfSpec live self-test set is therefore the current export,
@@ -403,7 +403,7 @@ the two tooltip specs plus the tooltip screen and tooltip overlay fixtures.
 
 There is no current DwarfUI callback injected into the generic `dy` object.
 Tooltip specs import DwarfUI modules directly. The future
-`Tests/dwarfspec/*.lua` custom-command contract is therefore a new consumer
+`tests/dwarfspec/*.lua` custom-command contract is therefore a new consumer
 extension seam, not a migration of an existing hidden callback.
 
 #### Phase 0 options, environment, paths, and identifiers
@@ -419,14 +419,14 @@ PowerShell runner always uses the bootstrap's default seed of `1`.
 
 | Current implicit contract | Current value | Required standalone input or owner |
 |---|---|---|
-| Repository root | Derived from `Tests/automation/bootstrap.lua`'s source path | CLI resolves the consumer project root; installed modules resolve their own rock location independently. |
-| Live spec root/suffix | `Tests/automation/specs/**/*_live_spec.lua` | Consumer convention `Tests/**/*_spec.ds.lua`. |
-| Screen fixture root | `Tests/automation/fixtures/<name>.lua` | Explicit import; recommended `Tests/**/fixtures/*.fixture.lua`, with no mandatory root. |
-| Overlay fixture root | `Tests/automation/overlay_fixtures/<name>.lua` | Explicit importable fixture definition owned by the consumer or DwarfSpec self-tests. |
-| Host/support paths | `Tests/automation/{bootstrap,status,abort,support}/...` | Installed `dwarfspec.*` modules and CLI-owned entry points. |
+| Repository root | Derived from `tests/automation/bootstrap.lua`'s source path | CLI resolves the consumer project root; installed modules resolve their own rock location independently. |
+| Live spec root/suffix | `tests/automation/specs/**/*_live_spec.lua` | Consumer convention `tests/**/*_spec.ds.lua`. |
+| Screen fixture root | `tests/automation/fixtures/<name>.lua` | Explicit import; recommended `tests/**/fixtures/*.fixture.lua`, with no mandatory root. |
+| Overlay fixture root | `tests/automation/overlay_fixtures/<name>.lua` | Explicit importable fixture definition owned by the consumer or DwarfSpec self-tests. |
+| Host/support paths | `tests/automation/{bootstrap,status,abort,support}/...` | Installed `dwarfspec.*` modules and CLI-owned entry points. |
 | Busted source root | `.luarocks/share/lua/5.4` | Resolve the DwarfSpec rock's LuaRocks dependencies; do not assume a project-local tree or hardcoded Lua directory. |
 | Native dependency root | `.luarocks/lib/lua/5.4` for local tests | External unit tooling only; never prepend this native directory inside DFHack Lua 5.3. |
-| Runner configuration file | `.env.local`, defaulted by `EnvFile` | Optional project configuration under `Tests/dwarfspec/*.lua`, CLI options, and documented environment variables. |
+| Runner configuration file | `.env.local`, defaulted by `EnvFile` | Optional project configuration under `tests/dwarfspec/*.lua`, CLI options, and documented environment variables. |
 | Runner executable | `MOD_COMMAND_RUNNER`, parameter, `GAME_ROOT/hack/dfhack-run.exe`, or `PATH` | `DFHACK_RUNNER`, `DFHACK_ROOT/hack/dfhack-run`, or `PATH`; legacy names may be accepted only through an explicit migration policy. |
 | Game/DFHack root | `GAME_ROOT` | Explicit CLI/config/environment input for temporary overlay staging; do not infer it from the consumer repository. |
 | Staged overlay directory | `<GAME_ROOT>/hack/scripts/gui` | Explicit validated DFHack installation path; stage only a unique run-owned file. |
@@ -455,7 +455,7 @@ Local toolchain and dependency versions:
 The shell did not initially contain the registered Lua installation on
 `PATH`; the unmodified runner therefore stopped with `LuaRocks was not found on
 PATH`. Prepending the registered Lua `bin` directory for that process and
-running `Tools/Run-UnitTests.ps1` produced:
+running `Tools/Run-Unittests.ps1` produced:
 
 ```text
 93 successes / 0 failures / 0 errors / 0 pending
@@ -468,7 +468,7 @@ Live target versions reported through the configured `dfhack-run` executable:
 - embedded `Lua 5.3`; and
 - `dfhack.is_core_context == true`.
 
-`Tools/Run-AutomationTests.ps1` ran the default live suite as protocol 1,
+`Tools/Run-Automationtests.ps1` ran the default live suite as protocol 1,
 generation 1, and produced:
 
 ```text
@@ -477,7 +477,7 @@ state=passed cleanup_confirmed=true
 ```
 
 The separate installed-overlay command
-`Tools/Run-AutomationTests.ps1 -Spec tooltip_overlay_live_spec.lua
+`Tools/Run-Automationtests.ps1 -Spec tooltip_overlay_live_spec.lua
 -OverlayFixture tooltip_probe` ran as generation 2 and produced:
 
 ```text
@@ -551,8 +551,8 @@ only reusable framework code.
 #### Phase 1 standalone baseline evidence
 
 - `README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.editorconfig`,
-  `docs/architecture.md`, `Tools/`, `bin/`, `src/dwarfspec/`, `Tests/unit/`,
-  and `Tests/framework/fixtures/` establish the independent repository and
+  `docs/architecture.md`, `Tools/`, `bin/`, `src/dwarfspec/`, `tests/unit/`,
+  and `tests/framework/fixtures/` establish the independent repository and
   target layout.
 - `LICENSE` contains the approved MIT text and
   `Copyright (c) 2026 David Sisco`.
@@ -560,7 +560,7 @@ only reusable framework code.
   tracked Lua source outside `.luarocks`, and enforces no tabs, no trailing
   whitespace, and a final newline. The same syntax audit was executed against
   DFHack's embedded Lua 5.3 and passed all 27 extracted Lua files.
-- `Tools/Run-UnitTests.ps1` provides the repository-owned local Busted command
+- `Tools/Run-Unittests.ps1` provides the repository-owned local Busted command
   with Busted `2.3.0-1` pinned in an ignored `.luarocks` tree. It produced:
 
 ```text
@@ -598,8 +598,8 @@ process-global export or compatibility alias.
 
 - DwarfSpec commit: `153fccc6b40bff715d7e34cf346a1b924dca0b94`
   (`feat: rename automation driver to ds`).
-- `Tests/automation/support/dy.lua` and
-  `Tests/automation/specs/dy_export_live_spec.lua` were removed in favor of
+- `tests/automation/support/dy.lua` and
+  `tests/automation/specs/dy_export_live_spec.lua` were removed in favor of
   `ds.lua` and `ds_export_live_spec.lua`. There is no compatibility alias.
 - The host now creates and exports `ds` through `busted.export('ds', ds)` and
   installs root Busted `before_each` and `after_each` callbacks with
@@ -639,18 +639,18 @@ DwarfUI:   93 successes / 0 failures / 0 errors / 0 pending
   result paths with resolved DwarfSpec package and consumer-project inputs.
 - ☐ Discover the project root from an explicit CLI option or current working
   directory without assuming a DwarfUI layout.
-- ☐ Discover live specs only through `Tests/**/*_spec.ds.lua`, including nested
+- ☐ Discover live specs only through `tests/**/*_spec.ds.lua`, including nested
   directories, with deterministic ordering and no overlap with ordinary Busted
   unit specs.
 - ☐ Load optional global configuration and custom command modules from
-  `Tests/dwarfspec/*.lua` with deterministic order, schema validation,
+  `tests/dwarfspec/*.lua` with deterministic order, schema validation,
   duplicate-command rejection, and actionable errors.
 - ☐ Define the custom command registration contract and make registered
   commands available through the isolated `ds` object without writing to `_G`.
 - ☐ Generalize fixture loading so specs and custom commands can explicitly
   import fixtures from any supported import location without a library-owned
   product allowlist or mandatory fixture root.
-- ☐ Document `Tests/**/fixtures/*.fixture.lua` as the recommended convention
+- ☐ Document `tests/**/fixtures/*.fixture.lua` as the recommended convention
   and prove fixtures outside that convention remain usable when importable.
 - ☐ Generalize overlay fixture staging from explicitly imported fixture
   definitions while retaining safe target validation, unique names, rescans,
@@ -699,7 +699,7 @@ paths, modules, or branding.
 - ☐ Test subcommand parsing, list/run parity, glob matching, malformed and
   unmatched globs, quoting, paths with spaces, exit-code propagation,
   interruption, and cleanup on Windows and at least one Unix-like environment.
-- ☐ Keep `Run-AutomationTests.ps1` available only as a temporary parity oracle
+- ☐ Keep `Run-Automationtests.ps1` available only as a temporary parity oracle
   until the installed command passes all equivalent cases.
 
 Exit: a developer can inspect the suite with `dwarfspec list`, select it with
@@ -736,12 +736,12 @@ library modules and working `dwarfspec` command.
 
 - ☐ Add a DwarfUI rockspec or update its existing dependency metadata to
   declare `dwarfspec ~> 0.1` as a `test_dependency`.
-- ☐ Rename and move retained DwarfUI live specs beneath `Tests/` with the
+- ☐ Rename and move retained DwarfUI live specs beneath `tests/` with the
   `*_spec.ds.lua` suffix.
 - ☐ Move retained DwarfUI fixtures to importable locations, preferably beside
-  their feature specs under `Tests/**/fixtures/*.fixture.lua`.
+  their feature specs under `tests/**/fixtures/*.fixture.lua`.
 - ☐ Put any DwarfUI-wide DwarfSpec configuration and tooltip-specific custom
-  commands under `Tests/dwarfspec/*.lua`.
+  commands under `tests/dwarfspec/*.lua`.
 - ☐ Register the DwarfUI tooltip diagnostic adapter through DwarfSpec's
   consumer extension seam.
 - ☐ Run every DwarfUI live spec through the locally installed DwarfSpec rock,
@@ -752,7 +752,7 @@ library modules and working `dwarfspec` command.
   payload and is needed only by developers/tests.
 - ☐ Remove generic framework modules, tests, fixtures, and copied dependencies
   from DwarfUI after parity is established.
-- ☐ Delete `Tools/Run-AutomationTests.ps1` after the installed command passes
+- ☐ Delete `Tools/Run-Automationtests.ps1` after the installed command passes
   the full DwarfUI suite plus deliberate failure, timeout, abort, and cleanup
   cases.
 - ☐ Update DwarfUI documentation to describe it as a DwarfSpec consumer and
@@ -767,12 +767,12 @@ longer owns a private copy or private runner.
 
 - ☐ From a clean temporary project, declare DwarfSpec only through
   `test_dependencies`, run `luarocks test --prepare`, write
-  `Tests/smoke_spec.ds.lua`, list it with `dwarfspec list`, and run it with
+  `tests/smoke_spec.ds.lua`, list it with `dwarfspec list`, and run it with
   `dwarfspec run`.
-- ☐ In the clean project, prove `Tests/dwarfspec/config.lua` applies global
-  configuration and another `Tests/dwarfspec/*.lua` module registers a custom
+- ☐ In the clean project, prove `tests/dwarfspec/config.lua` applies global
+  configuration and another `tests/dwarfspec/*.lua` module registers a custom
   `ds` command.
-- ☐ Prove a co-located `Tests/smoke/fixtures/example.fixture.lua` fixture and a
+- ☐ Prove a co-located `tests/smoke/fixtures/example.fixture.lua` fixture and a
   fixture from another supported import location can both be used explicitly.
 - ☐ In a second clean project, configure `test.command = 'dwarfspec'` with
   `test.flags = { 'run' }` and prove `luarocks test` installs dependencies and
@@ -802,7 +802,7 @@ and DwarfUI passes against the same artifact available to other projects.
 | Layer | Required proof |
 |---|---|
 | DwarfSpec syntax | All shipped and test Lua parses under Lua 5.3; external tooling also passes under Lua 5.4. |
-| DwarfSpec unit | `Tests/**/*_spec.ds.lua` discovery, canonical identities, list/run glob parity, filters, configuration, custom commands, fixture imports, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
+| DwarfSpec unit | `tests/**/*_spec.ds.lua` discovery, canonical identities, list/run glob parity, filters, configuration, custom commands, fixture imports, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
 | Rock metadata | Rockspec lint, source rock build, `.all.rock` build, clean-tree install, module load, and command installation pass. |
 | Generic live | In-process Busted host, `ds` isolation, frame yields, pointer/input operations, cleanup, failure, timeout, abort, and lease recovery pass in DFHack. |
 | DwarfUI local | Existing DwarfUI unit, syntax, build, and package checks pass independently of live automation. |
@@ -830,11 +830,11 @@ and DwarfUI passes against the same artifact available to other projects.
   PowerShell, shell, batch, or Lua runner script.
 - ☐ DwarfSpec resolves and invokes the supported `dfhack-run` bridge without
   exposing transport details to test authors.
-- ☐ Consumer specs are discovered only as `Tests/**/*_spec.ds.lua`.
+- ☐ Consumer specs are discovered only as `tests/**/*_spec.ds.lua`.
 - ☐ Global configuration and custom commands load only from
-  `Tests/dwarfspec/*.lua`.
+  `tests/dwarfspec/*.lua`.
 - ☐ Fixtures can be imported from any supported import location, with
-  `Tests/**/fixtures/*.fixture.lua` documented as the recommended convention.
+  `tests/**/fixtures/*.fixture.lua` documented as the recommended convention.
 - ☐ Product-specific diagnostics are supplied through an extension seam and
   do not leak into the DwarfSpec package.
 - ☐ DwarfUI passes all retained live specs against an installed DwarfSpec rock.

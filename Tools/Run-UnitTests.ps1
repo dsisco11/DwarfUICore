@@ -40,7 +40,7 @@ if ($LASTEXITCODE -ne 0) {
     }
 }
 
-$testsRoot = Join-Path $projectRoot 'Tests'
+$testsRoot = Join-Path $projectRoot 'tests'
 if (-not (Test-Path -LiteralPath $testsRoot -PathType Container)) {
     throw "Could not find Lua test directory: $testsRoot"
 }

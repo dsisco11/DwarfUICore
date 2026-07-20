@@ -3,8 +3,8 @@ param(
     [string] $LuaCompiler = $env:LUA_COMPILER,
     [string] $RequiredLuaVersion = $env:LUA_REQUIRED_VERSION,
     [string] $SourceDir = 'src',
-    [string] $TestsDir = 'Tests',
-    [switch] $IncludeTests
+    [string] $testsDir = 'tests',
+    [switch] $Includetests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,8 +58,8 @@ function Resolve-ProjectDirectory {
 }
 
 $sourcePath = Resolve-ProjectDirectory -Path $SourceDir -Label 'Lua source'
-$testPath = if ($IncludeTests) {
-    Resolve-ProjectDirectory -Path $TestsDir -Label 'Lua test' -AllowMissing
+$testPath = if ($Includetests) {
+    Resolve-ProjectDirectory -Path $testsDir -Label 'Lua test' -AllowMissing
 }
 
 $productionFiles = @(Get-ChildItem -LiteralPath $sourcePath -Recurse -File -Filter '*.lua' |

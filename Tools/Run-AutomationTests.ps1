@@ -165,8 +165,8 @@ function Ensure-AutomationDependencies {
     }
 
     foreach ($relativePath in @(
-            'Tests/automation\support\system_adapter.lua',
-            'Tests/automation\support\lfs_adapter.lua')) {
+            'tests/automation\support\system_adapter.lua',
+            'tests/automation\support\lfs_adapter.lua')) {
         $path = Join-Path $RepositoryRoot $relativePath
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Missing live automation adapter: $path"
@@ -196,7 +196,7 @@ function New-OverlayFixtureStage {
     if ($FixtureName -notmatch '^[a-z][a-z0-9_-]*$') {
         throw 'Overlay fixture names must be lowercase letters, digits, hyphens, or underscores.'
     }
-    $source = Join-Path $RepositoryRoot "Tests/automation\overlay_fixtures\$FixtureName.lua"
+    $source = Join-Path $RepositoryRoot "tests/automation\overlay_fixtures\$FixtureName.lua"
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
         throw "Approved overlay fixture was not found: $source"
     }
@@ -316,9 +316,9 @@ if (-not $RunId) {
 if ($RunId -notmatch '^[A-Za-z0-9_.-]+$') {
     throw 'RunId must contain only letters, digits, dot, underscore, or dash.'
 }
-$bootstrapFile = Join-Path $repoRoot 'Tests/automation\bootstrap.lua'
-$statusFile = Join-Path $repoRoot 'Tests/automation\status.lua'
-$abortFile = Join-Path $repoRoot 'Tests/automation\abort.lua'
+$bootstrapFile = Join-Path $repoRoot 'tests/automation\bootstrap.lua'
+$statusFile = Join-Path $repoRoot 'tests/automation\status.lua'
+$abortFile = Join-Path $repoRoot 'tests/automation\abort.lua'
 $bootstrapPath = (Resolve-Path -LiteralPath $bootstrapFile).Path.Replace('\', '/')
 $statusPath = (Resolve-Path -LiteralPath $statusFile).Path.Replace('\', '/')
 $abortPath = (Resolve-Path -LiteralPath $abortFile).Path.Replace('\', '/')

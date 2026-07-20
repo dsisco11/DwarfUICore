@@ -36,7 +36,7 @@ The intended developer workflow is:
 ```text
 1. Declare dwarfspec as a test dependency.
 2. Run `luarocks test --prepare` once to install test dependencies.
-3. Add specs beneath `tests/` with the `*_spec.ds.lua` suffix.
+3. Add specs beneath `tests/` with the `.ds.lua` suffix.
 4. Start DF/DFHack and run `dwarfspec run` from the project root.
 ```
 
@@ -74,7 +74,9 @@ PowerShell runner is required.
   framework fixtures.
 - The default consumer layout is convention-based and requires no DwarfSpec
   configuration file.
-- DwarfSpec live specs are discovered only as `tests/**/*_spec.ds.lua`.
+- DwarfSpec live specs default to recursive `*.ds.lua` basename matching
+  beneath `tests/`; consumers can configure another discovery glob without
+  changing the optional selection glob.
 - `tests/` is the canonical consumer test root; nested DwarfSpec framework
   directories use lowercase names such as `tests/automation/`.
 - Global configuration and custom command modules live under
@@ -104,7 +106,8 @@ PowerShell runner is required.
 
 Defaults:
 
-- live specs: `tests/**/*_spec.ds.lua`;
+- live specs: recursive `*.ds.lua` basename matching beneath `tests/` by
+  default, with a configurable discovery glob;
 - global configuration and custom commands: `tests/dwarfspec/*.lua`;
 - recommended fixture placement: `tests/**/fixtures/*.fixture.lua`;
 - results: `.test-results/dwarfspec/`;
@@ -343,7 +346,7 @@ pre-extraction baseline can be reproduced.
 All 33 current automation artifacts are accounted for below. DwarfSpec-owned
 files move to the new repository and their original DwarfUI copies become
 obsolete after installed-rock parity. DwarfUI-consumer files remain in DwarfUI
-and adopt the new `tests/**/*_spec.ds.lua` and importable-fixture conventions.
+and adopt the new `*.ds.lua` and importable-fixture conventions.
 
 | Current artifact | Ownership and destination |
 |---|---|
@@ -420,7 +423,7 @@ PowerShell runner always uses the bootstrap's default seed of `1`.
 | Current implicit contract | Current value | Required standalone input or owner |
 |---|---|---|
 | Repository root | Derived from `tests/automation/bootstrap.lua`'s source path | CLI resolves the consumer project root; installed modules resolve their own rock location independently. |
-| Live spec root/suffix | `tests/automation/specs/**/*_live_spec.lua` | Consumer convention `tests/**/*_spec.ds.lua`. |
+| Live spec root/suffix | `tests/automation/specs/**/*_live_spec.lua` | Consumer default: recursively match `*.ds.lua` beneath `tests/`; configurable by discovery glob. |
 | Screen fixture root | `tests/automation/fixtures/<name>.lua` | Explicit import; recommended `tests/**/fixtures/*.fixture.lua`, with no mandatory root. |
 | Overlay fixture root | `tests/automation/overlay_fixtures/<name>.lua` | Explicit importable fixture definition owned by the consumer or DwarfSpec self-tests. |
 | Host/support paths | `tests/automation/{bootstrap,status,abort,support}/...` | Installed `dwarfspec.*` modules and CLI-owned entry points. |
@@ -955,7 +958,9 @@ and DwarfUI passes against the same artifact available to other projects.
   PowerShell, shell, batch, or Lua runner script.
 - ☐ DwarfSpec resolves and invokes the supported `dfhack-run` bridge without
   exposing transport details to test authors.
-- ☐ Consumer specs are discovered only as `tests/**/*_spec.ds.lua`.
+- ☐ Consumer specs default to recursive `*.ds.lua` basename matching beneath
+  `tests/`, and a configured discovery glob is honored identically by `list`
+  and `run`.
 - ☐ Global configuration and custom commands load only from
   `tests/dwarfspec/*.lua`.
 - ☐ Fixtures can be imported from any supported import location, with

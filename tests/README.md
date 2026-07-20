@@ -18,10 +18,12 @@ Support modules provide isolated DFHack-style module loading and only the
 widget behavior required by the tooltip port. tests and `.luarocks/` are
 outside `src/` and are not included in published packages.
 
-Live product tests are separate `tests/**/*_spec.ds.lua` files executed by the
-installed DwarfSpec dependency declared in the repository rockspec. DwarfUI
-owns only its tooltip specs, feature fixtures, configuration, and diagnostic
-adapter. Run them with:
+Live product tests default to recursively discovered `*.ds.lua` files beneath
+`tests/`, executed by the installed DwarfSpec dependency declared in the
+repository rockspec. Consumers can replace that discovery glob without
+changing the optional selection glob.
+DwarfUI owns only its tooltip specs, feature fixtures, configuration, and
+diagnostic adapter. Run them with:
 
 ```powershell
 dwarfspec run tests/tooltip/tooltip_spec.ds.lua

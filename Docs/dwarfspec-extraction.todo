@@ -792,9 +792,7 @@ Evidence recorded on Windows before the cross-platform gate:
 - ☑ Keep the rock platform-independent and verify it builds as an `.all.rock`.
 - ☑ Ensure modules loaded inside DFHack are pure Lua and never resolve external
   Lua 5.4 native libraries in the Lua 5.3 process.
-- ☑ Run `luarocks lint` and build the binary rock. The standard source-rock
-  pack remains a release action once the public tag exists; no bespoke local
-  source-archive simulation is required.
+- ☑ Run `luarocks lint` and build both source and binary rocks.
 - ☑ Install the built rock into an empty temporary rock tree.
 - ☑ Prove `require('dwarfspec.ds')`, CLI help, configuration discovery, and
   Busted dependency resolution from the clean tree.
@@ -827,8 +825,9 @@ Evidence recorded on 2026-07-20:
   and confirmed cleanup. The DFHack host received only pure-Lua paths; the
   external Lua 5.4 launcher's native path is never propagated into DFHack.
 - The final DwarfSpec framework suite passed `62 successes / 0 failures /
-  0 errors / 0 pending`; the source-rock pack remains the normal release
-  operation after the public `v0.1.0` tag is available.
+  0 errors / 0 pending`. A source rock also built from a temporary archive of
+  commit `08531d1`; release installation from the public source remains gated
+  on publishing the `v0.1.0` tag, as documented by the release checklist.
 
 ### Phase 6 - Convert DwarfUI into the first external consumer
 

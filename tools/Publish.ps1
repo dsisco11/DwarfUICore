@@ -33,13 +33,13 @@ $outputPath = if ([IO.Path]::IsPathFullyQualified($OutputDir)) {
 $sourcePath = (Resolve-Path -LiteralPath $sourceCandidate).Path
 $infoPath = Join-Path $sourcePath 'info.txt'
 $buildScript = Join-Path $scriptRoot 'Build.ps1'
-$commonTools = Join-Path $scriptRoot 'Common.ps1'
+$commontools = Join-Path $scriptRoot 'Common.ps1'
 $verifyScript = Join-Path $scriptRoot 'VerifyPackage.ps1'
 
-if (-not (Test-Path -LiteralPath $commonTools -PathType Leaf)) {
-    throw "Missing required common tools: $commonTools"
+if (-not (Test-Path -LiteralPath $commontools -PathType Leaf)) {
+    throw "Missing required common tools: $commontools"
 }
-. $commonTools
+. $commontools
 
 if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
     throw "Missing required build script: $buildScript"

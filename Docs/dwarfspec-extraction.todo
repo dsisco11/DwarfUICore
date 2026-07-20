@@ -66,7 +66,7 @@ PowerShell runner is required.
 - `dwarfspec list`, `dwarfspec run`, and `dwarfspec run <glob>` are required
   first-class commands. Listing and selection use the same canonical test
   identities and glob-matching rules.
-- `Tools/Run-Automationtests.ps1` is retired only after the installed command
+- `tools/Run-Automationtests.ps1` is retired only after the installed command
   proves equivalent success, failure, timeout, abort, reporting, staging, and
   cleanup behavior against DwarfUI.
 - Consumer projects own their product specs, product fixtures, and optional
@@ -197,7 +197,7 @@ and consumer-owned tests must remain explicit.
 - Generic live host, scheduler, cleanup, interaction, and isolation specs
 - Generic live fixtures used only to prove DwarfSpec behavior
 - The reusable orchestration behavior currently implemented by
-  `Tools/Run-Automationtests.ps1`
+  `tools/Run-Automationtests.ps1`
 
 ### Remain in DwarfUI as DwarfSpec consumer coverage
 
@@ -211,7 +211,7 @@ and consumer-owned tests must remain explicit.
 
 - Copied DwarfSpec host/support files
 - Generic DwarfSpec framework tests and fixtures
-- `Tools/Run-Automationtests.ps1`
+- `tools/Run-Automationtests.ps1`
 - DwarfUI-branded automation run namespaces, JSON prefixes, and temporary file
   names
 - Documentation that describes the framework as DwarfUI-owned
@@ -378,7 +378,7 @@ and adopt the new `tests/**/*_spec.ds.lua` and importable-fixture conventions.
 | `tests/automation/support/pointer_adapter.lua` | DwarfSpec scoped pointer/input adapter; move. |
 | `tests/automation/support/scheduler.lua` | DwarfSpec frame-aware scheduler; move. |
 | `tests/automation/support/system_adapter.lua` | DwarfSpec DFHack-native dependency adapter; move. |
-| `Tools/Run-Automationtests.ps1` | Shared migration-only parity oracle; replace with the installed `dwarfspec` command and delete after parity. |
+| `tools/Run-Automationtests.ps1` | Shared migration-only parity oracle; replace with the installed `dwarfspec` command and delete after parity. |
 | `Docs/live-automation-framework.todo` | Migration-only historical design/evidence; replace active usage documentation with DwarfSpec docs and retain only as history or archive it after cutover. |
 
 The generic DwarfSpec live self-test set is therefore the current export,
@@ -398,7 +398,7 @@ the two tooltip specs plus the tooltip screen and tooltip overlay fixtures.
 | `gui`, `gui.widgets` | Generic and product fixtures plus `ds` input operations | DFHack runtime API; retain as live-only imports. |
 | `plugins.overlay` | Overlay staging/product coverage | DFHack runtime API; generic staging moves to DwarfSpec while tooltip behavior remains in DwarfUI. |
 | `dwarfui/tooltip`, `dwarfui/tooltip_registration` | Tooltip screen fixture, tooltip overlay fixture, and two tooltip specs | DwarfUI consumer-only imports; never move into DwarfSpec. |
-| `Tools/Common.ps1` `Import-EnvironmentFile()` and `Resolve-DFHackRunner()` | PowerShell runner | The file remains DwarfUI-owned. The cross-platform CLI independently implements the documented configuration and runner-resolution contract. |
+| `tools/Common.ps1` `Import-EnvironmentFile()` and `Resolve-DFHackRunner()` | PowerShell runner | The file remains DwarfUI-owned. The cross-platform CLI independently implements the documented configuration and runner-resolution contract. |
 | Repository-relative `loadfile()` calls | Unit tests, entry points, host, `dy`, hardening spec | Replace moved code with installed `dwarfspec.*` modules and pass the consumer project root explicitly. |
 
 There is no current DwarfUI callback injected into the generic `dy` object.
@@ -455,7 +455,7 @@ Local toolchain and dependency versions:
 The shell did not initially contain the registered Lua installation on
 `PATH`; the unmodified runner therefore stopped with `LuaRocks was not found on
 PATH`. Prepending the registered Lua `bin` directory for that process and
-running `Tools/Run-Unittests.ps1` produced:
+running `tools/Run-Unittests.ps1` produced:
 
 ```text
 93 successes / 0 failures / 0 errors / 0 pending
@@ -468,7 +468,7 @@ Live target versions reported through the configured `dfhack-run` executable:
 - embedded `Lua 5.3`; and
 - `dfhack.is_core_context == true`.
 
-`Tools/Run-Automationtests.ps1` ran the default live suite as protocol 1,
+`tools/Run-Automationtests.ps1` ran the default live suite as protocol 1,
 generation 1, and produced:
 
 ```text
@@ -477,7 +477,7 @@ state=passed cleanup_confirmed=true
 ```
 
 The separate installed-overlay command
-`Tools/Run-Automationtests.ps1 -Spec tooltip_overlay_live_spec.lua
+`tools/Run-Automationtests.ps1 -Spec tooltip_overlay_live_spec.lua
 -OverlayFixture tooltip_probe` ran as generation 2 and produced:
 
 ```text
@@ -551,16 +551,16 @@ only reusable framework code.
 #### Phase 1 standalone baseline evidence
 
 - `README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.editorconfig`,
-  `docs/architecture.md`, `Tools/`, `bin/`, `src/dwarfspec/`, `tests/unit/`,
+  `docs/architecture.md`, `tools/`, `bin/`, `src/dwarfspec/`, `tests/unit/`,
   and `tests/framework/fixtures/` establish the independent repository and
   target layout.
 - `LICENSE` contains the approved MIT text and
   `Copyright (c) 2026 David Sisco`.
-- `Tools/Check-Lua.ps1` requires an exact Lua 5.3 interpreter, parses every
+- `tools/Check-Lua.ps1` requires an exact Lua 5.3 interpreter, parses every
   tracked Lua source outside `.luarocks`, and enforces no tabs, no trailing
   whitespace, and a final newline. The same syntax audit was executed against
   DFHack's embedded Lua 5.3 and passed all 27 extracted Lua files.
-- `Tools/Run-Unittests.ps1` provides the repository-owned local Busted command
+- `tools/Run-Unittests.ps1` provides the repository-owned local Busted command
   with Busted `2.3.0-1` pinned in an ignored `.luarocks` tree. It produced:
 
 ```text
@@ -752,7 +752,7 @@ library modules and working `dwarfspec` command.
   payload and is needed only by developers/tests.
 - ☐ Remove generic framework modules, tests, fixtures, and copied dependencies
   from DwarfUI after parity is established.
-- ☐ Delete `Tools/Run-Automationtests.ps1` after the installed command passes
+- ☐ Delete `tools/Run-Automationtests.ps1` after the installed command passes
   the full DwarfUI suite plus deliberate failure, timeout, abort, and cleanup
   cases.
 - ☐ Update DwarfUI documentation to describe it as a DwarfSpec consumer and

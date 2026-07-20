@@ -29,11 +29,11 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$commonTools = Join-Path $PSScriptRoot 'Common.ps1'
-if (-not (Test-Path -LiteralPath $commonTools -PathType Leaf)) {
-    throw "Missing required common tools: $commonTools"
+$commontools = Join-Path $PSScriptRoot 'Common.ps1'
+if (-not (Test-Path -LiteralPath $commontools -PathType Leaf)) {
+    throw "Missing required common tools: $commontools"
 }
-. $commonTools
+. $commontools
 
 <#
 .SYNOPSIS

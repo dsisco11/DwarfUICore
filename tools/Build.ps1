@@ -18,12 +18,12 @@ Set-StrictMode -Version Latest
 
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $syntaxCheck = Join-Path $PSScriptRoot 'Check-LuaSyntax.ps1'
-$commonTools = Join-Path $PSScriptRoot 'Common.ps1'
+$commontools = Join-Path $PSScriptRoot 'Common.ps1'
 
-if (-not (Test-Path -LiteralPath $commonTools -PathType Leaf)) {
-    throw "Missing required common tools: $commonTools"
+if (-not (Test-Path -LiteralPath $commontools -PathType Leaf)) {
+    throw "Missing required common tools: $commontools"
 }
-. $commonTools
+. $commontools
 
 $resolvedEnvFile = $EnvFile
 if (-not [IO.Path]::IsPathRooted($resolvedEnvFile)) {

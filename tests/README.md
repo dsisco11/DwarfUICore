@@ -3,7 +3,7 @@
 Run the test suites from the repository root with:
 
 ```powershell
-.\Tools\Run-Unittests.ps1
+.\tools\Run-Unittests.ps1
 ```
 
 Lua and LuaRocks must be available on `PATH`. The runner pins Busted `2.3.0-1`

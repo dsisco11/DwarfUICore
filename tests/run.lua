@@ -20,7 +20,7 @@ package.path = table.concat({
 -- the same file list before any specs execute while leaving Busted's command-
 -- line arguments available for filtering, verbosity, and output selection.
 local discovered_files = assert(os.getenv('LUA_TEST_FILES'),
-    'LUA_TEST_FILES must be provided by Tools/Run-Unittests.ps1')
+    'LUA_TEST_FILES must be provided by tools/Run-Unittests.ps1')
 local normalized_tests_root = tests_root:gsub('\\', '/') .. '/'
 
 for path in discovered_files:gmatch('[^\r\n]+') do

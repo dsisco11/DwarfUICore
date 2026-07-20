@@ -21,7 +21,7 @@ describe('Busted test infrastructure', function()
         assert.is_true(setup_completed)
 
         local todo = assert(io.open(
-            repo_root .. '/Docs/tooltip-system-port.todo', 'r'))
+            repo_root .. '/Docs/dwarfspec-extraction.todo', 'r'))
         todo:close()
 
         local files = assert(os.getenv('LUA_TEST_FILES'),

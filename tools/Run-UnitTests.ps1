@@ -14,20 +14,22 @@ $luaSystemVersion = '0.3.0-2'
 $testFileEnvironmentVariable = 'LUA_TEST_FILES'
 
 if (-not (Get-Command lua -ErrorAction SilentlyContinue)) {
-    throw 'Lua 5.3 was not found on PATH.'
+    throw 'Lua was not found on PATH.'
 }
 if (-not (Get-Command luarocks -ErrorAction SilentlyContinue)) {
     throw 'LuaRocks was not found on PATH.'
 }
 
 $luaCommand = Get-Command lua
-$luaVersion = & $luaCommand.Source -e "io.write(_VERSION)"
-if ($LASTEXITCODE -ne 0 -or $luaVersion -ne 'Lua 5.3') {
-    throw "DwarfUI tests require Lua 5.3; found '$luaVersion'."
+$luaVersionText = & $luaCommand.Source -e "io.write(_VERSION)"
+$luaVersionMatch = [regex]::Match($luaVersionText, '^Lua ([0-9]+\.[0-9]+)$')
+if ($LASTEXITCODE -ne 0 -or -not $luaVersionMatch.Success) {
+    throw "Could not determine the Lua version; found '$luaVersionText'."
 }
+$luaVersion = $luaVersionMatch.Groups[1].Value
 $rockLuaVersion = & luarocks config lua_version
-if ($LASTEXITCODE -ne 0 -or $rockLuaVersion -ne '5.3') {
-    throw "DwarfUI tests require LuaRocks for Lua 5.3; found '$rockLuaVersion'."
+if ($LASTEXITCODE -ne 0 -or $rockLuaVersion.Trim() -ne $luaVersion) {
+    throw "LuaRocks targets Lua '$rockLuaVersion', but the active interpreter is Lua $luaVersion."
 }
 
 & luarocks show luasystem $luaSystemVersion --tree $rockTree *> $null
@@ -88,8 +90,8 @@ function Restore-ProcessEnvironmentVariable {
 
 try {
     $rockLuaPath = @(
-        (Join-Path $rockTree 'share\lua\5.3\?.lua'),
-        (Join-Path $rockTree 'share\lua\5.3\?\init.lua')
+        (Join-Path $rockTree "share\lua\$luaVersion\?.lua"),
+        (Join-Path $rockTree "share\lua\$luaVersion\?\init.lua")
     ) -join ';'
     $testLuaPath = @(
         (Join-Path $testsRoot '?.lua'),
@@ -105,7 +107,7 @@ try {
         $luaPathEntries += $oldLuaPath
     }
     Set-Item -LiteralPath Env:LUA_PATH -Value ($luaPathEntries -join ';')
-    $luaCPathEntries = @((Join-Path $rockTree 'lib\lua\5.3\?.dll'))
+    $luaCPathEntries = @((Join-Path $rockTree "lib\lua\$luaVersion\?.dll"))
     if ($null -ne $oldLuaCPath) {
         $luaCPathEntries += $oldLuaCPath
     }

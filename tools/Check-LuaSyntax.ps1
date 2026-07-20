@@ -19,15 +19,11 @@ if (-not $compiler) {
 }
 
 $version = (& $compiler.Source -v 2>&1 | Out-String)
-if ($version -notmatch 'Lua 5\.3') {
-    throw "DwarfUI requires a Lua 5.3 compiler; got: $version"
-}
 $versionMatch = [regex]::Match($version, 'Lua ([0-9]+(?:\.[0-9]+)+)')
-$compilerVersion = if ($versionMatch.Success) {
-    $versionMatch.Groups[1].Value
-} else {
-    'unknown version'
+if ($LASTEXITCODE -ne 0 -or -not $versionMatch.Success) {
+    throw "Could not determine the Lua compiler version; got: $version"
 }
+$compilerVersion = $versionMatch.Groups[1].Value
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 

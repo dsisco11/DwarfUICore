@@ -22,6 +22,17 @@ local function read_source(relative_path)
     return text
 end
 
+---Reads one repository file as binary text.
+---@param relative_path string
+---@return string
+local function read_repository_file(relative_path)
+    local file = assert(io.open(repo_root .. separator ..
+        relative_path:gsub('/', separator), 'rb'))
+    local text = file:read('*a')
+    file:close()
+    return text
+end
+
 local function contains(text, expected)
     assert.is_truthy(text:find(expected, 1, true))
 end
@@ -128,6 +139,13 @@ describe('DwarfUI package contract', function()
         for key, value in pairs(expected) do
             contains(info, ('[%s:%s]'):format(key, value))
         end
+    end)
+
+    it('supports Lua 5.3 and newer without an artificial upper bound',
+            function()
+        local rockspec = read_repository_file('dwarfui-0.1.0-1.rockspec')
+        contains(rockspec, '"lua >= 5.3"')
+        assert.is_nil(rockspec:find('< 5.4', 1, true))
     end)
 
     it('keeps stable public module contracts', function()

@@ -6,8 +6,9 @@ Run the test suites from the repository root with:
 .\tools\Run-UnitTests.ps1
 ```
 
-Lua 5.3 and LuaRocks must be available on `PATH`; other Lua versions are
-rejected. The runner pins Busted `2.3.0-1`
+Lua 5.3 or newer and a matching LuaRocks installation must be available on
+`PATH`. The runner follows the active toolchain while Lua 5.3 remains the
+required compatibility test for DFHack. The runner pins Busted `2.3.0-1`
 and Windows-toolchain-compatible LuaSystem `0.3.0-2` in the ignored repository-
 local `.luarocks/` tree, installing them and the remaining dependencies through
 LuaRocks when absent. It deterministically discovers `test_*.lua` and

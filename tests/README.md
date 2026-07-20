@@ -25,12 +25,11 @@ Live product tests default to recursively discovered `*.ds.lua` files beneath
 repository rockspec. Consumers can replace that discovery glob without
 changing the optional selection glob.
 DwarfUI owns only its tooltip specs, feature fixtures, configuration, and
-diagnostic adapter. Run them with:
+tooltip-state command. Run them with:
 
 ```powershell
 dwarfspec run tests/tooltip/tooltip_spec.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua `
-  --overlay-fixture tests/tooltip/fixtures/tooltip_overlay.fixture.lua
+dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua
 ```
 
 The local Busted unit runner does not discover or execute live DwarfSpec files.

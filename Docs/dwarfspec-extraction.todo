@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: in progress (Phases 0-4 complete)
+Status: in progress (Phases 0-6 complete)
 
 ## Goal
 
@@ -831,34 +831,62 @@ Evidence recorded on 2026-07-20:
 
 ### Phase 6 - Convert DwarfUI into the first external consumer
 
-- ☐ Add a DwarfUI rockspec or update its existing dependency metadata to
+- ☑ Add a DwarfUI rockspec or update its existing dependency metadata to
   declare `dwarfspec ~> 0.1` as a `test_dependency`.
-- ☐ Rename and move retained DwarfUI live specs beneath `tests/` with the
+- ☑ Rename and move retained DwarfUI live specs beneath `tests/` with the
   `*_spec.ds.lua` suffix.
-- ☐ Move retained DwarfUI fixtures to importable locations, preferably beside
+- ☑ Move retained DwarfUI fixtures to importable locations, preferably beside
   their feature specs under `tests/**/fixtures/*.fixture.lua`.
-- ☐ Put any DwarfUI-wide DwarfSpec configuration and tooltip-specific custom
+- ☑ Put any DwarfUI-wide DwarfSpec configuration and tooltip-specific custom
   commands under `tests/dwarfspec/*.lua`.
-- ☐ Register the DwarfUI tooltip diagnostic adapter through DwarfSpec's
+- ☑ Register the DwarfUI tooltip diagnostic adapter through DwarfSpec's
   consumer extension seam.
-- ☐ Run every DwarfUI live spec through the locally installed DwarfSpec rock,
+- ☑ Run every DwarfUI live spec through the locally installed DwarfSpec rock,
   not through source files reachable from the sibling DwarfSpec checkout.
-- ☐ Prove screen fixtures, overlay fixtures, pointer input, render waits,
+- ☑ Prove screen fixtures, overlay fixtures, pointer input, render waits,
   tooltip diagnostics, failure reporting, and automatic setup/teardown.
-- ☐ Prove the DwarfSpec package can be absent from DwarfUI's production package
+- ☑ Prove the DwarfSpec package can be absent from DwarfUI's production package
   payload and is needed only by developers/tests.
-- ☐ Remove generic framework modules, tests, fixtures, and copied dependencies
+- ☑ Remove generic framework modules, tests, fixtures, and copied dependencies
   from DwarfUI after parity is established.
-- ☐ Delete `tools/Run-Automationtests.ps1` after the installed command passes
+- ☑ Delete `tools/Run-Automationtests.ps1` after the installed command passes
   the full DwarfUI suite plus deliberate failure, timeout, abort, and cleanup
   cases.
-- ☐ Update DwarfUI documentation to describe it as a DwarfSpec consumer and
+- ☑ Update DwarfUI documentation to describe it as a DwarfSpec consumer and
   link to DwarfSpec for framework documentation.
-- ☐ Verify the DwarfUI production package contains no DwarfSpec framework or
+- ☑ Verify the DwarfUI production package contains no DwarfSpec framework or
   automation-test files.
 
 Exit: DwarfUI consumes DwarfSpec exactly as an unrelated project would and no
 longer owns a private copy or private runner.
+
+Evidence recorded on 2026-07-20:
+
+- `dwarfui-0.1.0-1.rockspec` declares `dwarfspec ~> 0.1` only in
+  `test_dependencies`. Installed discovery lists exactly the two retained
+  product specs under `tests/tooltip/`, with co-located screen and overlay
+  fixtures and project-wide configuration under `tests/dwarfspec/config.lua`.
+- The configuration registers the tooltip diagnostic adapter through
+  `ds.diagnostic('tooltip')`. Live installed-rock runs passed the normal
+  tooltip suite with `3 successes` and the overlay suite with `1 success`,
+  proving screen and overlay fixtures, pointer input, render synchronization,
+  dynamic diagnostics, z-order recovery, focus rejection, and cleanup. The
+  normal-then-overlay sequence passed again with `cleanup_confirmed=true` for
+  both runs.
+- Deliberate assertion and cleanup failures returned exit code 6, timeout
+  returned exit code 7, and explicit abort returned exit code 8 after the
+  abort command succeeded. Reports were DFHack-encoded JSON and every terminal
+  case confirmed cleanup. A cleanup-failure trace resolved both DwarfSpec and
+  Busted from DwarfUI's local `.luarocks` tree, proving the sibling source
+  checkout was not used.
+- The private framework modules, generic tests and fixtures, probes, and
+  `tools/Run-AutomationTests.ps1` were removed after parity. The remaining
+  local unit suite passes `68 successes / 0 failures / 0 errors / 0 pending`,
+  and all 5 production plus 20 test/support Lua files parse successfully.
+- Expanded and zip package verification passes. The production payload
+  contains only `info.txt` and the five `scripts_modinstalled/dwarfui/*.lua`
+  product modules; it contains no DwarfSpec dependency, framework module,
+  fixture, live spec, or test runner.
 
 ### Phase 7 - Validate installation and release readiness
 

@@ -17,3 +17,16 @@ its own location and validates the runner's discovered file list.
 Support modules provide isolated DFHack-style module loading and only the
 widget behavior required by the tooltip port. tests and `.luarocks/` are
 outside `src/` and are not included in published packages.
+
+Live product tests are separate `tests/**/*_spec.ds.lua` files executed by the
+installed DwarfSpec dependency declared in the repository rockspec. DwarfUI
+owns only its tooltip specs, feature fixtures, configuration, and diagnostic
+adapter. Run them with:
+
+```powershell
+dwarfspec run tests/tooltip/tooltip_spec.ds.lua
+dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua `
+  --overlay-fixture tests/tooltip/fixtures/tooltip_overlay.fixture.lua
+```
+
+The local Busted unit runner does not discover or execute live DwarfSpec files.

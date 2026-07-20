@@ -86,7 +86,6 @@ local function load_public_module(package_path)
             globals={
                 defclass=widget_harness.defclass,
                 dfhack={
-                    dwarfspec={},
                     gui={
                         getDFViewscreen=function() return nil end,
                         matchFocusString=function() return false end,

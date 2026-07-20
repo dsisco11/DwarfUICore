@@ -13,13 +13,21 @@ $bustedVersion = '2.3.0-1'
 $luaSystemVersion = '0.3.0-2'
 $testFileEnvironmentVariable = 'LUA_TEST_FILES'
 
+if (-not (Get-Command lua -ErrorAction SilentlyContinue)) {
+    throw 'Lua 5.3 was not found on PATH.'
+}
 if (-not (Get-Command luarocks -ErrorAction SilentlyContinue)) {
     throw 'LuaRocks was not found on PATH.'
 }
 
-$luaVersion = & lua -e "io.write(_VERSION:match('(%d+%.%d+)'))"
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($luaVersion)) {
-    throw 'Could not determine the Lua version.'
+$luaCommand = Get-Command lua
+$luaVersion = & $luaCommand.Source -e "io.write(_VERSION)"
+if ($LASTEXITCODE -ne 0 -or $luaVersion -ne 'Lua 5.3') {
+    throw "DwarfUI tests require Lua 5.3; found '$luaVersion'."
+}
+$rockLuaVersion = & luarocks config lua_version
+if ($LASTEXITCODE -ne 0 -or $rockLuaVersion -ne '5.3') {
+    throw "DwarfUI tests require LuaRocks for Lua 5.3; found '$rockLuaVersion'."
 }
 
 & luarocks show luasystem $luaSystemVersion --tree $rockTree *> $null
@@ -62,6 +70,7 @@ $oldLuaPath = [Environment]::GetEnvironmentVariable('LUA_PATH', 'Process')
 $oldLuaCPath = [Environment]::GetEnvironmentVariable('LUA_CPATH', 'Process')
 $oldTestFiles = [Environment]::GetEnvironmentVariable($testFileEnvironmentVariable, 'Process')
 
+# Restores one process environment variable to its prior value.
 function Restore-ProcessEnvironmentVariable {
     param(
         [Parameter(Mandatory)]
@@ -79,8 +88,8 @@ function Restore-ProcessEnvironmentVariable {
 
 try {
     $rockLuaPath = @(
-        (Join-Path $rockTree "share\lua\$luaVersion\?.lua"),
-        (Join-Path $rockTree "share\lua\$luaVersion\?\init.lua")
+        (Join-Path $rockTree 'share\lua\5.3\?.lua'),
+        (Join-Path $rockTree 'share\lua\5.3\?\init.lua')
     ) -join ';'
     $testLuaPath = @(
         (Join-Path $testsRoot '?.lua'),
@@ -96,7 +105,7 @@ try {
         $luaPathEntries += $oldLuaPath
     }
     Set-Item -LiteralPath Env:LUA_PATH -Value ($luaPathEntries -join ';')
-    $luaCPathEntries = @((Join-Path $rockTree "lib\lua\$luaVersion\?.dll"))
+    $luaCPathEntries = @((Join-Path $rockTree 'lib\lua\5.3\?.dll'))
     if ($null -ne $oldLuaCPath) {
         $luaCPathEntries += $oldLuaCPath
     }

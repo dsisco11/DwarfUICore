@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
     [string] $LuaCompiler = $env:LUA_COMPILER,
-    [string] $RequiredLuaVersion = $env:LUA_REQUIRED_VERSION,
     # DwarfUI does not expose a `dwarfui reload` command yet. Keep command-based
     # reload available as an explicit opt-in once its shared modules and
     # user-facing UI additions have a real reload entry point.
@@ -32,7 +31,6 @@ if (-not [IO.Path]::IsPathRooted($resolvedEnvFile)) {
 Import-EnvironmentFile -Path $resolvedEnvFile -AllowMissing
 
 $processLuaCompiler = [Environment]::GetEnvironmentVariable('LUA_COMPILER', 'Process')
-$processRequiredLuaVersion = [Environment]::GetEnvironmentVariable('LUA_REQUIRED_VERSION', 'Process')
 $processDFHackRunner = [Environment]::GetEnvironmentVariable('MOD_COMMAND_RUNNER', 'Process')
 $processDwarfFortressRoot = [Environment]::GetEnvironmentVariable('GAME_ROOT', 'Process')
 
@@ -42,9 +40,6 @@ if (-not $LuaCompiler) {
     } else {
         'luac.exe'
     }
-}
-if (-not $RequiredLuaVersion) {
-    $RequiredLuaVersion = $processRequiredLuaVersion
 }
 if (-not $DFHackRunner) {
     $DFHackRunner = $processDFHackRunner
@@ -63,8 +58,7 @@ $sourcePath = if ([IO.Path]::IsPathRooted($SourceDir)) {
     Join-Path $scriptRoot $SourceDir
 }
 
-& $syntaxCheck -LuaCompiler $LuaCompiler -RequiredLuaVersion $RequiredLuaVersion `
-    -SourceDir $sourcePath -Includetests
+& $syntaxCheck -LuaCompiler $LuaCompiler -SourceDir $sourcePath -Includetests
 if ($LASTEXITCODE -ne 0) {
     throw 'Lua syntax check failed.'
 }

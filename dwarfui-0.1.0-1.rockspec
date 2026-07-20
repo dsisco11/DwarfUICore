@@ -19,7 +19,7 @@ enhancements. DwarfSpec is declared only as a development test dependency.
 }
 
 dependencies = {
-    "lua >= 5.3, < 5.5",
+    "lua >= 5.3, < 5.4",
 }
 
 test_dependencies = {

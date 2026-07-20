@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
     [string] $LuaCompiler = $env:LUA_COMPILER,
-    [string] $RequiredLuaVersion = $env:LUA_REQUIRED_VERSION,
     [string] $SourceDir = 'src',
     [string] $testsDir = 'tests',
     [switch] $Includetests
@@ -20,8 +19,8 @@ if (-not $compiler) {
 }
 
 $version = (& $compiler.Source -v 2>&1 | Out-String)
-if ($RequiredLuaVersion -and $version -notmatch "Lua $([regex]::Escape($RequiredLuaVersion))") {
-    throw "Expected a Lua $RequiredLuaVersion compiler; got: $version"
+if ($version -notmatch 'Lua 5\.3') {
+    throw "DwarfUI requires a Lua 5.3 compiler; got: $version"
 }
 $versionMatch = [regex]::Match($version, 'Lua ([0-9]+(?:\.[0-9]+)+)')
 $compilerVersion = if ($versionMatch.Success) {

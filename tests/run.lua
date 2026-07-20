@@ -16,11 +16,11 @@ package.path = table.concat({
     package.path,
 }, ';')
 
--- Run-Unittests.ps1 owns deterministic discovery. This Busted helper verifies
+-- Run-UnitTests.ps1 owns deterministic discovery. This Busted helper verifies
 -- the same file list before any specs execute while leaving Busted's command-
 -- line arguments available for filtering, verbosity, and output selection.
 local discovered_files = assert(os.getenv('LUA_TEST_FILES'),
-    'LUA_TEST_FILES must be provided by tools/Run-Unittests.ps1')
+    'LUA_TEST_FILES must be provided by tools/Run-UnitTests.ps1')
 local normalized_tests_root = tests_root:gsub('\\', '/') .. '/'
 
 for path in discovered_files:gmatch('[^\r\n]+') do

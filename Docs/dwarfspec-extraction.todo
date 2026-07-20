@@ -395,8 +395,8 @@ the two tooltip specs plus the tooltip screen and tooltip overlay fixtures.
 |---|---|---|
 | `busted.core`, `busted`, `busted.modules.filter_loader`, `busted.modules.test_file_loader`, `busted.execute` | `busted_host.lua` | DwarfSpec runtime dependency and in-process host. |
 | `busted.outputHandlers.base` | `output_handler.lua` | DwarfSpec reporting adapter. |
-| `luassert`, Penlight, Say, Mediator, Lua CLI Args, Lua Term | Transitive Busted source dependencies | Installed transitively by the DwarfSpec rock; only Lua-compatible source is exposed inside DFHack. |
-| `system`, `lfs` | Busted/Penlight seams | DwarfSpec supplies the proven DFHack-native adapters instead of loading Lua 5.4 DLLs into Lua 5.3. |
+| `luassert`, Penlight, Say, Mediator, Lua CLI Args, Lua Term | Transitive Busted source dependencies | Installed transitively by the DwarfSpec rock for Lua 5.3. |
+| `system`, `lfs` | Busted/Penlight seams | DwarfSpec supplies the proven DFHack-native adapters instead of loading external native libraries into the game process. |
 | `json` | `busted_host.lua` | DFHack-native `require('json').encode`; retain inside the live host. |
 | `gui`, `gui.widgets` | Generic and product fixtures plus `ds` input operations | DFHack runtime API; retain as live-only imports. |
 | `plugins.overlay` | Overlay staging/product coverage | DFHack runtime API; generic staging moves to DwarfSpec while tooltip behavior remains in DwarfUI. |
@@ -427,8 +427,8 @@ PowerShell runner always uses the bootstrap's default seed of `1`.
 | Screen fixture root | `tests/automation/fixtures/<name>.lua` | Explicit import; recommended `tests/**/fixtures/*.fixture.lua`, with no mandatory root. |
 | Overlay fixture root | `tests/automation/overlay_fixtures/<name>.lua` | Explicit importable fixture definition owned by the consumer or DwarfSpec self-tests. |
 | Host/support paths | `tests/automation/{bootstrap,status,abort,support}/...` | Installed `dwarfspec.*` modules and CLI-owned entry points. |
-| Busted source root | `.luarocks/share/lua/5.4` | Resolve the DwarfSpec rock's LuaRocks dependencies; do not assume a project-local tree or hardcoded Lua directory. |
-| Native dependency root | `.luarocks/lib/lua/5.4` for local tests | External unit tooling only; never prepend this native directory inside DFHack Lua 5.3. |
+| Busted source root | `.luarocks/share/lua/5.3` | DwarfSpec and all of its dependencies use the same Lua 5.3 rock tree. |
+| Native dependency root | `.luarocks/lib/lua/5.3` for local tests | External unit tooling only; the DFHack host supplies native adapters instead. |
 | Runner configuration file | `.env.local`, defaulted by `EnvFile` | Optional project configuration under `tests/dwarfspec/*.lua`, CLI options, and documented environment variables. |
 | Runner executable | `MOD_COMMAND_RUNNER`, parameter, `GAME_ROOT/hack/dfhack-run.exe`, or `PATH` | `DFHACK_RUNNER`, `DFHACK_ROOT/hack/dfhack-run`, or `PATH`; legacy names may be accepted only through an explicit migration policy. |
 | Game/DFHack root | `GAME_ROOT` | Explicit CLI/config/environment input for temporary overlay staging; do not infer it from the consumer repository. |
@@ -458,7 +458,7 @@ Local toolchain and dependency versions:
 The shell did not initially contain the registered Lua installation on
 `PATH`; the unmodified runner therefore stopped with `LuaRocks was not found on
 PATH`. Prepending the registered Lua `bin` directory for that process and
-running `tools/Run-Unittests.ps1` produced:
+running `tools/Run-UnitTests.ps1` produced:
 
 ```text
 93 successes / 0 failures / 0 errors / 0 pending
@@ -563,7 +563,7 @@ only reusable framework code.
   tracked Lua source outside `.luarocks`, and enforces no tabs, no trailing
   whitespace, and a final newline. The same syntax audit was executed against
   DFHack's embedded Lua 5.3 and passed all 27 extracted Lua files.
-- `tools/Run-Unittests.ps1` provides the repository-owned local Busted command
+- `tools/Run-UnitTests.ps1` provides the repository-owned local Busted command
   with Busted `2.3.0-1` pinned in an ignored `.luarocks` tree. It produced:
 
 ```text
@@ -786,6 +786,10 @@ Evidence recorded on Windows before the cross-platform gate:
 
 ### Phase 5 - Package DwarfSpec with LuaRocks
 
+The evidence in this section records the original dual-runtime packaging
+proof. The later Lua 5.3-only toolchain decision supersedes that support
+contract without rewriting the historical results.
+
 - ☑ Add a rockspec using rockspec format 3.0 and an initial version such as
   `0.1.0-1`.
 - ☑ Declare the supported Lua versions and DwarfSpec's runtime dependency on
@@ -793,15 +797,14 @@ Evidence recorded on Windows before the cross-platform gate:
 - ☑ Install all public/internal Lua modules under the `dwarfspec.*` namespace.
 - ☑ Install the `dwarfspec` command with `build.install.bin`.
 - ☑ Keep the rock platform-independent and verify it builds as an `.all.rock`.
-- ☑ Ensure modules loaded inside DFHack are pure Lua and never resolve external
-  Lua 5.4 native libraries in the Lua 5.3 process.
+- ☑ Ensure modules loaded inside DFHack use Lua 5.3 and resolve DFHack-native
+  adapters instead of external native libraries.
 - ☑ Run `luarocks lint` and build both source and binary rocks.
 - ☑ Install the built rock into an empty temporary rock tree.
 - ☑ Prove `require('dwarfspec.ds')`, CLI help, configuration discovery, and
   Busted dependency resolution from the clean tree.
-- ☑ Prove an installation made through an external Lua 5.4 toolchain can still
-  launch the Lua 5.3-compatible in-process DFHack host through its pure-Lua
-  paths and adapters.
+- ☑ Prove an installation made through the Lua 5.3 toolchain launches the
+  in-process DFHack host through the same module paths and adapters.
 - ☑ Document installation from a local rock, development rock server, and the
   public LuaRocks server.
 - ☑ Add a release checklist covering version revision, changelog, pack, clean
@@ -812,7 +815,7 @@ library modules and working `dwarfspec` command.
 
 Evidence recorded on 2026-07-20:
 
-- `dwarfspec-0.1.0-1.rockspec` uses format 3.0, `lua >= 5.3, < 5.5`, pinned
+- `dwarfspec-0.1.0-1.rockspec` used format 3.0, `lua >= 5.3, < 5.5`, pinned
   `luasystem 0.3.0-2`, and `busted 2.3.0-1`; all shipped modules are mapped
   under `dwarfspec.*`, and `build.install.bin` deploys the Unix and Windows
   `dwarfspec` launchers.
@@ -826,7 +829,7 @@ Evidence recorded on 2026-07-20:
   `1 success / 0 failures / 0 errors / 0 pending`. That spec proved discovered
   configuration, an isolated `ds` command, diagnostics, explicit fixtures,
   and confirmed cleanup. The DFHack host received only pure-Lua paths; the
-  external Lua 5.4 launcher's native path is never propagated into DFHack.
+  external Lua 5.4 launcher's native path was never propagated into DFHack.
 - The final DwarfSpec framework suite passed `62 successes / 0 failures /
   0 errors / 0 pending`. A source rock also built from a temporary archive of
   commit `08531d1`; release installation from the public source remains gated
@@ -929,7 +932,7 @@ and DwarfUI passes against the same artifact available to other projects.
 
 | Layer | Required proof |
 |---|---|
-| DwarfSpec syntax | All shipped and test Lua parses under Lua 5.3; external tooling also passes under Lua 5.4. |
+| DwarfSpec syntax | All shipped and test Lua parses and executes under Lua 5.3. |
 | DwarfSpec unit | `tests/**/*_spec.ds.lua` discovery, canonical identities, list/run glob parity, filters, configuration, custom commands, fixture imports, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
 | Rock metadata | Rockspec lint, source rock build, `.all.rock` build, clean-tree install, module load, and command installation pass. |
 | Generic live | In-process Busted host, `ds` isolation, frame yields, pointer/input operations, cleanup, failure, timeout, abort, and lease recovery pass in DFHack. |

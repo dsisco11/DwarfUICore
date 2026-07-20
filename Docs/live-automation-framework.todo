@@ -702,7 +702,9 @@ hoc probes or new communication infrastructure.
 1. Keep product expectations in a new
    `Tests/Automation/specs/<feature>_live_spec.lua` Busted spec. Use Luassert
    and `dy.*` for all interaction, waiting, inspection, and cleanup; do not
-   call UI lifecycle callbacks directly.
+   call UI lifecycle callbacks directly. The host installs root Busted
+   `before_each` and `after_each` hooks that call `dy.reset()` automatically;
+   add local hooks only for feature-specific setup or state restoration.
 2. When a spec needs a test-owned screen, add a compact fixture under
    `Tests/Automation/fixtures/` and add its identifier to the allowlist in
    `support/fixture_loader.lua`. Fixtures expose `new(options)`, own their

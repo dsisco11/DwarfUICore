@@ -15,14 +15,7 @@ describe('live singleton tooltip service', function()
     local screen
 
     before_each(function()
-        dy.reset()
         screen = dy.show_fixture('tooltip_screen')
-    end)
-
-    after_each(function()
-        dy.clear_pointer()
-        dy.reset()
-        dy.wait_frames(2)
     end)
 
     it('targets normal screens and presents dynamic text after real renders',

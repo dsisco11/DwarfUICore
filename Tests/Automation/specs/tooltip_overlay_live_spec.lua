@@ -54,7 +54,6 @@ describe('live singleton tooltip overlay eligibility', function()
     local screen
 
     before_each(function()
-        dy.reset()
         original_viewscreens = widget.viewscreens
         screen = dy.show_fixture('cover_screen')
     end)
@@ -64,8 +63,6 @@ describe('live singleton tooltip overlay eligibility', function()
         overlay.get_state().config[overlay_name].enabled = true
         tooltip.unregister(target)
         if screen and screen:isActive() then dy.dismiss(screen) end
-        dy.clear_pointer()
-        dy.reset()
         dy.wait_frames(2)
     end)
 

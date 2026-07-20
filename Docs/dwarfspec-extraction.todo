@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: in progress (Phases 0-2 complete)
+Status: in progress (Phases 0-3 complete)
 
 ## Goal
 
@@ -635,38 +635,90 @@ DwarfUI:   93 successes / 0 failures / 0 errors / 0 pending
 
 ### Phase 3 - Generalize package and consumer boundaries
 
-- ☐ Replace DwarfUI-relative bootstrap, support, spec, fixture, overlay, and
+- ☑ Replace DwarfUI-relative bootstrap, support, spec, fixture, overlay, and
   result paths with resolved DwarfSpec package and consumer-project inputs.
-- ☐ Discover the project root from an explicit CLI option or current working
+- ☑ Discover the project root from an explicit CLI option or current working
   directory without assuming a DwarfUI layout.
-- ☐ Discover live specs only through `tests/**/*_spec.ds.lua`, including nested
+- ☑ Discover live specs only through `tests/**/*_spec.ds.lua`, including nested
   directories, with deterministic ordering and no overlap with ordinary Busted
   unit specs.
-- ☐ Load optional global configuration and custom command modules from
+- ☑ Load optional global configuration and custom command modules from
   `tests/dwarfspec/*.lua` with deterministic order, schema validation,
   duplicate-command rejection, and actionable errors.
-- ☐ Define the custom command registration contract and make registered
+- ☑ Define the custom command registration contract and make registered
   commands available through the isolated `ds` object without writing to `_G`.
-- ☐ Generalize fixture loading so specs and custom commands can explicitly
+- ☑ Generalize fixture loading so specs and custom commands can explicitly
   import fixtures from any supported import location without a library-owned
   product allowlist or mandatory fixture root.
-- ☐ Document `tests/**/fixtures/*.fixture.lua` as the recommended convention
+- ☑ Document `tests/**/fixtures/*.fixture.lua` as the recommended convention
   and prove fixtures outside that convention remain usable when importable.
-- ☐ Generalize overlay fixture staging from explicitly imported fixture
+- ☑ Generalize overlay fixture staging from explicitly imported fixture
   definitions while retaining safe target validation, unique names, rescans,
   and guaranteed removal.
-- ☐ Provide an explicit extension seam for consumer diagnostic adapters so
+- ☑ Provide an explicit extension seam for consumer diagnostic adapters so
   DwarfUI can expose tooltip diagnostics without adding product knowledge to
   DwarfSpec.
-- ☐ Move active-run ownership to `dfhack.dwarfspec` and reject incompatible or
+- ☑ Move active-run ownership to `dfhack.dwarfspec` and reject incompatible or
   overlapping hosts clearly.
-- ☐ Rename status reports, result paths, temporary files, and diagnostic labels
+- ☑ Rename status reports, result paths, temporary files, and diagnostic labels
   to DwarfSpec branding.
-- ☐ Preserve generation checks, lease recovery, idempotent LIFO cleanup, and
+- ☑ Preserve generation checks, lease recovery, idempotent LIFO cleanup, and
   stale-callback rejection.
 
 Exit: DwarfSpec can run a minimal fixture project that contains no DwarfUI
 paths, modules, or branding.
+
+#### Phase 3 package-boundary and verification evidence
+
+- DwarfSpec commit: `5e9ac69df204624ab883f1adb9c0507494c1747c`
+  (`feat: generalize consumer project boundaries`). The linked `phase3`
+  worktree is clean at that revision.
+- The bootstrap now supplies separate package and project roots. The package
+  root is derived only from the installed bootstrap location; the project root
+  comes from `--project-root` or `dfhack.filesystem.getcwd()`.
+- Project discovery recursively selects only `tests/**/*_spec.ds.lua` paths.
+  Unit coverage proves stable nested ordering, exclusion of ordinary Lua unit
+  files, selected-spec path validation, and rejection of paths that escape the
+  project root.
+- `tests/dwarfspec/config.lua` loads first, followed by other direct Lua
+  modules in stable order. The loader validates the wait-setting schema,
+  callback names and types, built-in conflicts, duplicate registrations, and
+  module failures. Modules execute in private environments, and custom
+  commands are bound only to the isolated `ds` object.
+- Consumer diagnostic callbacks are registered declaratively and invoked via
+  `ds.diagnostic(name, ...)`. The generic package contains no tooltip-specific
+  adapter.
+- Screen fixtures are explicit project-relative imports with no library-owned
+  allowlist. `docs/writing-tests.md` records the recommended co-located
+  `tests/**/fixtures/*.fixture.lua` convention while retaining support for any
+  safe importable project-relative Lua module.
+- Overlay fixture definitions explicitly name their safe logical name and
+  project-relative source. Staging uses a unique
+  `dwarfspec_<run>_<fixture>.lua` target, refuses overwrite, rescans after
+  staging, removes partial files after rescan failure, and registers exact
+  removal plus a final rescan in the run's LIFO cleanup registry.
+- Active ownership remains exclusively under `dfhack.dwarfspec`. Status,
+  bootstrap, and abort output now use `DWARFSPEC` and `DWARFSPEC_JSON`, with
+  reports encoded by DFHack's native `json.encode`; no private JSON encoder or
+  DwarfUI automation prefix remains in active DwarfSpec code.
+- Local Busted verification passed:
+
+```text
+34 successes / 0 failures / 0 errors / 0 pending
+```
+
+- DFHack's embedded Lua 5.3 parsed all 38 Lua files, the formatting audit
+  passed all 38 files, and `git diff --check` passed before the commit.
+- A live run used DwarfSpec's package root with
+  `tests/framework/minimal_project` as an unrelated explicit project root. Its
+  isolated config command and diagnostic adapter worked, `rawget(_G, 'ds')`
+  remained `nil`, and both a recommended co-located fixture and
+  `tests/support/external_screen.lua` rendered and cleaned up successfully:
+
+```text
+1 success / 0 failures / 0 errors / 0 pending
+state=passed cleanup_confirmed=true
+```
 
 ### Phase 4 - Replace the PowerShell runner with the DwarfSpec command
 

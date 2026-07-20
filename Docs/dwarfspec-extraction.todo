@@ -37,12 +37,12 @@ The intended developer workflow is:
 1. Declare dwarfspec as a test dependency.
 2. Run `luarocks test --prepare` once to install test dependencies.
 3. Add specs beneath `Tests/` with the `*_spec.ds.lua` suffix.
-4. Start DF/DFHack and run `dwarfspec` from the project root.
+4. Start DF/DFHack and run `dwarfspec run` from the project root.
 ```
 
 Projects that dedicate their rockspec test command to live automation may map
-`luarocks test` directly to `dwarfspec`. No consumer-specific PowerShell runner
-is required.
+`luarocks test` to the `dwarfspec run` subcommand. No consumer-specific
+PowerShell runner is required.
 
 ## Locked decisions
 
@@ -60,6 +60,12 @@ is required.
 - Native Lua modules built for an external Lua ABI are not loaded into DFHack.
   The proven DFHack-native `system` and `lfs` adapters remain part of the host.
 - DwarfSpec installs a cross-platform `dwarfspec` command through LuaRocks.
+- `dwarfspec` is a command dispatcher for the complete test-runner surface.
+  Invoking it without a subcommand displays command help and never implicitly
+  starts a test run.
+- `dwarfspec list`, `dwarfspec run`, and `dwarfspec run <glob>` are required
+  first-class commands. Listing and selection use the same canonical test
+  identities and glob-matching rules.
 - `Tools/Run-AutomationTests.ps1` is retired only after the installed command
   proves equivalent success, failure, timeout, abort, reporting, staging, and
   cleanup behavior against DwarfUI.
@@ -248,13 +254,52 @@ Projects that want `luarocks test` to run DwarfSpec directly may add:
 test = {
     type = 'command',
     command = 'dwarfspec',
+    flags = { 'run' },
 }
 ```
 
 Projects that already use the single rockspec `test` entry for local unit
-tests keep that entry and invoke `dwarfspec` directly for live automation.
+tests keep that entry and invoke `dwarfspec run` directly for live automation.
 `luarocks test --prepare` remains the standard way to install declared
 test-only dependencies without replacing the existing test command.
+
+## Command-line contract
+
+`dwarfspec` is the single entry point for DwarfSpec functionality, but the bare
+command is not shorthand for running tests. It prints the available commands
+and exits without connecting to DFHack or executing a spec.
+
+The required initial command surface is:
+
+```text
+dwarfspec list
+dwarfspec list <glob>
+dwarfspec run
+dwarfspec run <glob>
+dwarfspec help [command]
+dwarfspec version
+```
+
+Contracts:
+
+- `list` discovers and prints all DwarfSpec tests in stable order without
+  executing test bodies or Busted hooks.
+- `list <glob>` prints only identities selected by the same matcher used by
+  `run <glob>`.
+- `run` executes every discovered DwarfSpec test.
+- `run <glob>` executes only tests whose canonical identities match the glob.
+- The plan must freeze the canonical displayed identity and glob syntax before
+  implementation. The identity must be stable, project-relative, usable as
+  input to `run`, and sufficiently precise to distinguish tests with the same
+  leaf name.
+- Multiple matches execute in the same deterministic order shown by `list`.
+- A malformed glob and a valid glob that matches no tests both return nonzero
+  with distinct actionable diagnostics.
+- Command-specific help documents selection, DFHack requirements, exit codes,
+  filters, timeouts, result output, and examples.
+- Additional runner capabilities such as status, abort, diagnostics, or future
+  reporting formats are exposed as subcommands or options beneath this same
+  entry point, not as separate consumer-installed scripts.
 
 ## Implementation phases
 
@@ -356,8 +401,18 @@ paths, modules, or branding.
 ### Phase 4 - Replace the PowerShell runner with the DwarfSpec command
 
 - ☐ Implement a Lua CLI entry point installed as `dwarfspec`.
-- ☐ Support `dwarfspec --help`, project-root selection, spec filters, timeouts,
-  overlay fixtures, result-directory selection, and an explicit abort path.
+- ☐ Implement subcommand dispatch; bare `dwarfspec` must display help and must
+  not discover, connect, or run tests implicitly.
+- ☐ Implement `dwarfspec list` and `dwarfspec list <glob>` with deterministic
+  output and no test-body or hook execution.
+- ☐ Implement `dwarfspec run` to execute all discovered tests.
+- ☐ Implement `dwarfspec run <glob>` using exactly the identities and matcher
+  exposed by `list`.
+- ☐ Freeze and document canonical test identities, glob syntax, escaping,
+  case-sensitivity, multiple-match behavior, and no-match behavior.
+- ☐ Support command help, version output, project-root selection, Busted
+  filters, timeouts, overlay fixtures, result-directory selection, and an
+  explicit abort path.
 - ☐ Resolve `dfhack-run` through `DFHACK_RUNNER`, `DFHACK_ROOT`, or `PATH` and
   print the resolved executable in verbose diagnostics.
 - ☐ Verify DFHack connectivity before starting a run and report a concise
@@ -371,13 +426,15 @@ paths, modules, or branding.
   timeout, abort, malformed-report, and cleanup failures.
 - ☐ Preserve safe overlay staging and final rescans without requiring
   PowerShell.
-- ☐ Test command discovery, quoting, paths with spaces, exit-code propagation,
+- ☐ Test subcommand parsing, list/run parity, glob matching, malformed and
+  unmatched globs, quoting, paths with spaces, exit-code propagation,
   interruption, and cleanup on Windows and at least one Unix-like environment.
 - ☐ Keep `Run-AutomationTests.ps1` available only as a temporary parity oracle
   until the installed command passes all equivalent cases.
 
-Exit: a developer can run the same live suite with `dwarfspec` and receives
-the same or better diagnostics and exit behavior as the old runner.
+Exit: a developer can inspect the suite with `dwarfspec list`, select it with
+the same globs, and run it with `dwarfspec run`, receiving the same or better
+diagnostics and exit behavior as the old runner.
 
 ### Phase 5 - Package DwarfSpec with LuaRocks
 
@@ -440,16 +497,20 @@ longer owns a private copy or private runner.
 
 - ☐ From a clean temporary project, declare DwarfSpec only through
   `test_dependencies`, run `luarocks test --prepare`, write
-  `Tests/smoke_spec.ds.lua`, and run it with `dwarfspec`.
+  `Tests/smoke_spec.ds.lua`, list it with `dwarfspec list`, and run it with
+  `dwarfspec run`.
 - ☐ In the clean project, prove `Tests/dwarfspec/config.lua` applies global
   configuration and another `Tests/dwarfspec/*.lua` module registers a custom
   `ds` command.
 - ☐ Prove a co-located `Tests/smoke/fixtures/example.fixture.lua` fixture and a
   fixture from another supported import location can both be used explicitly.
-- ☐ In a second clean project, configure `test.command = 'dwarfspec'` and prove
-  `luarocks test` installs dependencies and executes the live suite.
+- ☐ In a second clean project, configure `test.command = 'dwarfspec'` with
+  `test.flags = { 'run' }` and prove `luarocks test` installs dependencies and
+  executes the live suite.
 - ☐ Prove a project with an existing local Busted `test` entry can keep it and
-  run DwarfSpec independently.
+  run `dwarfspec list` and `dwarfspec run` independently.
+- ☐ Prove `list <glob>` and `run <glob>` select identical canonical test
+  identities for exact, wildcard, nested-path, and no-match cases.
 - ☐ Verify deterministic discovery and filtering across nested spec paths.
 - ☐ Verify pass, assertion failure, operational error, pending, malformed spec,
   filter-no-match, timeout, explicit abort, lost runner, and cleanup failure.
@@ -471,7 +532,7 @@ and DwarfUI passes against the same artifact available to other projects.
 | Layer | Required proof |
 |---|---|
 | DwarfSpec syntax | All shipped and test Lua parses under Lua 5.3; external tooling also passes under Lua 5.4. |
-| DwarfSpec unit | `Tests/**/*_spec.ds.lua` discovery, filters, configuration, custom commands, fixture imports, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
+| DwarfSpec unit | `Tests/**/*_spec.ds.lua` discovery, canonical identities, list/run glob parity, filters, configuration, custom commands, fixture imports, paths, scheduler, cleanup, reporting, adapters, CLI parsing, and exit codes pass outside DFHack. |
 | Rock metadata | Rockspec lint, source rock build, `.all.rock` build, clean-tree install, module load, and command installation pass. |
 | Generic live | In-process Busted host, `ds` isolation, frame yields, pointer/input operations, cleanup, failure, timeout, abort, and lease recovery pass in DFHack. |
 | DwarfUI local | Existing DwarfUI unit, syntax, build, and package checks pass independently of live automation. |
@@ -489,6 +550,11 @@ and DwarfUI passes against the same artifact available to other projects.
 - ☐ Busted remains the sole test structure, hook, assertion, and result system.
 - ☐ The package installs through LuaRocks as a pure-Lua library and installs a
   working `dwarfspec` command.
+- ☐ Bare `dwarfspec` displays help and never implicitly runs tests.
+- ☐ `dwarfspec list` lists all canonical test identities without executing
+  tests or hooks.
+- ☐ `dwarfspec run` runs all discovered tests.
+- ☐ `dwarfspec list <glob>` and `dwarfspec run <glob>` select the same tests.
 - ☐ Consumers can declare DwarfSpec through `test_dependencies`.
 - ☐ The default install-write-run workflow requires no consumer-specific
   PowerShell, shell, batch, or Lua runner script.

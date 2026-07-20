@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: in progress (Phases 0-3 complete)
+Status: in progress (Phases 0-4 complete)
 
 ## Goal
 
@@ -722,41 +722,64 @@ state=passed cleanup_confirmed=true
 
 ### Phase 4 - Replace the PowerShell runner with the DwarfSpec command
 
-- ☐ Implement a Lua CLI entry point installed as `dwarfspec`.
-- ☐ Implement subcommand dispatch; bare `dwarfspec` must display help and must
+- ☒ Implement a Lua CLI entry point installed as `dwarfspec`.
+- ☒ Implement subcommand dispatch; bare `dwarfspec` must display help and must
   not discover, connect, or run tests implicitly.
-- ☐ Implement `dwarfspec list` and `dwarfspec list <glob>` with deterministic
+- ☒ Implement `dwarfspec list` and `dwarfspec list <glob>` with deterministic
   output and no test-body or hook execution.
-- ☐ Implement `dwarfspec run` to execute all discovered tests.
-- ☐ Implement `dwarfspec run <glob>` using exactly the identities and matcher
+- ☒ Implement `dwarfspec run` to execute all discovered tests.
+- ☒ Implement `dwarfspec run <glob>` using exactly the identities and matcher
   exposed by `list`.
-- ☐ Freeze and document canonical test identities, glob syntax, escaping,
+- ☒ Freeze and document canonical test identities, glob syntax, escaping,
   case-sensitivity, multiple-match behavior, and no-match behavior.
-- ☐ Support command help, version output, project-root selection, Busted
+- ☒ Support command help, version output, project-root selection, Busted
   filters, timeouts, overlay fixtures, result-directory selection, and an
   explicit abort path.
-- ☐ Resolve `dfhack-run` through `DFHACK_RUNNER`, `DFHACK_ROOT`, or `PATH` and
+- ☒ Resolve `dfhack-run` through `DFHACK_RUNNER`, `DFHACK_ROOT`, or `PATH` and
   print the resolved executable in verbose diagnostics.
-- ☐ Verify DFHack connectivity before starting a run and report a concise
+- ☒ Verify DFHack connectivity before starting a run and report a concise
   actionable error when DFHack is not running.
-- ☐ Locate DwarfSpec's installed bootstrap modules without copying them into
+- ☒ Locate DwarfSpec's installed bootstrap modules without copying them into
   the consumer repository or permanent DFHack script directories.
-- ☐ Start the in-process host, poll native JSON status reports, stream Busted
+- ☒ Start the in-process host, poll native JSON status reports, stream Busted
   progress, enforce the wall-clock timeout, and preserve final diagnostics.
-- ☐ Return zero only for a passing Busted result with confirmed cleanup.
-- ☐ Return nonzero for dependency, connection, discovery, host, Busted,
+- ☒ Return zero only for a passing Busted result with confirmed cleanup.
+- ☒ Return nonzero for dependency, connection, discovery, host, Busted,
   timeout, abort, malformed-report, and cleanup failures.
-- ☐ Preserve safe overlay staging and final rescans without requiring
+- ☒ Preserve safe overlay staging and final rescans without requiring
   PowerShell.
-- ☐ Test subcommand parsing, list/run parity, glob matching, malformed and
+- ☒ Test subcommand parsing, list/run parity, glob matching, malformed and
   unmatched globs, quoting, paths with spaces, exit-code propagation,
   interruption, and cleanup on Windows and at least one Unix-like environment.
-- ☐ Keep `Run-Automationtests.ps1` available only as a temporary parity oracle
+- ☒ Keep `Run-Automationtests.ps1` available only as a temporary parity oracle
   until the installed command passes all equivalent cases.
 
 Exit: a developer can inspect the suite with `dwarfspec list`, select it with
 the same globs, and run it with `dwarfspec run`, receiving the same or better
 diagnostics and exit behavior as the old runner.
+
+Evidence recorded on Windows before the cross-platform gate:
+
+- `bin/dwarfspec` derives its own package root and dispatches `list`, `run`,
+  `abort`, `help`, and `version` without copying bootstrap scripts.
+- 62 focused Busted contracts pass for parsing, discovery, list/run parity,
+  globs, runner resolution, quoting, native report validation, all stable exit
+  classes, interruption recovery, result persistence, and cleanup.
+- DFHack's embedded Lua 5.3 parsed all 59 Lua files, formatting checks passed,
+  and `git diff --check` passed.
+- Live Windows runs proved deterministic multi-selection, Busted filtering,
+  a project path containing spaces, native overlay staging and removal, exact
+  DFHack-encoded JSON persistence, assertion and cleanup failures, timeout
+  recovery, and explicit abort. Timeout and abort both left no active run and
+  archived `state=aborted cleanup_confirmed=true`.
+- The temporary DwarfUI `Run-AutomationTests.ps1` oracle passed its live
+  `ds_export_live_spec.lua` case; DwarfSpec passed again immediately afterward.
+- An ephemeral Ubuntu 24.04 container with Lua 5.4.6 and distribution-provided
+  Busted passed the same 62 contracts from a read-only repository mount. A
+  direct shebang invocation of `bin/dwarfspec` also passed bare-help, version,
+  non-executing discovery, and a project-root path containing spaces. This
+  caught and fixed an initial cross-platform native-module suffix defect before
+  the final passing run.
 
 ### Phase 5 - Package DwarfSpec with LuaRocks
 

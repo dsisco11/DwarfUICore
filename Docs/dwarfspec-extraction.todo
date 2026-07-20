@@ -1,6 +1,6 @@
 # DwarfSpec Standalone Library Extraction Plan
 
-Status: in progress (Phase 0 complete)
+Status: in progress (Phases 0-1 complete)
 
 ## Goal
 
@@ -500,27 +500,77 @@ The owner and canonical remote follow the current DwarfUI origin. Git history
 attributes every current DwarfUI commit, including every automation artifact,
 to `David Sisco <dsisco11@gmail.com>`; the copyright notice uses that recorded
 contributor name rather than the `Sisco++` mod display name. The new repository
-does not yet exist. This contract records the destination for the repository
-creation work and does not itself create a remote or publish an artifact.
+did not yet exist when this contract was recorded. Phase 1 created the local
+repository at that destination; no remote repository or artifact has been
+published.
 
 ### Phase 1 - Create the standalone repository safely
 
-- ☐ Create the DwarfSpec repository separately from the active DwarfUI
+- ☑ Create the DwarfSpec repository separately from the active DwarfUI
   workspace.
-- ☐ Preserve relevant file history with a filtered clone or subtree extraction
+- ☑ Preserve relevant file history with a filtered clone or subtree extraction
   performed against a disposable clone; do not rewrite DwarfUI history.
-- ☐ Add the target directory layout, README, license, changelog, and repository
+- ☑ Add the target directory layout, README, license, changelog, and repository
   development instructions.
-- ☐ Establish Lua 5.3-compatible formatting and syntax checks.
-- ☐ Establish a local Busted unit-test command for DwarfSpec's own code.
-- ☐ Move generic framework modules and tests without changing behavior.
-- ☐ Keep the first extraction commit mechanically reviewable and separate from
+- ☑ Establish Lua 5.3-compatible formatting and syntax checks.
+- ☑ Establish a local Busted unit-test command for DwarfSpec's own code.
+- ☑ Move generic framework modules and tests without changing behavior.
+- ☑ Keep the first extraction commit mechanically reviewable and separate from
   later renaming and packaging changes where practical.
-- ☐ Confirm no DwarfUI product modules or tooltip-specific fixtures were copied
+- ☑ Confirm no DwarfUI product modules or tooltip-specific fixtures were copied
   into DwarfSpec.
 
 Exit: DwarfSpec has an independent build and unit-test baseline containing
 only reusable framework code.
+
+#### Phase 1 repository and history evidence
+
+- Standalone checkout: `D:\CODE\DFHack\DwarfSpec`.
+- Branch: `main`.
+- Canonical `origin`: `https://github.com/dsisco11/DwarfSpec.git`.
+- Baseline commit: `39884b8fea35a4bd5da48a504e54647fe93d775f`
+  (`chore: establish standalone repository baseline`).
+- The new repository was initialized independently. A path-limited
+  `git fast-export` from DwarfUI was imported with `git fast-import`; the
+  active DwarfUI checkout and its history were never rewritten.
+- The identical filter was rerun against a disposable `--no-local` clone. Its
+  imported tip was exactly `e839a51c36255def7609969cc30b4151a79f3b3b`
+  with tree `c56600b3738e784da11fa382d1280a6b0ccd909d`, matching the standalone
+  repository's imported tip and tree.
+- The filtered history contains the eight relevant commits from the original
+  feasibility work through automatic Busted setup and teardown. The imported
+  tip is `e839a51` in DwarfSpec.
+- All 27 classified generic source, unit-test, live-spec, and fixture files
+  have identical Git blob hashes in DwarfUI and at imported commit `e839a51`.
+  The repository scaffold is a separate following commit, so the extraction
+  remains mechanically reviewable and no API rename or behavior change is
+  mixed into it.
+
+#### Phase 1 standalone baseline evidence
+
+- `README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.editorconfig`,
+  `docs/architecture.md`, `Tools/`, `bin/`, `src/dwarfspec/`, `Tests/unit/`,
+  and `Tests/framework/fixtures/` establish the independent repository and
+  target layout.
+- `LICENSE` contains the approved MIT text and
+  `Copyright (c) 2026 David Sisco`.
+- `Tools/Check-Lua.ps1` requires an exact Lua 5.3 interpreter, parses every
+  tracked Lua source outside `.luarocks`, and enforces no tabs, no trailing
+  whitespace, and a final newline. The same syntax audit was executed against
+  DFHack's embedded Lua 5.3 and passed all 27 extracted Lua files.
+- `Tools/Run-UnitTests.ps1` provides the repository-owned local Busted command
+  with Busted `2.3.0-1` pinned in an ignored `.luarocks` tree. It produced:
+
+```text
+25 successes / 0 failures / 0 errors / 0 pending
+```
+
+- The formatting audit and `git diff --check` passed.
+- A tracked-file boundary audit found 40 repository files and no
+  `tooltip_screen`, `tooltip_probe`, `src/scripts_modinstalled`, or DwarfUI
+  product-module path. The retained `diagnostics.lua` inspection of a generic
+  DFHack view's standard `tooltip` field is framework behavior, not a copied
+  DwarfUI tooltip module or fixture.
 
 ### Phase 2 - Rename the public API from `dy` to `ds`
 

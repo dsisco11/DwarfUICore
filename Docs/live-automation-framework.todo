@@ -663,18 +663,71 @@ temporary screen, pointer patch, registration, overlay, timer, or host run.
 
 ### Phase 6 - Harden the reusable framework
 
-- ☐ Unit-test discovery, filtering, scheduler transitions, cleanup ordering,
+- ☑ Unit-test discovery, filtering, scheduler transitions, cleanup ordering,
   output collection, path validation, and status formatting outside DFHack.
-- ☐ Live-test host conflicts, stale callback generations, lease recovery,
+- ☑ Live-test host conflicts, stale callback generations, lease recovery,
   injected fixture failures, and cleanup diagnostics.
-- ☐ Document how later DwarfUI features add fixtures and live specs without
+- ☑ Document how later DwarfUI features add fixtures and live specs without
   extending the test framework itself.
-- ☐ Document the read-only default and explicit future mutation boundary.
-- ☐ Record local unit and in-process live Busted results as separate evidence
+- ☑ Document the read-only default and explicit future mutation boundary.
+- ☑ Record local unit and in-process live Busted results as separate evidence
   layers.
 
 Exit: later DwarfUI work can add live automation specs without creating new ad
 hoc probes or new communication infrastructure.
+
+#### Phase 6 implementation and evidence
+
+- Local unit coverage now directly tests filter normalization and selected-spec
+  discovery, safe fixture and run identifiers, scheduler state transitions,
+  strict cleanup order, output-handler result recording, native JSON status
+  formatting, and escaped human-readable status output. The status test stubs
+  only the encoder boundary; production status reporting continues to call
+  DFHack's native `json.encode` through the host.
+- `framework_hardening_live_spec.lua` validates competing host-run rejection,
+  stale callback rejection after a genuine later DF frame, a deliberately
+  failing fixture, and retained cleanup diagnostics. The runner's existing
+  generation 29 lease-expiry proof remains the direct live lease-recovery
+  contract: it aborted the unpolled run and confirmed cleanup.
+- Local validation: `Run-UnitTests.ps1` passed with 92 successes, 0 failures,
+  0 errors, and 0 pending. Lua 5.4.6 syntax validation passed for 5 production
+  and 46 test/support files.
+- Live validation: the dedicated resilience suite passed generation 63 with 4
+  successes and `cleanup_confirmed=true`. The default in-process suite passed
+  generation 64 with 14 successes, 0 failures, 0 errors, 0 pending, and
+  `cleanup_confirmed=true`.
+
+## Adding later live automation coverage
+
+1. Keep product expectations in a new
+   `Tests/Automation/specs/<feature>_live_spec.lua` Busted spec. Use Luassert
+   and `dy.*` for all interaction, waiting, inspection, and cleanup; do not
+   call UI lifecycle callbacks directly.
+2. When a spec needs a test-owned screen, add a compact fixture under
+   `Tests/Automation/fixtures/` and add its identifier to the allowlist in
+   `support/fixture_loader.lua`. Fixtures expose `new(options)`, own their
+   state, and release product registrations in `onDismiss()`.
+3. When a spec needs a test overlay, place it in
+   `Tests/Automation/overlay_fixtures/` and invoke the supported runner with
+   `-OverlayFixture <name>`. The runner stages and removes the unique script;
+   a spec must restore any enabled or focus state it changes.
+4. Add pure behavior and framework-edge cases to `Tests/*_test.lua`; keep them
+   independent of DFHack. Live specs establish integration behavior, while the
+   unit suite establishes deterministic local behavior.
+5. Run live tests only through `Tools/Run-AutomationTests.ps1`. Its JSON
+   report is terminal status output, not a coordination channel.
+
+## Read-only automation boundary
+
+Default live automation may create test-owned screens and temporary overlays,
+move the scoped virtual pointer, send simulated input, and inspect live UI. It
+must not alter fortress data, game settings, saves, or persistent overlay
+configuration.
+
+Any future persistent-world mutation test requires a separate spec category,
+an explicit `-AllowWorldMutation` runner switch, a documented fixture/save
+precondition, and a verified restore strategy. Such tests are outside the
+default suite and must never become implicit behavior of `dy.*` helpers.
 
 ## Basic acceptance criteria
 

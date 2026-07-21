@@ -143,7 +143,7 @@ describe('DwarfUI package contract', function()
 
     it('supports Lua 5.3 and newer without an artificial upper bound',
             function()
-        local rockspec = read_repository_file('dwarfui-0.1.0-1.rockspec')
+        local rockspec = read_repository_file('dwarfui.rockspec')
         contains(rockspec, '"lua >= 5.3"')
         assert.is_nil(rockspec:find('< 5.4', 1, true))
     end)

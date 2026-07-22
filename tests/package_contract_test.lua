@@ -6,6 +6,7 @@ local public_modules = {
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
+    'dwarfui/mood_popover.lua',
     'dwarfui/tooltip.lua',
     'dwarfui/tooltip_registration.lua',
 }

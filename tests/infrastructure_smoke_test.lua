@@ -20,10 +20,6 @@ describe('Busted test infrastructure', function()
     it('runs setup and sees deterministic discovery', function()
         assert.is_true(setup_completed)
 
-        local todo = assert(io.open(
-            repo_root .. '/Docs/dwarfspec-extraction.todo', 'r'))
-        todo:close()
-
         local files = assert(os.getenv('LUA_TEST_FILES'),
             'runner did not provide discovered test files')
         contains(files, 'infrastructure_smoke_test.lua')

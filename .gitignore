@@ -1,3 +1,4 @@
 .luarocks/
 dist/
 .env
+.test-results/

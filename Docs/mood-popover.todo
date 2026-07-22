@@ -114,27 +114,27 @@ must remain free of product-specific unit logic either way.
 
 ## Phase 0 - Build the mood-level model
 
-- ☐ Add a documented mood descriptor table containing native hover value,
+- ☑ Add a documented mood descriptor table containing native hover value,
   stress category, display label, and display pen for every supported level.
-- ☐ Resolve mood descriptors by enum identity or numeric enum value without
+- ☑ Resolve mood descriptors by enum identity or numeric enum value without
   parsing enum names at runtime.
-- ☐ Keep category conversion table-driven so a future DF category-count
+- ☑ Keep category conversion table-driven so a future DF category-count
   change fails explicitly instead of silently applying `6 - index` to an
   unknown value.
-- ☐ Add a documented unit-membership predicate using the established
+- ☑ Add a documented unit-membership predicate using the established
   `dwarfmonitor/misery` active-citizen contract.
-- ☐ Build snapshot rows containing the stable unit ID, unit reference, and
+- ☑ Build snapshot rows containing the stable unit ID, unit reference, and
   readable display name.
-- ☐ Sort snapshots by normalized readable name and then unit ID.
-- ☐ Skip units that become invalid during a refresh without retaining stale
+- ☑ Sort snapshots by normalized readable name and then unit ID.
+- ☑ Skip units that become invalid during a refresh without retaining stale
   references in later snapshots.
-- ☐ Add focused Busted coverage for all seven mappings, unsupported hover
+- ☑ Add focused Busted coverage for all seven mappings, unsupported hover
   values, population boundaries, category filtering, readable names,
   deterministic sorting, and empty results.
 
 ### Phase 0 exit criteria
 
-- ☐ A pure, independently tested model converts native mood hover state into
+- ☑ A pure, independently tested model converts native mood hover state into
   the exact ordered unit rows represented by the native counter.
 
 ## Phase 1 - Add the reusable popover widget

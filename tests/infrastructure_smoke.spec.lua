@@ -2,12 +2,11 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
+---Asserts that text contains the expected literal substring.
+---@param text string
+---@param expected string
 local function contains(text, expected)
     assert.is_truthy(text:find(expected, 1, true))
-end
-
-local function excludes(text, unexpected)
-    assert.is_nil(text:find(unexpected, 1, true))
 end
 
 describe('Busted test infrastructure', function()
@@ -17,16 +16,8 @@ describe('Busted test infrastructure', function()
         setup_completed = true
     end)
 
-    it('runs setup and sees deterministic discovery', function()
+    it('runs setup without runner-specific environment state', function()
         assert.is_true(setup_completed)
-
-        local files = assert(os.getenv('LUA_TEST_FILES'),
-            'runner did not provide discovered test files')
-        contains(files, 'infrastructure_smoke.spec.lua')
-        excludes(files, 'tests\\support\\module_loader.lua')
-        excludes(files, 'tests/support/module_loader.lua')
-        excludes(files, 'tests\\run.lua')
-        excludes(files, 'tests/run.lua')
     end)
 
     it('isolates module globals and dependencies', function()

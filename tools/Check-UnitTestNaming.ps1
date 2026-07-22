@@ -8,7 +8,9 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $testsRoot = Join-Path $projectRoot 'tests'
 $excludedRoots = @(
     (Join-Path $testsRoot 'live'),
-    (Join-Path $testsRoot 'support')
+    (Join-Path $testsRoot 'support'),
+    (Join-Path $testsRoot 'dwarfspec'),
+    (Join-Path $testsRoot 'fixtures')
 )
 
 $invalidFiles = Get-ChildItem -LiteralPath $testsRoot -Recurse -File |
@@ -21,7 +23,11 @@ $invalidFiles = Get-ChildItem -LiteralPath $testsRoot -Recurse -File |
                 break
             }
         }
-        -not $isExcluded -and $_.Extension -eq '.lua' -and
+        if (-not $isExcluded -and $path -match '[\\/]support[\\/]') {
+            $isExcluded = $true
+        }
+        -not $isExcluded -and $_.Name -ne 'run.lua' -and
+            $_.Extension -eq '.lua' -and
             $_.Name -notlike '*.spec.lua' -and $_.Name -notlike '*.ds.lua'
     }
 

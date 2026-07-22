@@ -79,32 +79,32 @@ custom name.
 
 ## Phase 1: Build stop-marker projection and label layout
 
-- [ ] Add a projection class that consumes a selected route and a
+- [x] Add a projection class that consumes a selected route and a
       `gui.dwarfmode.Viewport` and produces immutable marker descriptors.
-- [ ] Preserve the route's stop ordering and include the stop ID, display
+- [x] Preserve the route's stop ordering and include the stop ID, display
       index, name, world position, screen position, and signed z delta in each
       descriptor.
-- [ ] Use `Viewport:isVisible()` for same-z markers and
+- [x] Use `Viewport:isVisible()` for same-z markers and
       `Viewport:isVisibleXY()` for explicitly marked off-z projections.
-- [ ] Use `Viewport:tileToScreen()` for map projection instead of deriving
+- [x] Use `Viewport:tileToScreen()` for map projection instead of deriving
       screen positions from `window_x`, `window_y`, or UI text coordinates.
-- [ ] Define distinct pens or graphics tiles for same-z, above, and below
+- [x] Define distinct pens or graphics tiles for same-z, above, and below
       markers with text-mode fallbacks.
-- [ ] Include the custom stop name in every label and include a signed z delta
+- [x] Include the custom stop name in every label and include a signed z delta
       for every off-z label.
-- [ ] Keep labels within the visible map viewport by choosing left or right
+- [x] Keep labels within the visible map viewport by choosing left or right
       placement and truncating only when neither direction has enough room.
-- [ ] Resolve overlapping labels deterministically without moving the marker
+- [x] Resolve overlapping labels deterministically without moving the marker
       away from its stop tile.
-- [ ] Avoid drawing labels over native non-map panels.
-- [ ] Add unit tests for same-z, above, below, offscreen, map-edge, long-name,
+- [x] Avoid drawing labels over native non-map panels.
+- [x] Add unit tests for same-z, above, below, offscreen, map-edge, long-name,
       empty-name, duplicate-position, and collision cases.
 
 ### Phase 1 completion gate
 
-- [ ] Every visible same-z stop produces one exact-tile marker and one label.
-- [ ] Every visible-x/y off-z stop is unmistakably identified as a projection.
-- [ ] Marker and label layout remains inside the map viewport at all tested
+- [x] Every visible same-z stop produces one exact-tile marker and one label.
+- [x] Every visible-x/y off-z stop is unmistakably identified as a projection.
+- [x] Marker and label layout remains inside the map viewport at all tested
       screen edges and interface sizes.
 
 ## Phase 2: Integrate the registered DFHack overlay
@@ -237,6 +237,9 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-22 | Focused marker-layout unit tests | `./tools/Run-UnitTests.ps1 tests/minecart_route.spec.lua` | Passed: 21 successes | Covers exact-tile same-z markers, above/below projections, offscreen filtering, map edges, long and empty names, copied positions, duplicate tiles, and deterministic collisions. |
+| 2026-07-22 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 133 successes | Includes marker projection/layout coverage and deterministic `*.spec.lua` discovery. |
+| 2026-07-22 | Syntax and whitespace validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 13 production and 27 test/support files | `git diff --check` reported no whitespace errors; Git only warned that edited files will use CRLF in the working copy. |
 | 2026-07-22 | Focused unit tests | Project-local Busted launcher with `tests/minecart_route.spec.lua` | Passed: 14 successes | Covers zero-based rows, scrolling, all list edges, invalid contexts, pass-through input, stale IDs, and duplicate route/stop names without live DF. |
 | 2026-07-22 | Relevant registry/package tests | Project-local Busted launcher with route, registry, and package-contract tests | Passed: 23 successes | New module contract loads in registry order and is part of the shipped module contract. |
 | 2026-07-22 | Complete unit suite | Project-local Busted launcher with deterministic `*.spec.lua` discovery | Passed: 126 successes | Zero failures, errors, or pending tests before the filename-only rename. The wrapper was not used because it expects an extensionless launcher while this Windows tree contains `busted.bat`. |

@@ -12,6 +12,10 @@ local public_modules = {
     'dwarfui/tooltip_registration.lua',
 }
 
+local overlay_scripts = {
+    'scripts_modinstalled/dwarfui-mood-popover.lua',
+}
+
 local function source_path(relative_path)
     return repo_root .. separator .. 'src' .. separator ..
         relative_path:gsub('/', separator)
@@ -93,6 +97,21 @@ local function load_public_module(package_path)
             require_modules={
                 gui={WINDOW_FRAME='window'},
                 ['gui.widgets']=widget_harness.widgets(nil, default_nil),
+            },
+        }
+    elseif package_path == 'scripts_modinstalled/dwarfui/mood_popover.lua' then
+        options = {
+            globals={
+                defclass=function(class)
+                    class = class or {}
+                    return setmetatable(class, {__call=function(class_table)
+                        return setmetatable({}, {__index=class_table})
+                    end})
+                end,
+                COLOR_LIGHTGREEN='lightgreen', COLOR_GREEN='green',
+                COLOR_LIGHTCYAN='lightcyan', COLOR_WHITE='white',
+                COLOR_YELLOW='yellow', COLOR_LIGHTRED='lightred',
+                COLOR_RED='red',
             },
         }
     elseif package_path ==
@@ -177,6 +196,14 @@ describe('DwarfUI package contract', function()
             local file = assert(io.open(source_path(
                 'scripts_modinstalled/' .. relative_path), 'rb'))
             file:close()
+        end
+    end)
+
+    it('includes the registered mood-popover overlay script', function()
+        for _, relative_path in ipairs(overlay_scripts) do
+            local source = read_source(relative_path)
+            contains(source, '--@ module=true')
+            contains(source, 'OVERLAY_WIDGETS')
         end
     end)
 end)

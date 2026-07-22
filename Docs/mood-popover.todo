@@ -199,39 +199,39 @@ must remain free of product-specific unit logic either way.
 
 ## Phase 3 - Add DwarfSpec component tests
 
-- ☐ Add `tools/Run-AutomationTests.ps1` as the dedicated DwarfUI entry point
+- ☑ Add `tools/Run-AutomationTests.ps1` as the dedicated DwarfUI entry point
   for DwarfSpec component tests; keep it separate from `Run-UnitTests.ps1`.
-- ☐ Add a `*.ds.lua` component spec that mounts `MoodPopoverOverlay`
+- ☑ Add a `*.ds.lua` component spec that mounts `MoodPopoverOverlay`
   directly with `ds.mount()` and a deterministic viewport.
-- ☐ Inject mutable hover, mouse, and mood-snapshot providers into the mounted
+- ☑ Inject mutable hover, mouse, and mood-snapshot providers into the mounted
   component; do not scan for native icons, hardcode screen coordinates, stage
   overlay registration, or mutate `df.global.game.main_interface.current_hover`.
-- ☐ Use normal Busted `describe`, `it`, hooks, and Luassert assertions inside
+- ☑ Use normal Busted `describe`, `it`, hooks, and Luassert assertions inside
   the DwarfSpec component spec.
-- ☐ Give the popover and its heading/list controls stable `view_id` values so
+- ☑ Give the popover and its heading/list controls stable `view_id` values so
   the spec can use `ds.get()` and fluent subjects for normal inspection and
   interaction.
-- ☐ Assert that each of the seven injected native hover values selects the
+- ☑ Assert that each of the seven injected native hover values selects the
   expected mood heading, count, and rows.
-- ☐ Move the pointer from the simulated native anchor into the rendered
+- ☑ Move the pointer from the simulated native anchor into the rendered
   panel and assert the component retains the selected mood.
-- ☐ Exercise wheel scrolling with an injected overflowing snapshot and prove
+- ☑ Exercise wheel scrolling with an injected overflowing snapshot and prove
   the first and last rows are reachable.
-- ☐ Assert pointer-out, null pointer, category switching, and empty snapshots
+- ☑ Assert pointer-out, null pointer, category switching, and empty snapshots
   update or close the component without stale content.
-- ☐ Use `ds.viewport()` to cover below-anchor placement, above-anchor
+- ☑ Use `ds.viewport()` to cover below-anchor placement, above-anchor
   fallback, horizontal clamping, and resize behavior.
-- ☐ Assert clicks, keys, and wheel input outside the visible list remain
+- ☑ Assert clicks, keys, and wheel input outside the visible list remain
   unhandled by the mounted overlay.
-- ☐ Unmount and remount the component and assert enable/disable cleanup does
+- ☑ Unmount and remount the component and assert enable/disable cleanup does
   not retain the previous category, scroll position, or unit rows.
-- ☐ Keep real overlay discovery and persisted overlay configuration outside
+- ☑ Keep real overlay discovery and persisted overlay configuration outside
   this feature's automation scope; the package contract covers the registration
   script's presence.
 
 ### Phase 3 exit criteria
 
-- ☐ DwarfSpec component tests prove the rendered overlay's hover, content,
+- ☑ DwarfSpec component tests prove the rendered overlay's hover, content,
   retention, scrolling, placement, input, resize, and cleanup behavior in the
   live DFHack UI environment.
 

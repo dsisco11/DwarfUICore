@@ -1,7 +1,7 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
-local _, mood_popover = module_loader.load(repo_root,
+local mood_environment = module_loader.load(repo_root,
     'src/scripts_modinstalled/dwarfui/mood_popover.lua', {
         globals={
             COLOR_LIGHTGREEN='lightgreen',
@@ -11,8 +11,14 @@ local _, mood_popover = module_loader.load(repo_root,
             COLOR_YELLOW='yellow',
             COLOR_LIGHTRED='lightred',
             COLOR_RED='red',
+            defclass=function(class) return setmetatable(class or {}, {
+                __call=function(class_table)
+                    return setmetatable({}, {__index=class_table})
+                end,
+            }) end,
         },
     })
+local mood_popover = mood_environment.MoodPopoverModel{}
 
 local hover_instructions = {
     INFO_STRESSED_0=100,
@@ -45,7 +51,7 @@ describe('DwarfUI mood popover model', function()
 
         for index, expectation in ipairs(expected) do
             local hover_index = index - 1
-            local descriptor = mood_popover.resolve_hover(
+            local descriptor = mood_popover:resolve_hover(
                 hover_instructions['INFO_STRESSED_' .. hover_index],
                 hover_instructions)
 
@@ -56,20 +62,25 @@ describe('DwarfUI mood popover model', function()
     end)
 
     it('rejects unsupported native hover instructions', function()
-        assert.is_nil(mood_popover.resolve_hover(nil, hover_instructions))
-        assert.is_nil(mood_popover.resolve_hover(999, hover_instructions))
+        assert.is_nil(mood_popover:resolve_hover(nil, hover_instructions))
+        assert.is_nil(mood_popover:resolve_hover(999, hover_instructions))
     end)
 
     it('uses the active-citizen predicate and includes insane citizens',
             function()
         local is_citizen_arguments = {}
-        local _, production_model = module_loader.load(repo_root,
+        local production_environment = module_loader.load(repo_root,
             'src/scripts_modinstalled/dwarfui/mood_popover.lua', {
                 globals={
                     COLOR_LIGHTGREEN='lightgreen', COLOR_GREEN='green',
                     COLOR_LIGHTCYAN='lightcyan', COLOR_WHITE='white',
                     COLOR_YELLOW='yellow', COLOR_LIGHTRED='lightred',
                     COLOR_RED='red',
+                    defclass=function(class) return setmetatable(class or {}, {
+                        __call=function(class_table)
+                            return setmetatable({}, {__index=class_table})
+                        end,
+                    }) end,
                     df={
                         global={world={units={active={
                             {id=1, name='Citizen', citizen=true,
@@ -97,7 +108,8 @@ describe('DwarfUI mood popover model', function()
                     }},
                 },
             })
-        local rows = production_model.build_active_snapshot({stress_category=1})
+        local production_model = production_environment.MoodPopoverModel{}
+        local rows = production_model:build_active_snapshot({stress_category=1})
 
         assert.same({1}, {rows[1].id})
         assert.equals(2, #is_citizen_arguments)
@@ -108,10 +120,10 @@ describe('DwarfUI mood popover model', function()
 
     it('filters a fresh snapshot to valid active citizens in one category',
             function()
-        local descriptor = mood_popover.resolve_hover(
+        local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_5, hover_instructions)
         local invalid_classifications = 0
-        local rows = mood_popover.build_snapshot({
+        local rows = mood_popover:build_snapshot({
             {id=1, name='Target', citizen=true, stress_category=1},
             {id=2, name='Visitor', citizen=false, stress_category=1},
             {id=3, name='Other mood', citizen=true, stress_category=2},
@@ -133,9 +145,9 @@ describe('DwarfUI mood popover model', function()
     end)
 
     it('sorts case-insensitively with unit ID as a stable tie-break', function()
-        local descriptor = mood_popover.resolve_hover(
+        local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_6, hover_instructions)
-        local rows = mood_popover.build_snapshot({
+        local rows = mood_popover:build_snapshot({
             {id=4, name='apple', citizen=true, stress_category=0},
             {id=3, name='zinc', citizen=true, stress_category=0},
             {id=2, name='Apple', citizen=true, stress_category=0},
@@ -147,7 +159,7 @@ describe('DwarfUI mood popover model', function()
     end)
 
     it('does not retain unit rows between snapshot refreshes', function()
-        local descriptor = mood_popover.resolve_hover(
+        local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_4, hover_instructions)
         local first_unit = {
             id=1, name='First', citizen=true, stress_category=2,
@@ -155,9 +167,9 @@ describe('DwarfUI mood popover model', function()
         local second_unit = {
             id=2, name='Second', citizen=true, stress_category=2,
         }
-        local first_rows = mood_popover.build_snapshot(
+        local first_rows = mood_popover:build_snapshot(
             {first_unit}, descriptor, dependencies)
-        local second_rows = mood_popover.build_snapshot(
+        local second_rows = mood_popover:build_snapshot(
             {second_unit}, descriptor, dependencies)
 
         assert.is_not.equal(first_rows, second_rows)
@@ -167,9 +179,9 @@ describe('DwarfUI mood popover model', function()
     end)
 
     it('returns an empty snapshot when no units match', function()
-        local descriptor = mood_popover.resolve_hover(
+        local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_0, hover_instructions)
-        assert.same({}, mood_popover.build_snapshot({
+        assert.same({}, mood_popover:build_snapshot({
             {id=1, name='Different', citizen=true, stress_category=5},
             {id=2, name='Visitor', citizen=false, stress_category=6},
         }, descriptor, dependencies))

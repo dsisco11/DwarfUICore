@@ -40,10 +40,6 @@ end
 local function load_overlay(state)
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
-    ---Records the base overlay update invocation.
-    function OverlayWidget:onUpdate()
-        self.parent_update_count = (self.parent_update_count or 0) + 1
-    end
     local descriptors = {
         [100]={hover_value=100, label='Ecstatic'},
         [101]={hover_value=101, label='Happy'},
@@ -57,8 +53,10 @@ local function load_overlay(state)
             },
             require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
             reqscript={
-                ['dwarfui/mood_popover']={resolve_hover=function(value)
-                    return descriptors[value]
+                ['dwarfui/mood_popover']={MoodPopoverModel=function()
+                    return {resolve_hover=function(_, value)
+                        return descriptors[value]
+                    end}
                 end},
                 ['dwarfui/popover']={Popover=make_popover()},
             },
@@ -93,21 +91,22 @@ describe('DwarfUI mood popover overlay', function()
         assert.is_true(Overlay.ATTRS.default_enabled)
         assert.equals('dwarfmode/Default', Overlay.ATTRS.viewscreens)
         assert.is_true(Overlay.ATTRS.fullscreen)
+        assert.equals(0, Overlay.ATTRS.overlay_onupdate_max_freq_seconds)
     end)
 
     it('opens for native hover, refreshes on cadence, and keeps its anchor',
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.equals('Ecstatic', overlay.selected_descriptor.label)
         assert.same({12, 3}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.equals(1, state.snapshot_count)
         assert.is_true(overlay.popover.set_calls[1].reset_scroll)
 
         state.mouse_x, state.mouse_y = 20, 8
-        overlay:onUpdate()
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
+        overlay:overlay_onupdate()
         assert.equals(2, state.snapshot_count)
         assert.same({12, 3}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.is_false(overlay.popover.set_calls[2].reset_scroll)
@@ -117,22 +116,22 @@ describe('DwarfUI mood popover overlay', function()
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         overlay.popover.inside = function(x, y) return x == 14 and y == 5 end
 
         state.hover, state.mouse_x, state.mouse_y = nil, 14, 5
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.equals('Ecstatic', overlay.selected_descriptor.label)
         assert.is_true(overlay.popover.visible)
 
         state.hover, state.mouse_x, state.mouse_y = 101, 30, 4
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.equals('Happy', overlay.selected_descriptor.label)
         assert.same({30, 4}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.is_true(overlay.popover.set_calls[#overlay.popover.set_calls].reset_scroll)
 
         state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.is_nil(overlay.selected_descriptor)
         assert.is_false(overlay.popover.visible)
         assert.same({}, overlay.popover.rows)
@@ -141,15 +140,15 @@ describe('DwarfUI mood popover overlay', function()
     it('clears safely on null pointers, inactive maps, and disable', function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         state.mouse_x = nil
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.is_nil(overlay.selected_descriptor)
 
         state.mouse_x, state.mouse_y, state.hover = 12, 3, 100
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         state.active = false
-        overlay:onUpdate()
+        overlay:overlay_onupdate()
         assert.is_nil(overlay.selected_descriptor)
         overlay:overlay_ondisable()
         assert.is_false(overlay.popover.visible)

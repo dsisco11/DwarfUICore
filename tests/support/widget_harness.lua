@@ -180,6 +180,12 @@ function M.widgets(overrides, default_nil)
     widgets.Panel = class('Panel', widgets.Widget, default_nil, overrides.Panel)
     widgets.Window = class('Window', widgets.Panel, default_nil, overrides.Window)
     widgets.Label = class('Label', widgets.Widget, default_nil, overrides.Label)
+    widgets.List = class('List', widgets.Widget, default_nil, overrides.List)
+    ---Replaces the harness list's choices with the supplied rows.
+    ---@param choices table[]|nil
+    function widgets.List:setChoices(choices)
+        self.choices = choices or {}
+    end
     widgets.TextButton = class(
         'TextButton', widgets.Panel, default_nil, overrides.TextButton)
     return widgets

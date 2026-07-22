@@ -7,6 +7,7 @@ local public_modules = {
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
     'dwarfui/mood_popover.lua',
+    'dwarfui/popover.lua',
     'dwarfui/tooltip.lua',
     'dwarfui/tooltip_registration.lua',
 }
@@ -82,6 +83,16 @@ local function load_public_module(package_path)
                     register=function() return true end,
                     unregister=function() return true end,
                 },
+            },
+        }
+    elseif package_path == 'scripts_modinstalled/dwarfui/popover.lua' then
+        local widget_harness = require('support.widget_harness')
+        local default_nil = widget_harness.default_nil()
+        options = {
+            globals={defclass=widget_harness.defclass},
+            require_modules={
+                gui={WINDOW_FRAME='window'},
+                ['gui.widgets']=widget_harness.widgets(nil, default_nil),
             },
         }
     elseif package_path ==

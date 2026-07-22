@@ -139,28 +139,28 @@ must remain free of product-specific unit logic either way.
 
 ## Phase 1 - Add the reusable popover widget
 
-- ☐ Implement a documented `Popover` widget with an anchored window,
+- ☑ Implement a documented `Popover` widget with an anchored window,
   heading, count, and scrollable row list.
-- ☐ Accept screen-space anchor coordinates and calculate a clamped frame
+- ☑ Accept screen-space anchor coordinates and calculate a clamped frame
   from measured content plus configurable minimum, maximum, and margin values.
-- ☐ Prefer placement below the anchor; fall back above it when the panel
+- ☑ Prefer placement below the anchor; fall back above it when the panel
   would otherwise exceed the interface bottom.
-- ☐ Cap visible rows according to available space while keeping every row
+- ☑ Cap visible rows according to available space while keeping every row
   reachable by scrolling.
-- ☐ Expose explicit methods to set content, show at an anchor, test whether
+- ☑ Expose explicit methods to set content, show at an anchor, test whether
   a screen-space point is inside the visible panel, reset scrolling, and hide.
-- ☐ Ensure the hidden widget renders nothing and never consumes input.
-- ☐ Consume only wheel events directed at a visible, overflowed list; return
+- ☑ Ensure the hidden widget renders nothing and never consumes input.
+- ☑ Consume only wheel events directed at a visible, overflowed list; return
   unhandled for all other game input.
-- ☐ Recompute placement after resize without changing the current subject or
+- ☑ Recompute placement after resize without changing the current subject or
   scroll position unless the new row bounds require clamping.
-- ☐ Add Busted coverage for preferred and fallback placement, all four screen
+- ☑ Add Busted coverage for preferred and fallback placement, all four screen
   edges, narrow/short screens, zero rows, overflow, wheel boundaries, resize,
   hit testing, and input pass-through.
 
 ### Phase 1 exit criteria
 
-- ☐ DwarfUI has a reusable, screen-clamped popover whose complete contents
+- ☑ DwarfUI has a reusable, screen-clamped popover whose complete contents
   remain reachable and whose inactive regions do not interfere with the game.
 
 ## Phase 2 - Implement hover retention and overlay integration

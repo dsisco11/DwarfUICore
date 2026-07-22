@@ -205,7 +205,7 @@ describe('DwarfUI package contract', function()
         local registration = read_source(mood_popover_payload.registration)
         contains(registration, '--@ module=true')
         contains(registration, 'OVERLAY_WIDGETS')
-        contains(registration, "['dwarfui-mood-popover']")
+        contains(registration, 'mood_popover=MoodPopoverOverlay')
 
         local model = read_source(mood_popover_payload.model)
         contains(model, '--@ module=true')

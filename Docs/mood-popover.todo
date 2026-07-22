@@ -50,9 +50,9 @@ available screen height, and disappear without affecting normal game input.
 - Follow DFHack's established `dwarfmonitor/misery` population contract: scan
   `df.global.world.units.active` and include units for which
   `dfhack.units.isCitizen(unit, true)` is true.
-- A `plugins.overlay.OverlayWidget` with `fullscreen=true` receives a
-  full-screen painter and can host a screen-clamped popover without the
-  clipping problem of a small movable overlay frame.
+- A `plugins.overlay.OverlayWidget` with `fullscreen=true` can expand its
+  transparent host across the interface for screen-clamped rendering and
+  input without appearing in DFHack's positioning UI.
 
 ## Architectural decisions
 
@@ -167,8 +167,7 @@ must remain free of product-specific unit logic either way.
 
 - ☑ Register `dwarfui-mood-popover.lua` as a default-enabled
   `overlay.OverlayWidget` for `dwarfmode/Default`.
-- ☑ Make the overlay fullscreen and visually transparent outside the
-  popover.
+- ☑ Make the overlay fullscreen and visually transparent outside the popover.
 - ☑ Define documented provider attributes for current hover, mouse position,
   and mood snapshots, with production defaults backed by the confirmed DFHack
   APIs.
@@ -225,9 +224,9 @@ must remain free of product-specific unit logic either way.
   unhandled by the mounted overlay.
 - ☑ Unmount and remount the component and assert enable/disable cleanup does
   not retain the previous category, scroll position, or unit rows.
-- ☑ Keep real overlay discovery and persisted overlay configuration outside
-  this feature's automation scope; the package contract covers the registration
-  script's presence.
+- ☑ Add a live registration contract that rescans DFHack's overlay database,
+  finds the canonical widget name, and proves its production instance fills
+  the active fortress screen without changing persisted enablement.
 
 ### Phase 3 exit criteria
 

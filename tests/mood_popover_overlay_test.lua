@@ -30,6 +30,10 @@ local function make_popover()
             self.input_keys = keys
             return self.input_result
         end
+        ---Records that the overlay rendered its child popover.
+        function popover:render()
+            self.render_count = (self.render_count or 0) + 1
+        end
         return popover
     end})
 end
@@ -49,7 +53,17 @@ local function load_overlay(state)
             globals={
                 defclass=widget_harness.defclass,
                 df={global={world={}}},
-                dfhack={screen={getMousePos=function() return nil, nil end}},
+                dfhack={
+                    gui={
+                        getDFViewscreen=function() return state.viewscreen end,
+                        matchFocusString=function(focus, viewscreen)
+                            state.matched_focus = focus
+                            state.matched_viewscreen = viewscreen
+                            return state.focus_matches
+                        end,
+                    },
+                    screen={getMousePos=function() return nil, nil end},
+                },
             },
             require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
             reqscript={
@@ -62,7 +76,7 @@ local function load_overlay(state)
             },
         })
     state.descriptors = descriptors
-    return module.MoodPopoverOverlay
+    return module.MoodPopoverOverlay, module
 end
 
 ---Creates an overlay with deterministic interactive providers.
@@ -87,26 +101,63 @@ end
 describe('DwarfUI mood popover overlay', function()
     it('registers a default-enabled fullscreen fortress overlay', function()
         local state = {active=true}
-        local Overlay = load_overlay(state)
+        local Overlay, module = load_overlay(state)
         assert.is_true(Overlay.ATTRS.default_enabled)
+        assert.same({x=1, y=1}, Overlay.ATTRS.default_pos)
         assert.equals('dwarfmode/Default', Overlay.ATTRS.viewscreens)
+        assert.is_true(Overlay.ATTRS.hotspot)
         assert.is_true(Overlay.ATTRS.fullscreen)
         assert.equals(0, Overlay.ATTRS.overlay_onupdate_max_freq_seconds)
+        assert.equal(module.MoodPopoverOverlay,
+            module.OVERLAY_WIDGETS.mood_popover)
+    end)
+
+    it('fills the screen so the popover can render and receive wheel input',
+            function()
+        local state = {active=true}
+        local overlay = overlay_with(state)
+        overlay.frame = {w=1, h=1}
+        overlay:preUpdateLayout(widget_harness.rect(0, 0, 120, 40))
+        assert.equals(120, overlay.frame.w)
+        assert.equals(40, overlay.frame.h)
+    end)
+
+    it('uses DFHack viewscreen matching for the production focus check',
+            function()
+        local viewscreen = {}
+        local state = {viewscreen=viewscreen, focus_matches=true}
+        local Overlay = load_overlay(state)
+        assert.is_true(Overlay.ATTRS.active_provider())
+        assert.equals('dwarfmode/Default', state.matched_focus)
+        assert.equal(viewscreen, state.matched_viewscreen)
+
+        state.focus_matches = false
+        assert.is_false(Overlay.ATTRS.active_provider())
+    end)
+
+    it('samples native hover during render after DF has updated it', function()
+        local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
+        local overlay = overlay_with(state)
+        overlay.visible = true
+        overlay:render({})
+        assert.equals('Ecstatic', overlay.selected_descriptor.label)
+        assert.is_true(overlay.popover.visible)
+        assert.equals(1, overlay.popover.render_count)
     end)
 
     it('opens for native hover, refreshes on cadence, and keeps its anchor',
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         assert.equals('Ecstatic', overlay.selected_descriptor.label)
         assert.same({12, 3}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.equals(1, state.snapshot_count)
         assert.is_true(overlay.popover.set_calls[1].reset_scroll)
 
         state.mouse_x, state.mouse_y = 20, 8
-        overlay:overlay_onupdate()
-        overlay:overlay_onupdate()
+        overlay:update_popover()
+        overlay:update_popover()
         assert.equals(2, state.snapshot_count)
         assert.same({12, 3}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.is_false(overlay.popover.set_calls[2].reset_scroll)
@@ -116,22 +167,22 @@ describe('DwarfUI mood popover overlay', function()
             function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         overlay.popover.inside = function(x, y) return x == 14 and y == 5 end
 
         state.hover, state.mouse_x, state.mouse_y = nil, 14, 5
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         assert.equals('Ecstatic', overlay.selected_descriptor.label)
         assert.is_true(overlay.popover.visible)
 
         state.hover, state.mouse_x, state.mouse_y = 101, 30, 4
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         assert.equals('Happy', overlay.selected_descriptor.label)
         assert.same({30, 4}, {overlay.popover.anchor_x, overlay.popover.anchor_y})
         assert.is_true(overlay.popover.set_calls[#overlay.popover.set_calls].reset_scroll)
 
         state.hover, state.mouse_x, state.mouse_y = nil, 0, 0
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         assert.is_nil(overlay.selected_descriptor)
         assert.is_false(overlay.popover.visible)
         assert.same({}, overlay.popover.rows)
@@ -140,13 +191,13 @@ describe('DwarfUI mood popover overlay', function()
     it('clears safely on null pointers, inactive maps, and disable', function()
         local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
         local overlay = overlay_with(state)
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         state.mouse_x = nil
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         assert.is_nil(overlay.selected_descriptor)
 
         state.mouse_x, state.mouse_y, state.hover = 12, 3, 100
-        overlay:overlay_onupdate()
+        overlay:update_popover()
         state.active = false
         overlay:overlay_onupdate()
         assert.is_nil(overlay.selected_descriptor)

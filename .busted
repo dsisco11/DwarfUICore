@@ -1,0 +1,16 @@
+return {
+    default = {
+        ROOT = { "tests" },
+        pattern = ".*%.spec%.lua$",
+        recursive = true,
+        sort = true,
+        lpath = table.concat({
+            "./src/scripts_modinstalled/?.lua",
+            "./src/scripts_modinstalled/?/init.lua",
+            "./src/?.lua",
+            "./src/?/init.lua",
+            "./tests/?.lua",
+            "./tests/?/init.lua",
+        }, ";"),
+    },
+}

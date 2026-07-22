@@ -8,129 +8,33 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$rockTree = Join-Path $projectRoot '.luarocks'
-$bustedVersion = '2.3.0-1'
-$luaSystemVersion = '0.3.0-2'
-$testFileEnvironmentVariable = 'LUA_TEST_FILES'
+$localBustedRunner = Join-Path $projectRoot 'lua_modules\bin\busted.bat'
+$bustedConfig = Join-Path $projectRoot '.busted'
 
-if (-not (Get-Command lua -ErrorAction SilentlyContinue)) {
-    throw 'Lua was not found on PATH.'
-}
-if (-not (Get-Command luarocks -ErrorAction SilentlyContinue)) {
-    throw 'LuaRocks was not found on PATH.'
+$bustedRunner = if (Test-Path -LiteralPath $localBustedRunner -PathType Leaf) {
+    $localBustedRunner
+} else {
+    $globalBusted = Get-Command 'busted' -ErrorAction SilentlyContinue
+    if ($globalBusted) { $globalBusted.Source } else { $null }
 }
 
-$luaCommand = Get-Command lua
-$luaVersionText = & $luaCommand.Source -e "io.write(_VERSION)"
-$luaVersionMatch = [regex]::Match($luaVersionText, '^Lua ([0-9]+\.[0-9]+)$')
-if ($LASTEXITCODE -ne 0 -or -not $luaVersionMatch.Success) {
-    throw "Could not determine the Lua version; found '$luaVersionText'."
-}
-$luaVersion = $luaVersionMatch.Groups[1].Value
-$rockLuaVersion = & luarocks config lua_version
-if ($LASTEXITCODE -ne 0 -or $rockLuaVersion.Trim() -ne $luaVersion) {
-    throw "LuaRocks targets Lua '$rockLuaVersion', but the active interpreter is Lua $luaVersion."
+if (-not $bustedRunner) {
+    throw "Busted was not found in the project-local LuaRocks tree or on PATH. Provision the pinned test dependencies with LuaRocks before running tests; this entrypoint does not install, update, or repair dependencies."
 }
 
-& luarocks show luasystem $luaSystemVersion --tree $rockTree *> $null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Installing LuaSystem $luaSystemVersion into .luarocks..."
-    & luarocks install luasystem $luaSystemVersion --tree $rockTree
-    if ($LASTEXITCODE -ne 0) {
-        throw "LuaRocks failed to install LuaSystem $luaSystemVersion."
-    }
+if (-not (Test-Path -LiteralPath $bustedConfig -PathType Leaf)) {
+    throw "Repository Busted configuration was not found at '$bustedConfig'."
 }
 
-& luarocks show busted $bustedVersion --tree $rockTree *> $null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Installing Busted $bustedVersion into .luarocks..."
-    & luarocks install busted $bustedVersion --tree $rockTree
-    if ($LASTEXITCODE -ne 0) {
-        throw "LuaRocks failed to install Busted $bustedVersion."
-    }
-}
+& (Join-Path $PSScriptRoot 'Check-UnitTestNaming.ps1')
 
-$testsRoot = Join-Path $projectRoot 'tests'
-if (-not (Test-Path -LiteralPath $testsRoot -PathType Container)) {
-    throw "Could not find Lua test directory: $testsRoot"
-}
-
-$testFiles = @(
-    Get-ChildItem -LiteralPath $testsRoot -Recurse -File -Filter '*.lua' |
-        Where-Object {
-            $_.Name -match '(^test_.*|.*_test)\.lua$'
-        } |
-        Sort-Object FullName |
-        ForEach-Object FullName
-)
-
-if ($testFiles.Count -eq 0) {
-    throw 'No Lua test files found. Name tests test_*.lua or *_test.lua.'
-}
-
-$oldLuaPath = [Environment]::GetEnvironmentVariable('LUA_PATH', 'Process')
-$oldLuaCPath = [Environment]::GetEnvironmentVariable('LUA_CPATH', 'Process')
-$oldTestFiles = [Environment]::GetEnvironmentVariable($testFileEnvironmentVariable, 'Process')
-
-# Restores one process environment variable to its prior value.
-function Restore-ProcessEnvironmentVariable {
-    param(
-        [Parameter(Mandatory)]
-        [string] $Name,
-
-        [string] $Value
-    )
-
-    if ($null -eq $Value) {
-        Remove-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
-    } else {
-        Set-Item -LiteralPath "Env:$Name" -Value $Value
-    }
-}
-
+Push-Location $projectRoot
 try {
-    $rockLuaPath = @(
-        (Join-Path $rockTree "share\lua\$luaVersion\?.lua"),
-        (Join-Path $rockTree "share\lua\$luaVersion\?\init.lua")
-    ) -join ';'
-    $testLuaPath = @(
-        (Join-Path $testsRoot '?.lua'),
-        (Join-Path $testsRoot '?\init.lua')
-    ) -join ';'
-    $productionRoot = Join-Path $projectRoot 'src\scripts_modinstalled'
-    $productionLuaPath = @(
-        (Join-Path $productionRoot '?.lua'),
-        (Join-Path $productionRoot '?\init.lua')
-    ) -join ';'
-    $luaPathEntries = @($rockLuaPath, $testLuaPath, $productionLuaPath)
-    if ($null -ne $oldLuaPath) {
-        $luaPathEntries += $oldLuaPath
-    }
-    Set-Item -LiteralPath Env:LUA_PATH -Value ($luaPathEntries -join ';')
-    $luaCPathEntries = @((Join-Path $rockTree "lib\lua\$luaVersion\?.dll"))
-    if ($null -ne $oldLuaCPath) {
-        $luaCPathEntries += $oldLuaCPath
-    }
-    Set-Item -LiteralPath Env:LUA_CPATH -Value ($luaCPathEntries -join ';')
-
-    # The Busted helper validates this newline-delimited discovered suite list.
-    # Keeping the contract project-neutral lets the runner be reused elsewhere.
-    Set-Item -LiteralPath "Env:$testFileEnvironmentVariable" -Value ($testFiles -join "`n")
-
-    $bustedLauncher = Join-Path $rockTree 'bin\busted'
-    if (-not (Test-Path -LiteralPath $bustedLauncher -PathType Leaf)) {
-        throw "Busted launcher was not installed at $bustedLauncher"
-    }
-    $helper = Join-Path $testsRoot 'run.lua'
-    & lua $bustedLauncher --helper $helper @BustedArgs @testFiles
-    $testExitCode = $LASTEXITCODE
+    & $bustedRunner '--config-file' $bustedConfig @BustedArgs
+    $bustedExitCode = $LASTEXITCODE
 }
 finally {
-    Restore-ProcessEnvironmentVariable -Name 'LUA_PATH' -Value $oldLuaPath
-    Restore-ProcessEnvironmentVariable -Name 'LUA_CPATH' -Value $oldLuaCPath
-    Restore-ProcessEnvironmentVariable -Name $testFileEnvironmentVariable -Value $oldTestFiles
+    Pop-Location
 }
 
-if ($testExitCode -ne 0) {
-    throw "Busted tests failed with exit code $testExitCode."
-}
+exit $bustedExitCode

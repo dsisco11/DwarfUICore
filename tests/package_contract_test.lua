@@ -7,6 +7,7 @@ local shipped_modules = {
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
+    'dwarfui/minecart_route.lua',
     'dwarfui/mood_popover.lua',
     'dwarfui/popover.lua',
     'dwarfui/tooltip.lua',
@@ -116,6 +117,22 @@ local function load_public_module(package_path)
                 COLOR_LIGHTCYAN='lightcyan', COLOR_WHITE='white',
                 COLOR_YELLOW='yellow', COLOR_LIGHTRED='lightred',
                 COLOR_RED='red',
+            },
+        }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/minecart_route.lua' then
+        options = {
+            globals={
+                defclass=function(class)
+                    class = class or {}
+                    return setmetatable(class, {__call=function(class_table,
+                            attributes)
+                        local instance = attributes or {}
+                        setmetatable(instance, {__index=class_table})
+                        if instance.init then instance:init() end
+                        return instance
+                    end})
+                end,
             },
         }
     elseif package_path ==

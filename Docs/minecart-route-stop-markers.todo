@@ -53,29 +53,29 @@ custom name.
 
 ## Phase 0: Build the route-selection model
 
-- [ ] Add a production module for route lookup, flattened-row resolution, and
+- [x] Add a production module for route lookup, flattened-row resolution, and
       selected-route lifecycle rules.
-- [ ] Represent stateful model types as proper `defclass` classes.
-- [ ] Isolate native route-list geometry and focus decisions behind a
+- [x] Represent stateful model types as proper `defclass` classes.
+- [x] Isolate native route-list geometry and focus decisions behind a
       documented route-menu layout class.
-- [ ] Store only the selected route ID as persistent selection state.
-- [ ] Resolve clicks on route headers and stop rows to their owning route.
-- [ ] Ignore clicks outside the native route list and clicks in unsupported
+- [x] Store only the selected route ID as persistent selection state.
+- [x] Resolve clicks on route headers and stop rows to their owning route.
+- [x] Ignore clicks outside the native route list and clicks in unsupported
       nested contexts.
-- [ ] Ensure selection observation returns `false` or `nil` so native DF still
+- [x] Ensure selection observation returns `false` or `nil` so native DF still
       processes the same input.
-- [ ] Clear stale selection when no route with the selected ID exists.
-- [ ] Add table-driven unit tests for zero-based vectors, scrolling, route
+- [x] Clear stale selection when no route with the selected ID exists.
+- [x] Add table-driven unit tests for zero-based vectors, scrolling, route
       headers, stop rows, list boundaries, invalid rows, and stale IDs.
-- [ ] Add regression coverage proving duplicate route names and duplicate stop
+- [x] Add regression coverage proving duplicate route names and duplicate stop
       names do not affect identity.
-- [ ] Add LuaDoc comments to every new or modified class and method.
+- [x] Add LuaDoc comments to every new or modified class and method.
 
 ### Phase 0 completion gate
 
-- [ ] Selection is deterministic from native row data and numeric route IDs.
-- [ ] Native route-menu input remains unconsumed.
-- [ ] The focused model tests pass with no live DF dependency.
+- [x] Selection is deterministic from native row data and numeric route IDs.
+- [x] Native route-menu input remains unconsumed.
+- [x] The focused model tests pass with no live DF dependency.
 
 ## Phase 1: Build stop-marker projection and label layout
 
@@ -237,9 +237,11 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Focused unit tests | | Pending | Record route-selection and marker-layout counts separately. |
+| 2026-07-22 | Focused unit tests | Project-local Busted launcher with `tests/minecart_route_test.lua` | Passed: 14 successes | Covers zero-based rows, scrolling, all list edges, invalid contexts, pass-through input, stale IDs, and duplicate route/stop names without live DF. |
+| 2026-07-22 | Relevant registry/package tests | Project-local Busted launcher with route, registry, and package-contract tests | Passed: 23 successes | New module contract loads in registry order and is part of the shipped module contract. |
+| 2026-07-22 | Complete unit suite | Project-local Busted launcher with deterministic `*_test.lua` discovery | Passed: 126 successes | Zero failures, errors, or pending tests. The wrapper was not used because it expects an extensionless launcher while this Windows tree contains `busted.bat`. |
+| 2026-07-22 | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 13 production and 27 test/support files | Includes the new production model and focused tests. |
 | | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <route-marker-file>.ds.lua` | Pending | Wrapper passes through to `dwarfspec run`; test must click the actual rendered Hauling menu and restore all UI state. |
-| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes and failures. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured result and cleanup state. |
 | | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and `.ds.lua` files. |
 | | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Do not treat this as live overlay proof. |

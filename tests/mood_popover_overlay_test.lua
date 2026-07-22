@@ -44,6 +44,22 @@ end
 local function load_overlay(state)
     local widgets = widget_harness.widgets()
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
+    ---Creates plain test classes and overlay subclasses with one harness API.
+    ---@param global_slot table|nil
+    ---@param parent table|nil
+    ---@return table
+    local function test_defclass(global_slot, parent)
+        return widget_harness.defclass(global_slot, parent or widgets.Widget)
+    end
+    local hover_instructions = {
+        INFO_STRESSED_0=100,
+        INFO_STRESSED_1=101,
+        INFO_STRESSED_2=102,
+        INFO_STRESSED_3=103,
+        INFO_STRESSED_4=104,
+        INFO_STRESSED_5=105,
+        INFO_STRESSED_6=106,
+    }
     local descriptors = {
         [100]={hover_value=100, label='Ecstatic'},
         [101]={hover_value=101, label='Happy'},
@@ -51,8 +67,12 @@ local function load_overlay(state)
     local _, module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui-mood-popover.lua', {
             globals={
-                defclass=widget_harness.defclass,
-                df={global={world={}}},
+                defclass=test_defclass,
+                df={
+                    global={world={}, gps={dimx=state.width or 80,
+                        dimy=state.height or 25}},
+                    main_hover_instruction=hover_instructions,
+                },
                 dfhack={
                     gui={
                         getDFViewscreen=function() return state.viewscreen end,
@@ -62,7 +82,15 @@ local function load_overlay(state)
                             return state.focus_matches
                         end,
                     },
-                    screen={getMousePos=function() return nil, nil end},
+                    screen={
+                        getMousePos=function()
+                            return state.mouse_x, state.mouse_y
+                        end,
+                        readTile=function(x, y)
+                            return state.tiles and state.tiles[y] and
+                                state.tiles[y][x] or {ch=0, tile=0}
+                        end,
+                    },
                 },
             },
             require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
@@ -133,6 +161,33 @@ describe('DwarfUI mood popover overlay', function()
 
         state.focus_matches = false
         assert.is_false(Overlay.ATTRS.active_provider())
+    end)
+
+    it('discovers and hit-tests the rendered top-bar mood icons', function()
+        local state = {width=40, height=10, tiles={}}
+        for y=0,2 do state.tiles[y] = {} end
+        state.tiles[0][5] = {ch=string.byte('P'), tile=0}
+        state.tiles[0][6] = {ch=string.byte('o'), tile=0}
+        state.tiles[0][7] = {ch=string.byte('p'), tile=0}
+        for hover_index=0,6 do
+            local icon_x = 9 + hover_index * 3
+            state.tiles[0][icon_x - 1] = {ch=0, tile=0}
+            for y=0,1 do
+                for x=icon_x,icon_x + 1 do
+                    state.tiles[y][x] = {ch=0, tile=100 + hover_index}
+                end
+            end
+        end
+
+        local _, module = load_overlay(state)
+        local display = module.TopBarMoodDisplay{}
+        local rects = assert(display:find_layout())
+        assert.equals(7, #rects)
+        for index, rect in ipairs(rects) do
+            assert.equals(9 + (index - 1) * 3, rect.x1)
+            assert.equals(99 + index,
+                display:resolve_hover(rect.x1, rect.y1))
+        end
     end)
 
     it('samples native hover during render after DF has updated it', function()

@@ -4,9 +4,9 @@ Status: complete
 
 ## Goal
 
-When the mouse is over one of the seven native dwarf mood icons in the
-fortress-mode top panel, display a popout containing every unit represented by
-that mood level.
+When the mouse is over one of the seven native dwarf mood icons beside the
+population counter in the fortress-mode top information bar, display a popout
+containing every unit represented by that mood level.
 
 The feature must follow the native UI as its source of truth for which mood
 icon is under the pointer, remain usable when the unit list is longer than the
@@ -36,9 +36,12 @@ available screen height, and disappear without affecting normal game input.
 
 ## Confirmed DFHack seams
 
-- `df.global.game.main_interface.current_hover` identifies the native mood
-  icons as `df.main_hover_instruction.INFO_STRESSED_0` through
-  `INFO_STRESSED_6`.
+- The top information bar does not publish its seven mood-icon hovers through
+  `df.global.game.main_interface.current_hover`; those enum values belong to
+  the Creatures table's per-unit happiness indicators.
+- `dfhack.screen.readTile()` exposes the rendered `Pop` heading and the seven
+  adjacent two-by-two mood icons, and `dfhack.screen.getMousePos()` exposes the
+  pointer used to hit-test their discovered rectangles.
 - Native hover index 0 means Ecstatic and index 6 means Miserable.
 - `dfhack.units.getStressCategory(unit)` uses the reverse ordering: category 0
   is most stressed and category 6 is least stressed. The conversion is
@@ -57,7 +60,7 @@ available screen height, and disappear without affecting normal game input.
 ## Architectural decisions
 
 ```text
-native top-panel hover
+rendered top-bar mood-icon hit
         |
         v
 MoodPopoverOverlay -----> mood/unit snapshot
@@ -72,8 +75,8 @@ hover-retention state     sorted row model
 
 - Implement the product integration as one fullscreen, transparent overlay
   restricted to `dwarfmode/Default`.
-- Do not place invisible controls over hardcoded top-panel coordinates. Read
-  the native `current_hover` value so UI scaling and top-panel layout remain
+- Do not place invisible controls over hardcoded top-bar coordinates. Discover
+  the rendered `Pop` heading and adjacent mood-icon cells so layout remains
   owned by DF.
 - Add a reusable DwarfUI popover widget rather than embedding all presentation
   behavior in the mood overlay. Resource-count, container-content, and bed
@@ -171,14 +174,14 @@ must remain free of product-specific unit logic either way.
 - ☑ Define documented provider attributes for current hover, mouse position,
   and mood snapshots, with production defaults backed by the confirmed DFHack
   APIs.
-- ☑ Sample `current_hover` and mouse position at interactive frequency
-  without rebuilding the entire unit census on every render.
+- ☑ Sample the rendered top-bar icon layout and mouse position at interactive
+  frequency without rebuilding the entire unit census on every render.
 - ☑ On entry to a supported mood icon, capture the selected descriptor and
   anchor, build the first snapshot, reset scrolling, and show the popover.
 - ☑ While the same icon remains hovered, refresh content on the bounded
   cadence but retain the anchor and scroll position.
 - ☑ When the pointer enters the panel, retain the last mood selection even
-  after native `current_hover` clears.
+  after the pointer leaves the native top-bar icon.
 - ☑ When the pointer is outside both a supported icon and the visible panel,
   close immediately and discard unit references.
 - ☑ Switching directly between mood icons must update the heading, rows,
@@ -227,6 +230,9 @@ must remain free of product-specific unit logic either way.
 - ☑ Add a live registration contract that rescans DFHack's overlay database,
   finds the canonical widget name, and proves its production instance fills
   the active fortress screen without changing persisted enablement.
+- ☑ Discover the seven real rendered mood icons beside the top-bar `Pop`
+  heading, position the pointer over each native rectangle, and prove the
+  registered overlay opens with the corresponding mood.
 
 ### Phase 3 exit criteria
 

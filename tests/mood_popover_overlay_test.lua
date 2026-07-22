@@ -93,7 +93,10 @@ local function load_overlay(state)
                     },
                 },
             },
-            require_modules={['plugins.overlay']={OverlayWidget=OverlayWidget}},
+            require_modules={
+                ['plugins.overlay']={OverlayWidget=OverlayWidget},
+                gui={FRAME_THIN='thin'},
+            },
             reqscript={
                 ['dwarfui/mood_popover']={MoodPopoverModel=function()
                     return {resolve_hover=function(_, value)
@@ -115,6 +118,7 @@ local function overlay_with(state)
     local instance = Overlay{
         hover_provider=function() return state.hover end,
         mouse_provider=function() return state.mouse_x, state.mouse_y end,
+        anchor_provider=function(x, y) return x, y end,
         snapshot_provider=function(descriptor)
             state.snapshot_count = (state.snapshot_count or 0) + 1
             return {{name=descriptor.label .. ' unit'}}
@@ -138,6 +142,8 @@ describe('DwarfUI mood popover overlay', function()
         assert.equals(0, Overlay.ATTRS.overlay_onupdate_max_freq_seconds)
         assert.equal(module.MoodPopoverOverlay,
             module.OVERLAY_WIDGETS.mood_popover)
+        local instance = Overlay{}
+        assert.equals('thin', instance.popover.frame_style)
     end)
 
     it('fills the screen so the popover can render and receive wheel input',
@@ -185,8 +191,15 @@ describe('DwarfUI mood popover overlay', function()
         assert.equals(7, #rects)
         for index, rect in ipairs(rects) do
             assert.equals(9 + (index - 1) * 3, rect.x1)
-            assert.equals(99 + index,
-                display:resolve_hover(rect.x1, rect.y1))
+            assert.equals(2, rect.y2)
+            for y=rect.y1,rect.y2 do
+                for x=rect.x1,rect.x2 do
+                    assert.equals(99 + index,
+                        display:resolve_hover(x, y))
+                end
+            end
+            assert.same({rect.x1, rect.y2 + 1},
+                {display:get_popover_anchor(rect.x2, rect.y1)})
         end
     end)
 

@@ -66,7 +66,7 @@ describe('DwarfUI mood popover model', function()
         assert.is_nil(mood_popover:resolve_hover(999, hover_instructions))
     end)
 
-    it('uses the active-citizen predicate and includes insane citizens',
+    it('uses the top-bar citizen population and excludes insane citizens',
             function()
         local is_citizen_arguments = {}
         local production_environment = module_loader.load(repo_root,
@@ -114,7 +114,7 @@ describe('DwarfUI mood popover model', function()
         assert.same({1}, {rows[1].id})
         assert.equals(2, #is_citizen_arguments)
         for _, arguments in ipairs(is_citizen_arguments) do
-            assert.is_true(arguments.include_insane)
+            assert.is_nil(arguments.include_insane)
         end
     end)
 

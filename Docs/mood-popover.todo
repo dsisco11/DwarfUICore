@@ -52,7 +52,8 @@ available screen height, and disappear without affecting normal game input.
 - `dfhack.units.getReadableName(unit)` is the supported display-name source.
 - Follow DFHack's established `dwarfmonitor/misery` population contract: scan
   `df.global.world.units.active` and include units for which
-  `dfhack.units.isCitizen(unit, true)` is true.
+  `dfhack.units.isCitizen(unit)` is true. This matches the top-bar population
+  by excluding insane former citizens.
 - A `plugins.overlay.OverlayWidget` with `fullscreen=true` can expand its
   transparent host across the interface for screen-clamped rendering and
   input without appearing in DFHack's positioning UI.
@@ -84,9 +85,10 @@ hover-retention state     sorted row model
   behavior.
 - Keep native-hover interpretation and unit selection in a mood-specific model
   module. Keep the reusable popover independent of DF unit and stress APIs.
-- Lock the popover anchor when a mood hover begins. Position it immediately
-  below the pointer, then clamp it to the interface rectangle. Do not make the
-  panel chase small pointer movements while the same icon remains selected.
+- Lock the popover anchor when a mood hover begins. Leave one clear row between
+  its top and the information bar's bottom edge, align its left with the
+  hovered mood column, then clamp it to the interface rectangle. Do not make
+  the panel chase pointer movements while the same icon remains selected.
 - Model visibility as an explicit state machine: closed, native-trigger hover,
   and panel-retained. This prevents a one-frame close while the pointer crosses
   from the icon into the adjoining panel.

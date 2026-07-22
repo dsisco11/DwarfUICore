@@ -28,8 +28,8 @@ DwarfUI owns only its tooltip specs, registration support source,
 configuration, and tooltip-state command. Run them with:
 
 ```powershell
-dwarfspec run tests/tooltip/tooltip_spec.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_spec.ds.lua
+dwarfspec run tests/tooltip/tooltip.ds.lua
+dwarfspec run tests/tooltip/tooltip_overlay.ds.lua
 dwarfspec run tests/tooltip/tooltip_overlay_registration_integration_spec.lua
 ```
 

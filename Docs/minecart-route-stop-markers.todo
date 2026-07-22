@@ -1,0 +1,249 @@
+# Minecart route-stop marker implementation checklist
+
+## Goal
+
+When the native Minecart Routes menu is open, allow the player to select a
+route and identify its stops on the fortress map. The selected route must draw
+a marker at each stop's map position and label the marker with the stop's
+custom name.
+
+## Confirmed native boundaries
+
+- [ ] Treat `dwarfmode/Hauling` as the production focus path for the native
+      Minecart Routes menu.
+- [ ] Read route and stop data from `df.global.plotinfo.hauling`.
+- [ ] Resolve route identity from `df.hauling_route.id` and resolve markers
+      from the selected route's ordered `stops` vector.
+- [ ] Read each label and position directly from `df.hauling_stop.name` and
+      `df.hauling_stop.pos`.
+- [ ] Treat `view_routes`, `view_stops`, and `scroll_position` as the native
+      flattened menu-row model.
+- [ ] Do not use the removed `hauling.cursor_top` field or the stale accessor
+      in `gui/guide-path.lua`.
+- [ ] Do not infer route identity from localized text, rendered route names,
+      or pointer proximity to a map stop.
+- [ ] Do not assume Premium DF exposes a persistent selected-route field;
+      DwarfUI owns the selected route ID.
+
+## Scope and behavior contract
+
+- [ ] Select a route when the player clicks a visible native route header or
+      one of that route's visible stop rows.
+- [ ] Preserve the selected route while the player scrolls the route list,
+      pans the map, or changes z-levels.
+- [ ] Pass route-list clicks through to native DF after observing them so
+      existing route-menu actions continue to work.
+- [ ] Draw a visible selection indicator beside the selected route header when
+      that header is visible.
+- [ ] Clear selection when the selected route is deleted, the world unloads,
+      the overlay is disabled, or the Hauling menu closes.
+- [ ] Re-resolve the selected numeric route ID against the current route vector
+      before every render; do not retain a native route pointer across frames.
+- [ ] Reflect stop additions, removals, renames, and position changes without
+      reopening the menu or reselecting the route.
+- [ ] Draw same-z stops as solid markers at their exact map tiles.
+- [ ] Draw off-z stops whose x/y coordinates are within the viewport as
+      visually distinct projected markers with an explicit signed z delta.
+- [ ] Never present an off-z projection as though it were a stop on the
+      currently displayed z-level.
+- [ ] Do not change the map viewport, cursor, route definitions, or stop data
+      merely to display markers.
+- [ ] Keep this work independent from editing an existing route-stop position,
+      which remains a separate project item.
+
+## Phase 0: Build the route-selection model
+
+- [ ] Add a production module for route lookup, flattened-row resolution, and
+      selected-route lifecycle rules.
+- [ ] Represent stateful model types as proper `defclass` classes.
+- [ ] Isolate native route-list geometry and focus decisions behind a
+      documented route-menu layout class.
+- [ ] Store only the selected route ID as persistent selection state.
+- [ ] Resolve clicks on route headers and stop rows to their owning route.
+- [ ] Ignore clicks outside the native route list and clicks in unsupported
+      nested contexts.
+- [ ] Ensure selection observation returns `false` or `nil` so native DF still
+      processes the same input.
+- [ ] Clear stale selection when no route with the selected ID exists.
+- [ ] Add table-driven unit tests for zero-based vectors, scrolling, route
+      headers, stop rows, list boundaries, invalid rows, and stale IDs.
+- [ ] Add regression coverage proving duplicate route names and duplicate stop
+      names do not affect identity.
+- [ ] Add LuaDoc comments to every new or modified class and method.
+
+### Phase 0 completion gate
+
+- [ ] Selection is deterministic from native row data and numeric route IDs.
+- [ ] Native route-menu input remains unconsumed.
+- [ ] The focused model tests pass with no live DF dependency.
+
+## Phase 1: Build stop-marker projection and label layout
+
+- [ ] Add a projection class that consumes a selected route and a
+      `gui.dwarfmode.Viewport` and produces immutable marker descriptors.
+- [ ] Preserve the route's stop ordering and include the stop ID, display
+      index, name, world position, screen position, and signed z delta in each
+      descriptor.
+- [ ] Use `Viewport:isVisible()` for same-z markers and
+      `Viewport:isVisibleXY()` for explicitly marked off-z projections.
+- [ ] Use `Viewport:tileToScreen()` for map projection instead of deriving
+      screen positions from `window_x`, `window_y`, or UI text coordinates.
+- [ ] Define distinct pens or graphics tiles for same-z, above, and below
+      markers with text-mode fallbacks.
+- [ ] Include the custom stop name in every label and include a signed z delta
+      for every off-z label.
+- [ ] Keep labels within the visible map viewport by choosing left or right
+      placement and truncating only when neither direction has enough room.
+- [ ] Resolve overlapping labels deterministically without moving the marker
+      away from its stop tile.
+- [ ] Avoid drawing labels over native non-map panels.
+- [ ] Add unit tests for same-z, above, below, offscreen, map-edge, long-name,
+      empty-name, duplicate-position, and collision cases.
+
+### Phase 1 completion gate
+
+- [ ] Every visible same-z stop produces one exact-tile marker and one label.
+- [ ] Every visible-x/y off-z stop is unmistakably identified as a projection.
+- [ ] Marker and label layout remains inside the map viewport at all tested
+      screen edges and interface sizes.
+
+## Phase 2: Integrate the registered DFHack overlay
+
+- [ ] Add a production `overlay.OverlayWidget` registered for the Hauling
+      viewscreen and restricted to the intended focus paths.
+- [ ] Use a fullscreen host only for screen-wide hit testing and map drawing;
+      do not expose a meaningless movable frame.
+- [ ] Construct and own the route-selection, menu-layout, and marker-projection
+      classes from the overlay.
+- [ ] Observe route-list clicks in `onInput()` and pass all native inputs
+      through unless a future DwarfUI-owned control explicitly requires
+      consumption.
+- [ ] Render the native screen first, then draw the selected-route indicator,
+      map markers, and stop labels.
+- [ ] Use the supported map painter mode or DFHack map-overlay API so markers
+      render correctly in both graphics and text modes.
+- [ ] Avoid per-frame world scans; inspect only the selected route and its
+      stops.
+- [ ] Register the overlay module in DwarfUI's module registry and reload
+      lifecycle.
+- [ ] Update package-contract tests for every new production module and asset.
+- [ ] Verify `dwarfui reload` removes the old class/module instances and
+      registers the new overlay exactly once.
+
+### Phase 2 completion gate
+
+- [ ] The overlay appears in DFHack's overlay registry and is enabled according
+      to its declared default/configuration.
+- [ ] Selecting, scrolling, panning, changing z-levels, renaming stops, and
+      deleting the selected route leave no stale marker or duplicated overlay.
+- [ ] Native route editing behavior remains functional after overlay input
+      interposition.
+
+## Phase 3: Add component and production-boundary coverage
+
+- [ ] Add a DwarfSpec file whose filename ends only in `.ds.lua`; do not use
+      `_spec` or any additional test suffix.
+- [ ] Mount the production overlay class, not a test-only proxy.
+- [ ] Back the mounted component with the real native Hauling viewscreen and
+      real `plotinfo.hauling` route data.
+- [ ] Position the DwarfSpec pointer over an actual rendered native route row
+      and click it through the component input boundary.
+- [ ] Assert that the clicked `view_routes` route ID becomes selected while the
+      native screen still receives the click.
+- [ ] Center a reversible test viewport on a real selected-route stop and
+      assert that the marker occupies the screen tile produced by
+      `Viewport:tileToScreen(stop.pos)`.
+- [ ] Assert that the rendered label contains the actual native
+      `df.hauling_stop.name` value.
+- [ ] Change to a different z-level and verify the same native stop becomes an
+      explicitly directional projection rather than a same-z marker.
+- [ ] Scroll the actual route list, click a newly visible route or stop row,
+      and verify selection follows the native flattened row model.
+- [ ] Verify route deletion or fixture invalidation clears the marker state.
+- [ ] Snapshot and restore viewport, cursor, overlay selection, route-menu
+      scroll state, and any other changed UI state even when an assertion
+      fails.
+- [ ] Keep the prepared-save requirement explicit when no suitable minecart
+      route and stop exist.
+- [ ] If deletion or rename coverage requires mutation, create a disposable
+      test route and restore or remove only that fixture; never mutate an
+      existing player-owned route for automated coverage.
+
+### Phase 3 completion gate
+
+- [ ] The component test proves that interaction with the actual rendered DF
+      Hauling menu selects the expected real route.
+- [ ] Marker coordinates and text are derived from the same real native stop,
+      not from duplicated fixtures.
+- [ ] DwarfSpec reports confirmed cleanup with no retained screen, subject,
+      pointer patch, viewport change, or route mutation.
+
+## Phase 4: Validate packaging and live behavior
+
+- [ ] Run the focused route-selection and marker-layout unit tests.
+- [ ] Run the focused DwarfSpec native-menu component test through
+      `tools/Run-AutomationTests.ps1`, which must only pass its arguments
+      through to `dwarfspec run`.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run the complete DwarfSpec suite through the same pass-through wrapper.
+- [ ] Run Lua syntax validation for production, unit, support, and `.ds.lua`
+      files.
+- [ ] Run the offline build and verify the expanded package contents.
+- [ ] Run archive package verification.
+- [ ] Run `git diff --check`.
+- [ ] Install the packaged mod into the configured live DFHack instance and run
+      `dwarfui reload`.
+- [ ] Confirm the live overlay registry contains exactly one enabled
+      route-marker widget with the expected Hauling focus restriction.
+- [ ] In the prepared fortress, click real route headers and stop rows and
+      visually confirm selection indicators, exact-tile markers, custom names,
+      list scrolling, map panning, same-z markers, and off-z projections.
+- [ ] Rename and delete a disposable selected route or stop through native DF
+      and verify markers update or clear without errors; do not use an
+      existing player-owned route for this destructive check.
+- [ ] Review the DFHack console and logs for Lua errors after selection,
+      scrolling, rendering, reload, rename, and deletion checks.
+- [ ] Record automated, packaged, registered-overlay, and manual visual
+      evidence separately.
+
+### Phase 4 completion gate
+
+- [ ] Focused and complete unit and DwarfSpec suites pass with zero failures.
+- [ ] Syntax, offline build, expanded package, archive package, and diff checks
+      pass.
+- [ ] Live DFHack proves overlay discovery, reload, native route-row selection,
+      map rendering, and cleanup without overstating component-test coverage.
+
+## Definition of done
+
+- [ ] Clicking an actual native route header or stop row selects the correct
+      route without blocking the native menu action.
+- [ ] The selected route remains identified after route-list scrolling and map
+      navigation.
+- [ ] Every selected-route stop visible on the current z-level has an exact
+      map-tile marker and its current custom name.
+- [ ] Every selected-route stop projected from another z-level is explicitly
+      marked as above or below with the correct signed delta.
+- [ ] Route and stop edits are reflected without stale pointers, stale labels,
+      duplicate overlays, or reopening the menu.
+- [ ] The implementation uses documented DFHack viewport and overlay APIs and
+      performs no world scan during rendering.
+- [ ] All new and modified classes and methods have LuaDoc comments.
+- [ ] Unit tests, real-native-menu DwarfSpec coverage, syntax checks, packaging
+      checks, overlay-registration proof, and live visual proof are recorded
+      independently.
+
+## Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| | Focused unit tests | | Pending | Record route-selection and marker-layout counts separately. |
+| | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <route-marker-file>.ds.lua` | Pending | Wrapper passes through to `dwarfspec run`; test must click the actual rendered Hauling menu and restore all UI state. |
+| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes and failures. |
+| | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured result and cleanup state. |
+| | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and `.ds.lua` files. |
+| | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Do not treat this as live overlay proof. |
+| | Package verification | `.\tools\Publish.ps1` | Pending | Verify expanded and archive packages. |
+| | Diff validation | `git diff --check` | Pending | Record whitespace result. |
+| | Registered overlay | `dwarfui reload` and overlay registry inspection | Pending | Confirm one enabled Hauling overlay instance. |
+| | Live visual behavior | Prepared fortress Minecart Routes menu | Pending | Verify selection, names, positions, scrolling, z behavior, edits, and cleanup. |

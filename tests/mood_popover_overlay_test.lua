@@ -95,7 +95,7 @@ local function load_overlay(state)
             },
             require_modules={
                 ['plugins.overlay']={OverlayWidget=OverlayWidget},
-                gui={FRAME_THIN='thin'},
+                gui={FRAME_INTERIOR='interior'},
             },
             reqscript={
                 ['dwarfui/mood_popover']={MoodPopoverModel=function()
@@ -143,7 +143,7 @@ describe('DwarfUI mood popover overlay', function()
         assert.equal(module.MoodPopoverOverlay,
             module.OVERLAY_WIDGETS.mood_popover)
         local instance = Overlay{}
-        assert.equals('thin', instance.popover.frame_style)
+        assert.equals('interior', instance.popover.frame_style)
     end)
 
     it('fills the screen so the popover can render and receive wheel input',

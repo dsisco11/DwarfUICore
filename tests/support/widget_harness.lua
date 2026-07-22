@@ -66,10 +66,13 @@ local function compute_frame(self, parent_rect)
     local global_x = parent_rect.x1 + frame_x
     local global_y = parent_rect.y1 + frame_y
     local inset_l, inset_t, inset_r, inset_b = inset_edges(self.frame_inset)
-    local body_x = global_x + inset_l
-    local body_y = global_y + inset_t
-    local body_width = math.max(0, width - inset_l - inset_r)
-    local body_height = math.max(0, height - inset_t - inset_b)
+    local frame_gap = self.frame_style and 1 or 0
+    local body_x = global_x + inset_l + frame_gap
+    local body_y = global_y + inset_t + frame_gap
+    local body_width = math.max(0,
+        width - inset_l - inset_r - 2 * frame_gap)
+    local body_height = math.max(0,
+        height - inset_t - inset_b - 2 * frame_gap)
     return M.rect(frame_x, frame_y, width, height), M.rect(
         body_x,
         body_y,

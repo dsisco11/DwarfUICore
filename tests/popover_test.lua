@@ -15,7 +15,7 @@ local _, popover_module = module_loader.load(repo_root,
             }},
         },
         require_modules={
-            gui={WINDOW_FRAME='window'},
+            gui={WINDOW_FRAME='window', FRAME_INTERIOR='interior'},
             ['gui.widgets']=widgets,
         },
     })
@@ -92,22 +92,21 @@ describe('DwarfUI Popover', function()
         assert.is_false(popover.list.visible)
         assert.equals(0, popover:get_visible_row_count())
         assert.is_false(popover:has_overflow())
+        assert.equals(6, popover.frame_global.h)
+        assert.equals(2, popover.frame_body.height)
     end)
 
-    it('consumes only wheel scrolling inside an overflowing visible list',
+    it('scrolls an overflowing visible list without moving off the anchor',
             function()
         local popover = Popover{}
         popover:set_content('Content', rows(20))
         popover:show_at(10, 5, rect(80, 25))
-        mouse.x = popover.frame_global.x + 1
-        mouse.y = popover.frame_global.y + 2
+        mouse.x = 0
+        mouse.y = 0
 
         assert.is_true(popover:onInput({STANDARDSCROLL_DOWN=true}))
         assert.equals(2, popover.scroll_top)
         assert.is_nil(popover:onInput({KEYBOARD_CURSOR_DOWN=true}))
-        mouse.y = popover.frame_global.y + 1
-        assert.is_nil(popover:onInput({STANDARDSCROLL_DOWN=true}))
-        mouse.y = popover.frame_global.y + 2
         popover:scroll(100)
         assert.equals(9, popover.scroll_top)
         assert.is_true(popover:onInput({STANDARDSCROLL_DOWN=true}))
@@ -151,8 +150,8 @@ describe('DwarfUI Popover', function()
 
         assert.is_true(popover:contains_point(10, 6))
         assert.is_false(popover:contains_point(9, 6))
-        assert.is_true(popover:contains_list_point(11, 8))
-        assert.is_false(popover:contains_list_point(11, 7))
+        assert.is_true(popover:contains_list_point(12, 9))
+        assert.is_false(popover:contains_list_point(12, 8))
         popover:render({})
         local rendered = popover.render_count
         popover:hide()

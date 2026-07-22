@@ -3,6 +3,7 @@ local repo_root = require('support.repo_root')
 
 local separator = package.config:sub(1, 1)
 local shipped_modules = {
+    'dwarfui/module_registry.lua',
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
@@ -10,6 +11,7 @@ local shipped_modules = {
     'dwarfui/popover.lua',
     'dwarfui/tooltip.lua',
     'dwarfui/tooltip_registration.lua',
+    'dwarfui/unit_card_task.lua',
 }
 
 local mood_popover_payload = {
@@ -155,6 +157,26 @@ local function load_public_module(package_path)
                 ['dwarfui/tooltip']={TooltipRenderer=function() return {} end},
             },
         }
+    elseif package_path ==
+            'scripts_modinstalled/dwarfui/unit_card_task.lua' then
+        options = {
+            globals={
+                df={
+                    job_type={
+                        BringItemToDepot=1,
+                        BringItemToShop=2,
+                        StoreItemInStockpile=3,
+                        StoreItemInBag=4,
+                        StoreItemInLocation=5,
+                        StoreItemInBarrel=6,
+                        StoreItemInBin=7,
+                        StoreItemInVehicle=8,
+                        DumpItem=9,
+                    },
+                    job_role_type={Hauled=1, QueuedContainer=2},
+                },
+            },
+        }
     end
     return module_loader.load(repo_root, 'src/' .. package_path, options)
 end
@@ -214,5 +236,12 @@ describe('DwarfUI package contract', function()
         local widget = read_source(mood_popover_payload.widget)
         contains(widget, '--@ module=true')
         contains(widget, 'Popover = defclass')
+    end)
+
+    it('ships the dwarfui reload command', function()
+        local command = read_source('scripts_modinstalled/dwarfui.lua')
+        contains(command, 'dwarfui reload')
+        contains(command, "qerror('Usage: dwarfui [reload]')")
+        contains(command, "require('plugins.overlay').rescan()")
     end)
 end)

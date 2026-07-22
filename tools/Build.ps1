@@ -1,10 +1,7 @@
 [CmdletBinding()]
 param(
     [string] $LuaCompiler = $env:LUA_COMPILER,
-    # DwarfUI does not expose a `dwarfui reload` command yet. Keep command-based
-    # reload available as an explicit opt-in once its shared modules and
-    # user-facing UI additions have a real reload entry point.
-    [bool] $LiveReload = $false,
+    [bool] $LiveReload = $true,
     [string] $SourceDir = 'src',
     [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
     [string] $DwarfFortressRoot = $env:GAME_ROOT,

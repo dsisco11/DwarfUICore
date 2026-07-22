@@ -116,5 +116,8 @@ describe('DwarfUI unit-card task details', function()
         assert.equals('Destination: Finished go',
             task_details.truncate_panel_text('Destination: Finished goods', 24))
         assert.equals('Gra', task_details.truncate_panel_text('Grab: log', 3))
+        assert.is_true(task_details.is_panel_text_truncated(
+            'Destination: Finished goods', 24))
+        assert.is_false(task_details.is_panel_text_truncated('Grab: log', 24))
     end)
 end)

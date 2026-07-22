@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local separator = package.config:sub(1, 1)
-local public_modules = {
+local shipped_modules = {
     'dwarfui/text.lua',
     'dwarfui/widget_extensions.lua',
     'dwarfui/pointer.lua',
@@ -12,8 +12,10 @@ local public_modules = {
     'dwarfui/tooltip_registration.lua',
 }
 
-local overlay_scripts = {
-    'scripts_modinstalled/dwarfui-mood-popover.lua',
+local mood_popover_payload = {
+    registration='scripts_modinstalled/dwarfui-mood-popover.lua',
+    model='scripts_modinstalled/dwarfui/mood_popover.lua',
+    widget='scripts_modinstalled/dwarfui/popover.lua',
 }
 
 local function source_path(relative_path)
@@ -179,8 +181,8 @@ describe('DwarfUI package contract', function()
         assert.is_nil(rockspec:find('< 5.4', 1, true))
     end)
 
-    it('keeps stable public module contracts', function()
-        for _, relative_path in ipairs(public_modules) do
+    it('ships expected Lua module contracts', function()
+        for _, relative_path in ipairs(shipped_modules) do
             local package_path = 'scripts_modinstalled/' .. relative_path
             local source = read_source(package_path)
             contains(source, '--@ module=true')
@@ -191,19 +193,26 @@ describe('DwarfUI package contract', function()
         end
     end)
 
-    it('roots the public namespace in the package', function()
-        for _, relative_path in ipairs(public_modules) do
+    it('roots shipped modules in the package', function()
+        for _, relative_path in ipairs(shipped_modules) do
             local file = assert(io.open(source_path(
                 'scripts_modinstalled/' .. relative_path), 'rb'))
             file:close()
         end
     end)
 
-    it('includes the registered mood-popover overlay script', function()
-        for _, relative_path in ipairs(overlay_scripts) do
-            local source = read_source(relative_path)
-            contains(source, '--@ module=true')
-            contains(source, 'OVERLAY_WIDGETS')
-        end
+    it('includes the complete mood-popover payload and registration', function()
+        local registration = read_source(mood_popover_payload.registration)
+        contains(registration, '--@ module=true')
+        contains(registration, 'OVERLAY_WIDGETS')
+        contains(registration, "['dwarfui-mood-popover']")
+
+        local model = read_source(mood_popover_payload.model)
+        contains(model, '--@ module=true')
+        contains(model, 'MoodPopoverModel = defclass')
+
+        local widget = read_source(mood_popover_payload.widget)
+        contains(widget, '--@ module=true')
+        contains(widget, 'Popover = defclass')
     end)
 end)

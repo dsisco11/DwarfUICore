@@ -1,6 +1,6 @@
 # Mood Icon Unit Popover
 
-Status: planned
+Status: complete
 
 ## Goal
 
@@ -237,21 +237,21 @@ must remain free of product-specific unit logic either way.
 
 ## Phase 4 - Package and document the user-facing feature
 
-- ☐ Include the overlay registration script and reusable modules in the
+- ☑ Include the overlay registration script and reusable modules in the
   rockspec and expanded mod package.
-- ☐ Add package-contract coverage so a missing registration or module file
+- ☑ Add package-contract coverage so a missing registration or module file
   fails locally.
-- ☐ Add user-facing README documentation describing the feature, how to
+- ☑ Add user-facing README documentation describing the feature, how to
   enable or disable its overlay, supported screens, and scrolling behavior.
-- ☐ Document the reusable popover API separately only if it is intended as a
+- ☑ Document the reusable popover API separately only if it is intended as a
   stable downstream API in this release; otherwise keep it project-internal.
-- ☐ Run the repository Lua syntax check, local Busted suite, DwarfSpec
+- ☑ Run the repository Lua syntax check, local Busted suite, DwarfSpec
   component suite through `Run-AutomationTests.ps1`, build, and package
   verification and record each evidence layer separately.
 
 ### Phase 4 exit criteria
 
-- ☐ The feature is present in the installable mod, has focused regression
+- ☑ The feature is present in the installable mod, has focused regression
   coverage, and is documented for end users without exposing an accidental
   public API.
 
@@ -271,14 +271,14 @@ must remain free of product-specific unit logic either way.
 
 ## Completion criteria
 
-- ☐ Hovering any native mood icon shows exactly the units represented by that
+- ☑ Hovering any native mood icon shows exactly the units represented by that
   icon's counter.
-- ☐ Every matching unit is reachable, including when the list exceeds the
+- ☑ Every matching unit is reachable, including when the list exceeds the
   available screen height.
-- ☐ The popover remains open across the icon-to-panel transition and closes
+- ☑ The popover remains open across the icon-to-panel transition and closes
   everywhere else required by the user experience contract.
-- ☐ Unsupported screens and inactive popover regions do not alter normal
+- ☑ Unsupported screens and inactive popover regions do not alter normal
   game input or rendering.
-- ☐ Unit selection and mapping have focused Busted coverage; rendered
+- ☑ Unit selection and mapping have focused Busted coverage; rendered
   presentation and lifecycle have DwarfSpec component coverage; packaging has
   build and manifest verification.

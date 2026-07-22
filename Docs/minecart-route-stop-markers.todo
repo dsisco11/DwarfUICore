@@ -237,9 +237,9 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 2026-07-22 | Focused unit tests | Project-local Busted launcher with `tests/minecart_route_test.lua` | Passed: 14 successes | Covers zero-based rows, scrolling, all list edges, invalid contexts, pass-through input, stale IDs, and duplicate route/stop names without live DF. |
+| 2026-07-22 | Focused unit tests | Project-local Busted launcher with `tests/minecart_route.spec.lua` | Passed: 14 successes | Covers zero-based rows, scrolling, all list edges, invalid contexts, pass-through input, stale IDs, and duplicate route/stop names without live DF. |
 | 2026-07-22 | Relevant registry/package tests | Project-local Busted launcher with route, registry, and package-contract tests | Passed: 23 successes | New module contract loads in registry order and is part of the shipped module contract. |
-| 2026-07-22 | Complete unit suite | Project-local Busted launcher with deterministic `*_test.lua` discovery | Passed: 126 successes | Zero failures, errors, or pending tests. The wrapper was not used because it expects an extensionless launcher while this Windows tree contains `busted.bat`. |
+| 2026-07-22 | Complete unit suite | Project-local Busted launcher with deterministic `*.spec.lua` discovery | Passed: 126 successes | Zero failures, errors, or pending tests before the filename-only rename. The wrapper was not used because it expects an extensionless launcher while this Windows tree contains `busted.bat`. |
 | 2026-07-22 | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 13 production and 27 test/support files | Includes the new production model and focused tests. |
 | | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <route-marker-file>.ds.lua` | Pending | Wrapper passes through to `dwarfspec run`; test must click the actual rendered Hauling menu and restore all UI state. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured result and cleanup state. |

@@ -22,7 +22,7 @@ describe('Busted test infrastructure', function()
 
         local files = assert(os.getenv('LUA_TEST_FILES'),
             'runner did not provide discovered test files')
-        contains(files, 'infrastructure_smoke_test.lua')
+        contains(files, 'infrastructure_smoke.spec.lua')
         excludes(files, 'tests\\support\\module_loader.lua')
         excludes(files, 'tests/support/module_loader.lua')
         excludes(files, 'tests\\run.lua')

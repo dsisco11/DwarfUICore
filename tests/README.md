@@ -12,7 +12,7 @@ required compatibility test for DFHack. The runner pins Busted `2.3.0-1`
 and Windows-toolchain-compatible LuaSystem `0.3.0-2` in the ignored repository-
 local `.luarocks/` tree, installing them and the remaining dependencies through
 LuaRocks when absent. It deterministically discovers `test_*.lua` and
-`*_test.lua` specs and forwards remaining arguments to Busted.
+`*.spec.lua` specs and forwards remaining arguments to Busted.
 
 `tests/run.lua` is a Busted helper that derives test and production paths from
 its own location and validates the runner's discovered file list.
@@ -30,7 +30,7 @@ configuration, and tooltip-state command. Run them with:
 ```powershell
 dwarfspec run tests/tooltip/tooltip.ds.lua
 dwarfspec run tests/tooltip/tooltip_overlay.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay_registration_integration_spec.lua
+dwarfspec run tests/tooltip/tooltip_overlay_registration_integration.ds.lua
 ```
 
 The first two commands mount components without installing scripts. The last

@@ -152,6 +152,8 @@ describe('DwarfUI Popover', function()
 
         assert.is_true(popover:contains_point(10, 6))
         assert.is_false(popover:contains_point(9, 6))
+        assert.is_true(popover:contains_retention_point(12, 5))
+        assert.is_false(popover:contains_retention_point(9, 5))
         assert.is_true(popover:contains_list_point(12, 9))
         assert.is_false(popover:contains_list_point(12, 8))
         popover:render({})
@@ -162,5 +164,25 @@ describe('DwarfUI Popover', function()
         assert.is_false(popover:contains_point(10, 6))
         assert.is_false(popover:contains_list_point(11, 8))
         assert.is_nil(popover:onInput({CONTEXT_SCROLL_DOWN=true}))
+    end)
+
+    it('submits the clicked list row', function()
+        local submitted_row, submitted_index
+        local row = {id=42, name='Clickable Unit'}
+        local popover = Popover{on_submit=function(value, index)
+            submitted_row, submitted_index = value, index
+            return true
+        end}
+        popover:set_content('Content', {row})
+        popover:show_at(10, 5, rect(80, 25))
+        popover.list.onInput = function(list, keys)
+            if not keys._MOUSE_L then return end
+            return list.on_submit(1, list.choices[1])
+        end
+        mouse.x, mouse.y = 12, 9
+
+        assert.is_true(popover:onInput({_MOUSE_L=true}))
+        assert.is.equal(row, submitted_row)
+        assert.equals(1, submitted_index)
     end)
 end)

@@ -25,6 +25,10 @@ local function make_popover()
         function popover:contains_point(x, y)
             return self.visible and self.inside and self.inside(x, y)
         end
+        ---Returns whether a point is inside the configured retained region.
+        function popover:contains_retention_point(x, y)
+            return self:contains_point(x, y)
+        end
         ---Records and returns the configured input decision.
         function popover:onInput(keys)
             self.input_keys = keys
@@ -124,6 +128,10 @@ local function overlay_with(state)
             return {{name=descriptor.label .. ' unit'}}
         end,
         active_provider=function() return state.active end,
+        unit_opener=function(unit)
+            state.opened_unit = unit
+            return state.open_result ~= false
+        end,
         refresh_interval=2,
     }
     instance.frame_parent_rect = widget_harness.rect(0, 0, 80, 25)
@@ -281,5 +289,17 @@ describe('DwarfUI mood popover overlay', function()
         assert.is.equal(keys, overlay.popover.input_keys)
         overlay.popover.input_result = true
         assert.is_true(overlay:onInput({STANDARDSCROLL_DOWN=true}))
+    end)
+
+    it('opens the selected row unit and clears the popover', function()
+        local state = {active=true, hover=100, mouse_x=12, mouse_y=3}
+        local overlay = overlay_with(state)
+        local unit = {id=42}
+        overlay:update_popover()
+
+        assert.is_true(overlay:open_row({unit=unit}))
+        assert.is.equal(unit, state.opened_unit)
+        assert.is_nil(overlay.selected_descriptor)
+        assert.is_false(overlay.popover.visible)
     end)
 end)

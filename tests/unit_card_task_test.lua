@@ -84,8 +84,36 @@ describe('DwarfUI unit-card task details', function()
         assert.equals('Grab: gold goblet', task_details.get_grab_item_text(unit))
     end)
 
+    it('shows an uncollected Hauled item as the primary grab target', function()
+        local book = {description='Records of the Monastery',
+            flags={in_inventory=false}}
+        local unit = {job={current_job={
+            job_type='StoreItemInLocation',
+            items={{role=2, item=book}, {role=7, item={
+                description='fallback container'}}},
+            pos={x=10, y=20, z=4},
+        }}}
+
+        assert.equals(book, task_details.get_grab_item(unit.job.current_job))
+        assert.equals('Grab: Records of the Monastery',
+            task_details.get_grab_item_text(unit))
+    end)
+
+    it('does not show a grab target after the item enters the inventory',
+            function()
+        local book = {description='carried book', flags={in_inventory=true}}
+        local unit = {job={current_job={
+            job_type='StoreItemInLocation',
+            items={{role=2, item=book}},
+            pos={x=10, y=20, z=4},
+        }}}
+
+        assert.is_nil(task_details.get_grab_item(unit.job.current_job))
+        assert.is_nil(task_details.get_grab_item_text(unit))
+    end)
+
     it('truncates task-detail rows to the available panel width', function()
-        assert.equals('Destination: Finished...',
+        assert.equals('Destination: Finished go',
             task_details.truncate_panel_text('Destination: Finished goods', 24))
         assert.equals('Gra', task_details.truncate_panel_text('Grab: log', 3))
     end)

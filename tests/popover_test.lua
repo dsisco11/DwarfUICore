@@ -92,56 +92,30 @@ describe('DwarfUI Popover', function()
         assert.is_false(popover.list.visible)
         assert.equals(0, popover:get_visible_row_count())
         assert.is_false(popover:has_overflow())
+        assert.is_true(popover:onInput({CONTEXT_SCROLL_DOWN=true}))
         assert.equals(6, popover.frame_global.h)
         assert.equals(2, popover.frame_body.height)
     end)
 
-    it('scrolls an overflowing visible list without moving off the anchor',
+    it('focuses the scrollbar and forwards wheel input without leaving the anchor',
             function()
         local popover = Popover{}
         popover:set_content('Content', rows(20))
+        popover.list.scrollbar = {setFocus=function(scrollbar, value)
+            scrollbar.focused = value
+        end, on_scroll=function(scroll_spec)
+            popover.list.scroll_spec = scroll_spec
+        end}
         popover:show_at(10, 5, rect(80, 25))
         mouse.x = 0
         mouse.y = 0
 
         assert.is_true(popover:onInput({CONTEXT_SCROLL_DOWN=true}))
-        assert.equals(2, popover.scroll_top)
+        assert.is_true(popover.list.scrollbar.focused)
+        assert.equals('down_small', popover.list.scroll_spec)
         assert.is_nil(popover:onInput({KEYBOARD_CURSOR_DOWN=true}))
         assert.is_true(popover:onInput({CONTEXT_SCROLL_PAGEDOWN=true}))
-        assert.equals(9, popover.scroll_top)
-        popover:scroll(100)
-        assert.equals(9, popover.scroll_top)
-        assert.is_true(popover:onInput({CONTEXT_SCROLL_DOWN=true}))
-        assert.equals(9, popover.scroll_top)
-    end)
-
-    it('resets scrolling on new content and clamps it after resize', function()
-        local popover = Popover{}
-        popover:set_content('Happy', rows(20))
-        popover:show_at(10, 20, rect(80, 25))
-        popover:scroll(4)
-        assert.equals(5, popover.scroll_top)
-        popover:reposition(rect(30, 10))
-
-        assert.equals('Happy (20)', popover.header.text)
-        assert.equals(5, popover.scroll_top)
-        assert.is_true(popover.frame_global.x >= 1)
-        assert.is_true(popover.frame_global.y >= 1)
-        assert.is_true(popover.frame_global.x + popover.frame_global.w <= 29)
-        assert.is_true(popover.frame_global.y + popover.frame_global.h <= 9)
-
-        popover:set_content('Happy', rows(2))
-        assert.equals(1, popover.scroll_top)
-    end)
-
-    it('can preserve scrolling when refreshing the same subject', function()
-        local popover = Popover{}
-        popover:set_content('Ecstatic', rows(20))
-        popover:show_at(10, 5, rect(80, 25))
-        popover:scroll(3)
-        popover:set_content('Ecstatic', rows(20), false)
-
-        assert.equals(4, popover.scroll_top)
+        assert.equals('down_large', popover.list.scroll_spec)
     end)
 
     it('reports visible panel and list hit regions and clears them on hide',

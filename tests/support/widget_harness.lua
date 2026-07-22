@@ -119,6 +119,12 @@ function BASE_METHODS:setText(value)
     self.text = value
 end
 
+---Sets whether this harness widget owns keyboard and wheel focus.
+---@param value boolean
+function BASE_METHODS:setFocus(value)
+    self.focused = value
+end
+
 local function apply_attributes(instance, class, info, default_nil)
     local chain = {}
     local current = class

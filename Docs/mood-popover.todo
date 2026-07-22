@@ -1,0 +1,284 @@
+# Mood Icon Unit Popover
+
+Status: planned
+
+## Goal
+
+When the mouse is over one of the seven native dwarf mood icons in the
+fortress-mode top panel, display a popout containing every unit represented by
+that mood level.
+
+The feature must follow the native UI as its source of truth for which mood
+icon is under the pointer, remain usable when the unit list is longer than the
+available screen height, and disappear without affecting normal game input.
+
+## User experience contract
+
+- Support the seven native levels: Ecstatic, Happy, Pleased, Content,
+  Displeased, Unhappy, and Miserable.
+- Open immediately when a supported native mood icon becomes the current hover
+  target.
+- Show the mood name and current unit count in the panel heading.
+- Show one readable unit name per row, sorted case-insensitively by name with
+  unit ID as the deterministic tie-break.
+- Keep the panel open while the pointer remains over the originating icon or
+  moves into the panel.
+- Allow the mouse wheel to scroll long lists while the pointer is over the
+  panel.
+- Reset the scroll position when the selected mood level changes.
+- Close when the pointer is over neither the originating icon nor the panel,
+  when fortress mode loses focus, when the map unloads, or when the overlay is
+  disabled.
+- Clamp the panel to the current interface rectangle and cap its height so it
+  cannot cover the entire usable screen.
+- Preserve ordinary clicks, wheel input, and keyboard input whenever the
+  popover does not explicitly consume scrolling inside its list.
+
+## Confirmed DFHack seams
+
+- `df.global.game.main_interface.current_hover` identifies the native mood
+  icons as `df.main_hover_instruction.INFO_STRESSED_0` through
+  `INFO_STRESSED_6`.
+- Native hover index 0 means Ecstatic and index 6 means Miserable.
+- `dfhack.units.getStressCategory(unit)` uses the reverse ordering: category 0
+  is most stressed and category 6 is least stressed. The conversion is
+  therefore `stress_category = 6 - native_hover_index` for the current seven
+  categories.
+- `dfhack.units.getStressCategory()` is the supported classifier; DwarfUI must
+  not duplicate DF's stress cutoffs.
+- `dfhack.units.getReadableName(unit)` is the supported display-name source.
+- Follow DFHack's established `dwarfmonitor/misery` population contract: scan
+  `df.global.world.units.active` and include units for which
+  `dfhack.units.isCitizen(unit, true)` is true.
+- A `plugins.overlay.OverlayWidget` with `fullscreen=true` receives a
+  full-screen painter and can host a screen-clamped popover without the
+  clipping problem of a small movable overlay frame.
+
+## Architectural decisions
+
+```text
+native top-panel hover
+        |
+        v
+MoodPopoverOverlay -----> mood/unit snapshot
+        |                       |
+        v                       v
+hover-retention state     sorted row model
+        |                       |
+        +----------+------------+
+                   v
+          reusable Popover widget
+```
+
+- Implement the product integration as one fullscreen, transparent overlay
+  restricted to `dwarfmode/Default`.
+- Do not place invisible controls over hardcoded top-panel coordinates. Read
+  the native `current_hover` value so UI scaling and top-panel layout remain
+  owned by DF.
+- Add a reusable DwarfUI popover widget rather than embedding all presentation
+  behavior in the mood overlay. Resource-count, container-content, and bed
+  status popovers can later reuse its anchoring, clamping, retention, and list
+  behavior.
+- Keep native-hover interpretation and unit selection in a mood-specific model
+  module. Keep the reusable popover independent of DF unit and stress APIs.
+- Lock the popover anchor when a mood hover begins. Position it immediately
+  below the pointer, then clamp it to the interface rectangle. Do not make the
+  panel chase small pointer movements while the same icon remains selected.
+- Model visibility as an explicit state machine: closed, native-trigger hover,
+  and panel-retained. This prevents a one-frame close while the pointer crosses
+  from the icon into the adjoining panel.
+- Separate cheap per-update hover sampling from census rebuilding. Rebuild the
+  unit rows when the selected category changes and thereafter on a bounded
+  refresh cadence while the panel remains visible.
+- Give the overlay documented provider attributes for hover state, mouse
+  position, and mood snapshots. Production defaults read DFHack state;
+  DwarfSpec component tests inject deterministic providers without changing
+  game globals or discovering native screen coordinates.
+- Start with a presentation-only unit list. Opening a unit sheet, zooming to a
+  unit, pinning the panel, filtering, and keyboard navigation are outside this
+  feature.
+
+## Intended production layout
+
+```text
+src/scripts_modinstalled/
+  dwarfui-mood-popover.lua       overlay registration and product lifecycle
+  dwarfui/
+    popover.lua                  reusable anchored popover widget
+    mood_popover.lua             hover mapping and unit-list model
+```
+
+The exact split may be reduced if implementation proves that the registration
+script can remain small without a dedicated mood module. The reusable popover
+must remain free of product-specific unit logic either way.
+
+## Phase 0 - Build the mood-level model
+
+- ☐ Add a documented mood descriptor table containing native hover value,
+  stress category, display label, and display pen for every supported level.
+- ☐ Resolve mood descriptors by enum identity or numeric enum value without
+  parsing enum names at runtime.
+- ☐ Keep category conversion table-driven so a future DF category-count
+  change fails explicitly instead of silently applying `6 - index` to an
+  unknown value.
+- ☐ Add a documented unit-membership predicate using the established
+  `dwarfmonitor/misery` active-citizen contract.
+- ☐ Build snapshot rows containing the stable unit ID, unit reference, and
+  readable display name.
+- ☐ Sort snapshots by normalized readable name and then unit ID.
+- ☐ Skip units that become invalid during a refresh without retaining stale
+  references in later snapshots.
+- ☐ Add focused Busted coverage for all seven mappings, unsupported hover
+  values, population boundaries, category filtering, readable names,
+  deterministic sorting, and empty results.
+
+### Phase 0 exit criteria
+
+- ☐ A pure, independently tested model converts native mood hover state into
+  the exact ordered unit rows represented by the native counter.
+
+## Phase 1 - Add the reusable popover widget
+
+- ☐ Implement a documented `Popover` widget with an anchored window,
+  heading, count, and scrollable row list.
+- ☐ Accept screen-space anchor coordinates and calculate a clamped frame
+  from measured content plus configurable minimum, maximum, and margin values.
+- ☐ Prefer placement below the anchor; fall back above it when the panel
+  would otherwise exceed the interface bottom.
+- ☐ Cap visible rows according to available space while keeping every row
+  reachable by scrolling.
+- ☐ Expose explicit methods to set content, show at an anchor, test whether
+  a screen-space point is inside the visible panel, reset scrolling, and hide.
+- ☐ Ensure the hidden widget renders nothing and never consumes input.
+- ☐ Consume only wheel events directed at a visible, overflowed list; return
+  unhandled for all other game input.
+- ☐ Recompute placement after resize without changing the current subject or
+  scroll position unless the new row bounds require clamping.
+- ☐ Add Busted coverage for preferred and fallback placement, all four screen
+  edges, narrow/short screens, zero rows, overflow, wheel boundaries, resize,
+  hit testing, and input pass-through.
+
+### Phase 1 exit criteria
+
+- ☐ DwarfUI has a reusable, screen-clamped popover whose complete contents
+  remain reachable and whose inactive regions do not interfere with the game.
+
+## Phase 2 - Implement hover retention and overlay integration
+
+- ☐ Register `dwarfui-mood-popover.lua` as a default-enabled
+  `overlay.OverlayWidget` for `dwarfmode/Default`.
+- ☐ Make the overlay fullscreen and visually transparent outside the
+  popover.
+- ☐ Define documented provider attributes for current hover, mouse position,
+  and mood snapshots, with production defaults backed by the confirmed DFHack
+  APIs.
+- ☐ Sample `current_hover` and mouse position at interactive frequency
+  without rebuilding the entire unit census on every render.
+- ☐ On entry to a supported mood icon, capture the selected descriptor and
+  anchor, build the first snapshot, reset scrolling, and show the popover.
+- ☐ While the same icon remains hovered, refresh content on the bounded
+  cadence but retain the anchor and scroll position.
+- ☐ When the pointer enters the panel, retain the last mood selection even
+  after native `current_hover` clears.
+- ☐ When the pointer is outside both a supported icon and the visible panel,
+  close immediately and discard unit references.
+- ☐ Switching directly between mood icons must update the heading, rows,
+  anchor, and scroll position in one update without flashing closed.
+- ☐ Handle a null mouse position as pointer-out and close safely.
+- ☐ Clear state from `overlay_ondisable`, map unload, and focus loss.
+- ☐ Ensure the overlay returns unhandled for clicks and keys and for wheel
+  events outside the active list.
+- ☐ Keep transition logic in documented methods that can be exercised by the
+  mounted component without writing to DF globals.
+
+### Phase 2 exit criteria
+
+- ☐ The enabled overlay opens from native mood hover, remains usable over
+  its own panel, refreshes safely, and otherwise behaves as transparent game
+  UI.
+
+## Phase 3 - Add DwarfSpec component tests
+
+- ☐ Add `tools/Run-AutomationTests.ps1` as the dedicated DwarfUI entry point
+  for DwarfSpec component tests; keep it separate from `Run-UnitTests.ps1`.
+- ☐ Add a `*.ds.lua` component spec that mounts `MoodPopoverOverlay`
+  directly with `ds.mount()` and a deterministic viewport.
+- ☐ Inject mutable hover, mouse, and mood-snapshot providers into the mounted
+  component; do not scan for native icons, hardcode screen coordinates, stage
+  overlay registration, or mutate `df.global.game.main_interface.current_hover`.
+- ☐ Use normal Busted `describe`, `it`, hooks, and Luassert assertions inside
+  the DwarfSpec component spec.
+- ☐ Give the popover and its heading/list controls stable `view_id` values so
+  the spec can use `ds.get()` and fluent subjects for normal inspection and
+  interaction.
+- ☐ Assert that each of the seven injected native hover values selects the
+  expected mood heading, count, and rows.
+- ☐ Move the pointer from the simulated native anchor into the rendered
+  panel and assert the component retains the selected mood.
+- ☐ Exercise wheel scrolling with an injected overflowing snapshot and prove
+  the first and last rows are reachable.
+- ☐ Assert pointer-out, null pointer, category switching, and empty snapshots
+  update or close the component without stale content.
+- ☐ Use `ds.viewport()` to cover below-anchor placement, above-anchor
+  fallback, horizontal clamping, and resize behavior.
+- ☐ Assert clicks, keys, and wheel input outside the visible list remain
+  unhandled by the mounted overlay.
+- ☐ Unmount and remount the component and assert enable/disable cleanup does
+  not retain the previous category, scroll position, or unit rows.
+- ☐ Keep real overlay discovery and persisted overlay configuration outside
+  this feature's automation scope; the package contract covers the registration
+  script's presence.
+
+### Phase 3 exit criteria
+
+- ☐ DwarfSpec component tests prove the rendered overlay's hover, content,
+  retention, scrolling, placement, input, resize, and cleanup behavior in the
+  live DFHack UI environment.
+
+## Phase 4 - Package and document the user-facing feature
+
+- ☐ Include the overlay registration script and reusable modules in the
+  rockspec and expanded mod package.
+- ☐ Add package-contract coverage so a missing registration or module file
+  fails locally.
+- ☐ Add user-facing README documentation describing the feature, how to
+  enable or disable its overlay, supported screens, and scrolling behavior.
+- ☐ Document the reusable popover API separately only if it is intended as a
+  stable downstream API in this release; otherwise keep it project-internal.
+- ☐ Run the repository Lua syntax check, local Busted suite, DwarfSpec
+  component suite through `Run-AutomationTests.ps1`, build, and package
+  verification and record each evidence layer separately.
+
+### Phase 4 exit criteria
+
+- ☐ The feature is present in the installable mod, has focused regression
+  coverage, and is documented for end users without exposing an accidental
+  public API.
+
+## Non-goals
+
+- Do not replace, redraw, reposition, or click the native mood icons.
+- Do not duplicate native stress thresholds or infer mood from colors or
+  graphics tiles.
+- Do not include visitors, residents, animals, or other populations outside
+  the established `dwarfmonitor/misery` active-citizen contract.
+- Do not open, zoom to, select, or otherwise modify a unit from a row.
+- Do not add search, filtering, pinning, keyboard navigation, or configurable
+  sorting.
+- Do not modify unit stress or any game state.
+- Do not generalize the overlay into a process-wide popover service until a
+  second consumer demonstrates a real arbitration requirement.
+
+## Completion criteria
+
+- ☐ Hovering any native mood icon shows exactly the units represented by that
+  icon's counter.
+- ☐ Every matching unit is reachable, including when the list exceeds the
+  available screen height.
+- ☐ The popover remains open across the icon-to-panel transition and closes
+  everywhere else required by the user experience contract.
+- ☐ Unsupported screens and inactive popover regions do not alter normal
+  game input or rendering.
+- ☐ Unit selection and mapping have focused Busted coverage; rendered
+  presentation and lifecycle have DwarfSpec component coverage; packaging has
+  build and manifest verification.

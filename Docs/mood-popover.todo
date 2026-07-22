@@ -165,35 +165,35 @@ must remain free of product-specific unit logic either way.
 
 ## Phase 2 - Implement hover retention and overlay integration
 
-- ☐ Register `dwarfui-mood-popover.lua` as a default-enabled
+- ☑ Register `dwarfui-mood-popover.lua` as a default-enabled
   `overlay.OverlayWidget` for `dwarfmode/Default`.
-- ☐ Make the overlay fullscreen and visually transparent outside the
+- ☑ Make the overlay fullscreen and visually transparent outside the
   popover.
-- ☐ Define documented provider attributes for current hover, mouse position,
+- ☑ Define documented provider attributes for current hover, mouse position,
   and mood snapshots, with production defaults backed by the confirmed DFHack
   APIs.
-- ☐ Sample `current_hover` and mouse position at interactive frequency
+- ☑ Sample `current_hover` and mouse position at interactive frequency
   without rebuilding the entire unit census on every render.
-- ☐ On entry to a supported mood icon, capture the selected descriptor and
+- ☑ On entry to a supported mood icon, capture the selected descriptor and
   anchor, build the first snapshot, reset scrolling, and show the popover.
-- ☐ While the same icon remains hovered, refresh content on the bounded
+- ☑ While the same icon remains hovered, refresh content on the bounded
   cadence but retain the anchor and scroll position.
-- ☐ When the pointer enters the panel, retain the last mood selection even
+- ☑ When the pointer enters the panel, retain the last mood selection even
   after native `current_hover` clears.
-- ☐ When the pointer is outside both a supported icon and the visible panel,
+- ☑ When the pointer is outside both a supported icon and the visible panel,
   close immediately and discard unit references.
-- ☐ Switching directly between mood icons must update the heading, rows,
+- ☑ Switching directly between mood icons must update the heading, rows,
   anchor, and scroll position in one update without flashing closed.
-- ☐ Handle a null mouse position as pointer-out and close safely.
-- ☐ Clear state from `overlay_ondisable`, map unload, and focus loss.
-- ☐ Ensure the overlay returns unhandled for clicks and keys and for wheel
+- ☑ Handle a null mouse position as pointer-out and close safely.
+- ☑ Clear state from `overlay_ondisable`, map unload, and focus loss.
+- ☑ Ensure the overlay returns unhandled for clicks and keys and for wheel
   events outside the active list.
-- ☐ Keep transition logic in documented methods that can be exercised by the
+- ☑ Keep transition logic in documented methods that can be exercised by the
   mounted component without writing to DF globals.
 
 ### Phase 2 exit criteria
 
-- ☐ The enabled overlay opens from native mood hover, remains usable over
+- ☑ The enabled overlay opens from native mood hover, remains usable over
   its own panel, refreshes safely, and otherwise behaves as transparent game
   UI.
 

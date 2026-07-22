@@ -14,13 +14,15 @@ available screen height, and disappear without affecting normal game input.
 
 ## User experience contract
 
-- Support the seven native levels: Ecstatic, Happy, Pleased, Content,
-  Displeased, Unhappy, and Miserable.
+- Support the seven native levels: Ecstatic, Very Happy, Happy, Content,
+  Unhappy, Very Unhappy, and Miserable.
 - Open immediately when a supported native mood icon becomes the current hover
   target.
 - Show the mood name and current unit count in the panel heading.
-- Show one readable unit name per row, sorted case-insensitively by name with
-  unit ID as the deterministic tie-break.
+- Show one readable unit name per row, sorted by raw stress within the focused
+  DFHack stress category. Sort happy and content categories toward lower stress
+  and unhappy categories toward higher stress, using name and unit ID as
+  deterministic tie-breakers.
 - Keep the panel open while the pointer remains over the originating icon or
   moves into the panel.
 - Allow the mouse wheel to scroll long lists while the pointer is over the

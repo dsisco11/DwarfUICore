@@ -34,19 +34,20 @@ local dependencies = {
     is_valid=function(unit) return unit.valid ~= false end,
     is_citizen=function(unit) return unit.citizen == true end,
     get_stress_category=function(unit) return unit.stress_category end,
+    get_stress_value=function(unit) return unit.stress end,
     get_readable_name=function(unit) return unit.name end,
 }
 
 describe('DwarfUI mood popover model', function()
     it('maps every native mood hover instruction to its descriptor', function()
         local expected = {
-            {label='Ecstatic', category=6},
-            {label='Happy', category=5},
-            {label='Pleased', category=4},
-            {label='Content', category=3},
-            {label='Displeased', category=2},
-            {label='Unhappy', category=1},
-            {label='Miserable', category=0},
+            {label='Ecstatic', category=6, descending=false},
+            {label='Very Happy', category=5, descending=false},
+            {label='Happy', category=4, descending=false},
+            {label='Content', category=3, descending=false},
+            {label='Unhappy', category=2, descending=true},
+            {label='Very Unhappy', category=1, descending=true},
+            {label='Miserable', category=0, descending=true},
         }
 
         for index, expectation in ipairs(expected) do
@@ -58,6 +59,8 @@ describe('DwarfUI mood popover model', function()
             assert.equals(hover_index, descriptor.hover_index)
             assert.equals(expectation.category, descriptor.stress_category)
             assert.equals(expectation.label, descriptor.label)
+            assert.equals(expectation.descending,
+                descriptor.stress_descending)
         end
     end)
 
@@ -84,11 +87,14 @@ describe('DwarfUI mood popover model', function()
                     df={
                         global={world={units={active={
                             {id=1, name='Citizen', citizen=true,
-                                stress_category=1, valid=true},
+                                stress_category=1, stress=30000, valid=true,
+                                status={current_soul={personality={stress=30000}}}},
                             {id=2, name='Visitor', citizen=false,
-                                stress_category=1, valid=true},
+                                stress_category=1, stress=30000, valid=true,
+                                status={current_soul={personality={stress=30000}}}},
                             {id=3, name='Removed', citizen=true,
-                                stress_category=1, valid=false},
+                                stress_category=1, stress=30000, valid=false,
+                                status={current_soul={personality={stress=30000}}}},
                         }}}},
                         isvalid=function(unit)
                             return unit.valid and 'ref' or nil
@@ -124,10 +130,10 @@ describe('DwarfUI mood popover model', function()
             hover_instructions.INFO_STRESSED_5, hover_instructions)
         local invalid_classifications = 0
         local rows = mood_popover:build_snapshot({
-            {id=1, name='Target', citizen=true, stress_category=1},
-            {id=2, name='Visitor', citizen=false, stress_category=1},
-            {id=3, name='Other mood', citizen=true, stress_category=2},
-            {id=4, name='Removed', citizen=true, stress_category=1, valid=false},
+            {id=1, name='Target', citizen=true, stress_category=1, stress=30000},
+            {id=2, name='Visitor', citizen=false, stress_category=1, stress=30000},
+            {id=3, name='Other mood', citizen=true, stress_category=2, stress=15000},
+            {id=4, name='Removed', citizen=true, stress_category=1, stress=30000, valid=false},
         }, descriptor, {
             is_valid=dependencies.is_valid,
             is_citizen=dependencies.is_citizen,
@@ -136,6 +142,7 @@ describe('DwarfUI mood popover model', function()
                     invalid_classifications + 1 end
                 return unit.stress_category
             end,
+            get_stress_value=dependencies.get_stress_value,
             get_readable_name=dependencies.get_readable_name,
         })
 
@@ -144,14 +151,38 @@ describe('DwarfUI mood popover model', function()
         assert.equals(0, invalid_classifications)
     end)
 
-    it('sorts case-insensitively with unit ID as a stable tie-break', function()
+    it('sorts happy and unhappy categories in opposite stress directions',
+            function()
+        local units = {
+            {id=1, name='Lower', citizen=true, stress=-30000},
+            {id=2, name='Higher', citizen=true, stress=-40000},
+        }
+        local happy = mood_popover:resolve_hover(
+            hover_instructions.INFO_STRESSED_1, hover_instructions)
+        for _, unit in ipairs(units) do unit.stress_category = 5 end
+        local happy_rows = mood_popover:build_snapshot(units, happy, dependencies)
+
+        units[1].stress, units[2].stress = 30000, 40000
+        units[1].stress_category, units[2].stress_category = 1, 1
+        local unhappy = mood_popover:resolve_hover(
+            hover_instructions.INFO_STRESSED_5, hover_instructions)
+        local unhappy_rows = mood_popover:build_snapshot(
+            units, unhappy, dependencies)
+
+        assert.same({2, 1}, {happy_rows[1].id, happy_rows[2].id})
+        assert.same({2, 1}, {unhappy_rows[1].id, unhappy_rows[2].id})
+        assert.equals(-40000, happy_rows[1].stress)
+        assert.equals(40000, unhappy_rows[1].stress)
+    end)
+
+    it('uses name and unit ID to break equal-stress ties', function()
         local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_6, hover_instructions)
         local rows = mood_popover:build_snapshot({
-            {id=4, name='apple', citizen=true, stress_category=0},
-            {id=3, name='zinc', citizen=true, stress_category=0},
-            {id=2, name='Apple', citizen=true, stress_category=0},
-            {id=1, name='apple', citizen=true, stress_category=0},
+            {id=4, name='apple', citizen=true, stress_category=0, stress=60000},
+            {id=3, name='zinc', citizen=true, stress_category=0, stress=60000},
+            {id=2, name='Apple', citizen=true, stress_category=0, stress=60000},
+            {id=1, name='apple', citizen=true, stress_category=0, stress=60000},
         }, descriptor, dependencies)
 
         assert.same({1, 2, 4, 3},
@@ -162,10 +193,10 @@ describe('DwarfUI mood popover model', function()
         local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_4, hover_instructions)
         local first_unit = {
-            id=1, name='First', citizen=true, stress_category=2,
+            id=1, name='First', citizen=true, stress_category=2, stress=15000,
         }
         local second_unit = {
-            id=2, name='Second', citizen=true, stress_category=2,
+            id=2, name='Second', citizen=true, stress_category=2, stress=15000,
         }
         local first_rows = mood_popover:build_snapshot(
             {first_unit}, descriptor, dependencies)
@@ -182,8 +213,8 @@ describe('DwarfUI mood popover model', function()
         local descriptor = mood_popover:resolve_hover(
             hover_instructions.INFO_STRESSED_0, hover_instructions)
         assert.same({}, mood_popover:build_snapshot({
-            {id=1, name='Different', citizen=true, stress_category=5},
-            {id=2, name='Visitor', citizen=false, stress_category=6},
+            {id=1, name='Different', citizen=true, stress_category=5, stress=-30000},
+            {id=2, name='Visitor', citizen=false, stress_category=6, stress=-60000},
         }, descriptor, dependencies))
     end)
 end)

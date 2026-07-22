@@ -141,41 +141,41 @@ custom name.
 
 ## Phase 3: Add component and production-boundary coverage
 
-- [ ] Add a DwarfSpec file whose filename ends only in `.ds.lua`; do not use
+- [x] Add a DwarfSpec file whose filename ends only in `.ds.lua`; do not use
       `_spec` or any additional test suffix.
-- [ ] Mount the production overlay class, not a test-only proxy.
-- [ ] Back the mounted component with the real native Hauling viewscreen and
+- [x] Mount the production overlay class, not a test-only proxy.
+- [x] Back the mounted component with the real native Hauling viewscreen and
       real `plotinfo.hauling` route data.
-- [ ] Position the DwarfSpec pointer over an actual rendered native route row
+- [x] Position the DwarfSpec pointer over an actual rendered native route row
       and click it through the component input boundary.
-- [ ] Assert that the clicked `view_routes` route ID becomes selected while the
+- [x] Assert that the clicked `view_routes` route ID becomes selected while the
       native screen still receives the click.
-- [ ] Center a reversible test viewport on a real selected-route stop and
+- [x] Center a reversible test viewport on a real selected-route stop and
       assert that the marker occupies the screen tile produced by
       `Viewport:tileToScreen(stop.pos)`.
-- [ ] Assert that the rendered label contains the actual native
+- [x] Assert that the rendered label contains the actual native
       `df.hauling_stop.name` value.
-- [ ] Change to a different z-level and verify the same native stop becomes an
+- [x] Change to a different z-level and verify the same native stop becomes an
       explicitly directional projection rather than a same-z marker.
-- [ ] Scroll the actual route list, click a newly visible route or stop row,
+- [x] Scroll the actual route list, click a newly visible route or stop row,
       and verify selection follows the native flattened row model.
-- [ ] Verify route deletion or fixture invalidation clears the marker state.
-- [ ] Snapshot and restore viewport, cursor, overlay selection, route-menu
+- [x] Verify route deletion or fixture invalidation clears the marker state.
+- [x] Snapshot and restore viewport, cursor, overlay selection, route-menu
       scroll state, and any other changed UI state even when an assertion
       fails.
-- [ ] Keep the prepared-save requirement explicit when no suitable minecart
+- [x] Keep the prepared-save requirement explicit when no suitable minecart
       route and stop exist.
-- [ ] If deletion or rename coverage requires mutation, create a disposable
+- [x] If deletion or rename coverage requires mutation, create a disposable
       test route and restore or remove only that fixture; never mutate an
       existing player-owned route for automated coverage.
 
 ### Phase 3 completion gate
 
-- [ ] The component test proves that interaction with the actual rendered DF
+- [x] The component test proves that interaction with the actual rendered DF
       Hauling menu selects the expected real route.
-- [ ] Marker coordinates and text are derived from the same real native stop,
+- [x] Marker coordinates and text are derived from the same real native stop,
       not from duplicated fixtures.
-- [ ] DwarfSpec reports confirmed cleanup with no retained screen, subject,
+- [x] DwarfSpec reports confirmed cleanup with no retained screen, subject,
       pointer patch, viewport change, or route mutation.
 
 ## Phase 4: Validate packaging and live behavior
@@ -237,6 +237,7 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-23 | Phase 3 native-menu component test | `./tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Passed: 5 consecutive rendering runs | Opens Hauling itself; native pointer-over-list scrolling changes `plotinfo.hauling.scroll_position`; production overlay selection and the rendered route-header indicator are verified from live screen cells. Every visible same-z and off-z marker is verified at the DFHack map-compositor boundary, and every corresponding label is verified from live screen cells. Stale-ID clearing and UI restoration passed. DwarfSpec reported confirmed cleanup with no retained screen, subject, or pointer patch. |
 | 2026-07-22 | Focused overlay integration tests | `./tools/Run-UnitTests.ps1` with route, overlay, command, and package contracts | Passed: 34 successes | Covers Hauling registration/configuration, fullscreen host, click pass-through, map compositor calls, labels, stale selection, package contract, and single rescan reload lifecycle. |
 | 2026-07-22 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 138 successes | Zero failures, errors, or pending tests. |
 | 2026-07-22 | Syntax and whitespace validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 14 production and 28 test/support files | No whitespace errors; Git only reported CRLF working-copy conversion warnings. |

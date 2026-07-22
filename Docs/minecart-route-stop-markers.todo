@@ -109,34 +109,34 @@ custom name.
 
 ## Phase 2: Integrate the registered DFHack overlay
 
-- [ ] Add a production `overlay.OverlayWidget` registered for the Hauling
+- [x] Add a production `overlay.OverlayWidget` registered for the Hauling
       viewscreen and restricted to the intended focus paths.
-- [ ] Use a fullscreen host only for screen-wide hit testing and map drawing;
+- [x] Use a fullscreen host only for screen-wide hit testing and map drawing;
       do not expose a meaningless movable frame.
-- [ ] Construct and own the route-selection, menu-layout, and marker-projection
+- [x] Construct and own the route-selection, menu-layout, and marker-projection
       classes from the overlay.
-- [ ] Observe route-list clicks in `onInput()` and pass all native inputs
+- [x] Observe route-list clicks in `onInput()` and pass all native inputs
       through unless a future DwarfUI-owned control explicitly requires
       consumption.
-- [ ] Render the native screen first, then draw the selected-route indicator,
+- [x] Render the native screen first, then draw the selected-route indicator,
       map markers, and stop labels.
-- [ ] Use the supported map painter mode or DFHack map-overlay API so markers
+- [x] Use the supported map painter mode or DFHack map-overlay API so markers
       render correctly in both graphics and text modes.
-- [ ] Avoid per-frame world scans; inspect only the selected route and its
+- [x] Avoid per-frame world scans; inspect only the selected route and its
       stops.
-- [ ] Register the overlay module in DwarfUI's module registry and reload
+- [x] Register the overlay module in DwarfUI's module registry and reload
       lifecycle.
-- [ ] Update package-contract tests for every new production module and asset.
-- [ ] Verify `dwarfui reload` removes the old class/module instances and
+- [x] Update package-contract tests for every new production module and asset.
+- [x] Verify `dwarfui reload` removes the old class/module instances and
       registers the new overlay exactly once.
 
 ### Phase 2 completion gate
 
-- [ ] The overlay appears in DFHack's overlay registry and is enabled according
+- [x] The overlay appears in DFHack's overlay registry and is enabled according
       to its declared default/configuration.
-- [ ] Selecting, scrolling, panning, changing z-levels, renaming stops, and
+- [x] Selecting, scrolling, panning, changing z-levels, renaming stops, and
       deleting the selected route leave no stale marker or duplicated overlay.
-- [ ] Native route editing behavior remains functional after overlay input
+- [x] Native route editing behavior remains functional after overlay input
       interposition.
 
 ## Phase 3: Add component and production-boundary coverage
@@ -237,6 +237,9 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-22 | Focused overlay integration tests | `./tools/Run-UnitTests.ps1` with route, overlay, command, and package contracts | Passed: 34 successes | Covers Hauling registration/configuration, fullscreen host, click pass-through, map compositor calls, labels, stale selection, package contract, and single rescan reload lifecycle. |
+| 2026-07-22 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 138 successes | Zero failures, errors, or pending tests. |
+| 2026-07-22 | Syntax and whitespace validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 14 production and 28 test/support files | No whitespace errors; Git only reported CRLF working-copy conversion warnings. |
 | 2026-07-22 | Focused marker-layout unit tests | `./tools/Run-UnitTests.ps1 tests/minecart_route.spec.lua` | Passed: 21 successes | Covers exact-tile same-z markers, above/below projections, offscreen filtering, map edges, long and empty names, copied positions, duplicate tiles, and deterministic collisions. |
 | 2026-07-22 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 133 successes | Includes marker projection/layout coverage and deterministic `*.spec.lua` discovery. |
 | 2026-07-22 | Syntax and whitespace validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 13 production and 27 test/support files | `git diff --check` reported no whitespace errors; Git only warned that edited files will use CRLF in the working copy. |

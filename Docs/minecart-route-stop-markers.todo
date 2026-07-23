@@ -86,17 +86,18 @@ custom name.
       descriptor.
 - [x] Use `Viewport:isVisible()` for same-z markers and
       `Viewport:isVisibleXY()` for explicitly marked off-z projections.
-- [x] Use `Viewport:tileToScreen()` for map projection instead of deriving
-      screen positions from `window_x`, `window_y`, or UI text coordinates.
+- [x] Use `Viewport:tileToScreen()` in text mode and translate Premium's native
+      viewport corner and zoom into interface-layer coordinates in graphics
+      mode.
 - [x] Define distinct pens or graphics tiles for same-z, above, and below
       markers with text-mode fallbacks.
 - [x] Include the custom stop name in every label and include a signed z delta
       for every off-z label.
-- [x] Keep labels within the visible map viewport by choosing left or right
-      placement and truncating only when neither direction has enough room.
-- [x] Resolve overlapping labels deterministically without moving the marker
-      away from its stop tile.
-- [x] Avoid drawing labels over native non-map panels.
+- [x] Anchor each label to its marker column and one interface row below it,
+      leaving ordinary offscreen clipping to the interface painter.
+- [x] Preserve the marker-relative label anchor when labels overlap.
+- [x] Do not suppress world-visible stop descriptors merely because their
+      translated interface coordinates are outside the current screen.
 - [x] Add unit tests for same-z, above, below, offscreen, map-edge, long-name,
       empty-name, duplicate-position, and collision cases.
 
@@ -104,7 +105,7 @@ custom name.
 
 - [x] Every visible same-z stop produces one exact-tile marker and one label.
 - [x] Every visible-x/y off-z stop is unmistakably identified as a projection.
-- [x] Marker and label layout remains inside the map viewport at all tested
+- [x] Markers and labels share one translated coordinate space at all tested
       screen edges and interface sizes.
 
 ## Phase 2: Integrate the registered DFHack overlay
@@ -120,8 +121,11 @@ custom name.
       consumption.
 - [x] Render the native screen first, then draw the selected-route indicator,
       map markers, and stop labels.
-- [x] Use the supported map painter mode or DFHack map-overlay API so markers
-      render correctly in both graphics and text modes.
+- [x] Render marker glyphs as full map tiles with lower-layer-preserving pens,
+      while positioning labels through the graphics-aware interface
+      translation.
+- [x] Read and cache the native Hauling panel bounds from its rendered panel
+      coverage, refreshing the cache when interface dimensions change.
 - [x] Avoid per-frame world scans; inspect only the selected route and its
       stops.
 - [x] Register the overlay module in DwarfUI's module registry and reload
@@ -151,8 +155,8 @@ custom name.
 - [x] Assert that the clicked `view_routes` route ID becomes selected while the
       native screen still receives the click.
 - [x] Center a reversible test viewport on a real selected-route stop and
-      assert that the marker occupies the screen tile produced by
-      `Viewport:tileToScreen(stop.pos)`.
+      assert that the marker and label use DFHack's graphics-aware
+      world-to-interface translation.
 - [x] Assert that the rendered label contains the actual native
       `df.hauling_stop.name` value.
 - [x] Change to a different z-level and verify the same native stop becomes an
@@ -237,6 +241,8 @@ custom name.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-23 | Final marker sizing, transparency, and offsets | `./tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua`; focused and complete unit suites; syntax validation; live install and `dwarfui reload` | Passed: component test and focused suite | The selection indicator is inset one cell from the cached Hauling panel edge. Labels are anchored two interface rows below their stop. Circle and bold-triangle indicators render through DFHack's map compositor as full map tiles with `keep_lower=true`, preserving the underlying map texture instead of painting a black background. |
+| 2026-07-23 | Native menu bounds and unified Premium marker projection | `./tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua`; `./tools/Run-UnitTests.ps1`; `./tools/Check-LuaSyntax.ps1 -IncludeTests`; live install and `dwarfui reload` | Passed: component test; 142 unit successes; 14 production and 29 test/support syntax checks | Live panel inspection resolved the current Hauling bounds as x=4..59 and y=4..74. The zero-offset selection glyph is anchored to the cached panel x origin instead of fullscreen x=0. Stop glyphs and labels now share the same Premium world-to-interface translation and interface painter; descriptors are no longer discarded by an incorrect 72-cell viewport filter. The live test reads the circle or triangle and full label from screen cells and verifies both move together after a native map pan. |
 | 2026-07-23 | Production focus-list regression and registered-widget interaction | `./tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua`; `./tools/Run-UnitTests.ps1`; live `dwarfui reload` and registered-widget probe | Passed: component test; 138 unit successes; live route-label and stop-row selection | Corrected the `dfhack.gui.getCurFocus()` list contract that previously rejected every production click and cleared selection before render. The component test now exercises the canonical enabled overlay with the real focus list over actual route-label and stop rows, verifies click pass-through, and reads the CP437 selection indicator from the native screen. The live registered widget selected route 6 from both its header and stop row and rendered glyph 16 in yellow. |
 | 2026-07-23 | Phase 3 native-menu component test | `./tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Passed: 5 consecutive rendering runs | Opens Hauling itself; native pointer-over-list scrolling changes `plotinfo.hauling.scroll_position`; production overlay selection and the rendered route-header indicator are verified from live screen cells. Every visible same-z and off-z marker is verified at the DFHack map-compositor boundary, and every corresponding label is verified from live screen cells. Stale-ID clearing and UI restoration passed. DwarfSpec reported confirmed cleanup with no retained screen, subject, or pointer patch. |
 | 2026-07-22 | Focused overlay integration tests | `./tools/Run-UnitTests.ps1` with route, overlay, command, and package contracts | Passed: 34 successes | Covers Hauling registration/configuration, fullscreen host, click pass-through, map compositor calls, labels, stale selection, package contract, and single rescan reload lifecycle. |

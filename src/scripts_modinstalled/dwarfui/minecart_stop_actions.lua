@@ -54,8 +54,8 @@ end
 ---@field asset_hover {page: string, x: integer, y: integer}|false
 ---@field chars (string|string[])[]
 ---@field chars_hover (string|string[])[]|false
----@field pens dfhack.color|dfhack.color[][]|false
----@field pens_hover dfhack.color|dfhack.color[][]|false
+---@field pens dfhack.color|dfhack.pen|(dfhack.color|dfhack.pen)[][]|false
+---@field pens_hover dfhack.color|dfhack.pen|(dfhack.color|dfhack.pen)[][]|false
 ---@field tooltip string|false
 ---@field on_activate fun(descriptor: dwarfui.MinecartStopActionDescriptor)
 MinecartStopActionDefinition = defclass(MinecartStopActionDefinition)

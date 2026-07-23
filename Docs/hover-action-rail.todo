@@ -128,47 +128,47 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 2: Implement deterministic placement geometry
 
-- [ ] Convert the screen pointer to rail-local coordinates before target
+- [x] Convert the screen pointer to rail-local coordinates before target
       resolution.
-- [ ] Require target anchors and placement bounds in the same local coordinate
+- [x] Require target anchors and placement bounds in the same local coordinate
       space.
-- [ ] Measure only currently visible action widgets.
-- [ ] Include each widget's current dimensions, action gap, content inset, and
+- [x] Measure only currently visible action widgets.
+- [x] Include each widget's current dimensions, action gap, content inset, and
       outer surface edges in the measured bounds.
-- [ ] Implement `left` placement with the first action nearest the target and
+- [x] Implement `left` placement with the first action nearest the target and
       later actions growing leftward.
-- [ ] Implement `right` placement with the first action nearest the target and
+- [x] Implement `right` placement with the first action nearest the target and
       later actions growing rightward.
-- [ ] Implement a centered horizontal action sequence for `above` placement.
-- [ ] Implement a centered horizontal action sequence for `below` placement.
-- [ ] Vertically center left and right rails against their target anchor.
-- [ ] Try configured placements in deterministic declaration order.
-- [ ] Accept a placement only when the complete outer surface fits within the
+- [x] Implement a centered horizontal action sequence for `above` placement.
+- [x] Implement a centered horizontal action sequence for `below` placement.
+- [x] Vertically center left and right rails against their target anchor.
+- [x] Try configured placements in deterministic declaration order.
+- [x] Accept a placement only when the complete outer surface fits within the
       current placement bounds.
-- [ ] Never clamp a surface across its target to force it to fit.
-- [ ] Hide the rail when no configured placement fits.
-- [ ] Store the complete outer surface as `rail_bounds`.
-- [ ] Compute the rectangular retention bridge between target and surface when
+- [x] Never clamp a surface across its target to force it to fit.
+- [x] Hide the rail when no configured placement fits.
+- [x] Store the complete outer surface as `rail_bounds`.
+- [x] Compute the rectangular retention bridge between target and surface when
       a configured gap separates them.
-- [ ] Recompute placement after target-anchor, action-visibility, widget-size,
+- [x] Recompute placement after target-anchor, action-visibility, widget-size,
       inset, border, placement-bound, or parent-layout changes.
-- [ ] Add focused tests for every placement and mixed action dimensions.
-- [ ] Add tests proving action order remains stable as more actions are added.
-- [ ] Add boundary tests at every screen edge and with a nonzero parent origin.
-- [ ] Add tests for placement fallback order and the no-fit hidden result.
-- [ ] Add tests proving border and inset dimensions affect fitting and
+- [x] Add focused tests for every placement and mixed action dimensions.
+- [x] Add tests proving action order remains stable as more actions are added.
+- [x] Add boundary tests at every screen edge and with a nonzero parent origin.
+- [x] Add tests for placement fallback order and the no-fit hidden result.
+- [x] Add tests proving border and inset dimensions affect fitting and
       centering.
-- [ ] Add tests for zero-gap and nonzero-gap bridge geometry.
+- [x] Add tests for zero-gap and nonzero-gap bridge geometry.
 
 ### Phase 2 completion gate
 
-- [ ] Every supported placement produces exact deterministic action and
+- [x] Every supported placement produces exact deterministic action and
       surface bounds.
-- [ ] The primary action remains nearest the target for left and right rails.
-- [ ] No accepted placement crosses the target or placement boundary.
-- [ ] Dynamic presentation changes cause correct remeasurement without widget
+- [x] The primary action remains nearest the target for left and right rails.
+- [x] No accepted placement crosses the target or placement boundary.
+- [x] Dynamic presentation changes cause correct remeasurement without widget
       recreation.
-- [ ] Focused placement tests pass.
+- [x] Focused placement tests pass.
 
 ## Phase 3: Implement hover ownership and lifecycle
 
@@ -467,7 +467,7 @@ eliminating overlap with the native scrollbar.
 | --- | --- | --- | --- | --- |
 | 2026-07-23 | Generic class contract | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 20 successes, 0 failures, 0 errors, 0 pending | Covers construction, validation, registry order, and package contract. |
 | 2026-07-23 | Generic surface presentation | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 27 successes, 0 failures, 0 errors, 0 pending | Covers background, border, inset, render order, body-relative action layout, and widget reuse. |
-| | Generic placement geometry | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record left/right/above/below placement coverage. |
+| 2026-07-23 | Generic placement geometry | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 36 successes, 0 failures, 0 errors, 0 pending | Covers all placements, bounds, fallback, local coordinates, remeasurement, border/inset sizing, and retention bridges. |
 | | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record retention, lifecycle, validation, ownership, and pass-through coverage. |
 | | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua` | Pending | Record hover adapter, left placement, styling, selection, zoom, stale safety, and scrolling coverage. |
 | | Native-menu component | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Pending | Must use real registered production widgets and confirm cleanup. |

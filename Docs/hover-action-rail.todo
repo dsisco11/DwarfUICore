@@ -83,48 +83,48 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 1: Implement the configurable rail surface
 
-- [ ] Create one internal `widgets.Panel` surface during rail initialization.
-- [ ] Keep the controller full-parent and visually transparent.
-- [ ] Attach all action widgets to the internal surface, not directly to the
+- [x] Create one internal `widgets.Panel` surface during rail initialization.
+- [x] Keep the controller full-parent and visually transparent.
+- [x] Attach all action widgets to the internal surface, not directly to the
       full-parent controller.
-- [ ] Support `background_pen=false` for a fully transparent surface.
-- [ ] Support a static parsed background pen.
-- [ ] Support a target-sensitive background callback.
-- [ ] Support `border_style=false` for a frameless surface.
-- [ ] Support standard DFHack frame styles such as `gui.FRAME_THIN`,
+- [x] Support `background_pen=false` for a fully transparent surface.
+- [x] Support a static parsed background pen.
+- [x] Support a target-sensitive background callback.
+- [x] Support `border_style=false` for a frameless surface.
+- [x] Support standard DFHack frame styles such as `gui.FRAME_THIN`,
       `gui.FRAME_INTERIOR`, and `gui.FRAME_INTERIOR_MEDIUM`.
-- [ ] Support custom `gui.Frame` definitions with consumer-provided edge,
+- [x] Support custom `gui.Frame` definitions with consumer-provided edge,
       corner, and pen configuration.
-- [ ] Support a target-sensitive border callback.
-- [ ] Support scalar and per-edge content insets.
-- [ ] Default to a transparent background, no border, and zero inset.
-- [ ] Resolve target-sensitive presentation only from the current target.
-- [ ] Apply the resolved background to the surface's `frame_background`.
-- [ ] Apply the resolved border to the surface's `frame_style`.
-- [ ] Apply the content inset to the surface's `frame_inset`.
-- [ ] Render the background before the border and actions.
-- [ ] Keep action coordinates body-relative inside the surface.
-- [ ] Evaluate each action's dynamic visibility and enabled state whenever its
+- [x] Support a target-sensitive border callback.
+- [x] Support scalar and per-edge content insets.
+- [x] Default to a transparent background, no border, and zero inset.
+- [x] Resolve target-sensitive presentation only from the current target.
+- [x] Apply the resolved background to the surface's `frame_background`.
+- [x] Apply the resolved border to the surface's `frame_style`.
+- [x] Apply the content inset to the surface's `frame_inset`.
+- [x] Render the background before the border and actions.
+- [x] Keep action coordinates body-relative inside the surface.
+- [x] Evaluate each action's dynamic visibility and enabled state whenever its
       target changes.
-- [ ] Compact visible actions without reconstructing hidden action widgets.
-- [ ] Hide the surface and every action widget when the rail has no target.
-- [ ] Include background, border, inset, and action-gap cells in the rail's
+- [x] Compact visible actions without reconstructing hidden action widgets.
+- [x] Hide the surface and every action widget when the rail has no target.
+- [x] Include background, border, inset, and action-gap cells in the rail's
       visible ownership rectangle.
-- [ ] Add focused tests for transparent, opaque, `keep_lower`, and
+- [x] Add focused tests for transparent, opaque, `keep_lower`, and
       target-sensitive backgrounds.
-- [ ] Add focused tests for frameless, standard, custom, and target-sensitive
+- [x] Add focused tests for frameless, standard, custom, and target-sensitive
       borders.
-- [ ] Add focused tests for scalar and asymmetric insets.
-- [ ] Prove the full-parent controller never paints outside the moving surface.
-- [ ] Prove widgets are created once and reused across presentation changes.
+- [x] Add focused tests for scalar and asymmetric insets.
+- [x] Prove the full-parent controller never paints outside the moving surface.
+- [x] Prove widgets are created once and reused across presentation changes.
 
 ### Phase 1 completion gate
 
-- [ ] Consumers can configure background, border, and inset independently.
-- [ ] The visible surface paints only its own bounds.
-- [ ] Background, border, and action render order is deterministic.
-- [ ] Presentation changes reuse the same action-widget instances.
-- [ ] Focused surface and rendering tests pass.
+- [x] Consumers can configure background, border, and inset independently.
+- [x] The visible surface paints only its own bounds.
+- [x] Background, border, and action render order is deterministic.
+- [x] Presentation changes reuse the same action-widget instances.
+- [x] Focused surface and rendering tests pass.
 
 ## Phase 2: Implement deterministic placement geometry
 
@@ -466,7 +466,8 @@ eliminating overlap with the native scrollbar.
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-07-23 | Generic class contract | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 20 successes, 0 failures, 0 errors, 0 pending | Covers construction, validation, registry order, and package contract. |
-| | Generic surface and placement | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record background, border, inset, action reuse, and geometry coverage. |
+| 2026-07-23 | Generic surface presentation | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 27 successes, 0 failures, 0 errors, 0 pending | Covers background, border, inset, render order, body-relative action layout, and widget reuse. |
+| | Generic placement geometry | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record left/right/above/below placement coverage. |
 | | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record retention, lifecycle, validation, ownership, and pass-through coverage. |
 | | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua` | Pending | Record hover adapter, left placement, styling, selection, zoom, stale safety, and scrolling coverage. |
 | | Native-menu component | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Pending | Must use real registered production widgets and confirm cleanup. |

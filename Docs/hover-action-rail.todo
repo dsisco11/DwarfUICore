@@ -257,72 +257,72 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 5: Migrate the Hauling stop action to one hover rail
 
-- [ ] Import the generic hover-action-rail module from the production
+- [x] Import the generic hover-action-rail module from the production
       minecart-route overlay.
-- [ ] Build the recenter action as a generic `HoverAction` whose factory
+- [x] Build the recenter action as a generic `HoverAction` whose factory
       returns the production `AssetButton`.
-- [ ] Preserve the complete vanilla 3-by-3 `STOCKS_RECENTER` graphic and
+- [x] Preserve the complete vanilla 3-by-3 `STOCKS_RECENTER` graphic and
       classic fallback.
-- [ ] Preserve normal and hover pens that do not overwrite their configured
+- [x] Preserve normal and hover pens that do not overwrite their configured
       rail background.
-- [ ] Add one `HoverActionRail` instance to the overlay after the marker and
+- [x] Add one `HoverActionRail` instance to the overlay after the marker and
       label subviews so the rail renders last.
-- [ ] Configure the Hauling rail with `placement_order={'left'}`.
-- [ ] Configure its initial background, frame style, and inset explicitly
+- [x] Configure the Hauling rail with `placement_order={'left'}`.
+- [x] Configure its initial background, frame style, and inset explicitly
       instead of relying on generic defaults.
-- [ ] Keep the rail background and border constants outside the generic module.
-- [ ] Resolve targets only while the production focus includes
+- [x] Keep the rail background and border constants outside the generic module.
+- [x] Resolve targets only while the production focus includes
       `dwarfmode/Hauling`.
-- [ ] Resolve targets only from current cached native panel bounds,
+- [x] Resolve targets only from current cached native panel bounds,
       `scroll_position`, `view_routes`, and `view_stops`.
-- [ ] Make the entire three-row stop entry hoverable across the native list
+- [x] Make the entire three-row stop entry hoverable across the native list
       content width.
-- [ ] Exclude the native scrollbar and cells outside the list from target
+- [x] Exclude the native scrollbar and cells outside the list from target
       resolution.
-- [ ] Return no target for route headers, empty rows, clipped rows, or missing
+- [x] Return no target for route headers, empty rows, clipped rows, or missing
       stops.
-- [ ] Use a stable composite route-and-stop key.
-- [ ] Store route ID, stop ID, flattened row index, current anchor, and copied
+- [x] Use a stable composite route-and-stop key.
+- [x] Store route ID, stop ID, flattened row index, current anchor, and copied
       stop position data in the opaque payload.
-- [ ] Revalidate current focus, cached bounds, scroll position, flattened row,
+- [x] Revalidate current focus, cached bounds, scroll position, flattened row,
       route ID, stop ID, anchor, and stop position before activation.
-- [ ] End the complete outer rail surface immediately before the native
+- [x] End the complete outer rail surface immediately before the native
       panel's left edge.
-- [ ] Vertically center the recenter action against its hovered three-row stop.
-- [ ] Ensure the rail surface, background, border, and actions never overlap
+- [x] Vertically center the recenter action against its hovered three-row stop.
+- [x] Ensure the rail surface, background, border, and actions never overlap
       the native scrollbar.
-- [ ] Preserve button activation that selects the owning hauling route,
+- [x] Preserve button activation that selects the owning hauling route,
       centers the map, and highlights the current stop.
-- [ ] Preserve selection-indicator and in-world route-marker rendering.
-- [ ] Preserve the open Hauling menu, native route data, and list scroll
+- [x] Preserve selection-indicator and in-world route-marker rendering.
+- [x] Preserve the open Hauling menu, native route data, and list scroll
       position after zoom activation.
-- [ ] Consume wheel input over the rail so it cannot change the map z-level.
-- [ ] Leave wheel input over the native list to native DF and rebind or hide
+- [x] Consume wheel input over the rail so it cannot change the map z-level.
+- [x] Leave wheel input over the native list to native DF and rebind or hide
       the rail on the following update.
-- [ ] Clear the rail on menu closure, focus change, overlay disable, world
+- [x] Clear the rail on menu closure, focus change, overlay disable, world
       unload, missing Hauling state, and reload.
-- [ ] Remove the production per-visible-row action layout and pool after the
+- [x] Remove the production per-visible-row action layout and pool after the
       rail migration has no remaining caller.
-- [ ] Remove or replace obsolete registry entries, package contracts, and unit
+- [x] Remove or replace obsolete registry entries, package contracts, and unit
       tests instead of retaining two placement implementations.
-- [ ] Retain only domain adapter code that remains necessary for current-row
+- [x] Retain only domain adapter code that remains necessary for current-row
       resolution and activation.
-- [ ] Update focused minecart overlay tests for hover-only presentation,
+- [x] Update focused minecart overlay tests for hover-only presentation,
       left-side geometry, styling, route selection, zoom behavior, scrolling,
       stale-target rejection, and cleanup.
-- [ ] Add a second synthetic action test proving later actions grow outward
+- [x] Add a second synthetic action test proving later actions grow outward
       without changing target-resolution code.
 
 ### Phase 5 completion gate
 
-- [ ] No permanent stop-row buttons or right-side action pool remains active.
-- [ ] Hovering a real stop produces one styled left-side rail; hovering a route
+- [x] No permanent stop-row buttons or right-side action pool remains active.
+- [x] Hovering a real stop produces one styled left-side rail; hovering a route
       header produces none.
-- [ ] The rail never overlaps the native panel or scrollbar.
-- [ ] Zoom activation still selects, centers, highlights, and consumes input
+- [x] The rail never overlaps the native panel or scrollbar.
+- [x] Zoom activation still selects, centers, highlights, and consumes input
       correctly.
-- [ ] Scrolling and native edits cannot leave an action bound to an old stop.
-- [ ] Focused Hauling integration tests pass.
+- [x] Scrolling and native edits cannot leave an action bound to an old stop.
+- [x] Focused Hauling integration tests pass.
 
 ## Phase 6: Prove the interaction against the native Hauling menu
 
@@ -468,13 +468,13 @@ eliminating overlap with the native scrollbar.
 | 2026-07-23 | Generic class contract | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 20 successes, 0 failures, 0 errors, 0 pending | Covers construction, validation, registry order, and package contract. |
 | 2026-07-23 | Generic surface presentation | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 27 successes, 0 failures, 0 errors, 0 pending | Covers background, border, inset, render order, body-relative action layout, and widget reuse. |
 | 2026-07-23 | Generic placement geometry | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 36 successes, 0 failures, 0 errors, 0 pending | Covers all placements, bounds, fallback, local coordinates, remeasurement, border/inset sizing, and retention bridges. |
-| | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record retention, lifecycle, validation, ownership, and pass-through coverage. |
-| | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua` | Pending | Record hover adapter, left placement, styling, selection, zoom, stale safety, and scrolling coverage. |
+| 2026-07-23 | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | 26 successes, 0 failures, 0 errors, 0 pending | Covers retention, lifecycle, fresh validation, input ownership, and outward action ordering. |
+| 2026-07-23 | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 48 successes, 0 failures, 0 errors, 0 pending | Covers hover-only left placement, complete recenter asset, transparent native-preserving background, selection, zoom, stale safety, invalid native state, scrolling, lifecycle, registry, and package cleanup. |
 | | Native-menu component | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Pending | Must use real registered production widgets and confirm cleanup. |
-| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record exact success, failure, error, and pending counts. |
+| 2026-07-23 | Complete unit suite | `.\tools\Run-UnitTests.ps1` | 183 successes, 0 failures, 0 errors, 0 pending | Standalone unit suite after removal of the obsolete placement module. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Wrapper remains a direct `dwarfspec run` pass-through. |
-| | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and live component files. |
+| 2026-07-23 | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed for 16 production and 31 test/support files | Includes production, unit, support, and live component files. |
 | | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Does not constitute live UI proof. |
 | | Package verification | `.\tools\Publish.ps1` | Pending | Verify expanded and archive contents. |
-| | Diff validation | `git diff --check` | Pending | Record whitespace result. |
+| 2026-07-23 | Diff validation | `git diff --check` | Passed | No whitespace errors. |
 | | Registered overlay and manual behavior | `dwarfui reload` and prepared fortress Hauling menu | Pending | Confirm styling, placement, hover retention, activation, scrolling, reload, and cleanup. |

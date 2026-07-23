@@ -41,45 +41,45 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 0: Add the generic public types and module contract
 
-- [ ] Add `dwarfui/widgets/hover_action_rail.lua` under the production module
+- [x] Add `dwarfui/widgets/hover_action_rail.lua` under the production module
       tree.
-- [ ] Define `HoverActionTarget` as a proper `defclass`.
-- [ ] Accept only a stable nonempty string or integer target key.
-- [ ] Validate that target anchors contain integer coordinates with
+- [x] Define `HoverActionTarget` as a proper `defclass`.
+- [x] Accept only a stable nonempty string or integer target key.
+- [x] Validate that target anchors contain integer coordinates with
       `x2 >= x1` and `y2 >= y1`.
-- [ ] Copy the anchor table at construction so later consumer mutation cannot
+- [x] Copy the anchor table at construction so later consumer mutation cannot
       change an existing target snapshot.
-- [ ] Retain target payload as opaque consumer-owned data without interpreting
+- [x] Retain target payload as opaque consumer-owned data without interpreting
       it in the generic module.
-- [ ] Define `HoverAction` as a proper `defclass`.
-- [ ] Validate its nonempty stable action ID, widget factory, activation
+- [x] Define `HoverAction` as a proper `defclass`.
+- [x] Validate its nonempty stable action ID, widget factory, activation
       callback, visibility callback, enabled callback, and nonnegative gap.
-- [ ] Provide documented default visibility and enabled callbacks that return
+- [x] Provide documented default visibility and enabled callbacks that return
       `true`.
-- [ ] Define `HoverActionRail` as a proper `widgets.Widget` subclass.
-- [ ] Declare and validate the required target, validation, context, pointer,
+- [x] Define `HoverActionRail` as a proper `widgets.Widget` subclass.
+- [x] Declare and validate the required target, validation, context, pointer,
       and placement-bound providers.
-- [ ] Copy and validate the ordered action list and reject duplicate action
+- [x] Copy and validate the ordered action list and reject duplicate action
       IDs.
-- [ ] Validate placement names, action gaps, scroll-consumption configuration,
+- [x] Validate placement names, action gaps, scroll-consumption configuration,
       background values, border values, and content inset values.
-- [ ] Create every action widget exactly once by passing a rail-owned
+- [x] Create every action widget exactly once by passing a rail-owned
       activation function to its factory.
-- [ ] Reject factories that do not return a `widgets.Widget`.
-- [ ] Ensure action callbacks capture the owning rail and action definition,
+- [x] Reject factories that do not return a `widgets.Widget`.
+- [x] Ensure action callbacks capture the owning rail and action definition,
       never a target snapshot.
-- [ ] Export all three classes from the module.
-- [ ] Add full LuaDoc class, field, parameter, return, and method contracts.
-- [ ] Register the module with the DwarfUI module registry and reload order.
-- [ ] Add the module and exported classes to package-contract coverage.
-- [ ] Add `tests/hover_action_rail.spec.lua` construction and validation tests.
+- [x] Export all three classes from the module.
+- [x] Add full LuaDoc class, field, parameter, return, and method contracts.
+- [x] Register the module with the DwarfUI module registry and reload order.
+- [x] Add the module and exported classes to package-contract coverage.
+- [x] Add `tests/hover_action_rail.spec.lua` construction and validation tests.
 
 ### Phase 0 completion gate
 
-- [ ] All three exported types are proper classes with validated contracts.
-- [ ] One rail instance constructs each configured action widget exactly once.
-- [ ] The module loads without importing any consumer-specific module.
-- [ ] Focused class, registry, and package-contract tests pass.
+- [x] All three exported types are proper classes with validated contracts.
+- [x] One rail instance constructs each configured action widget exactly once.
+- [x] The module loads without importing any consumer-specific module.
+- [x] Focused class, registry, and package-contract tests pass.
 
 ## Phase 1: Implement the configurable rail surface
 
@@ -465,7 +465,7 @@ eliminating overlap with the native scrollbar.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Generic class contract | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record construction and validation coverage. |
+| 2026-07-23 | Generic class contract | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 20 successes, 0 failures, 0 errors, 0 pending | Covers construction, validation, registry order, and package contract. |
 | | Generic surface and placement | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record background, border, inset, action reuse, and geometry coverage. |
 | | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | Pending | Record retention, lifecycle, validation, ownership, and pass-through coverage. |
 | | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua` | Pending | Record hover adapter, left placement, styling, selection, zoom, stale safety, and scrolling coverage. |

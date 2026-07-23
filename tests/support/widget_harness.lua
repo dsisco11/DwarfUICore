@@ -219,7 +219,6 @@ end
 ---@param parent table
 ---@return table class
 function M.defclass(_, parent)
-    assert(parent, 'defclass requires a parent class')
     return class('defclass', parent, DEFAULT_NIL)
 end
 

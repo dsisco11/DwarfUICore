@@ -215,45 +215,45 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 4: Implement input ownership and activation freshness
 
-- [ ] Refresh hover state at the beginning of `onInput()`.
-- [ ] Dispatch input to visible action subviews before handling rail
+- [x] Refresh hover state at the beginning of `onInput()`.
+- [x] Dispatch input to visible action subviews before handling rail
       background input.
-- [ ] Revalidate the active target immediately before every activation.
-- [ ] Require the validated target to retain the same stable key.
-- [ ] Replace the presentation snapshot with the fresh validated target before
+- [x] Revalidate the active target immediately before every activation.
+- [x] Require the validated target to retain the same stable key.
+- [x] Replace the presentation snapshot with the fresh validated target before
       invoking the action.
-- [ ] Pass only the freshly validated target to the action callback.
-- [ ] Never invoke an action when validation fails.
-- [ ] Clear a stale target after rejecting its activation.
-- [ ] Consume a stale click that landed on a previously owned action so it
+- [x] Pass only the freshly validated target to the action callback.
+- [x] Never invoke an action when validation fails.
+- [x] Clear a stale target after rejecting its activation.
+- [x] Consume a stale click that landed on a previously owned action so it
       cannot reach the map.
-- [ ] Consume successful action clicks.
-- [ ] Consume clicks on visible rail background, border, inset, and gaps.
-- [ ] Prevent disabled actions from invoking their callbacks.
-- [ ] Keep disabled-action surface clicks owned by the rail so they cannot
+- [x] Consume successful action clicks.
+- [x] Consume clicks on visible rail background, border, inset, and gaps.
+- [x] Prevent disabled actions from invoking their callbacks.
+- [x] Keep disabled-action surface clicks owned by the rail so they cannot
       reach the backing map.
-- [ ] Consume scroll-wheel input over the visible rail when
+- [x] Consume scroll-wheel input over the visible rail when
       `consume_scroll=true`.
-- [ ] Pass scroll-wheel input through when `consume_scroll=false`.
-- [ ] Pass native target-row clicks through unchanged.
-- [ ] Pass pointer and keyboard input outside the visible rail unchanged.
-- [ ] Ensure a hidden rail consumes no input.
-- [ ] Define and test the action callback's success and rejection return
+- [x] Pass scroll-wheel input through when `consume_scroll=false`.
+- [x] Pass native target-row clicks through unchanged.
+- [x] Pass pointer and keyboard input outside the visible rail unchanged.
+- [x] Ensure a hidden rail consumes no input.
+- [x] Define and test the action callback's success and rejection return
       behavior independently from click ownership.
-- [ ] Add focused tests for valid activation, callback rejection, stale keys,
+- [x] Add focused tests for valid activation, callback rejection, stale keys,
       changed payloads, changed anchors, and disappearing targets.
-- [ ] Add exact hit tests for action, background, border, inset, gap, bridge,
+- [x] Add exact hit tests for action, background, border, inset, gap, bridge,
       target, and outside cells.
-- [ ] Add scroll, keyboard, disabled-action, hidden-rail, and pass-through
+- [x] Add scroll, keyboard, disabled-action, hidden-rail, and pass-through
       regressions.
 
 ### Phase 4 completion gate
 
-- [ ] No action can execute against a presentation-only or stale target.
-- [ ] Every visible rail cell has deterministic input ownership.
-- [ ] Native targets and unrelated input retain pass-through behavior.
-- [ ] Scroll consumption follows configuration exactly.
-- [ ] Focused input and activation tests pass.
+- [x] No action can execute against a presentation-only or stale target.
+- [x] Every visible rail cell has deterministic input ownership.
+- [x] Native targets and unrelated input retain pass-through behavior.
+- [x] Scroll consumption follows configuration exactly.
+- [x] Focused input and activation tests pass.
 
 ## Phase 5: Migrate the Hauling stop action to one hover rail
 

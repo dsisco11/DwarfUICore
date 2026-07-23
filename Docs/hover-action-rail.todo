@@ -172,46 +172,46 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 3: Implement hover ownership and lifecycle
 
-- [ ] Implement hidden, target-hover, and rail-hover states without a timeout
+- [x] Implement hidden, target-hover, and rail-hover states without a timeout
       or delayed latch.
-- [ ] Sample `context_active()` before resolving or retaining a target.
-- [ ] Clear immediately when the host context is inactive.
-- [ ] Resolve at most one target from each pointer sample.
-- [ ] Rebind immediately when the pointer crosses directly from one target to
+- [x] Sample `context_active()` before resolving or retaining a target.
+- [x] Clear immediately when the host context is inactive.
+- [x] Resolve at most one target from each pointer sample.
+- [x] Rebind immediately when the pointer crosses directly from one target to
       another.
-- [ ] Treat a matching key as the same logical target while accepting its
+- [x] Treat a matching key as the same logical target while accepting its
       refreshed anchor and payload.
-- [ ] Validate an already retained target during each hover update.
-- [ ] Clear when retained-target validation fails.
-- [ ] Retain the target while the pointer remains inside its refreshed anchor.
-- [ ] Retain the target while the pointer is inside `rail_bounds`.
-- [ ] Retain the target while the pointer is inside the target-to-rail bridge.
-- [ ] Clear immediately after the pointer leaves target, bridge, and rail.
-- [ ] Run hover updating before both rendering and input dispatch.
-- [ ] Recompute child layout before rendering after a target or style change.
-- [ ] Make `get_target()` explicitly return the current presentation snapshot,
+- [x] Validate an already retained target during each hover update.
+- [x] Clear when retained-target validation fails.
+- [x] Retain the target while the pointer remains inside its refreshed anchor.
+- [x] Retain the target while the pointer is inside `rail_bounds`.
+- [x] Retain the target while the pointer is inside the target-to-rail bridge.
+- [x] Clear immediately after the pointer leaves target, bridge, and rail.
+- [x] Run hover updating before both rendering and input dispatch.
+- [x] Recompute child layout before rendering after a target or style change.
+- [x] Make `get_target()` explicitly return the current presentation snapshot,
       not an activation-authoritative result.
-- [ ] Make `clear()` hide the surface and actions and release target, bridge,
+- [x] Make `clear()` hide the surface and actions and release target, bridge,
       geometry, and dynamic-state references.
-- [ ] Ensure ordinary overlay destruction is sufficient cleanup.
-- [ ] Do not create a screen, global hook, timeout, singleton, or registry.
-- [ ] Ensure reload creates a new widget generation with no callback retaining
+- [x] Ensure ordinary overlay destruction is sufficient cleanup.
+- [x] Do not create a screen, global hook, timeout, singleton, or registry.
+- [x] Ensure reload creates a new widget generation with no callback retaining
       the old rail or target.
-- [ ] Add state-transition tests covering target entry, target switching,
+- [x] Add state-transition tests covering target entry, target switching,
       rail entry, bridge entry, target return, and complete leave.
-- [ ] Add tests for context loss, target disappearance, anchor movement,
+- [x] Add tests for context loss, target disappearance, anchor movement,
       parent resize, and explicit clear.
-- [ ] Add a regression proving target-to-rail pointer movement does not hide
+- [x] Add a regression proving target-to-rail pointer movement does not hide
       the action before it can be clicked.
 
 ### Phase 3 completion gate
 
-- [ ] The rail follows exactly one current target and never requires a hover
+- [x] The rail follows exactly one current target and never requires a hover
       delay.
-- [ ] Pointer movement from a target into its rail preserves action access.
-- [ ] Context loss and stale targets clear all transient state immediately.
-- [ ] No global or screen-owned lifecycle state is introduced.
-- [ ] Focused hover and lifecycle tests pass.
+- [x] Pointer movement from a target into its rail preserves action access.
+- [x] Context loss and stale targets clear all transient state immediately.
+- [x] No global or screen-owned lifecycle state is introduced.
+- [x] Focused hover and lifecycle tests pass.
 
 ## Phase 4: Implement input ownership and activation freshness
 

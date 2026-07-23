@@ -88,44 +88,44 @@ without changing the generic button widget or replacing the row-layout model.
 
 ## Phase 1: Add reusable stop-row action layout
 
-- [ ] Add proper `defclass` descriptor and layout classes for visible
+- [x] Add proper `defclass` descriptor and layout classes for visible
       minecart-stop row actions.
-- [ ] Represent each action definition with a stable action ID, button
+- [x] Represent each action definition with a stable action ID, button
       dimensions, asset configuration, tooltip, and activation callback.
-- [ ] Accept an ordered action-definition list so future buttons can be added
+- [x] Accept an ordered action-definition list so future buttons can be added
       without changing row-resolution code.
-- [ ] Read the native panel origin from the existing cached Hauling menu
+- [x] Read the native panel origin from the existing cached Hauling menu
       bounds.
-- [ ] Set the first action's x coordinate to `menu_bounds.x2 + 1`.
-- [ ] Compute every later action's x coordinate from the accumulated widths
+- [x] Set the first action's x coordinate to `menu_bounds.x2 + 1`.
+- [x] Compute every later action's x coordinate from the accumulated widths
       and configured gaps of preceding actions.
-- [ ] Compute each action's y coordinate from `first_row_top`,
+- [x] Compute each action's y coordinate from `first_row_top`,
       `scroll_position`, the flattened row index, and the native three-row
       entry height.
-- [ ] Produce descriptors only for currently visible rows with a non-nil
+- [x] Produce descriptors only for currently visible rows with a non-nil
       `view_stops` entry.
-- [ ] Include route ID, stop ID, flattened row index, action ID, and immutable
+- [x] Include route ID, stop ID, flattened row index, action ID, and immutable
       screen bounds in every descriptor.
-- [ ] Rebuild or rebind visible descriptors after native list scrolling,
+- [x] Rebuild or rebind visible descriptors after native list scrolling,
       route edits, panel-bound changes, and window-size changes.
-- [ ] Use a bounded pool of visible button widgets instead of allocating one
+- [x] Use a bounded pool of visible button widgets instead of allocating one
       permanent widget per route stop.
-- [ ] Hide unused pooled buttons and clear their prior row bindings.
-- [ ] Ensure action layout cannot overwrite the native Hauling panel or
+- [x] Hide unused pooled buttons and clear their prior row bindings.
+- [x] Ensure action layout cannot overwrite the native Hauling panel or
       intercept its native control cells.
-- [ ] Add focused layout tests for route headers, stop rows, first and last
+- [x] Add focused layout tests for route headers, stop rows, first and last
       visible rows, nonzero scroll positions, multiple actions, mixed action
       widths, panel-bound changes, stale rows, and unused pooled slots.
 
 ### Phase 1 completion gate
 
-- [ ] One ordered action definition produces one correctly aligned button
+- [x] One ordered action definition produces one correctly aligned button
       beside every visible stop row and no route-header buttons.
-- [ ] Two or more action definitions form a deterministic horizontal action
+- [x] Two or more action definitions form a deterministic horizontal action
       strip without overlap.
-- [ ] Scrolling changes row bindings without preserving stale stop pointers or
+- [x] Scrolling changes row bindings without preserving stale stop pointers or
       callbacks.
-- [ ] Focused action-layout tests pass independently of live DF rendering.
+- [x] Focused action-layout tests pass independently of live DF rendering.
 
 ## Phase 2: Integrate the stop zoom action
 
@@ -275,7 +275,7 @@ without changing the generic button widget or replacing the row-layout model.
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-07-23 | Phase 0 reusable widget and contracts | `.\tools\Run-UnitTests.ps1 tests\asset_button.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua`; `.\tools\Run-UnitTests.ps1`; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 17 focused checks; 149 complete-suite checks; 15 production and 30 test/support syntax checks | Proves arbitrary dimensions, graphics and classic fallback mapping, hover/disabled/hidden behavior, exact hit edges, input consumption, independent instances, registry/reload ordering, shipped class contract, and no minecart dependency. |
-| | Minecart action unit tests | `.\tools\Run-UnitTests.ps1 tests/minecart_stop_actions.spec.lua` | Pending | Must prove multi-action layout, row rebinding, copied positions, stale rejection, and input policy. |
+| 2026-07-23 | Phase 1 stop-row action layout and pool | `.\tools\Run-UnitTests.ps1 tests\minecart_stop_actions.spec.lua`; focused action/registry/package contracts; complete unit suite; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 10 action checks; 22 focused contract checks; 160 complete-suite checks; 16 production and 31 test/support syntax checks | Proves cached-bound placement, first/last visible rows, headers excluded, ordered mixed-width actions, configured gaps, scrolling and edit rebinding, immutable ID/bounds snapshots, stale-row rejection, bounded pooled `AssetButton` reuse, unused-slot cleanup, registry order, and shipped class contracts without live DF rendering. |
 | | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <minecart-stop-actions>.ds.lua` | Pending | Must open Hauling, inspect real stop rows, click a rendered production button, and restore viewport and UI state. |
 | | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes and failures separately from live coverage. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Wrapper must remain a direct `dwarfspec run` pass-through. |

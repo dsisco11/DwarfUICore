@@ -169,47 +169,58 @@ without changing the generic button widget or replacing the row-layout model.
 
 ## Phase 3: Prove behavior against the native Hauling menu
 
-- [ ] Add or extend a DwarfSpec component file whose filename ends only in
+- [x] Add or extend a DwarfSpec component file whose filename ends only in
       `.ds.lua`.
-- [ ] Open the native Hauling menu from the component test instead of assuming
+- [x] Open the native Hauling menu from the component test instead of assuming
       the user opened it manually.
-- [ ] Exercise the registered production overlay and production
+- [x] Exercise the registered production overlay and production
       `AssetButton`, not test-only proxy components.
-- [ ] Read the actual cached Hauling panel bounds and actual flattened
+- [x] Read the actual cached Hauling panel bounds and actual flattened
       `view_routes`, `view_stops`, and `scroll_position` state.
-- [ ] Identify visible real stop rows and assert that route-header rows have no
+- [x] Identify visible real stop rows and assert that route-header rows have no
       action buttons.
-- [ ] Read all nine rendered graphics cells for each visible
+- [x] Read all nine rendered graphics cells for each visible
       `STOCKS_RECENTER` button and compare them with DFHack's interface asset
       tile lookup.
-- [ ] Use DwarfSpec's standard pointer-position API to place the pointer over
+- [x] Use DwarfSpec's standard pointer-position API to place the pointer over
       the center of an actual rendered button.
-- [ ] Click through the mounted component input boundary instead of calling
+- [x] Click through the mounted component input boundary instead of calling
       the button callback directly.
-- [ ] Verify the map changes to the clicked stop's z-level and the stop is
+- [x] Verify the map changes to the clicked stop's z-level and the stop is
       centered, accounting for map-edge clamping.
-- [ ] Verify the native location highlight targets the clicked stop.
-- [ ] Verify the Hauling menu remains open, the route list retains its scroll
+- [x] Verify the native location highlight targets the clicked stop.
+- [x] Verify the Hauling menu remains open, the route list retains its scroll
       position, and no underlying native row action is triggered.
-- [ ] Scroll the actual native list with the pointer over the list, then verify
+- [x] Scroll the actual native list with the pointer over the list, then verify
       the visible buttons move and rebind to the newly visible real stops.
-- [ ] Click a rebound button and verify it centers on the newly associated
+- [x] Click a rebound button and verify it centers on the newly associated
       native stop rather than the stop previously occupying that screen row.
-- [ ] Snapshot and restore viewport, z-level, highlight state, pointer
+- [x] Snapshot and restore viewport, z-level, highlight state, pointer
       position, route selection, list scroll position, and any other changed
       UI state even when an assertion fails.
-- [ ] Keep the prepared-save requirement explicit when the fortress contains
+- [x] Keep the prepared-save requirement explicit when the fortress contains
       no suitable minecart route and stop.
 
 ### Phase 3 completion gate
 
-- [ ] The component test proves that the vanilla recenter graphic is rendered
+- [x] The component test proves that the vanilla recenter graphic is rendered
       beside actual native stop rows.
-- [ ] A real pointer click on the rendered production button centers the
+- [x] A real pointer click on the rendered production button centers the
       fortress map on the corresponding real native stop.
-- [ ] Native scrolling demonstrably changes the button-to-stop binding.
-- [ ] DwarfSpec reports confirmed cleanup with no retained viewport, pointer,
+- [x] Native scrolling demonstrably changes the button-to-stop binding.
+- [x] DwarfSpec reports confirmed cleanup with no retained viewport, pointer,
       highlight, screen, scroll, or selection state.
+
+Validation evidence (2026-07-23):
+
+- `tools/Run-AutomationTests.ps1
+  tests/minecart_route/minecart_route_markers.ds.lua --run-id
+  dwarfui-phase3-repeat-a`
+- `tools/Run-AutomationTests.ps1
+  tests/minecart_route/minecart_route_markers.ds.lua --run-id
+  dwarfui-phase3-repeat-b`
+- Both persisted reports passed with confirmed cleanup and verified zero active
+  DwarfSpec screens, subjects, and pointer ownership.
 
 ## Phase 4: Validate reload, packaging, and live behavior
 

@@ -125,6 +125,20 @@ function BASE_METHODS:setFocus(value)
     self.focused = value
 end
 
+---Dispatches input to visible children in topmost-first order.
+---@param keys table
+---@return boolean
+function BASE_METHODS:inputToSubviews(keys)
+    for index=#(self.subviews or {}),1,-1 do
+        local child = self.subviews[index]
+        if (child.visible == nil or getval(child.visible)) and
+                child.onInput and child:onInput(keys) then
+            return true
+        end
+    end
+    return false
+end
+
 local function apply_attributes(instance, class, info, default_nil)
     local chain = {}
     local current = class

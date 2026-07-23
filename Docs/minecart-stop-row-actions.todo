@@ -129,42 +129,42 @@ without changing the generic button widget or replacing the row-layout model.
 
 ## Phase 2: Integrate the stop zoom action
 
-- [ ] Define the zoom action using `AssetButton` and the vanilla
+- [x] Define the zoom action using `AssetButton` and the vanilla
       3-by-3 `STOCKS_RECENTER` asset.
-- [ ] Add the matching classic `STOCKS_RECENTER` character and pen fallback.
-- [ ] Provide localized or symbol-based hover help without hardcoding
+- [x] Add the matching classic `STOCKS_RECENTER` character and pen fallback.
+- [x] Provide localized or symbol-based hover help without hardcoding
       minecart behavior into the shared button class.
-- [ ] Bind visible zoom buttons to the current stop-row descriptors.
-- [ ] Resolve the current Hauling state, route ID, stop ID, and flattened row
+- [x] Bind visible zoom buttons to the current stop-row descriptors.
+- [x] Resolve the current Hauling state, route ID, stop ID, and flattened row
       again when a zoom button is activated.
-- [ ] Abort activation safely if the row, route, stop, or position became
+- [x] Abort activation safely if the row, route, stop, or position became
       stale between rendering and input dispatch.
-- [ ] Copy the resolved `df.hauling_stop.pos` into an ordinary coordinate table
+- [x] Copy the resolved `df.hauling_stop.pos` into an ordinary coordinate table
       before calling the DFHack GUI API.
-- [ ] Call `dfhack.gui.revealInDwarfmodeMap(position, true, true)` to center and
+- [x] Call `dfhack.gui.revealInDwarfmodeMap(position, true, true)` to center and
       highlight the selected stop.
-- [ ] Dispatch button subview input before observing native route-row clicks.
-- [ ] Return `true` after zoom-button activation so the click cannot reach the
+- [x] Dispatch button subview input before observing native route-row clicks.
+- [x] Return `true` after zoom-button activation so the click cannot reach the
       map or a native Hauling control.
-- [ ] Continue returning `false` for ordinary native Hauling row clicks so
+- [x] Continue returning `false` for ordinary native Hauling row clicks so
       route selection and native editing behavior remain unchanged.
-- [ ] Preserve the open Hauling viewscreen, current route selection, list
+- [x] Preserve the open Hauling viewscreen, current route selection, list
       scroll position, and route data after zooming.
-- [ ] Add focused overlay tests with an injected reveal callback to verify the
+- [x] Add focused overlay tests with an injected reveal callback to verify the
       copied coordinate, exact center/highlight flags, stale-binding rejection,
       click consumption, ordinary-click pass-through, and selected-route
       preservation.
-- [ ] Add a regression test proving a second synthetic action can be added to
+- [x] Add a regression test proving a second synthetic action can be added to
       the production action list without modifying zoom-action layout code.
 
 ### Phase 2 completion gate
 
-- [ ] Every visible native stop row has one recenter button aligned to its
+- [x] Every visible native stop row has one recenter button aligned to its
       three-row entry.
-- [ ] Activating a valid button requests exact centering and highlighting for
+- [x] Activating a valid button requests exact centering and highlighting for
       the currently resolved stop position.
-- [ ] Stale actions perform no map movement and raise no Lua error.
-- [ ] Native route-list interaction remains unchanged outside DwarfUI-owned
+- [x] Stale actions perform no map movement and raise no Lua error.
+- [x] Native route-list interaction remains unchanged outside DwarfUI-owned
       action buttons.
 
 ## Phase 3: Prove behavior against the native Hauling menu
@@ -274,6 +274,7 @@ without changing the generic button widget or replacing the row-layout model.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-23 | Phase 2 stop recenter action and overlay integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua`; focused widget/action/overlay suites; complete unit suite; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 9 focused overlay checks; 25 combined checks; 166 complete-suite checks; 16 production and 31 test/support syntax checks | Proves the vanilla 3-by-3 `STOCKS_RECENTER` asset and classic arrow/X fallback, symbol-only hover help, current-row identity revalidation, copied coordinates, exact center/highlight flags, stale-binding rejection, button-first input consumption, native pass-through, route/menu preservation, top-layer rendering, and additive second-action layout without live DF claims. |
 | 2026-07-23 | Phase 0 reusable widget and contracts | `.\tools\Run-UnitTests.ps1 tests\asset_button.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua`; `.\tools\Run-UnitTests.ps1`; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 17 focused checks; 149 complete-suite checks; 15 production and 30 test/support syntax checks | Proves arbitrary dimensions, graphics and classic fallback mapping, hover/disabled/hidden behavior, exact hit edges, input consumption, independent instances, registry/reload ordering, shipped class contract, and no minecart dependency. |
 | 2026-07-23 | Phase 1 stop-row action layout and pool | `.\tools\Run-UnitTests.ps1 tests\minecart_stop_actions.spec.lua`; focused action/registry/package contracts; complete unit suite; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 10 action checks; 22 focused contract checks; 160 complete-suite checks; 16 production and 31 test/support syntax checks | Proves cached-bound placement, first/last visible rows, headers excluded, ordered mixed-width actions, configured gaps, scrolling and edit rebinding, immutable ID/bounds snapshots, stale-row rejection, bounded pooled `AssetButton` reuse, unused-slot cleanup, registry order, and shipped class contracts without live DF rendering. |
 | | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <minecart-stop-actions>.ds.lua` | Pending | Must open Hauling, inspect real stop rows, click a rendered production button, and restore viewport and UI state. |

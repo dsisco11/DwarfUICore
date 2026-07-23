@@ -1,0 +1,286 @@
+# Minecart stop row-action implementation checklist
+
+## Goal
+
+Add reusable interface-asset buttons to DwarfUI and use them to place a
+zoom-to-location button beside every visible minecart-stop row in the native
+Hauling menu. The initial button must use the game's normal recenter graphic
+and center the fortress map on the selected stop without disturbing native
+route-menu behavior.
+
+The Hauling integration must support adding more stop-row buttons later
+without changing the generic button widget or replacing the row-layout model.
+
+## Confirmed design decisions
+
+- [ ] Implement the shared widget as a proper `defclass` class named
+      `AssetButton`.
+- [ ] Place the shared widget in
+      `src/scripts_modinstalled/dwarfui/widgets/asset_button.lua`.
+- [ ] Keep the shared widget independent of minecart routes, Hauling menu
+      state, map coordinates, and zoom behavior.
+- [ ] Support arbitrary rectangular interface assets instead of assuming all
+      buttons are 3-by-3 cells.
+- [ ] Support a classic-mode character and pen grid for every graphics asset.
+- [ ] Expose activation through a caller-supplied callback.
+- [ ] Consume a left click only when the visible, enabled button is activated.
+- [ ] Preserve pass-through behavior for pointer input outside a button and
+      for input types the button does not handle.
+- [ ] Use the vanilla `STOCKS_RECENTER` asset from `INTERFACE_BITS` at
+      coordinates `32,0` for the initial 3-by-3 zoom button.
+- [ ] Place stop-row actions immediately outside the cached right edge of the
+      native Hauling panel so they do not cover stop names, progress text, or
+      native controls.
+- [ ] Arrange additional actions horizontally to the right of the first
+      action instead of hardcoding one zoom-button coordinate.
+- [ ] Create actions only for flattened rows whose current `view_stops` entry
+      resolves to a real stop.
+- [ ] Retain numeric route and stop identity only; do not retain a native stop
+      pointer across frames.
+- [ ] Resolve and copy the current stop position immediately before invoking
+      `dfhack.gui.revealInDwarfmodeMap(position, true, true)`.
+- [ ] Keep the Hauling menu open after activation and preserve the overlay's
+      existing selected-route state.
+- [ ] Add LuaDoc comments to every new or modified class and method.
+
+## Phase 0: Implement the reusable interface-asset button
+
+- [ ] Add the `AssetButton` production module under the shared
+      DwarfUI widgets namespace.
+- [ ] Derive the widget from an appropriate DFHack widget class and use
+      `widgets.Label.makeButtonLabelText()` to construct multi-cell asset
+      rendering.
+- [ ] Define documented attributes for the normal asset, optional hover asset,
+      classic character grid, normal and hover pens, enabled state, visibility,
+      tooltip text, and activation callback.
+- [ ] Derive or validate the widget's hit-test width and height from its
+      declared rectangular character grid.
+- [ ] Reject ragged fallback rows and asset dimensions that do not match the
+      button frame.
+- [ ] Render the graphics asset through DFHack's interface tile lookup while
+      retaining a usable classic-mode representation when graphics tiles are
+      unavailable.
+- [ ] Apply hover presentation across the complete button rectangle.
+- [ ] Prevent disabled or hidden buttons from activating.
+- [ ] Return consumed input only for a successful activation inside the
+      button rectangle.
+- [ ] Ensure the widget does not retain screen, overlay, menu-row, or native
+      game-object state.
+- [ ] Register the new widget module with DwarfUI's module registry and reload
+      lifecycle.
+- [ ] Add package-contract coverage for the new production module.
+- [ ] Add focused `asset_button.spec.lua` tests for arbitrary
+      dimensions, asset mapping, classic fallback, hover state, disabled
+      state, visibility, hit-test edges, activation, and pass-through input.
+- [ ] Add a focused test containing multiple button instances with different
+      sizes and callbacks to prove that activation and rendering remain
+      instance-local.
+
+### Phase 0 completion gate
+
+- [ ] The shared widget can render and activate without importing any
+      minecart-specific module.
+- [ ] Button dimensions, asset cells, fallback cells, and hit-test bounds agree
+      for every covered shape.
+- [ ] Multiple button instances coexist without sharing callbacks, state, or
+      hover behavior.
+- [ ] Focused widget and package-contract tests pass.
+
+## Phase 1: Add reusable stop-row action layout
+
+- [ ] Add proper `defclass` descriptor and layout classes for visible
+      minecart-stop row actions.
+- [ ] Represent each action definition with a stable action ID, button
+      dimensions, asset configuration, tooltip, and activation callback.
+- [ ] Accept an ordered action-definition list so future buttons can be added
+      without changing row-resolution code.
+- [ ] Read the native panel origin from the existing cached Hauling menu
+      bounds.
+- [ ] Set the first action's x coordinate to `menu_bounds.x2 + 1`.
+- [ ] Compute every later action's x coordinate from the accumulated widths
+      and configured gaps of preceding actions.
+- [ ] Compute each action's y coordinate from `first_row_top`,
+      `scroll_position`, the flattened row index, and the native three-row
+      entry height.
+- [ ] Produce descriptors only for currently visible rows with a non-nil
+      `view_stops` entry.
+- [ ] Include route ID, stop ID, flattened row index, action ID, and immutable
+      screen bounds in every descriptor.
+- [ ] Rebuild or rebind visible descriptors after native list scrolling,
+      route edits, panel-bound changes, and window-size changes.
+- [ ] Use a bounded pool of visible button widgets instead of allocating one
+      permanent widget per route stop.
+- [ ] Hide unused pooled buttons and clear their prior row bindings.
+- [ ] Ensure action layout cannot overwrite the native Hauling panel or
+      intercept its native control cells.
+- [ ] Add focused layout tests for route headers, stop rows, first and last
+      visible rows, nonzero scroll positions, multiple actions, mixed action
+      widths, panel-bound changes, stale rows, and unused pooled slots.
+
+### Phase 1 completion gate
+
+- [ ] One ordered action definition produces one correctly aligned button
+      beside every visible stop row and no route-header buttons.
+- [ ] Two or more action definitions form a deterministic horizontal action
+      strip without overlap.
+- [ ] Scrolling changes row bindings without preserving stale stop pointers or
+      callbacks.
+- [ ] Focused action-layout tests pass independently of live DF rendering.
+
+## Phase 2: Integrate the stop zoom action
+
+- [ ] Define the zoom action using `AssetButton` and the vanilla
+      3-by-3 `STOCKS_RECENTER` asset.
+- [ ] Add the matching classic `STOCKS_RECENTER` character and pen fallback.
+- [ ] Provide localized or symbol-based hover help without hardcoding
+      minecart behavior into the shared button class.
+- [ ] Bind visible zoom buttons to the current stop-row descriptors.
+- [ ] Resolve the current Hauling state, route ID, stop ID, and flattened row
+      again when a zoom button is activated.
+- [ ] Abort activation safely if the row, route, stop, or position became
+      stale between rendering and input dispatch.
+- [ ] Copy the resolved `df.hauling_stop.pos` into an ordinary coordinate table
+      before calling the DFHack GUI API.
+- [ ] Call `dfhack.gui.revealInDwarfmodeMap(position, true, true)` to center and
+      highlight the selected stop.
+- [ ] Dispatch button subview input before observing native route-row clicks.
+- [ ] Return `true` after zoom-button activation so the click cannot reach the
+      map or a native Hauling control.
+- [ ] Continue returning `false` for ordinary native Hauling row clicks so
+      route selection and native editing behavior remain unchanged.
+- [ ] Preserve the open Hauling viewscreen, current route selection, list
+      scroll position, and route data after zooming.
+- [ ] Add focused overlay tests with an injected reveal callback to verify the
+      copied coordinate, exact center/highlight flags, stale-binding rejection,
+      click consumption, ordinary-click pass-through, and selected-route
+      preservation.
+- [ ] Add a regression test proving a second synthetic action can be added to
+      the production action list without modifying zoom-action layout code.
+
+### Phase 2 completion gate
+
+- [ ] Every visible native stop row has one recenter button aligned to its
+      three-row entry.
+- [ ] Activating a valid button requests exact centering and highlighting for
+      the currently resolved stop position.
+- [ ] Stale actions perform no map movement and raise no Lua error.
+- [ ] Native route-list interaction remains unchanged outside DwarfUI-owned
+      action buttons.
+
+## Phase 3: Prove behavior against the native Hauling menu
+
+- [ ] Add or extend a DwarfSpec component file whose filename ends only in
+      `.ds.lua`.
+- [ ] Open the native Hauling menu from the component test instead of assuming
+      the user opened it manually.
+- [ ] Exercise the registered production overlay and production
+      `AssetButton`, not test-only proxy components.
+- [ ] Read the actual cached Hauling panel bounds and actual flattened
+      `view_routes`, `view_stops`, and `scroll_position` state.
+- [ ] Identify visible real stop rows and assert that route-header rows have no
+      action buttons.
+- [ ] Read all nine rendered graphics cells for each visible
+      `STOCKS_RECENTER` button and compare them with DFHack's interface asset
+      tile lookup.
+- [ ] Use DwarfSpec's standard pointer-position API to place the pointer over
+      the center of an actual rendered button.
+- [ ] Click through the mounted component input boundary instead of calling
+      the button callback directly.
+- [ ] Verify the map changes to the clicked stop's z-level and the stop is
+      centered, accounting for map-edge clamping.
+- [ ] Verify the native location highlight targets the clicked stop.
+- [ ] Verify the Hauling menu remains open, the route list retains its scroll
+      position, and no underlying native row action is triggered.
+- [ ] Scroll the actual native list with the pointer over the list, then verify
+      the visible buttons move and rebind to the newly visible real stops.
+- [ ] Click a rebound button and verify it centers on the newly associated
+      native stop rather than the stop previously occupying that screen row.
+- [ ] Snapshot and restore viewport, z-level, highlight state, pointer
+      position, route selection, list scroll position, and any other changed
+      UI state even when an assertion fails.
+- [ ] Keep the prepared-save requirement explicit when the fortress contains
+      no suitable minecart route and stop.
+
+### Phase 3 completion gate
+
+- [ ] The component test proves that the vanilla recenter graphic is rendered
+      beside actual native stop rows.
+- [ ] A real pointer click on the rendered production button centers the
+      fortress map on the corresponding real native stop.
+- [ ] Native scrolling demonstrably changes the button-to-stop binding.
+- [ ] DwarfSpec reports confirmed cleanup with no retained viewport, pointer,
+      highlight, screen, scroll, or selection state.
+
+## Phase 4: Validate reload, packaging, and live behavior
+
+- [ ] Run the focused reusable-widget, action-layout, zoom-action, overlay,
+      registry, and package-contract unit tests.
+- [ ] Run the focused DwarfSpec native-menu component test through
+      `tools/Run-AutomationTests.ps1`, which must only pass its arguments
+      through to `dwarfspec run`.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run the complete DwarfSpec suite through the same pass-through wrapper.
+- [ ] Run Lua syntax validation for production, unit, support, and `.ds.lua`
+      files.
+- [ ] Run the offline build and verify the expanded package contents.
+- [ ] Run archive package verification.
+- [ ] Run `git diff --check`.
+- [ ] Install the packaged mod into the configured live DFHack instance and
+      run `dwarfui reload`.
+- [ ] Confirm reload produces exactly one registered overlay instance using
+      the current shared button class.
+- [ ] Visually confirm normal, hovered, and clicked recenter graphics beside
+      several real stop rows.
+- [ ] Click stops on the current z-level and other z-levels and confirm exact
+      centering, highlighting, and continued Hauling-menu visibility.
+- [ ] Scroll the native list and confirm button positions and destinations
+      continue to follow the visible stop rows.
+- [ ] Review the DFHack console and logs for Lua errors after rendering,
+      hovering, clicking, scrolling, reload, route edits, and menu closure.
+- [ ] Record unit, component, package, registered-overlay, and manual live
+      evidence separately.
+
+### Phase 4 completion gate
+
+- [ ] Focused and complete unit and DwarfSpec suites pass with zero failures.
+- [ ] Syntax, offline build, expanded package, archive package, reload, and
+      diff checks pass.
+- [ ] Live DFHack proves the packaged production button renders, centers, and
+      cleans up correctly against the native Hauling menu.
+- [ ] Evidence does not represent mocked callback coverage as proof of live
+      viewport behavior.
+
+## Definition of done
+
+- [ ] `AssetButton` is a documented reusable production widget with
+      no minecart-specific dependency.
+- [ ] Multiple independently configured buttons can render and activate
+      without shared state or layout changes.
+- [ ] Stop-row actions are described and positioned by an ordered action list
+      that can accept future buttons.
+- [ ] Every visible real minecart-stop row has a vanilla recenter button
+      immediately beside the native Hauling panel.
+- [ ] Clicking the button centers and highlights the correct current stop
+      while leaving the Hauling menu open.
+- [ ] Buttons rebind correctly after scrolling and never act on a stale native
+      pointer.
+- [ ] DwarfUI-owned button clicks are consumed while all other native Hauling
+      input retains its existing behavior.
+- [ ] All new and modified classes and methods have LuaDoc comments.
+- [ ] Unit, real-native-menu component, syntax, packaging, reload, and live
+      visual evidence are recorded independently.
+
+## Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| | Reusable widget unit tests | `.\tools\Run-UnitTests.ps1 tests/asset_button.spec.lua` | Pending | Must prove arbitrary dimensions, independent instances, input consumption, and classic fallback without Hauling dependencies. |
+| | Minecart action unit tests | `.\tools\Run-UnitTests.ps1 tests/minecart_stop_actions.spec.lua` | Pending | Must prove multi-action layout, row rebinding, copied positions, stale rejection, and input policy. |
+| | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <minecart-stop-actions>.ds.lua` | Pending | Must open Hauling, inspect real stop rows, click a rendered production button, and restore viewport and UI state. |
+| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes and failures separately from live coverage. |
+| | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Wrapper must remain a direct `dwarfspec run` pass-through. |
+| | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and `.ds.lua` files. |
+| | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Does not constitute live viewport proof. |
+| | Package verification | `.\tools\Publish.ps1` | Pending | Verify expanded and archive contents. |
+| | Diff validation | `git diff --check` | Pending | Record whitespace result. |
+| | Registered overlay and live behavior | `dwarfui reload` and prepared fortress Hauling menu | Pending | Confirm one overlay, real graphics, pointer activation, exact centering, highlighting, scrolling, and cleanup. |

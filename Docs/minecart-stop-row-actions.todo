@@ -45,46 +45,46 @@ without changing the generic button widget or replacing the row-layout model.
 
 ## Phase 0: Implement the reusable interface-asset button
 
-- [ ] Add the `AssetButton` production module under the shared
+- [x] Add the `AssetButton` production module under the shared
       DwarfUI widgets namespace.
-- [ ] Derive the widget from an appropriate DFHack widget class and use
+- [x] Derive the widget from an appropriate DFHack widget class and use
       `widgets.Label.makeButtonLabelText()` to construct multi-cell asset
       rendering.
-- [ ] Define documented attributes for the normal asset, optional hover asset,
+- [x] Define documented attributes for the normal asset, optional hover asset,
       classic character grid, normal and hover pens, enabled state, visibility,
       tooltip text, and activation callback.
-- [ ] Derive or validate the widget's hit-test width and height from its
+- [x] Derive or validate the widget's hit-test width and height from its
       declared rectangular character grid.
-- [ ] Reject ragged fallback rows and asset dimensions that do not match the
+- [x] Reject ragged fallback rows and asset dimensions that do not match the
       button frame.
-- [ ] Render the graphics asset through DFHack's interface tile lookup while
+- [x] Render the graphics asset through DFHack's interface tile lookup while
       retaining a usable classic-mode representation when graphics tiles are
       unavailable.
-- [ ] Apply hover presentation across the complete button rectangle.
-- [ ] Prevent disabled or hidden buttons from activating.
-- [ ] Return consumed input only for a successful activation inside the
+- [x] Apply hover presentation across the complete button rectangle.
+- [x] Prevent disabled or hidden buttons from activating.
+- [x] Return consumed input only for a successful activation inside the
       button rectangle.
-- [ ] Ensure the widget does not retain screen, overlay, menu-row, or native
+- [x] Ensure the widget does not retain screen, overlay, menu-row, or native
       game-object state.
-- [ ] Register the new widget module with DwarfUI's module registry and reload
+- [x] Register the new widget module with DwarfUI's module registry and reload
       lifecycle.
-- [ ] Add package-contract coverage for the new production module.
-- [ ] Add focused `asset_button.spec.lua` tests for arbitrary
+- [x] Add package-contract coverage for the new production module.
+- [x] Add focused `asset_button.spec.lua` tests for arbitrary
       dimensions, asset mapping, classic fallback, hover state, disabled
       state, visibility, hit-test edges, activation, and pass-through input.
-- [ ] Add a focused test containing multiple button instances with different
+- [x] Add a focused test containing multiple button instances with different
       sizes and callbacks to prove that activation and rendering remain
       instance-local.
 
 ### Phase 0 completion gate
 
-- [ ] The shared widget can render and activate without importing any
+- [x] The shared widget can render and activate without importing any
       minecart-specific module.
-- [ ] Button dimensions, asset cells, fallback cells, and hit-test bounds agree
+- [x] Button dimensions, asset cells, fallback cells, and hit-test bounds agree
       for every covered shape.
-- [ ] Multiple button instances coexist without sharing callbacks, state, or
+- [x] Multiple button instances coexist without sharing callbacks, state, or
       hover behavior.
-- [ ] Focused widget and package-contract tests pass.
+- [x] Focused widget and package-contract tests pass.
 
 ## Phase 1: Add reusable stop-row action layout
 
@@ -274,7 +274,7 @@ without changing the generic button widget or replacing the row-layout model.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Reusable widget unit tests | `.\tools\Run-UnitTests.ps1 tests/asset_button.spec.lua` | Pending | Must prove arbitrary dimensions, independent instances, input consumption, and classic fallback without Hauling dependencies. |
+| 2026-07-23 | Phase 0 reusable widget and contracts | `.\tools\Run-UnitTests.ps1 tests\asset_button.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua`; `.\tools\Run-UnitTests.ps1`; `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed: 17 focused checks; 149 complete-suite checks; 15 production and 30 test/support syntax checks | Proves arbitrary dimensions, graphics and classic fallback mapping, hover/disabled/hidden behavior, exact hit edges, input consumption, independent instances, registry/reload ordering, shipped class contract, and no minecart dependency. |
 | | Minecart action unit tests | `.\tools\Run-UnitTests.ps1 tests/minecart_stop_actions.spec.lua` | Pending | Must prove multi-action layout, row rebinding, copied positions, stale rejection, and input policy. |
 | | Native-menu component test | `.\tools\Run-AutomationTests.ps1 <minecart-stop-actions>.ds.lua` | Pending | Must open Hauling, inspect real stop rows, click a rendered production button, and restore viewport and UI state. |
 | | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes and failures separately from live coverage. |

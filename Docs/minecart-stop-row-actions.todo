@@ -1,5 +1,13 @@
 # Minecart stop row-action implementation checklist
 
+## Status
+
+The reusable `AssetButton` work and historical evidence remain valid. The
+per-visible-row action pool and permanent right-side placement described below
+were superseded on 2026-07-24 by the contextual left-side hover rail in
+`Docs/hover-action-rail.todo`. They are retained here as implementation history,
+not as the current Hauling placement contract.
+
 ## Goal
 
 Add reusable interface-asset buttons to DwarfUI and use them to place a

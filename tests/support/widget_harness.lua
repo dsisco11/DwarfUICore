@@ -119,6 +119,13 @@ function BASE_METHODS:setText(value)
     self.text = value
 end
 
+---Returns no pointer when a test has not installed a Busted method stub.
+---@return nil
+---@return nil
+function BASE_METHODS:getMousePos()
+    return nil, nil
+end
+
 ---Sets whether this harness widget owns keyboard and wheel focus.
 ---@param value boolean
 function BASE_METHODS:setFocus(value)

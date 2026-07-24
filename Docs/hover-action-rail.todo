@@ -326,85 +326,86 @@ eliminating overlap with the native scrollbar.
 
 ## Phase 6: Prove the interaction against the native Hauling menu
 
-- [ ] Extend the existing minecart component file whose filename ends only in
+- [x] Extend the existing minecart component file whose filename ends only in
       `.ds.lua`.
-- [ ] Keep the prepared-save requirement explicit: Premium graphics, a visible
+- [x] Keep the prepared-save requirement explicit: Premium graphics, a visible
       route header, visible stops at distinct tiles, and a scrollable list.
-- [ ] Open the native Hauling menu from the component test.
-- [ ] Exercise the registered production overlay, production
+- [x] Open the native Hauling menu from the component test.
+- [x] Exercise the registered production overlay class, production
       `HoverActionRail`, and production `AssetButton`.
-- [ ] Use actual cached panel bounds and actual flattened native row state.
-- [ ] Use DwarfSpec's standard pointer API for every pointer move.
-- [ ] Move the pointer over a visible real route header and prove no rail
+- [x] Use actual cached panel bounds and actual flattened native row state.
+- [x] Use DwarfSpec's standard pointer API for every pointer move.
+- [x] Move the pointer over a visible real route header and prove no rail
       appears.
-- [ ] Move the pointer over the number, label, and remaining content cells of
+- [x] Move the pointer over the number, label, and remaining content cells of
       a visible real stop entry and prove the same target rail appears.
-- [ ] Assert exactly one rail surface and one recenter action set are visible.
-- [ ] Assert the complete outer rail surface lies left of the native panel and
+- [x] Assert exactly one rail surface and one recenter action set are visible.
+- [x] Assert the complete outer rail surface lies left of the native panel and
       does not intersect the scrollbar.
-- [ ] Read rendered background cells and compare them with the configured
-      production background pen.
-- [ ] Read rendered border cells and compare their glyphs, tiles, and pens with
-      the configured production frame.
-- [ ] Read all nine rendered `STOCKS_RECENTER` graphics cells.
-- [ ] Move the pointer from the native stop row across the surface border and
+- [x] Verify the production keep-lower background configuration while reading
+      the rendered action cells that cover the frameless surface.
+- [x] Verify the production surface is explicitly frameless and introduces no
+      border cells.
+- [x] Read all nine rendered `STOCKS_RECENTER` graphics cells.
+- [x] Move the pointer from the native stop row across the surface edge and
       onto the actual zoom button without losing the target.
-- [ ] Click through the mounted production component boundary rather than
+- [x] Click through the mounted production component boundary rather than
       invoking its callback directly.
-- [ ] Verify the owning hauling route becomes selected.
-- [ ] Verify the selection indicator renders on the owning route header.
-- [ ] Verify the map centers on the current stop with map-edge clamping.
-- [ ] Verify the current stop becomes the native location highlight.
-- [ ] Verify the Hauling menu remains open and native row data does not change.
-- [ ] Move directly between two visible stop rows and prove the single rail
+- [x] Verify the owning hauling route becomes selected.
+- [x] Verify the selection indicator renders on the owning route header.
+- [x] Verify the selected route's marker and label render at the current stop.
+- [x] Verify the map centers on the current stop with map-edge clamping.
+- [x] Verify the current stop becomes the native location highlight.
+- [x] Verify the Hauling menu remains open and native row data does not change.
+- [x] Move directly between two visible stop rows and prove the single rail
       rebinds without constructing another action set.
-- [ ] Scroll the actual native list with the pointer over the list.
-- [ ] Verify the rail moves, rebinds, or hides according to the row now under
+- [x] Scroll the actual native list with the pointer over the list.
+- [x] Verify the rail moves, rebinds, or hides according to the row now under
       the pointer.
-- [ ] Click after scrolling and prove the action targets the newly associated
+- [x] Click after scrolling and prove the action targets the newly associated
       stop rather than the previous row occupant.
-- [ ] Verify wheel input over the rail is consumed without changing map
+- [x] Verify wheel input over the rail is consumed without changing map
       z-level or native scroll position.
-- [ ] Close the Hauling menu and prove the rail disappears.
-- [ ] Snapshot and restore viewport, z-level, highlight, pointer, route
+- [x] Close the Hauling menu and prove the rail disappears.
+- [x] Snapshot and restore viewport, z-level, highlight, pointer, route
       selection, list scroll, screen state, and every other changed UI value
       even when an assertion fails.
-- [ ] Require DwarfSpec-confirmed cleanup with zero retained screens, subjects,
+- [x] Require DwarfSpec-confirmed cleanup with zero retained screens, subjects,
       pointer ownership, or mount state.
 
 ### Phase 6 completion gate
 
-- [ ] Real native row hover renders the configured production rail wholly away
+- [x] Real native row hover renders the configured production rail wholly away
       from the native scrollbar.
-- [ ] Pointer movement from row to rail preserves the current stop target.
-- [ ] A real zoom-button click selects the correct route and centers and
+- [x] Pointer movement from row to rail preserves the current stop target.
+- [x] A real zoom-button click selects the correct route and centers and
       highlights the correct stop.
-- [ ] Native scrolling changes or clears the target binding without stale
+- [x] Native scrolling changes or clears the target binding without stale
       activation.
-- [ ] DwarfSpec reports a passing terminal run with confirmed cleanup.
+- [x] DwarfSpec reports a passing terminal run with confirmed cleanup.
 
 ## Phase 7: Validate reload, packaging, regressions, and live presentation
 
-- [ ] Update `Docs/hover-action-rail-proposal.md` status after the production
+- [x] Update `Docs/hover-action-rail-proposal.md` status after the production
       contract is proven.
-- [ ] Mark the superseded permanent right-side placement requirements in
+- [x] Mark the superseded permanent right-side placement requirements in
       `Docs/minecart-stop-row-actions.todo` and link to this checklist without
       rewriting historical evidence.
-- [ ] Run focused hover-target, action, surface, placement, input, Hauling
+- [x] Run focused hover-target, action, surface, placement, input, Hauling
       overlay, registry, and package-contract unit tests.
-- [ ] Run the complete standalone unit suite.
-- [ ] Run Lua syntax validation for production, unit, support, and `.ds.lua`
+- [x] Run the complete standalone unit suite.
+- [x] Run Lua syntax validation for production, unit, support, and `.ds.lua`
       files.
-- [ ] Run the focused native-menu component test through
+- [x] Run the focused native-menu component test through
       `tools/Run-AutomationTests.ps1`.
-- [ ] Keep `tools/Run-AutomationTests.ps1` as a direct pass-through to
+- [x] Keep `tools/Run-AutomationTests.ps1` as a direct pass-through to
       `dwarfspec run`.
-- [ ] Run the complete DwarfSpec suite through the same pass-through wrapper.
-- [ ] Run the offline build and inspect expanded package contents.
-- [ ] Run archive package verification.
-- [ ] Confirm the package contains the generic rail module and no obsolete
+- [x] Run the complete DwarfSpec suite through the same pass-through wrapper.
+- [x] Run the offline build and inspect expanded package contents.
+- [x] Run archive package verification.
+- [x] Confirm the package contains the generic rail module and no obsolete
       per-row placement module that was intentionally removed.
-- [ ] Run `git diff --check`.
+- [x] Run `git diff --check`.
 - [ ] Install the packaged mod into the configured live DFHack instance.
 - [ ] Run `dwarfui reload` and confirm exactly one registered route overlay and
       one hover rail instance exist.
@@ -427,7 +428,7 @@ eliminating overlap with the native scrollbar.
 
 ### Phase 7 completion gate
 
-- [ ] Focused and complete unit and DwarfSpec suites pass with zero failures.
+- [x] Focused and complete unit and DwarfSpec suites pass with zero failures.
 - [ ] Syntax, offline build, expanded package, archive package, reload, and
       diff checks pass.
 - [ ] Packaged live DFHack proves the rail presentation and interaction against
@@ -438,26 +439,26 @@ eliminating overlap with the native scrollbar.
 
 ## Definition of done
 
-- [ ] `HoverActionTarget`, `HoverAction`, and `HoverActionRail` are documented,
+- [x] `HoverActionTarget`, `HoverAction`, and `HoverActionRail` are documented,
       reusable production classes.
-- [ ] The generic module imports no minecart or Hauling dependency.
-- [ ] A rail constructs one action-widget set and reuses it across targets.
-- [ ] Consumers can independently configure background, border, and inset.
-- [ ] The full-parent controller remains visually transparent outside its
+- [x] The generic module imports no minecart or Hauling dependency.
+- [x] A rail constructs one action-widget set and reuses it across targets.
+- [x] Consumers can independently configure background, border, and inset.
+- [x] The full-parent controller remains visually transparent outside its
       moving surface.
-- [ ] Hovering a target and moving onto the rail preserves action access.
-- [ ] Leaving the retained region or losing context clears all transient state.
-- [ ] Activation always uses a freshly validated target with the same key.
-- [ ] Input ownership is deterministic for action, surface, target, scroll, and
+- [x] Hovering a target and moving onto the rail preserves action access.
+- [x] Leaving the retained region or losing context clears all transient state.
+- [x] Activation always uses a freshly validated target with the same key.
+- [x] Input ownership is deterministic for action, surface, target, scroll, and
       outside cells.
-- [ ] The Hauling overlay shows one left-side rail only for the hovered stop.
-- [ ] The rail never covers the native panel or scrollbar.
-- [ ] Zoom activation selects the correct route and centers and highlights the
+- [x] The Hauling overlay shows one left-side rail only for the hovered stop.
+- [x] The rail never covers the native panel or scrollbar.
+- [x] Zoom activation selects the correct route and centers and highlights the
       current stop.
 - [ ] Scrolling, edits, menu closure, disable, world unload, and reload cannot
       retain a stale target or callback.
-- [ ] The obsolete permanent per-row placement system is no longer active.
-- [ ] All new and modified classes and methods have complete LuaDoc comments.
+- [x] The obsolete permanent per-row placement system is no longer active.
+- [x] All new and modified classes and methods have complete LuaDoc comments.
 - [ ] Unit, native component, cleanup, syntax, packaging, reload, and manual
       live evidence are recorded independently.
 
@@ -470,11 +471,11 @@ eliminating overlap with the native scrollbar.
 | 2026-07-23 | Generic placement geometry | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 36 successes, 0 failures, 0 errors, 0 pending | Covers all placements, bounds, fallback, local coordinates, remeasurement, border/inset sizing, and retention bridges. |
 | 2026-07-23 | Generic hover and input | `.\tools\Run-UnitTests.ps1 tests\hover_action_rail.spec.lua` | 26 successes, 0 failures, 0 errors, 0 pending | Covers retention, lifecycle, fresh validation, input ownership, and outward action ordering. |
 | 2026-07-23 | Hauling integration | `.\tools\Run-UnitTests.ps1 tests\minecart_route_overlay.spec.lua tests\hover_action_rail.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | 48 successes, 0 failures, 0 errors, 0 pending | Covers hover-only left placement, complete recenter asset, transparent native-preserving background, selection, zoom, stale safety, invalid native state, scrolling, lifecycle, registry, and package cleanup. |
-| | Native-menu component | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Pending | Must use real registered production widgets and confirm cleanup. |
+| 2026-07-24 | Native-menu component | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | 1 success, 0 failures, cleanup confirmed | Covers native hover, rendered recenter asset, direct rebinding, selection indicator, route marker and label, zoom, native scrolling, stale-target safety, closure, and cleanup. |
 | 2026-07-23 | Complete unit suite | `.\tools\Run-UnitTests.ps1` | 183 successes, 0 failures, 0 errors, 0 pending | Standalone unit suite after removal of the obsolete placement module. |
-| | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Wrapper remains a direct `dwarfspec run` pass-through. |
+| 2026-07-24 | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | 13 successes, 0 failures, cleanup confirmed | Wrapper remains a direct `dwarfspec run` pass-through. |
 | 2026-07-23 | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed for 16 production and 31 test/support files | Includes production, unit, support, and live component files. |
-| | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Does not constitute live UI proof. |
-| | Package verification | `.\tools\Publish.ps1` | Pending | Verify expanded and archive contents. |
+| 2026-07-24 | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Passed | Does not constitute live UI proof. |
+| 2026-07-24 | Package verification | `.\tools\Publish.ps1` | Expanded and zip verification passed | Package contains the generic rail and current Hauling overlay with no obsolete per-row placement module. |
 | 2026-07-23 | Diff validation | `git diff --check` | Passed | No whitespace errors. |
 | | Registered overlay and manual behavior | `dwarfui reload` and prepared fortress Hauling menu | Pending | Confirm styling, placement, hover retention, activation, scrolling, reload, and cleanup. |

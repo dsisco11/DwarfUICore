@@ -107,19 +107,50 @@ subject.
 ## Phase 1: Complete the required DwarfSpec native-input boundary
 
 - [x] Confirm that `ds.mouseInput()` can deliver pointer input to the mounted DwarfUI host.
-- [x] Confirm that `ds.mouseInput()` can target the native backing screen when an overlay is mounted over a native DF screen.
-- [ ] Define how a test identifies the intended input recipient without reaching into DwarfSpec internals.
-- [ ] Add or update DwarfSpec coverage for wheel delivery to a native list while the pointer is over that list.
-- [ ] Add or update DwarfSpec coverage for overlay-first input handling and backing-screen fallthrough.
-- [ ] Verify that consumed overlay input does not reach the backing screen.
-- [ ] Verify that unconsumed overlay input reaches the correct backing screen exactly once.
-- [ ] Document the minimum supported DwarfSpec version or capability required by DwarfUI's native interaction tests.
+- [x] Confirm that declined pointer input falls through from the mounted host to
+      its native backing screen.
+- [x] Define how a test identifies the intended input recipient without reaching
+      into DwarfSpec internals.
+- [x] Add or update DwarfSpec coverage for wheel delivery to a native list while
+      the pointer is over that list.
+- [x] Add or update DwarfSpec coverage for overlay-first input handling and
+      backing-screen fallthrough.
+- [x] Verify that consumed overlay input does not reach the backing screen.
+- [x] Verify that unconsumed overlay input reaches the correct backing screen
+      exactly once.
+- [x] Document the minimum supported DwarfSpec version or capability required by
+      DwarfUI's native interaction tests.
+
+### Input routing contract
+
+- The input recipient is the current mounted DwarfSpec host. Tests do not select
+  an overlay or backing screen through an internal targeting API.
+- `ds.move_pointer()` establishes the current pointer location.
+- `ds.mouseInput()` dispatches once to the mounted host at that location.
+- The host offers input to its overlay first. Consumed input stops there;
+  declined input is forwarded once to the host's configured backing viewscreen
+  through ordinary DFHack screen bubbling.
+- Pointer-dependent native controls identify themselves through rendered hit
+  testing at the current pointer location. Tests prove the intended recipient
+  by asserting the resulting native state, such as a list's `page_top`, rather
+  than inspecting DwarfSpec internals.
+- DwarfUI requires DwarfSpec 0.2.0 or newer for `ds.mouseInput()`,
+  `ds.EMouseButton`, mounted-host backing-screen fallthrough, and `ds.redraw()`.
 
 ### Completion gate
 
-- [ ] DwarfUI tests can express overlay and native backing-screen mouse input entirely through public DwarfSpec APIs.
-- [ ] Pointer-dependent native scrolling is proven with the pointer over the rendered native list.
-- [ ] No DwarfUI test requires the former pointer adapter or a test-owned mouse provider.
+- [x] DwarfUI tests can express overlay and native backing-screen mouse input entirely through public DwarfSpec APIs.
+- [x] Pointer-dependent native scrolling is proven with the pointer over the rendered native list.
+- [x] No DwarfUI native-input test requires the former pointer adapter or a
+      test-owned mouse provider to deliver input.
+
+### Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 2026-07-24 | DwarfSpec unit suite | `.\tools\Run-UnitTests.ps1` in the DwarfSpec checkout | 255 successes, 0 failures, 0 errors, 0 pending | Complete rerun after the concurrent `problem_fixtures` work settled. |
+| 2026-07-24 | Mounted overlay lifecycle and mouse routing | `dwarfspec run tests/automation/overlay_widget_mount_live_spec.lua --project-root D:\CODE\DFHack\DwarfSpec --no-results --timeout 60 --verbose` | 3 successes, 0 failures, cleanup confirmed | Proves explicit redraw lifecycle, overlay-first consumption, single backing-screen fallthrough, pointer-over-native-list wheel delivery, and native list movement. |
+| 2026-07-24 | DwarfUI native Hauling consumer | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua --no-results --timeout 90 --verbose` | 1 success, 0 failures, cleanup confirmed | Uses public `ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)` with the pointer over the native list; Phase 2 still owns removal of the test's separate overlay instance and direct refresh shortcuts. |
 
 ## Phase 2: Correct the minecart registered-overlay component test
 

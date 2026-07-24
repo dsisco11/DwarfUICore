@@ -29,28 +29,85 @@ Tests described as user-interaction or production proofs must move the pointer o
 
 ## Phase 0: Establish test evidence boundaries
 
-- [ ] Inventory every `.spec.lua` and `.ds.lua` test that directly invokes `onInput()`, `render()`, `refresh()`, `update_popover()`, `activate()`, or another interaction lifecycle method.
-- [ ] Inventory tests that directly mutate DFHack pointer globals.
-- [ ] Inventory native tests that construct an overlay class directly instead of obtaining the registered overlay instance.
-- [ ] Inventory tests that stub focus, enablement, disablement, mouse position, or overlay lifecycle behavior.
-- [ ] Classify each affected case as:
+- [x] Inventory every `.spec.lua` and `.ds.lua` test that directly invokes `onInput()`, `render()`, `refresh()`, `update_popover()`, `activate()`, or another interaction lifecycle method.
+- [x] Inventory tests that directly mutate DFHack pointer globals.
+- [x] Inventory native tests that construct an overlay class directly instead of obtaining the registered overlay instance.
+- [x] Inventory tests that stub focus, enablement, disablement, mouse position, or overlay lifecycle behavior.
+- [x] Classify each affected case as:
   - method-level unit coverage,
   - mounted component coverage,
   - registered-overlay coverage, or
   - native DF UI integration coverage.
-- [ ] Rename test descriptions that claim a stronger interaction layer than the test exercises.
-- [ ] Record an explicit justification for any remaining direct lifecycle-method invocation in a `.ds.lua` test.
+- [x] Rename test descriptions that claim a stronger interaction layer than the test exercises.
+- [x] Record an explicit justification for any remaining direct lifecycle-method invocation in a `.ds.lua` test.
+
+### Audit record
+
+The inventory covers every Lua file under `tests/`. Definitions of fixture
+methods are listed separately from calls made by test cases so a test-owned
+event dispatcher is not mistaken for direct invocation of the production
+subject.
+
+| Test or support file | Direct lifecycle surface | Evidence classification | Disposition |
+| --- | --- | --- | --- |
+| `asset_button.spec.lua` | `updateLayout()`, `onInput()` | Method-level unit coverage | Retain. The cases explicitly verify layout, hit testing, activation, and input return contracts. |
+| `hover_action_rail.spec.lua` | `updateLayout()`, `render()`, `update_hover()`, `activate()`, `onInput()` | Method-level unit coverage | Retain. Each suite names the construction, surface, placement, hover-lifecycle, or input method contract under test. |
+| `infrastructure_smoke.spec.lua` | `updateLayout()`, `render()` | Test-infrastructure coverage | Retain. These calls verify the isolated widget harness, not production user interaction. |
+| `minecart_route_overlay.spec.lua` | `preUpdateLayout()`, `updateLayout()`, `render()`, `overlay_onupdate()`, `overlay_ondisable()`, `ensure_menu_bounds()`, `onInput()`, button `activate()` | Method-level unit coverage | Retain. Descriptions now say that the class declares attributes, returns input decisions, or responds to provider-reported state; they do not claim registry or native event delivery. |
+| `mood_popover_overlay.spec.lua` | `preUpdateLayout()`, `render()`, `update_popover()`, `overlay_onupdate()`, `overlay_ondisable()`, `onInput()` | Method-level unit coverage | Retain. Descriptions now identify simulated tiles and provider-reported hover instead of claiming native interaction. |
+| `popover.spec.lua` | `render()`, `onInput()` | Method-level unit coverage | Retain. The cases explicitly verify Popover rendering and input contracts. |
+| `tooltip_host_integration.spec.lua` | `updateLayout()`, `render()` | In-process host integration coverage | Retain. It verifies painter ordering and clipping through a test-owned host, not a live DFHack overlay. |
+| `tooltip_registration.spec.lua` | `updateLayout()`, screen `onInput()`, screen `dismiss()` | Method-level singleton-service coverage | Retain. The suite exercises a test-owned `ZScreen` implementation and registration algorithm. |
+| `tooltip.spec.lua` | renderer `render()` | Method-level unit coverage | Retain. Rendering is the explicit subject of the assertions. |
+| `unit_card_task_overlay.spec.lua` | overlay `render()` | Method-level unit coverage | Retain. The cases verify truncation and overdraw output from a controlled painter. |
+| `support/widget_harness.lua` | definitions and child dispatch for `updateLayout()`, `render()`, `onInput()` | Test infrastructure | Retain. These are the mounted component host's natural layout, render, and event-bubbling implementation. |
+| `minecart_route/minecart_route_markers.ds.lua` | `ensure_menu_bounds()`, rail `update_hover()`, overlay `onInput()`, `clear_overlay_state()` | Mounted production-class component over native DF UI | `ensure_menu_bounds()`, `update_hover()`, and `onInput()` are interaction shortcuts to remove in Phase 2. `clear_overlay_state()` is cleanup and remains justified. |
+| `mood_popover/mood_popover.ds.lua`, registered native-data case | `update_popover()`, `refresh()`, native screen `logic()` and `render()`, `clear()` | Registered overlay plus native data, but synthetic interaction | `update_popover()` and `refresh()` are interaction shortcuts to remove in Phase 3. Direct native `logic()`/`render()` and `clear()` occur only after state restoration and remain justified as cleanup synchronization. |
+| `mood_popover/mood_popover.ds.lua`, injected-provider cases | `update_popover()`, overlay `onInput()` | Mounted component coverage | Reclassify or route through mounted input in Phase 4. Until then, these calls prove only deterministic component method behavior. |
+| `tooltip/tooltip_overlay.ds.lua` | fixture component `render()` implementation | Mounted component coverage | Retain. The render calls are the implementation of the mounted test component and exercise the normal host render path. |
+| `tooltip/tooltip.ds.lua` | fixture screen `onInput()` implementation, modal `show()` and `dismiss()` setup | Mounted component coverage | Retain. Input reaches the fixture through `root:input()`; direct modal show and dismiss calls establish test state and are not presented as user input. |
+| `tooltip/tooltip_overlay_registration_integration.ds.lua` | no direct production interaction lifecycle calls | Registered-overlay coverage | Retain. Pointer movement and lifecycle observations already use the registered widget and DwarfSpec host. |
+
+### Pointer and lifecycle substitution inventory
+
+| Location | Substitution | Classification and required action |
+| --- | --- | --- |
+| `minecart_route/minecart_route_markers.ds.lua` | Creates `getmetatable(registered){}` after confirming registry discovery | The interaction assertions cover a fresh production-class instance, not the registered instance. The suite and comments were renamed accordingly; Phase 2 must use the registry-owned instance. |
+| `minecart_route/minecart_route_markers.ds.lua` | Stubs `focus_provider()` and `overlay_ondisable()` | Bypasses registered-overlay focus and disablement. Remove both in Phase 2. |
+| `minecart_route/minecart_route_markers.ds.lua` | Calls empty `overlay:onInput({})` and rail `update_hover()` after pointer movement | Manufactures render-driven hover refresh. Remove in Phase 2 and await the normal render loop. |
+| `minecart_route/minecart_route_markers.ds.lua` | Calls `overlay:onInput()` for wheel ownership | Proves only the method return path. Replace with `ds.mouseInput()` over the rendered rail in Phase 2. |
+| `minecart_route/minecart_route_markers.ds.lua` | Restores `gps.mouse_*` and `gps.precise_mouse_*` directly | Cleanup-only mutation. Interaction pointer movement already uses `ds.move_pointer()`; direct restoration remains justified until DwarfSpec owns a complete pointer-state restoration API. |
+| `mood_popover/mood_popover.ds.lua` | Assigns `gps.mouse_*` and `gps.precise_mouse_*` before calling `update_popover()` | Bypasses DwarfSpec pointer movement and the render-driven production hover path. Remove in Phase 3. |
+| `mood_popover/mood_popover.ds.lua` | Replaces `snapshot_provider` and calls `refresh()` before the unit-row click | Bypasses the production refresh cadence and can mask a stale-row failure. Replace with state setup followed by the normal update loop in Phase 3. |
+| `mood_popover/mood_popover.ds.lua` | Calls `gui.simulateInput()` for wheel and click after direct pointer assignment | Delivers input to a real native screen, but not through the public DwarfSpec pointer/input boundary. Replace with DwarfSpec mouse input in Phase 3. |
+| `mood_popover/mood_popover.ds.lua` | Overrides the registered widget's active, hover, mouse, and snapshot providers | Valid only as deterministic registered-instance rendering coverage. The registration test name now states that its rendered data is injected; it is not native interaction proof. |
+| `mood_popover/mood_popover.ds.lua` | Mounts `MoodPopoverOverlay` with injected active, hover, mouse, and snapshot providers | Intentional deterministic component coverage. The suite and cases were renamed to state that boundary; Phase 4 will move direct method contracts to unit coverage or use mounted input routing. |
+| `asset_button.spec.lua`, `hover_action_rail.spec.lua`, `minecart_route_overlay.spec.lua`, `mood_popover_overlay.spec.lua`, `package_contract.spec.lua`, `pointer.spec.lua`, `popover.spec.lua`, `tooltip_host_integration.spec.lua`, `tooltip_registration.spec.lua`, `tooltip.spec.lua`, `unit_card_task_overlay.spec.lua` | Test-owned mouse positions, provider injection, or Busted `getMousePos()` stubs | Intentional method-level or in-process integration isolation. None of these files is counted as registered-overlay or native DF UI interaction evidence. |
+
+### Overlay construction inventory
+
+- `minecart_route/minecart_route_markers.ds.lua` discovers the registered
+  overlay but constructs a fresh instance for all interaction assertions. This
+  is the only test that combines a native DF menu claim with a replacement
+  instance and must be corrected in Phase 2.
+- `mood_popover/mood_popover.ds.lua` uses the registry-owned instance for its
+  native-data case. Its separate `ds.mount(MoodPopoverOverlay, ...)` cases are
+  deliberately classified as injected-provider component coverage.
+- `tooltip/tooltip_overlay.ds.lua` mounts a purpose-built fixture component and
+  makes no registration claim.
+- Constructors in `.spec.lua` files are method-level unit fixtures and do not
+  represent registered overlays.
 
 ### Completion gate
 
-- [ ] Every interaction test has a documented evidence layer.
-- [ ] No deterministic provider-driven test is presented as native DF UI proof.
-- [ ] Direct method calls retained for unit coverage are named as method-contract tests.
+- [x] Every interaction test has a documented evidence layer.
+- [x] No deterministic provider-driven test is presented as native DF UI proof.
+- [x] Direct method calls retained for unit coverage are named as method-contract tests.
 
 ## Phase 1: Complete the required DwarfSpec native-input boundary
 
-- [ ] Confirm that `ds.mouseInput()` can deliver pointer input to the mounted DwarfUI host.
-- [ ] Confirm that `ds.mouseInput()` can target the native backing screen when an overlay is mounted over a native DF screen.
+- [x] Confirm that `ds.mouseInput()` can deliver pointer input to the mounted DwarfUI host.
+- [x] Confirm that `ds.mouseInput()` can target the native backing screen when an overlay is mounted over a native DF screen.
 - [ ] Define how a test identifies the intended input recipient without reaching into DwarfSpec internals.
 - [ ] Add or update DwarfSpec coverage for wheel delivery to a native list while the pointer is over that list.
 - [ ] Add or update DwarfSpec coverage for overlay-first input handling and backing-screen fallthrough.

@@ -154,34 +154,43 @@ subject.
 
 ## Phase 2: Correct the minecart registered-overlay component test
 
-- [ ] Open the native Hauling Routes menu through native screen input.
-- [ ] Obtain the active `MinecartRouteMarkersOverlay` instance from the DFHack overlay registry.
-- [ ] Remove the separately constructed overlay instance from the native component test.
-- [ ] Remove native-test stubs for focus detection and overlay disablement.
-- [ ] Confirm the registry-created overlay becomes active only while its real focus conditions are satisfied.
-- [ ] Move the pointer onto route rows and stop rows with DwarfSpec's pointer API.
-- [ ] Allow the normal render loop to update hover state.
-- [ ] Remove empty `overlay:onInput({})` calls used to force hover refreshes.
-- [ ] Click route and stop rows through the mounted screen input path.
-- [ ] Assert that clicking either row selects the appropriate route in the native menu.
-- [ ] Assert that the selected-row indicator is rendered at the correct menu-relative position.
-- [ ] Assert that route-stop world markers and labels are rendered for the selected route.
-- [ ] Assert that marker position follows viewport movement using the production world-to-UI transform.
-- [ ] Hover a stop row and assert that its action rail appears at the configured row-relative position.
-- [ ] Move the pointer from the row onto the rail and assert that the rail remains open.
-- [ ] Click the zoom action through the rendered button hit target.
-- [ ] Assert that the viewport centers on the stop and the corresponding route remains selected.
-- [ ] Scroll while the pointer is over the action rail and assert that the rail consumes the wheel input.
-- [ ] Scroll while the pointer is over the native route list and assert that the native list scrolls.
-- [ ] Assert that the rail rebinds to the correct visible row after native list scrolling.
-- [ ] Assert that stale action callbacks cannot act on a formerly bound stop.
+- [x] Open the native Hauling Routes menu through native screen input.
+- [x] Obtain the active `MinecartRouteMarkersOverlay` instance from the DFHack overlay registry.
+- [x] Remove the separately constructed overlay instance from the native component test.
+- [x] Remove native-test stubs for focus detection and overlay disablement.
+- [x] Confirm the registry-created overlay becomes active only while its real focus conditions are satisfied.
+- [x] Move the pointer onto route rows and stop rows with DwarfSpec's pointer API.
+- [x] Allow the normal render loop to update hover state.
+- [x] Remove empty `overlay:onInput({})` calls used to force hover refreshes.
+- [x] Click route and stop rows through the mounted screen input path.
+- [x] Assert that clicking either row selects the appropriate route in the native menu.
+- [x] Assert that the selected-row indicator is rendered at the correct menu-relative position.
+- [x] Assert that route-stop world markers and labels are rendered for the selected route.
+- [x] Assert that marker position follows viewport movement using the production world-to-UI transform.
+- [x] Hover a stop row and assert that its action rail appears at the configured row-relative position.
+- [x] Move the pointer from the row onto the rail and assert that the rail remains open.
+- [x] Click the zoom action through the rendered button hit target.
+- [x] Assert that the viewport centers on the stop and the corresponding route remains selected.
+- [x] Scroll while the pointer is over the action rail and assert that the rail consumes the wheel input.
+- [x] Scroll while the pointer is over the native route list and assert that the native list scrolls.
+- [x] Assert that the rail rebinds to the correct visible row after native list scrolling.
+- [x] Assert that stale action callbacks cannot act on a formerly bound stop.
 
 ### Completion gate
 
-- [ ] The minecart component test uses the registry-created production overlay.
-- [ ] All pointer movement, clicking, and wheel input use public DwarfSpec APIs.
-- [ ] Selection indicators, route markers, labels, zoom behavior, rail retention, and scrolling are verified from rendered or native state.
-- [ ] No direct overlay `onInput()`, forced refresh, or lifecycle stub is required.
+- [x] The minecart component test uses the registry-created production overlay.
+- [x] All pointer movement, clicking, and wheel input use public DwarfSpec APIs.
+- [x] Selection indicators, route markers, labels, zoom behavior, rail retention, and scrolling are verified from rendered or native state.
+- [x] No direct overlay `onInput()`, forced refresh, or lifecycle stub is required.
+
+### Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 2026-07-24 | Registered native Hauling interaction, repeat run | `.\Tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua --no-results --timeout 90 --verbose --repeat 2` | 2 successes, 0 failures, cleanup confirmed | Uses the canonical registry widget, mounted pass-through native input, explicit redraws, rendered selection/label/button cells, and the real DFHack map-paint boundary. |
+| 2026-07-24 | Registered native Hauling interaction, final run | `.\Tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua --no-results --timeout 90 --verbose` | 1 success, 0 failures, cleanup confirmed | Includes exact row-relative rail bounds and close-triggered lifecycle cleanup. |
+| 2026-07-24 | Complete Busted unit suite | `.\Tools\Run-UnitTests.ps1` | 183 successes, 0 failures, 0 errors, 0 pending | Covers the native-focus fallback and unchanged deterministic marker/rail contracts. |
+| 2026-07-24 | Lua syntax | `.\Tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed for 16 production and 31 test/support files | Validates all production, component-test, and support Lua sources. |
 
 ## Phase 3: Correct the native mood-popover component test
 

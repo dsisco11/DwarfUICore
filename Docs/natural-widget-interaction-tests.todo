@@ -13,6 +13,18 @@ The resulting test suite must clearly distinguish:
 
 Tests described as user-interaction or production proofs must move the pointer over the rendered target, deliver input through DwarfSpec's public input APIs, and assert the resulting visible or native UI state.
 
+## Execution status
+
+This document preserves the original evidence-boundary audit and historical
+implementation record. The active execution checklist is
+`native-dwarfspec-command-migration.todo`.
+
+The mounted-host routing contract and custom-screen minecart implementation
+below were valid intermediate work but are superseded by DwarfSpec's borrowed
+native-screen mount, native/overlay `ds.get(...)` subjects, and exact-coordinate
+pointer commands. Their completed checks and passing runs are historical
+evidence, not proof of the final native-mount architecture.
+
 ## Confirmed design decisions
 
 - Direct method invocation remains valid in `.spec.lua` tests that explicitly test a method contract.
@@ -104,7 +116,10 @@ subject.
 - [x] No deterministic provider-driven test is presented as native DF UI proof.
 - [x] Direct method calls retained for unit coverage are named as method-contract tests.
 
-## Phase 1: Complete the required DwarfSpec native-input boundary
+## Phase 1: Historical mounted-host input boundary (superseded)
+
+This section records the earlier hosted-overlay and backing-screen routing
+boundary. Do not use it as the implementation contract for new native tests.
 
 - [x] Confirm that `ds.mouseInput()` can deliver pointer input to the mounted DwarfUI host.
 - [x] Confirm that declined pointer input falls through from the mounted host to
@@ -152,7 +167,11 @@ subject.
 | 2026-07-24 | Mounted overlay lifecycle and mouse routing | `dwarfspec run tests/automation/overlay_widget_mount_live_spec.lua --project-root D:\CODE\DFHack\DwarfSpec --no-results --timeout 60 --verbose` | 3 successes, 0 failures, cleanup confirmed | Proves explicit redraw lifecycle, overlay-first consumption, single backing-screen fallthrough, pointer-over-native-list wheel delivery, and native list movement. |
 | 2026-07-24 | DwarfUI native Hauling consumer | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua --no-results --timeout 90 --verbose` | 1 success, 0 failures, cleanup confirmed | Uses public `ds.mouseInput(ds.EMouseButton.SCROLL_DOWN)` with the pointer over the native list; Phase 2 still owns removal of the test's separate overlay instance and direct refresh shortcuts. |
 
-## Phase 2: Correct the minecart registered-overlay component test
+## Phase 2: Historical minecart correction (superseded)
+
+This section records the passing custom-screen implementation that preceded
+`ds.mountNativeScreen()`. Its user-visible assertions remain requirements, but
+their active migration is tracked in `native-dwarfspec-command-migration.todo`.
 
 - [x] Open the native Hauling Routes menu through native screen input.
 - [x] Obtain the active `MinecartRouteMarkersOverlay` instance from the DFHack overlay registry.
@@ -192,92 +211,12 @@ subject.
 | 2026-07-24 | Complete Busted unit suite | `.\Tools\Run-UnitTests.ps1` | 183 successes, 0 failures, 0 errors, 0 pending | Covers the native-focus fallback and unchanged deterministic marker/rail contracts. |
 | 2026-07-24 | Lua syntax | `.\Tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed for 16 production and 31 test/support files | Validates all production, component-test, and support Lua sources. |
 
-## Phase 3: Correct the native mood-popover component test
+## Remaining execution work (moved)
 
-- [ ] Open or restore the native screen containing the top information-bar moodlets.
-- [ ] Obtain the active mood overlay through its registered DFHack overlay lifecycle.
-- [ ] Remove direct writes to `df.global.gps.mouse_x` and `df.global.gps.mouse_y`.
-- [ ] Move the pointer with DwarfSpec to each complete moodlet column in the native information bar.
-- [ ] Allow the normal render loop to call the production hover-update path.
-- [ ] Remove direct calls to `update_popover()` from native interaction tests.
-- [ ] Assert that each of the seven native moodlet columns opens the popover for the expected stress category.
-- [ ] Assert that hovering the number, icon, area above the icon, and area below the icon remains within the intended moodlet hit column.
-- [ ] Assert that the popover remains open when the pointer moves from a moodlet into the popover.
-- [ ] Deliver wheel input through DwarfSpec while the pointer remains over a moodlet.
-- [ ] Assert that the popover consumes the wheel input and scrolls exactly once.
-- [ ] Deliver wheel input through DwarfSpec while the pointer is over the popover list.
-- [ ] Assert that the scrollbar position and visible rows update consistently.
-- [ ] Replace direct `widget:refresh()` setup with state changes followed by the normal render/update cadence.
-- [ ] Click a rendered unit row through DwarfSpec.
-- [ ] Assert that the game zooms to the selected unit.
-- [ ] Assert that the unit card opens on its overview tab with populated overview data.
-- [ ] Assert that closing or changing native focus disables the overlay through its real lifecycle.
+The pending native mood-popover migration, deterministic component
+reclassification, remaining-suite audit, tooltip registration migration, and
+verification requirements have been merged into
+`native-dwarfspec-command-migration.todo`.
 
-### Completion gate
-
-- [ ] All seven top-bar moodlet hover paths are exercised against the native DF UI.
-- [ ] Popover retention, both wheel-input locations, unit selection, zoom, and populated unit-card overview data are verified.
-- [ ] No native test directly mutates pointer globals, invokes `onInput()`, calls `update_popover()`, or forces `refresh()`.
-
-## Phase 4: Reclassify deterministic mood component coverage
-
-- [ ] Retain provider-injected snapshot tests that isolate stress-category and sorting behavior.
-- [ ] Retain deterministic layout tests that do not claim native DF UI integration.
-- [ ] Rename provider-driven test suites and cases to identify them as component-logic coverage.
-- [ ] Move direct `update_popover()` contract cases into `.spec.lua` tests when mounting and rendering are not part of the assertion.
-- [ ] For mounted component event-routing cases, replace `root:raw():onInput()` with DwarfSpec input delivery.
-- [ ] For pure `onInput()` return-value contracts, move the cases to `.spec.lua` and name the method under test.
-- [ ] Replace descriptions such as “lets DFHack move it” when the test only invokes a widget method directly.
-- [ ] Keep injected providers out of the native moodlet production-proof scenario.
-
-### Completion gate
-
-- [ ] Provider-driven tests make only deterministic component-logic claims.
-- [ ] Mounted event-routing tests send input through the mounted screen.
-- [ ] Direct method tests reside in the unit layer and state the contract they prove.
-
-## Phase 5: Audit the remaining component suite
-
-- [ ] Review every remaining `.ds.lua` file for direct pointer-global mutation.
-- [ ] Review every remaining `.ds.lua` file for direct calls to widget `onInput()`.
-- [ ] Review every remaining `.ds.lua` file for direct calls to render, update, or refresh methods that manufacture user-visible state.
-- [ ] Review every remaining `.ds.lua` file for direct calls to button activation in place of a rendered click.
-- [ ] Review every remaining `.ds.lua` file for focus or lifecycle stubs in tests described as registered-overlay proof.
-- [ ] Preserve natural tooltip tests that already use DwarfSpec pointer movement and mounted-screen input.
-- [ ] Preserve native menu opening and closing through real DFHack input where no more specific public DwarfSpec helper is required.
-- [ ] Add comments to each component test describing the intent of setup, interaction, and assertions.
-- [ ] Add a test-review convention that rejects native-interaction claims based only on internal callback invocation.
-
-### Completion gate
-
-- [ ] No unclassified interaction bypass remains in the component suite.
-- [ ] Every exception is explicitly limited to method-level or deterministic component coverage.
-- [ ] Test comments make the intended interaction path and evidence boundary clear.
-
-## Phase 6: Verification and evidence
-
-- [ ] Run the focused HoverActionRail unit suite.
-- [ ] Run the focused minecart route-marker unit suite.
-- [ ] Run the focused mood-popover unit suite.
-- [ ] Run the complete Busted unit suite from the workspace root.
-- [ ] Run Lua syntax checks for every changed Lua file.
-- [ ] Run the focused minecart native component test through `dwarfspec run`.
-- [ ] Run the focused native mood-popover component test through `dwarfspec run`.
-- [ ] Run the remaining affected component tests through `dwarfspec run`.
-- [ ] Run the complete DwarfSpec component suite.
-- [ ] Confirm that each native test restores the prior screen, pointer-sensitive state, viewport, and overlay state.
-- [ ] Inspect the final diff for accidental test-runner or dependency-bootstrap changes.
-- [ ] Report evidence separately for:
-  - syntax validation,
-  - method-level unit coverage,
-  - mounted component coverage,
-  - registered-overlay coverage,
-  - native DF UI interaction coverage, and
-  - cleanup and state restoration.
-
-### Completion gate
-
-- [ ] All focused and complete suites pass.
-- [ ] Native interaction evidence demonstrates production input and lifecycle paths instead of test-only shortcuts.
-- [ ] Cleanup is confirmed independently of test assertions.
-- [ ] `Run-AutomationTests` remains only a pass-through to `dwarfspec run`.
+That document is the only active checklist. Add new native-test migration work
+there instead of extending this historical record.

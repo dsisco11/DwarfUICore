@@ -10,18 +10,29 @@ test-owned screen above them.
 ## Command conventions
 
 - Use `ds.mountNativeScreen()` for tests that interact with the live DF UI.
-- Use `ds.get(path)` for native controls; native is the default source.
-- Use `ds.get(path, {overlay=name})` for controls in a registered overlay.
+- Use `ds.get(path)` for native controls that are exposed as widgets; native is
+  the default source.
+- Use `ds.get(path, {source='overlay', overlay=name})` for controls in a
+  registered overlay; the installed DwarfSpec declaration requires the
+  explicit overlay source.
 - Do not use `ds.root()` for UI selection.
 - Use `ds.move_pointer(x, y)` for exact native screen cells.
 - Use subject `input()`, `click()`, `hover()`, `redraw()`, `inspect()`,
   `text()`, and `getFocusList()` for interaction and observation.
-- Use `ds.capture_view_tree()` to record unresolved native or overlay paths
-  before introducing test-only discovery code.
+- Use `ds.capture_view_tree()` to record unresolved native or overlay widget
+  paths before introducing test-only discovery code. Procedural game UI, such
+  as the Hauling route rows, is outside that widget tree.
 - Use `ds.capture_screen()` when a bounded screen snapshot is stronger than
   a sequence of individual tile reads.
 - Keep direct raw DF data reads only for domain-state assertions that have no
-  UI equivalent, such as route stop coordinates or map viewport state.
+  widget equivalent, such as `plotinfo.hauling` route/scroll state, route stop
+  coordinates, or map viewport state.
+- Treat the base-game Hauling route list as procedural screen-cell UI, not as
+  an addressable native widget tree. Exercise it through the borrowed native
+  screen's input path, derive its screen cells through the production layout,
+  and use rendered output plus `plotinfo.hauling` state for observation.
+- Use `plotinfo.hauling` only for domain-state assertions. It is not a widget
+  root and must not be passed to `ds.get()`.
 
 ## Phase 0: Establish the native command baseline
 
@@ -29,22 +40,30 @@ test-owned screen above them.
       DwarfSpec migration.
 - [x] Mark the earlier mounted-host routing and custom-screen minecart work in
       `natural-widget-interaction-tests.todo` as historical and superseded.
-- [ ] Confirm the installed DwarfSpec package exposes `mountNativeScreen()`,
+- [x] Confirm the installed DwarfSpec package exposes `mountNativeScreen()`,
       exact-coordinate `move_pointer(x, y)`, native and registered-overlay
       control lookup through `get()`, subject inspection, focus, text, and
       screen/view-tree capture commands.
-- [ ] Record the minimum DwarfSpec version or explicit capability check required
+- [x] Record the minimum DwarfSpec version or explicit capability check required
       by DwarfUI's native tests.
-- [ ] Capture the native Hauling view tree and record the stable route-list
-      control path used by the minecart test.
-- [ ] Capture the native fortress view tree and record the stable top-bar
+- [x] Capture the native Hauling screen and record the calculated route-list
+      bounds and row geometry used by the minecart test. Document that the
+      route and stop rows are procedurally rendered from
+      `plotinfo.hauling.view_routes`, `view_stops`, and `scroll_position` and
+      therefore have no stable native widget path for `ds.get(...)`.
+- [x] Record the `plotinfo.hauling` fields used strictly as state evidence
+      beside the native interaction test.
+- [x] Capture the native fortress view tree and record the stable top-bar
       moodlet controls or the evidence that their hit regions are screen-cell
-      based rather than native widget controls.
-- [ ] Capture the registered minecart and mood overlay trees and record their
+      based rather than native widget controls. The baseline uses
+      `TopBarMoodDisplay:find_layout()` to verify all seven production
+      screen-cell regions; no native widget path is required for moodlets.
+- [x] Capture the registered minecart and mood overlay trees and record their
       stable control paths.
-- [ ] Capture the staged tooltip overlay tree and record its stable target
+- [x] Capture the staged tooltip overlay tree and record its stable target
       path after registration.
-- [ ] Document every resolved path beside the test that uses it.
+- [x] Document every resolved control path and every procedural screen-cell
+      region beside the test that uses it.
 
 ## Phase 1: Migrate the minecart registered-overlay test
 
@@ -53,13 +72,20 @@ test-owned screen above them.
 - [ ] Remove the test-owned pointer `Panel`, its layout mutation, and the
       custom pointer helper.
 - [ ] Replace all native pointer placement with `ds.move_pointer(x, y)`.
-- [ ] Open and close Hauling through the mounted native subject's `input()`.
-- [ ] Replace direct native focus queries with `getFocusList()` on a selected
-      native subject.
-- [ ] Select the native route list with `ds.get(path)` and use `inspect()`
-      for its bounds, scroll position, visible rows, and active state.
+- [ ] Open and close Hauling through `ds.input()` while the borrowed native
+      screen is mounted.
+- [ ] Confirm the mounted native screen reports the expected Hauling focus
+      string before interacting with its procedural rows.
+- [ ] Calculate and cache the native Hauling panel bounds and visible route/stop
+      row geometry from the production layout and `plotinfo.hauling` state.
+- [ ] Use `ds.capture_screen()` over the cached Hauling panel bounds to verify
+      rendered row text and selection indicators; do not model the procedural
+      rows as `ds.get(...)` subjects.
+- [ ] Use `plotinfo.hauling.view_routes`, `view_stops`, and `scroll_position`
+      only to identify which logical row occupies a production-derived screen
+      cell and to observe the result of naturally delivered input.
 - [ ] Select the real rail and zoom controls with
-      `ds.get(path, {overlay=registered_name})`.
+      `ds.get(path, {source='overlay', overlay=registered_name})`.
 - [ ] Remove direct overlay-registry table lookup where a selected overlay
       control provides the necessary rendered or inspected evidence.
 - [ ] Replace overlay-root state assertions with rendered selection indicators,
@@ -69,10 +95,10 @@ test-owned screen above them.
 - [ ] Keep the map-paint spy only if `capture_screen()` cannot observe the
       Premium transparent marker; document why the final paint boundary is
       required.
-- [ ] Click a rendered route-label row and assert that it selects the
-      corresponding route.
-- [ ] Click a rendered stop row and assert that it selects the corresponding
-      route.
+- [ ] Move to a rendered route-label cell, send normal mouse input, and assert
+      that it selects the corresponding route.
+- [ ] Move to a rendered stop-row cell, send normal mouse input, and assert
+      that it selects the corresponding route.
 - [ ] Assert that the selected-row indicator is rendered at the exact
       menu-relative position.
 - [ ] Hover a stop row and assert that the action rail is rendered at the exact
@@ -82,9 +108,10 @@ test-owned screen above them.
 - [ ] Click the rendered zoom action and assert that the viewport centers on the
       stop while its route remains selected.
 - [ ] Scroll over the rail and assert that the rail consumes the wheel without
-      scrolling the native route list.
-- [ ] Scroll over the native route list and assert that its inspected scroll
-      position changes.
+      changing `plotinfo.hauling.scroll_position`.
+- [ ] Scroll with the pointer over the rendered native route-list bounds and
+      assert that `plotinfo.hauling.scroll_position` changes and the captured
+      visible rows change consistently.
 - [ ] Assert that native scrolling rebinds the rail to the newly visible stop.
 - [ ] Assert that the formerly bound stop is no longer eligible for activation.
 - [ ] Assert marker glyph, color, transparency, and label rendering for the
@@ -98,7 +125,8 @@ test-owned screen above them.
 
 - [ ] Start the native top-bar scenario with `ds.mountNativeScreen()`.
 - [ ] Obtain registered popover controls through
-      `ds.get(path, {overlay='dwarfui-mood-popover.mood_popover'})`.
+      `ds.get(path, {source='overlay',
+      overlay='dwarfui-mood-popover.mood_popover'})`.
 - [ ] Remove direct writes to `gps.mouse_*` and `gps.precise_mouse_*`.
 - [ ] Move the pointer to every complete moodlet column with
       `ds.move_pointer(x, y)` and request the normal render path with
@@ -154,7 +182,8 @@ test-owned screen above them.
 - [ ] Keep `ds.stage_overlay_registration()` for the staged registration
       source; do not substitute a fake overlay lifecycle.
 - [ ] Resolve the staged overlay target through
-      `ds.get(path, {overlay=registered_name})` after registration.
+      `ds.get(path, {source='overlay', overlay=registered_name})` after
+      registration.
 - [ ] Replace manual native-focus matching with `getFocusList()` and native
       subject inspection.
 - [ ] Use redraw and overlay-control inspection to prove registration,
@@ -210,6 +239,8 @@ test-owned screen above them.
 - [ ] Inspect the final diff for `ds.root()`, custom pointer hosts, test-owned
       native focus shims, direct pointer-global writes, direct production
       `onInput()` calls, and direct production refresh/update shortcuts.
+- [ ] Inspect the final diff for attempts to treat `plotinfo.hauling` or its
+      procedural rows as widget paths.
 - [ ] Inspect the final diff for accidental test-runner, dependency-bootstrap,
       or package-provisioning changes.
 - [ ] Confirm `Run-AutomationTests.ps1` remains a direct pass-through to
@@ -219,8 +250,10 @@ test-owned screen above them.
 
 ## Completion gate
 
-- [ ] Native interaction tests use borrowed native-screen attachments and
-      selected `ds.get(...)` subjects.
+- [ ] Native interaction tests use borrowed native-screen attachments;
+      addressable controls use selected `ds.get(...)` subjects, while
+      procedural Hauling rows use production-derived screen-cell input and
+      captured rendering/state evidence.
 - [ ] Registered overlays remain owned by the DFHack registry throughout
       interaction tests.
 - [ ] No native test depends on a custom host screen, pointer target, focus

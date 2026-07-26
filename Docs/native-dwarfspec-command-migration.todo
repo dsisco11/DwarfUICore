@@ -202,18 +202,32 @@ test-owned screen above them.
 
 ## Phase 4: Migrate tooltip registration integration
 
-- [ ] Replace `TooltipRegistrationScreen` and its pointer target with
+- [x] Replace `TooltipRegistrationScreen` and its pointer target with
       `ds.mountNativeScreen()` and exact-cell pointer movement.
-- [ ] Keep `ds.stage_overlay_registration()` for the staged registration
+- [x] Keep `ds.stage_overlay_registration()` for the staged registration
       source; do not substitute a fake overlay lifecycle.
-- [ ] Resolve the staged overlay target through
+- [x] Resolve the staged overlay target through
       `ds.get(path, {source='overlay', overlay=registered_name})` after
       registration.
-- [ ] Replace manual native-focus matching with `getFocusList()` and native
+- [x] Replace manual native-focus matching with `getFocusList()` and native
       subject inspection.
-- [ ] Use redraw and overlay-control inspection to prove registration,
+- [x] Use redraw and overlay-control inspection to prove registration,
       enablement, tooltip selection, and focus ineligibility.
-- [ ] Preserve cleanup of the staged registration and tooltip singleton.
+- [x] Preserve cleanup of the staged registration and tooltip singleton.
+
+### Phase 4 evidence
+
+- 2026-07-26: the migrated tooltip registration integration passed twice in
+  one DwarfSpec run with 1 success per repeat and
+  `cleanup_confirmed=true`; teardown also proved that the staged target was no
+  longer selected by the singleton service.
+- 2026-07-26: the complete tooltip DwarfSpec group passed with 5 successes and
+  `cleanup_confirmed=true`.
+- 2026-07-26: the focused tooltip unit suites passed with 36 successes; the
+  complete Busted suite passed with 183 successes and no failures, errors, or
+  pending cases.
+- 2026-07-26: Lua syntax validation passed for 16 production files and 33
+  test/support files.
 
 ## Phase 5: Normalize mounted components and audit the remaining suite
 

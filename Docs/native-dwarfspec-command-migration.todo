@@ -67,58 +67,58 @@ test-owned screen above them.
 
 ## Phase 1: Migrate the minecart registered-overlay test
 
-- [ ] Start the test with `ds.mountNativeScreen()` and remove
+- [x] Start the test with `ds.mountNativeScreen()` and remove
       `MinecartNativeInteractionScreen`.
-- [ ] Remove the test-owned pointer `Panel`, its layout mutation, and the
+- [x] Remove the test-owned pointer `Panel`, its layout mutation, and the
       custom pointer helper.
-- [ ] Replace all native pointer placement with `ds.move_pointer(x, y)`.
-- [ ] Open and close Hauling through `ds.input()` while the borrowed native
+- [x] Replace all native pointer placement with `ds.move_pointer(x, y)`.
+- [x] Open and close Hauling through `ds.input()` while the borrowed native
       screen is mounted.
-- [ ] Confirm the mounted native screen reports the expected Hauling focus
+- [x] Confirm the mounted native screen reports the expected Hauling focus
       string before interacting with its procedural rows.
-- [ ] Calculate and cache the native Hauling panel bounds and visible route/stop
+- [x] Calculate and cache the native Hauling panel bounds and visible route/stop
       row geometry from the production layout and `plotinfo.hauling` state.
-- [ ] Use `ds.capture_screen()` over the cached Hauling panel bounds to verify
+- [x] Use `ds.capture_screen()` over the cached Hauling panel bounds to verify
       rendered row text and selection indicators; do not model the procedural
       rows as `ds.get(...)` subjects.
-- [ ] Use `plotinfo.hauling.view_routes`, `view_stops`, and `scroll_position`
+- [x] Use `plotinfo.hauling.view_routes`, `view_stops`, and `scroll_position`
       only to identify which logical row occupies a production-derived screen
       cell and to observe the result of naturally delivered input.
-- [ ] Select the real rail and zoom controls with
+- [x] Select the real rail and zoom controls with
       `ds.get(path, {source='overlay', overlay=registered_name})`.
-- [ ] Remove direct overlay-registry table lookup where a selected overlay
+- [x] Remove direct overlay-registry table lookup where a selected overlay
       control provides the necessary rendered or inspected evidence.
-- [ ] Replace overlay-root state assertions with rendered selection indicators,
+- [x] Replace overlay-root state assertions with rendered selection indicators,
       control inspection, and native route/map state.
-- [ ] Remove the test-driven native-viewscreen lookup from production
+- [x] Remove the test-driven native-viewscreen lookup from production
       `get_focus()` and restore its production focus semantics.
-- [ ] Keep the map-paint spy only if `capture_screen()` cannot observe the
+- [x] Keep the map-paint spy only if `capture_screen()` cannot observe the
       Premium transparent marker; document why the final paint boundary is
       required.
-- [ ] Move to a rendered route-label cell, send normal mouse input, and assert
+- [x] Move to a rendered route-label cell, send normal mouse input, and assert
       that it selects the corresponding route.
-- [ ] Move to a rendered stop-row cell, send normal mouse input, and assert
+- [x] Move to a rendered stop-row cell, send normal mouse input, and assert
       that it selects the corresponding route.
-- [ ] Assert that the selected-row indicator is rendered at the exact
+- [x] Assert that the selected-row indicator is rendered at the exact
       menu-relative position.
-- [ ] Hover a stop row and assert that the action rail is rendered at the exact
+- [x] Hover a stop row and assert that the action rail is rendered at the exact
       row-relative position.
-- [ ] Move the pointer from the stop row onto the rail and assert that the rail
+- [x] Move the pointer from the stop row onto the rail and assert that the rail
       remains open.
-- [ ] Click the rendered zoom action and assert that the viewport centers on the
+- [x] Click the rendered zoom action and assert that the viewport centers on the
       stop while its route remains selected.
-- [ ] Scroll over the rail and assert that the rail consumes the wheel without
+- [x] Scroll over the rail and assert that the rail consumes the wheel without
       changing `plotinfo.hauling.scroll_position`.
-- [ ] Scroll with the pointer over the rendered native route-list bounds and
+- [x] Scroll with the pointer over the rendered native route-list bounds and
       assert that `plotinfo.hauling.scroll_position` changes and the captured
       visible rows change consistently.
-- [ ] Assert that native scrolling rebinds the rail to the newly visible stop.
-- [ ] Assert that the formerly bound stop is no longer eligible for activation.
-- [ ] Assert marker glyph, color, transparency, and label rendering for the
+- [x] Assert that native scrolling rebinds the rail to the newly visible stop.
+- [x] Assert that the formerly bound stop is no longer eligible for activation.
+- [x] Assert marker glyph, color, transparency, and label rendering for the
       selected route.
-- [ ] Move the native viewport and assert that marker and label positions follow
+- [x] Move the native viewport and assert that marker and label positions follow
       the production world-to-UI transform.
-- [ ] Confirm cleanup releases the native attachment without dismissing or
+- [x] Confirm cleanup releases the native attachment without dismissing or
       mutating the pre-existing game screen.
 
 ## Phase 2: Migrate the native mood-popover test

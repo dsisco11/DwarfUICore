@@ -168,23 +168,37 @@ test-owned screen above them.
 
 ## Phase 3: Reclassify deterministic mood component contracts
 
-- [ ] Split provider-injected registered-overlay setup from the native
+- [x] Split provider-injected registered-overlay setup from the native
       production-proof scenario.
-- [ ] Retain provider-injected snapshot tests for stress-category and sorting
+- [x] Retain provider-injected snapshot tests for stress-category and sorting
       behavior.
-- [ ] Retain deterministic layout tests that make no native interaction claim.
-- [ ] Rename provider-driven suites and cases to identify component-logic
+- [x] Retain deterministic layout tests that make no native interaction claim.
+- [x] Rename provider-driven suites and cases to identify component-logic
       coverage explicitly.
-- [ ] Move pure `update_popover()` and `onInput()` return-value contracts into
+- [x] Move pure `update_popover()` and `onInput()` return-value contracts into
       `.spec.lua` files when no mounted rendering or routing is asserted.
-- [ ] For retained mounted component routing tests, use DwarfSpec mouse input
+- [x] For retained mounted component routing tests, use DwarfSpec mouse input
       and redraw commands instead of direct `onInput()` calls.
-- [ ] Retain `ds.mount(MoodPopoverOverlay, ...)` only for explicitly named
+- [x] Retain `ds.mount(MoodPopoverOverlay, ...)` only for explicitly named
       injected-provider component coverage.
-- [ ] Remove descriptions that imply DFHack-native behavior when the test only
+- [x] Remove descriptions that imply DFHack-native behavior when the test only
       calls a method or uses an injected provider.
-- [ ] Keep injected providers out of the native moodlet production-proof
+- [x] Keep injected providers out of the native moodlet production-proof
       scenario.
+
+### Phase 3 evidence
+
+- 2026-07-26: provider-injected registry coverage was separated into
+  `tests/mood_popover/registered_component.ds.lua`; its focused DwarfSpec run
+  passed with 1 success and `cleanup_confirmed=true`.
+- 2026-07-26: the focused mood-popover DwarfSpec file passed with 6 successes,
+  including mounted redraw/mouse routing and the provider-free native moodlet
+  scenario, with `cleanup_confirmed=true`.
+- 2026-07-26: the focused mood model and overlay unit suites passed with 18
+  successes; the complete Busted suite passed with 183 successes and no
+  failures, errors, or pending cases.
+- 2026-07-26: Lua syntax validation passed for 16 production files and 33
+  test/support files.
 
 ## Phase 4: Migrate tooltip registration integration
 

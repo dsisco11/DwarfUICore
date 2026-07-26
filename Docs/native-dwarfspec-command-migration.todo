@@ -123,37 +123,48 @@ test-owned screen above them.
 
 ## Phase 2: Migrate the native mood-popover test
 
-- [ ] Start the native top-bar scenario with `ds.mountNativeScreen()`.
-- [ ] Obtain registered popover controls through
+- [x] Start the native top-bar scenario with `ds.mountNativeScreen()`.
+- [x] Obtain registered popover controls through
       `ds.get(path, {source='overlay',
       overlay='dwarfui-mood-popover.mood_popover'})`.
-- [ ] Remove direct writes to `gps.mouse_*` and `gps.precise_mouse_*`.
-- [ ] Move the pointer to every complete moodlet column with
+- [x] Remove direct writes to `gps.mouse_*` and `gps.precise_mouse_*`.
+- [x] Move the pointer to every complete moodlet column with
       `ds.move_pointer(x, y)` and request the normal render path with
       `redraw()`.
-- [ ] Exercise the number, icon, area above the icon, and area below the icon in
+- [x] Exercise the number, icon, area above the icon, and area below the icon in
       each of the seven moodlet columns.
-- [ ] Assert that every moodlet column selects its expected stress category.
-- [ ] Remove direct `update_popover()` calls from the native scenario.
-- [ ] Use `inspect()` for popover/list bounds and scroll position and `text()`
-      for the selected category, count, and visible unit rows.
-- [ ] Replace direct `gui.simulateInput()` wheel and click delivery with
+- [x] Assert that every moodlet column selects its expected stress category.
+- [x] Remove direct `update_popover()` calls from the native scenario.
+- [x] Use `inspect()` for popover/list bounds and scroll position, `text()` for
+      the selected category and count, and bounded `capture_screen()` output
+      for visible unit rows.
+- [x] Replace direct `gui.simulateInput()` wheel and click delivery with
       `ds.mouseInput()` at the current native pointer position.
-- [ ] Remove direct `refresh()` calls from the native scenario; establish data
+- [x] Remove direct `refresh()` calls from the native scenario; establish data
       then allow the registered overlay's normal update/render cadence.
-- [ ] Move the pointer from a moodlet into the popover and assert that the
+- [x] Move the pointer from a moodlet into the popover and assert that the
       popover remains open.
-- [ ] Scroll while the pointer remains over a moodlet and assert that the list
+- [x] Scroll while the pointer remains over a moodlet and assert that the list
       advances exactly once.
-- [ ] Scroll while the pointer is over the popover list and assert that the
+- [x] Scroll while the pointer is over the popover list and assert that the
       scrollbar position and visible rows update consistently.
-- [ ] Click a rendered unit row and assert that the game zooms to that unit.
-- [ ] Assert that the unit card opens on its overview tab.
-- [ ] Assert that the overview tab contains populated overview data.
-- [ ] Verify native focus loss through `getFocusList()` and the registered
+- [x] Click a rendered unit row and assert that the game zooms to that unit.
+- [x] Assert that the unit card opens on its overview tab.
+- [x] Assert that the overview tab contains populated overview data.
+- [x] Verify native focus loss through `getFocusList()` and the registered
       overlay's actual lifecycle.
-- [ ] Restore unit-card, viewport, pointer-sensitive, and overlay state after
+- [x] Restore unit-card, viewport, pointer-sensitive, and overlay state after
       the native attachment is released.
+
+### Phase 2 evidence
+
+- 2026-07-26: the focused mood-popover DwarfSpec file passed twice
+  consecutively with 7 successes, 0 failures, 0 errors, and
+  `cleanup_confirmed=true` in both runs.
+- 2026-07-26: the complete Busted suite passed with 183 successes and no
+  failures, errors, or pending cases.
+- 2026-07-26: Lua syntax validation passed for 16 production files and 32
+  test/support files.
 
 ## Phase 3: Reclassify deterministic mood component contracts
 

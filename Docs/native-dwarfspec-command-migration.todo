@@ -34,16 +34,14 @@ test-owned screen above them.
 - Use `plotinfo.hauling` only for domain-state assertions. It is not a widget
   root and must not be passed to `ds.get()`.
 
-## Phase 0: Establish the native command baseline
+## Phase 0: Establish the DwarfUI native integration inventory
 
 - [x] Make this document the authoritative execution checklist for the native
       DwarfSpec migration.
 - [x] Mark the earlier mounted-host routing and custom-screen minecart work in
       `natural-widget-interaction-tests.todo` as historical and superseded.
-- [x] Confirm the installed DwarfSpec package exposes `mountNativeScreen()`,
-      exact-coordinate `move_pointer(x, y)`, native and registered-overlay
-      control lookup through `get()`, subject inspection, focus, text, and
-      screen/view-tree capture commands.
+- [x] Record the DwarfSpec commands required by DwarfUI's feature tests without
+      retaining consumer-side tests that specify those commands' behavior.
 - [x] Record the minimum DwarfSpec version or explicit capability check required
       by DwarfUI's native tests.
 - [x] Capture the native Hauling screen and record the calculated route-list
@@ -55,7 +53,7 @@ test-owned screen above them.
       beside the native interaction test.
 - [x] Capture the native fortress view tree and record the stable top-bar
       moodlet controls or the evidence that their hit regions are screen-cell
-      based rather than native widget controls. The baseline uses
+      based rather than native widget controls. The native mood test uses
       `TopBarMoodDisplay:find_layout()` to verify all seven production
       screen-cell regions; no native widget path is required for moodlets.
 - [x] Capture the registered minecart and mood overlay trees and record their
@@ -118,8 +116,8 @@ test-owned screen above them.
       selected route.
 - [x] Move the native viewport and assert that marker and label positions follow
       the production world-to-UI transform.
-- [x] Confirm cleanup releases the native attachment without dismissing or
-      mutating the pre-existing game screen.
+- [x] Restore minecart selection, viewport, indicator, scroll, and original
+      Hauling focus before releasing the native attachment.
 
 ## Phase 2: Migrate the native mood-popover test
 
@@ -269,62 +267,101 @@ Phase 5 direct-lifecycle classification:
 
 Phase 5 evidence:
 
-- 2026-07-26: removed implicit `dwarfui reload` calls from the native command
-  baseline and minecart interaction test; both select existing registry-owned
-  overlays.
-- 2026-07-26: the native command baseline passed with 1 success and
-  `cleanup_confirmed=true` without a reload.
+- 2026-07-26: removed the implicit `dwarfui reload` call from the minecart
+  interaction test so it selects the existing registry-owned overlay.
 - 2026-07-26: the minecart unit suite passed with 10 successes, and its native
   component test passed with 1 success and `cleanup_confirmed=true` without a
   reload.
 - 2026-07-26: the complete DwarfSpec suite passed with 14 successes and
-  `cleanup_confirmed=true`, including preservation of an initially open native
-  Hauling menu across independent tests.
+  `cleanup_confirmed=true`; one case was the temporary command baseline later
+  removed because it specified DwarfSpec behavior instead of DwarfUI behavior.
 - 2026-07-26: suite-wide source audit found no `wait_frames()`, pointer-global
   mutation, direct production `onInput()`, direct production refresh/update,
   or direct production button activation in any `.ds.lua` file.
 
 ## Phase 6: Verification and evidence
 
-- [ ] Run Lua syntax validation for all changed production, test, and support
+- [x] Run Lua syntax validation for all changed production, test, and support
       files.
-- [ ] Run the focused HoverActionRail unit suite.
-- [ ] Run the focused minecart route-marker unit suite.
-- [ ] Run the focused mood-popover unit suite.
-- [ ] Run the complete Busted unit suite from the workspace root.
-- [ ] Run the minecart native component test at least twice through the thin
+- [x] Run the focused HoverActionRail unit suite.
+- [x] Run the focused minecart route-marker unit suite.
+- [x] Run the focused mood-popover unit suite.
+- [x] Run the complete Busted unit suite from the workspace root.
+- [x] Run the minecart native component test at least twice through the thin
       `Run-AutomationTests` pass-through.
-- [ ] Run the native mood-popover component test through the same entrypoint.
-- [ ] Run the tooltip registration integration test through the same
+- [x] Run the native mood-popover component test through the same entrypoint.
+- [x] Run the tooltip registration integration test through the same
       entrypoint.
-- [ ] Run the remaining affected DwarfSpec component tests.
-- [ ] Run the complete DwarfSpec component suite.
-- [ ] Confirm every native attachment reports cleanup without dismissing the
-      pre-existing DF screen.
-- [ ] Confirm each native test restores pointer-sensitive state, viewport,
+- [x] Run the remaining affected DwarfSpec component tests.
+- [x] Run the complete DwarfSpec component suite.
+- [x] Confirm every automation run reports cleanup and each native feature test
+      restores the DwarfUI and game state it changes without asserting
+      DwarfSpec's mount ownership semantics.
+- [x] Confirm each native test restores pointer-sensitive state, viewport,
       unit-card state, and registered-overlay state.
-- [ ] Inspect the final diff for `ds.root()`, custom pointer hosts, test-owned
+- [x] Inspect the final diff for `ds.root()`, custom pointer hosts, test-owned
       native focus shims, direct pointer-global writes, direct production
       `onInput()` calls, and direct production refresh/update shortcuts.
-- [ ] Inspect the final diff for attempts to treat `plotinfo.hauling` or its
+- [x] Inspect the final diff for attempts to treat `plotinfo.hauling` or its
       procedural rows as widget paths.
-- [ ] Inspect the final diff for accidental test-runner, dependency-bootstrap,
+- [x] Inspect the final diff for accidental test-runner, dependency-bootstrap,
       or package-provisioning changes.
-- [ ] Confirm `Run-AutomationTests.ps1` remains a direct pass-through to
+- [x] Confirm `Run-AutomationTests.ps1` remains a direct pass-through to
       `dwarfspec run`.
-- [ ] Report syntax, unit, mounted-component, registered-overlay, native-UI,
+- [x] Report syntax, unit, mounted-component, registered-overlay, native-UI,
       and cleanup evidence separately.
+
+### Phase 6 evidence
+
+- Test ownership: removed the temporary native-command baseline and generic
+  assertions about DwarfSpec API shape, subject representation, coordinate
+  return values, and post-unmount screen ownership. DwarfUI tests retain only
+  feature-specific setup, interaction, rendering, game-state, and cleanup
+  assertions.
+- Syntax: `.\tools\Check-LuaSyntax.ps1 -IncludeTests` passed with Lua 5.4.6
+  for 16 production files and 32 test/support files.
+- Focused units: HoverActionRail passed 26 checks; the minecart model and
+  overlay passed 36 checks; the mood model and overlay passed 18 checks.
+- Complete units: `.\tools\Run-UnitTests.ps1` passed 183 checks with no
+  failures, errors, or pending cases.
+- Mounted components: the mood file passed five deterministic mounted cases;
+  the registered mood component passed its registry-owned injected-provider
+  case; the tooltip group passed four mounted component cases.
+- Registered overlays and native UI: the real Hauling minecart test passed
+  twice consecutively; the native top-bar moodlet case, tooltip registration
+  integration, and registered mood component each passed through the thin
+  automation entrypoint.
+- Complete live suite: `.\tools\Run-AutomationTests.ps1` passed all 13 DwarfUI
+  cases with no failures, errors, or pending cases.
+- Cleanup: every focused and complete automation run reported
+  `cleanup_confirmed=true` as runner-health evidence. DwarfUI assertions remain
+  limited to state owned or changed by its features: minecart restores its
+  viewport, scroll, selection, indicator, and original Hauling focus; mood
+  restores viewport, unit-card, indicator, overlay, and original focus state;
+  tooltip restores registration, eligibility, target, visibility, and original
+  focus state. DwarfSpec owns verification of pointer and mount restoration.
+- Final audit: source-wide searches found no `ds.root()`, custom pointer host,
+  focus shim, direct pointer-global write, `simulateInput()`, `wait_frames()`,
+  test-triggered `dwarfui reload`, direct production refresh shortcut, or
+  procedural Hauling row passed to `ds.get()`. Remaining direct fixture and
+  cleanup lifecycle calls retain the Phase 5 classification above.
+- Tooling and package boundary: the final diff removes the temporary DwarfSpec
+  command baseline and generic post-unmount assertions, and updates this
+  planning evidence. No test runner, dependency bootstrap, rockspec, LuaLS, or
+  package-provisioning file changed.
+  `tools/Run-AutomationTests.ps1` remains
+  `& dwarfspec run @DwarfSpecArgs` followed by `exit $LASTEXITCODE`.
 
 ## Completion gate
 
-- [ ] Native interaction tests use borrowed native-screen attachments;
+- [x] Native interaction tests use borrowed native-screen attachments;
       addressable controls use selected `ds.get(...)` subjects, while
       procedural Hauling rows use production-derived screen-cell input and
       captured rendering/state evidence.
-- [ ] Registered overlays remain owned by the DFHack registry throughout
+- [x] Registered overlays remain owned by the DFHack registry throughout
       interaction tests.
-- [ ] No native test depends on a custom host screen, pointer target, focus
+- [x] No native test depends on a custom host screen, pointer target, focus
       shim, or direct interaction lifecycle call.
-- [ ] Deterministic component contracts are clearly separated from native
+- [x] Deterministic component contracts are clearly separated from native
       production evidence.
-- [ ] Syntax, unit, live component, cleanup, and final-diff evidence pass.
+- [x] Syntax, unit, live component, cleanup, and final-diff evidence pass.

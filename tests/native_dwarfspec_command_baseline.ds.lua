@@ -1,8 +1,8 @@
 -- Live capability and control-tree baseline for DwarfUI's native UI tests.
 
 local overlay = require('plugins.overlay')
-local gui = require('gui')
 local mood_overlay = reqscript('dwarfui-mood-popover')
+local tooltip = reqscript('dwarfui/tooltip')
 
 local MINECART_OVERLAY =
     'dwarfui-minecart-route-markers.minecart_route_markers'
@@ -111,7 +111,6 @@ describe('native DwarfSpec command baseline', function()
             assert.is_table(hauling_tree)
             assert.is_table(ds.capture_screen('native_hauling_screen'))
 
-            dfhack.run_command('dwarfui reload')
             ds.await('DwarfUI registered overlays are available', function()
                 local db = overlay.get_state().db
                 return db[MINECART_OVERLAY] and db[MOOD_OVERLAY]
@@ -173,14 +172,23 @@ describe('native DwarfSpec command baseline', function()
                 source='overlay', overlay=staged_name,
             })
             assert.is_table(tooltip_target)
+
+            -- Staging cleanup removes the generated overlay at run teardown.
+            -- Product-level cleanup is immediate so this baseline does not
+            -- leave the singleton tooltip screen between later examples.
+            assert.is_true(tooltip.unregister(tooltip_target:raw()))
+            assert.is_true(overlay.overlay_command(
+                {'disable', staged_name}, true))
+            ds.redraw()
         end, debug.traceback)
 
         if not initially_open and hauling_is_open() then
-            -- Opening Hauling replaces the borrowed native screen. Cleanup
-            -- closes that underlying screen directly before releasing the
-            -- stale attachment, without introducing a test-owned host.
-            gui.simulateInput(dfhack.gui.getDFViewscreen(true), 'LEAVESCREEN')
-            ds.wait_frames(1)
+            -- Cleanup uses the borrowed screen's public input path to restore
+            -- the pre-test native menu state before releasing the attachment.
+            ds.input('LEAVESCREEN')
+            ds.await('cleanup restores the default native screen', function()
+                return not hauling_is_open()
+            end)
             assert.is_false(hauling_is_open(),
                 'cleanup did not restore the original native screen')
         end

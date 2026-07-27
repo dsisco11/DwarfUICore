@@ -231,30 +231,58 @@ test-owned screen above them.
 
 ## Phase 5: Normalize mounted components and audit the remaining suite
 
-- [ ] Keep test-owned `ds.mount(...)` screens and overlays where the fixture
+- [x] Keep test-owned `ds.mount(...)` screens and overlays where the fixture
       itself is the subject of the test.
-- [ ] Replace render-dependent `wait_frames()` calls with `redraw()` where a
+- [x] Replace render-dependent `wait_frames()` calls with `redraw()` where a
       completed render is required.
-- [ ] Replace any direct fixture input invocation with subject `input()` or
+- [x] Replace any direct fixture input invocation with subject `input()` or
       DwarfSpec mouse input when validating event routing.
-- [ ] Keep direct fixture screen show/dismiss calls only where the test is
+- [x] Keep direct fixture screen show/dismiss calls only where the test is
       explicitly proving modal lifecycle behavior.
-- [ ] Confirm neither tooltip component test claims native DF UI coverage.
-- [ ] Review every remaining `.ds.lua` file for direct pointer-global mutation.
-- [ ] Review every remaining `.ds.lua` file for direct production `onInput()`
+- [x] Confirm neither tooltip component test claims native DF UI coverage.
+- [x] Review every remaining `.ds.lua` file for direct pointer-global mutation.
+- [x] Review every remaining `.ds.lua` file for direct production `onInput()`
       calls.
-- [ ] Review every remaining `.ds.lua` file for direct render, update, or
+- [x] Review every remaining `.ds.lua` file for direct render, update, or
       refresh calls that manufacture user-visible state.
-- [ ] Review every remaining `.ds.lua` file for direct button activation in
+- [x] Review every remaining `.ds.lua` file for direct button activation in
       place of a rendered click.
-- [ ] Review registered-overlay tests for focus, pointer, enablement, or
+- [x] Review registered-overlay tests for focus, pointer, enablement, or
       lifecycle stubs.
-- [ ] Add comments to each component test describing setup intent, interaction
+- [x] Add comments to each component test describing setup intent, interaction
       intent, and the state or rendering proved by its assertions.
-- [ ] Add a test-review convention that rejects native-interaction claims based
+- [x] Add a test-review convention that rejects native-interaction claims based
       only on internal callback invocation.
-- [ ] Classify and justify every remaining direct lifecycle call as a pure
+- [x] Classify and justify every remaining direct lifecycle call as a pure
       method contract, deterministic component fixture, or cleanup operation.
+
+Phase 5 direct-lifecycle classification:
+
+| Location | Classification | Justification |
+|---|---|---|
+| `mood_popover/mood_popover.ds.lua` registered popover `clear()` | Cleanup operation | Clears registry-owned transient rows only after native interaction assertions and unmount. |
+| `mood_popover/mood_popover.ds.lua` borrowed-screen `logic()` and `render()` | Cleanup operation | Applies restored game-owned unit-card state after releasing the borrowed attachment; neither call establishes interaction evidence. |
+| `mood_popover/registered_component.ds.lua` widget `clear()` | Cleanup operation | Removes injected deterministic state after assertions. |
+| `tooltip/tooltip_overlay.ds.lua` fixture `onRenderFrame()` and `render()` | Deterministic component fixture | These methods implement the test-owned mounted overlay subject; interaction still enters through DwarfSpec. |
+| `tooltip/tooltip.ds.lua` fixture `onInput()` | Deterministic component fixture | This is the mounted test screen's event receiver, not a direct production call. |
+| `tooltip/tooltip.ds.lua` cover show/dismiss and fixture `onDismiss()` | Deterministic component fixture | The test explicitly proves modal z-order lifecycle; dismissal also guarantees fixture cleanup. |
+
+Phase 5 evidence:
+
+- 2026-07-26: removed implicit `dwarfui reload` calls from the native command
+  baseline and minecart interaction test; both select existing registry-owned
+  overlays.
+- 2026-07-26: the native command baseline passed with 1 success and
+  `cleanup_confirmed=true` without a reload.
+- 2026-07-26: the minecart unit suite passed with 10 successes, and its native
+  component test passed with 1 success and `cleanup_confirmed=true` without a
+  reload.
+- 2026-07-26: the complete DwarfSpec suite passed with 14 successes and
+  `cleanup_confirmed=true`, including preservation of an initially open native
+  Hauling menu across independent tests.
+- 2026-07-26: suite-wide source audit found no `wait_frames()`, pointer-global
+  mutation, direct production `onInput()`, direct production refresh/update,
+  or direct production button activation in any `.ds.lua` file.
 
 ## Phase 6: Verification and evidence
 

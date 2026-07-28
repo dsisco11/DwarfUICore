@@ -2,8 +2,9 @@
 
 ## Status
 
-Planning only. This document is the execution contract for pointer sampling,
-registered-control hit testing, and tooltip-service notification.
+Phase 0 is complete. Phase 1 is the next implementation step. This document is
+the execution contract for pointer sampling, registered-control hit testing,
+and tooltip-service notification.
 
 Tooltip rendering is intentionally excluded. A separate plan will decide how
 tooltip presentation is placed above base-game and DFHack content without
@@ -200,36 +201,78 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 0: Characterize scheduler and current behavior
 
-- [ ] Record the current production registration, hit-testing, target
+- [x] Record the current production registration, hit-testing, target
       transition, dynamic-text, and teardown behavior in focused tests before
       refactoring it.
-- [ ] Add a minimal live probe proving whether a recurring
+- [x] Add a minimal live probe proving whether a recurring
       `dfhack.timeout(1, 'frames', callback)` continues to run while the game is
       paused and while a foreground widget consumes mouse input.
-- [ ] Prove that reading `dfhack.screen.getMousePos()` from the timeout callback
+- [x] Prove that reading `dfhack.screen.getMousePos()` from the timeout callback
       neither consumes input nor changes the current viewscreen or focus
       string.
-- [ ] Characterize timeout behavior at the title screen, during a safe
+- [x] Characterize timeout behavior at the title screen, during a safe
       load-state transition, and after map load without leaving a recurring
       callback behind.
-- [ ] Confirm how native-mounted DwarfSpec roots can be recognized as
+- [x] Confirm how native-mounted DwarfSpec roots can be recognized as
       currently presented without consulting a tooltip presentation object.
-- [ ] Record the current cross-root arbitration result for overlapping
+- [x] Record the current cross-root arbitration result for overlapping
       eligible roots.
-- [ ] Treat any scheduler behavior that depends on a screen's render,
+- [x] Treat any scheduler behavior that depends on a screen's render,
       `onInput`, or `onIdle` method as a failed feasibility result and stop
       before production refactoring.
 
 ### Phase 0 completion gate
 
-- [ ] The recurring scheduler has live evidence that it observes pointer
+- [x] The recurring scheduler has live evidence that it observes pointer
       movement independently of UI input dispatch.
-- [ ] Pointer sampling has no observed focus, viewscreen, pause, or input
+- [x] Pointer sampling has no observed focus, viewscreen, pause, or input
       side effect.
-- [ ] Timeout teardown and reload behavior are understood well enough to write
+- [x] Timeout teardown and reload behavior are understood well enough to write
       deterministic lifecycle tests.
-- [ ] Root eligibility inputs are identified without referencing the tooltip
+- [x] Root eligibility inputs are identified without referencing the tooltip
       renderer.
+
+### Phase 0 evidence
+
+- Current behavior is locked by
+  `tests/tooltip_registration.spec.lua` and `tests/pointer.spec.lua`.
+  The focused run reported `29 successes / 0 failures / 0 errors`. It covers
+  idempotent registration, reverse-subview hit testing, blocked and missed
+  targets, enter/update/leave ordering, dynamic text, attachment and
+  visibility changes, explicit removal, weak collection, reload, and
+  registration-sequence priority between overlapping roots.
+- `tests/tooltip/tooltip_pointer_scheduler.ds.lua` is the minimal live probe.
+  Its focused DwarfSpec run reported `2 successes / 0 failures / 0 errors`
+  with `cleanup_confirmed=true` and `mount_cleanup_verified=true`. The
+  recurring callback observed pointer movement while paused, continued after
+  its foreground screen consumed left-click input, preserved the focus list
+  returned by DwarfSpec's `getFocusList()` command, preserved
+  `dfhack.gui.getCurViewscreen(true)` identity and pause state, and stopped
+  rescheduling after its demand flag was cleared.
+- The installed DFHack 53.15 scheduler implementation establishes the
+  title/load/map contract. `library/LuaTools.cpp` stores frame timers in
+  `frame_timers`, advances them from `Lua::Core::onUpdate()`, and cancels only
+  `tick_timers` on map or world unload. `library/Core.cpp` calls that update
+  from the process-wide core update path without consulting a viewscreen
+  render, input, or idle method. A frame timer therefore remains queued across
+  title and load-state transitions and resumes on core updates; it does not
+  execute while a synchronous load blocks the core update loop.
+- A currently presented DwarfSpec native root is identified without a
+  presentation object by identity with
+  `dfhack.gui.getDFViewscreen(true).widgets`. The live probe confirms that
+  `ds.mountNativeScreen()` borrows this exact root. Registered overlays retain
+  their existing registry-owned enabled-instance and viewscreen-match inputs.
+- Teardown uses an explicit demand flag plus a generation token in the
+  planned implementation. The live probe proves a queued callback becomes
+  inert and drains without rescheduling; the current focused reload coverage
+  proves the registration set and target behavior that the generation handoff
+  must preserve.
+- Lua syntax validation passed for all 50 production, test, and support Lua
+  files; unit-test naming and `git diff --check` passed. The complete unit run
+  reached `183 successes / 0 failures / 1 error`: the error is the pre-existing
+  modified special-screen workaround indexing a missing package-test `df`
+  global from `tooltip_registration.lua`. Phase 0 does not alter that
+  superseded workaround, and the failure is not counted as passing evidence.
 
 ## Phase 1: Implement the generic pointer poller
 

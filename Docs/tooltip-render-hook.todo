@@ -1,0 +1,510 @@
+# Tooltip Global Render Hook Implementation Plan
+
+## Status
+
+Planning only. This document is the execution contract for rendering the
+current process-wide tooltip intent after DFHack's native overlay render pass.
+
+It depends on the polling, detection, and intent contracts in
+`Docs/tooltip-input-polling.todo`. It does not replace or absorb any input
+responsibility from that plan.
+
+## Goal
+
+Present the current DwarfUI tooltip:
+
+- after the complete base-game viewscreen render,
+- after every DFHack overlay rendered by `plugins.overlay`,
+- without creating a `gui.ZScreen`,
+- without registering an `OverlayWidget`,
+- without receiving, forwarding, or consuming input,
+- without participating in viewscreen focus or logic, and
+- without allowing a tooltip failure to break normal overlay rendering.
+
+The implementation will wrap the exported
+`plugins.overlay.render_viewscreen_widgets()` function at runtime. The wrapper
+will call the function it replaced first and then render the latest
+`TooltipIntent`.
+
+## Supported presentation boundary
+
+The initial implementation supports tooltip targets rendered in the native
+viewscreen and DFHack overlay pipeline, including the native Hauling menu and
+the DwarfUI minecart overlay.
+
+It does not claim to render above a foreground `gui.ZScreen`. A `ZScreen`
+renders its parent first and then draws its own content, so the native overlay
+hook necessarily runs below it.
+
+For an intent whose opaque `source_root` belongs to an unsupported presentation
+host, the presenter must render nothing and expose that decision in
+diagnostics. A future host-local presenter or a separately justified
+`gui.ZScreen:render()` hook can extend coverage without changing pointer
+polling, target detection, or the global overlay hook.
+
+## Scope boundary
+
+This plan owns:
+
+- runtime installation of the overlay render trampoline,
+- safe chaining with the function already exported by `plugins.overlay`,
+- same-version reload and module-replacement behavior,
+- exactly-once tooltip presentation after the predecessor render function,
+- consumption of `TooltipIntent` notifications,
+- redraw invalidation,
+- tooltip measurement, placement, and painting,
+- supported-surface filtering,
+- failure isolation and diagnostics,
+- focused, full-suite, package, and live evidence.
+
+This plan does not own:
+
+- pointer sampling or hit testing,
+- tooltip registration or hover callbacks,
+- tooltip-text validation,
+- input forwarding or consumption,
+- overlay update callbacks,
+- viewscreen focus, raising, dismissal, or logic,
+- modification of DFHack's installed `plugins/overlay.lua` source,
+- global ordering against unrelated code that deliberately patches itself
+  outside DwarfUI after the last tooltip intent update, or
+- presentation above arbitrary foreground `gui.ZScreen` instances.
+
+## Confirmed architecture
+
+### Stable process state
+
+Keep hook ownership in a versioned process-wide slot:
+
+```lua
+---@class dwarfui.TooltipRenderHookState
+---@field api_version integer
+---@field overlay_module table|nil
+---@field active_trampoline function|nil
+---@field predecessor function|nil
+---@field presenter function|nil
+---@field generation integer
+---@field render_count integer
+---@field last_rendered_revision integer|nil
+---@field last_error string|nil
+---@field disabled_generation integer|nil
+```
+
+The slot belongs under `dfhack.dwarfui`. Same-version DwarfUI reloads update
+the presenter generation in this stable state instead of relying on closures
+from the cleared module environment.
+
+### Chained render trampoline
+
+Each installed trampoline captures:
+
+- the function exported immediately before installation,
+- its own function identity, and
+- access to the stable process slot.
+
+Its behavior is:
+
+1. Call the captured predecessor with the original arguments and preserve its
+   return values.
+2. Re-read the current hook state from `dfhack.dwarfui`.
+3. Render only if this trampoline is still the state's active trampoline.
+4. Invoke the current presenter generation through an error boundary.
+5. Return the predecessor's original return values.
+
+The predecessor call remains outside the tooltip error boundary. DwarfUI must
+not reinterpret or suppress failures from DFHack's normal overlay renderer or
+another wrapper in the established chain.
+
+### Outermost repair
+
+When the renderer receives a new or cleared intent, reloads, or explicitly
+checks its installation:
+
+- if the exported function is the active trampoline, no change is required;
+- if the overlay module was replaced, install against the replacement module;
+- if another wrapper is currently exported, wrap that function and designate
+  the new trampoline as active.
+
+Older DwarfUI trampolines remain in the predecessor chain but observe that
+they are no longer active and skip presentation. This allows DwarfUI to regain
+the outermost position without drawing the tooltip more than once.
+
+The system must not continuously fight another extension for outermost
+position on every render. Repair occurs only at explicit lifecycle boundaries
+and intent notifications. Diagnostics report whether the active trampoline is
+currently the exported function.
+
+### Presenter
+
+The active presenter reads the current immutable `TooltipIntent` at render
+time. Notification handlers request redraw and repair the hook, but do not
+cache a second authoritative copy of the intent.
+
+For a supported intent, the presenter:
+
+1. Reads the current screen dimensions.
+2. Creates a full-screen UI painter whose global coordinates match
+   `dfhack.screen.getMousePos()`.
+3. Applies the current tooltip wrapping and placement policy.
+4. Renders the tooltip once.
+5. Records the rendered revision in diagnostics.
+
+For no intent, a stale intent, an unsupported source root, or a disabled
+presenter generation, it performs no painting.
+
+### Existing renderer reuse
+
+Retain `dwarfui.TooltipRenderer` as the visual implementation unless focused
+characterization identifies a concrete incompatibility with the global
+painter. The hook owns one renderer instance per presenter generation and maps
+the current intent into:
+
+```lua
+renderer:set_tooltip(
+    intent.text,
+    intent.anchor_x,
+    intent.anchor_y,
+    full_screen_rect)
+```
+
+The renderer remains a plain widget. It is not attached to a screen, overlay,
+or consumer root.
+
+If the renderer's current parent invalidation behavior cannot be used without
+a UI owner, move invalidation into the presenter notification adapter instead
+of introducing a synthetic parent view.
+
+## Ordering guarantees
+
+The implementation guarantees:
+
+- the predecessor overlay renderer completes before tooltip painting;
+- all viewscreen-specific and `all` overlay widgets rendered by that
+  predecessor are beneath the tooltip;
+- older DwarfUI trampolines do not paint;
+- one active trampoline paints at most once per native overlay render call;
+- an intent notification repairs DwarfUI to the outermost exported wrapper at
+  that moment.
+
+The implementation cannot guarantee:
+
+- ordering against another extension that replaces the exported function
+  afterward and does not cooperate with wrapper chaining;
+- rendering on native viewscreen classes that the DFHack overlay plugin does
+  not interpose;
+- rendering above content drawn by a foreground `gui.ZScreen` after its
+  parent render; or
+- ordering against native or external drawing that occurs after the DFHack
+  overlay interpose hook.
+
+These limitations must be documented and tested as scope boundaries rather
+than hidden behind screen-type exception lists.
+
+## Lifecycle decisions
+
+- Install the hook when the tooltip presenter subscribes to the service, not
+  from pointer polling code.
+- Installation is valid before map load because it creates no viewscreen,
+  widget, timeout, input handler, or logic callback.
+- A missing current intent makes the active presenter a no-op.
+- Intent publish and clear notifications repair hook ownership and request one
+  redraw through a presentation-owned invalidation adapter.
+- DwarfUI reload replaces the presenter generation and retires the prior
+  renderer instance without nesting an active presentation callback.
+- `plugins.overlay.rescan()` must not disturb the hook.
+- Replacement or clearing of the `plugins.overlay` module is detected the next
+  time installation is ensured.
+- Explicit shutdown clears the presenter and disables the active generation
+  before attempting to restore any exported function.
+- Restore the predecessor only when the module still exports DwarfUI's exact
+  active trampoline.
+- If another wrapper is currently outermost, leave the inert DwarfUI
+  trampoline in its predecessor chain rather than overwriting the other
+  wrapper.
+- A stale trampoline may call its predecessor but must never call a retired
+  presenter.
+
+## Failure-containment decisions
+
+- Run only the DwarfUI presenter through `xpcall`.
+- Never include the predecessor overlay render call inside the tooltip
+  `xpcall`.
+- On presenter failure, capture a traceback, failed revision, generation, and
+  viewscreen identity.
+- Disable the failed presenter generation immediately.
+- Log the failure once and suppress per-frame repetition.
+- Leave the exported trampoline and predecessor chain operational so normal
+  overlays continue rendering.
+- Require an explicit presenter replacement, repair command, or DwarfUI reload
+  before a failed generation can render again.
+- A malformed intent should fail within the presenter boundary and must not
+  corrupt the process-wide input service state.
+
+## Phase 0: Characterize the actual render seam
+
+- [ ] Add a focused live probe proving that replacing
+      `plugins.overlay.render_viewscreen_widgets` changes the function called
+      by the native C++ overlay interpose hook.
+- [ ] Record the exact function arguments and return values received by the
+      installed DFHack version.
+- [ ] Prove the wrapped predecessor renders viewscreen-specific overlays and
+      `viewscreens='all'` overlays before the appended callback.
+- [ ] Prove the appended callback can paint a known cell above a native
+      viewscreen and above both overlay groups.
+- [ ] Verify screen-global pointer coordinates align with a full-window
+      `gui.Painter` in classic and graphics modes supported by the test
+      environment.
+- [ ] Characterize the redraw API needed to show and clear appended painting
+      immediately while the game is paused.
+- [ ] Verify `plugins.overlay.rescan()` preserves a runtime replacement of the
+      exported render function.
+- [ ] Characterize behavior when the overlay Lua module environment is cleared
+      and reloaded.
+- [ ] Confirm that a foreground `gui.ZScreen` paints after the native overlay
+      hook and record it as unsupported initial coverage.
+
+### Phase 0 completion gate
+
+- [ ] The exported Lua function is proven to be the live native overlay render
+      seam.
+- [ ] The appended painter is visibly last within the native overlay pipeline.
+- [ ] Coordinate, redraw, rescan, and module-replacement behavior are known.
+- [ ] No implementation claim extends above a foreground `gui.ZScreen`.
+
+## Phase 1: Implement the versioned render-hook manager
+
+- [ ] Add
+      `src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua`.
+- [ ] Define the documented versioned process-state contract.
+- [ ] Implement idempotent installation around the function currently
+      exported by `plugins.overlay`.
+- [ ] Preserve predecessor arguments, call order, and return values.
+- [ ] Make each trampoline consult the stable process slot instead of calling
+      module-generation state directly.
+- [ ] Ensure only the designated active trampoline can invoke the presenter.
+- [ ] Detect overlay module replacement by module-table identity and exported
+      function identity.
+- [ ] Implement outermost repair that chains the current exported function
+      instead of replacing or bypassing it.
+- [ ] Implement safe shutdown and conditional predecessor restoration.
+- [ ] Expose installation, module identity, generation, outermost status, and
+      chain-repair counters through diagnostics.
+- [ ] Add LuaDoc comments for the hook manager, public methods, process state,
+      trampoline contract, and diagnostics record.
+- [ ] Add the hook module to `dwarfui/module_registry.lua` after tooltip intent
+      mediation and before presentation consumers.
+- [ ] Add package-contract coverage for the hook module.
+
+### Phase 1 completion gate
+
+- [ ] Initial installation calls the predecessor first and the presenter last.
+- [ ] Repeated installation with no external change is a no-op.
+- [ ] Reload changes the presenter generation without double presentation.
+- [ ] External wrappers remain in the predecessor chain.
+- [ ] Focused hook-manager and package-contract tests pass.
+
+## Phase 2: Implement the intent-driven presenter
+
+- [ ] Add a documented presentation adapter under the generic DwarfUI tooltip
+      namespace.
+- [ ] Subscribe the adapter to tooltip intent publish and clear notifications.
+- [ ] Keep the tooltip service authoritative; do not maintain a divergent
+      second intent state.
+- [ ] Repair the render hook and request redraw from the presentation adapter,
+      not from pointer polling or target detection.
+- [ ] Create one `TooltipRenderer` per presenter generation.
+- [ ] Reuse the current tooltip border, colors, wrapping limit, pointer offset,
+      and screen-edge clamping behavior.
+- [ ] Recalculate layout when intent revision or screen dimensions change.
+- [ ] Render against an unclipped full-window UI painter.
+- [ ] Render nothing when the service has no current intent.
+- [ ] Use the intent's opaque `source_root` only to decide whether the global
+      native overlay hook supports that surface.
+- [ ] Do not ask the input system for a renderer, overlay name, focus string,
+      viewscreen, dimensions, or painter.
+- [ ] Reject unsupported source roots without altering target or hover state.
+- [ ] Record current intent revision, last rendered revision, last screen
+      dimensions, supported-surface decision, and render count in diagnostics.
+- [ ] Keep the presenter independent of registration lifetime and pointer
+      polling cadence.
+- [ ] Add LuaDoc comments for all new or modified classes and methods.
+
+### Phase 2 completion gate
+
+- [ ] A valid native-overlay intent renders through the existing visual
+      contract.
+- [ ] Clear notification removes the tooltip on the next requested redraw.
+- [ ] Unsupported roots produce no painting and a diagnostic reason.
+- [ ] No input-layer module imports the presenter or render-hook manager.
+- [ ] Focused presenter and renderer tests pass.
+
+## Phase 3: Harden chaining, reload, and failure isolation
+
+- [ ] Cover an unrelated wrapper installed before DwarfUI and prove it runs
+      before the tooltip.
+- [ ] Cover an unrelated wrapper installed after DwarfUI, repair around it,
+      and prove the former active trampoline becomes presentation-inert.
+- [ ] Prove repeated repair does not render the tooltip twice.
+- [ ] Prove same-version `dwarfui reload` replaces stale renderer and presenter
+      objects while preserving one active hook generation.
+- [ ] Prove `plugins.overlay.rescan()` neither removes nor duplicates the
+      trampoline.
+- [ ] Simulate overlay module replacement and prove the next ensure operation
+      installs against the replacement module.
+- [ ] Prove shutdown restores the predecessor when DwarfUI remains outermost.
+- [ ] Prove shutdown does not overwrite another outer wrapper.
+- [ ] Inject a presenter failure and prove the predecessor completed, the
+      generation disabled, the error recorded once, and subsequent native
+      overlay renders continued.
+- [ ] Replace the failed presenter generation and prove explicit recovery.
+- [ ] Add diagnostics that distinguish installed, outermost, chained,
+      disabled, replaced-module, unsupported-surface, and inactive-intent
+      states.
+
+### Phase 3 completion gate
+
+- [ ] Hook chains survive reload, rescan, repair, and shutdown without losing
+      another wrapper.
+- [ ] Exactly one current presenter can paint per native overlay render call.
+- [ ] Presenter failures cannot stop or repeatedly fault normal overlay
+      rendering.
+- [ ] Focused lifecycle and failure-containment tests pass.
+
+## Phase 4: Cut over the tooltip service
+
+- [ ] Remove `TooltipServiceScreen` and all screen creation, resumption,
+      raising, dismissal, input forwarding, and parent-logic code from
+      production tooltip registration.
+- [ ] Remove native-screen special lists introduced solely to protect the
+      service `ZScreen`.
+- [ ] Remove renderer ownership from registration and input-service state.
+- [ ] Connect the intent service to the render presenter through the
+      presentation-neutral notification boundary.
+- [ ] Keep registration and input polling operational when the presenter is
+      absent, disabled, or failed.
+- [ ] Update public diagnostics so screen and renderer counts are no longer
+      input-service concepts.
+- [ ] Add render-hook diagnostics to DwarfSpec's tooltip-state inspection
+      without exposing mutable implementation tables.
+- [ ] Update `dwarfui reload` ordering so the intent service exists before the
+      presenter and the new presenter is installed before live overlays are
+      rescanned.
+- [ ] Ensure no production tooltip path constructs a `gui.ZScreen`.
+- [ ] Ensure no production tooltip path registers another `OverlayWidget`.
+- [ ] Remove obsolete unit fixtures that emulate a tooltip service screen.
+- [ ] Preserve useful renderer appearance and placement tests at their proper
+      method-contract layer.
+
+### Phase 4 completion gate
+
+- [ ] Tooltip registration creates no screen, overlay widget, focus owner, or
+      input recipient.
+- [ ] The process-wide intent service and renderer are connected only through
+      intent notifications and reads.
+- [ ] Reload leaves one current poller generation and one current presenter
+      generation.
+- [ ] Focused registration, reload, registry, and package tests pass.
+
+## Phase 5: Prove native Hauling rendering and ordering
+
+- [ ] Update the focused minecart tooltip `.ds.lua` test to use the actual
+      registered minecart overlay and zoom button.
+- [ ] Open the native Hauling menu through public DwarfSpec input APIs.
+- [ ] Move the pointer onto the production zoom button and await the published
+      `Zoom to this stop` intent.
+- [ ] Assert the tooltip is painted at the expected screen cells without any
+      tooltip `ZScreen`.
+- [ ] Enable a controlled viewscreen-specific test overlay that paints a
+      conflicting sentinel into the tooltip cells and prove the tooltip is
+      final.
+- [ ] Enable a controlled `viewscreens='all'` test overlay that paints the same
+      conflicting sentinel and prove the tooltip is final.
+- [ ] Install a controlled foreign render wrapper, repair on the next intent
+      notification, and prove both wrappers execute while the tooltip remains
+      final and appears exactly once.
+- [ ] Move the pointer off the button and prove the underlying native and
+      overlay content is restored on the requested redraw.
+- [ ] Assert the native focus string, current viewscreen, pause state, and input
+      routing do not change when the tooltip appears or clears.
+- [ ] Assert render-hook diagnostics report installed, outermost, one active
+      presenter generation, and the expected rendered intent revision.
+- [ ] Run `dwarfui reload` while the Hauling menu remains open and prove the
+      production overlay, poller, render hook, and tooltip all recover without
+      duplication.
+- [ ] Exercise a foreground DwarfSpec `ZScreen` fixture and prove the global
+      presenter suppresses unsupported intent instead of creating or raising a
+      screen.
+- [ ] Restore the original exported overlay render function, controlled test
+      overlays, pointer, Hauling state, focus, and mounted DwarfSpec subjects
+      even when an assertion fails.
+- [ ] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
+      subjects, pointer ownership, test overlays, or foreign wrappers.
+
+### Phase 5 completion gate
+
+- [ ] The production zoom tooltip is visibly above native Hauling UI,
+      viewscreen-specific overlays, and `all` overlays.
+- [ ] Showing and clearing the tooltip changes no focus, viewscreen, pause, or
+      input state.
+- [ ] Reload produces no duplicate render callbacks or missing minecart
+      overlay.
+- [ ] Unsupported `ZScreen` presentation is safely suppressed and explicitly
+      diagnosed.
+- [ ] Focused live automation passes with confirmed cleanup.
+
+## Phase 6: Verification and documentation
+
+- [ ] Run focused unit tests for tooltip rendering, render-hook management,
+      intent mediation, registration, polling, module registry, reload, and
+      package contracts.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run Lua syntax validation for production, test, and support sources.
+- [ ] Run unit-test naming validation.
+- [ ] Run package verification and inspect the packaged manifest for every new
+      production module.
+- [ ] Run the focused native Hauling tooltip test through the unchanged thin
+      `Tools/Run-AutomationTests.ps1` pass-through.
+- [ ] Run the existing native minecart interaction tests to detect overlay or
+      input regressions.
+- [ ] Run the focused live tooltip proof twice to detect retained wrappers,
+      stale presenter generations, or duplicate painting.
+- [ ] Document the supported native-overlay boundary and foreground
+      `ZScreen` limitation in the public tooltip API.
+- [ ] Record focused, full-suite, syntax, naming, package, live, repeat-run,
+      failure-containment, and cleanup evidence separately.
+
+### Phase 6 completion gate
+
+- [ ] All focused and complete verification categories pass.
+- [ ] Package contents and module order include the hook and presenter.
+- [ ] Live evidence proves final native-overlay ordering and system
+      non-interference.
+- [ ] No unsupported claim of universal foreground `ZScreen` ordering remains.
+
+## Planned file impact
+
+Expected production changes:
+
+- `src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua` — stable runtime
+  trampoline installation, chaining, repair, shutdown, and diagnostics.
+- `src/scripts_modinstalled/dwarfui/tooltip.lua` — intent-driven presenter and
+  existing renderer adaptation.
+- `src/scripts_modinstalled/dwarfui/tooltip_registration.lua` — remove screen
+  ownership and expose presentation-neutral intent notifications.
+- `src/scripts_modinstalled/dwarfui/module_registry.lua` — hook and presenter
+  dependency order.
+- `src/scripts_modinstalled/dwarfui.lua` — coherent reload handoff.
+
+Expected test changes:
+
+- `tests/tooltip_render_hook.spec.lua`
+- `tests/tooltip.spec.lua`
+- `tests/tooltip_registration.spec.lua`
+- `tests/module_registry.spec.lua`
+- `tests/package_contract.spec.lua`
+- `tests/minecart_route/minecart_route_tooltip.ds.lua`
+- focused DwarfSpec support for controlled overlay and foreign-wrapper
+  ordering probes.
+
+No DFHack core, plugin binary, or installed `plugins/overlay.lua` source file
+will be modified.

@@ -124,11 +124,15 @@ The tooltip service accepts observations and owns semantic tooltip state:
 ---@field anchor_x integer
 ---@field anchor_y integer
 ---@field coordinate_space '"screen-cells"'
+---@field source_root gui.View
 ```
 
-The intent contains a text snapshot and a screen-cell anchor only. It does not
-contain a renderer frame, dimensions, wrapping result, screen bounds, painter,
-overlay name, focus string, or viewscreen.
+The intent contains a text snapshot, a screen-cell anchor, and the opaque root
+that supplied the target. The input system does not classify or interpret the
+root for presentation; it merely preserves the identity already produced by
+hit testing so a presentation consumer can reject surfaces it cannot render
+above. The intent does not contain a renderer frame, dimensions, wrapping
+result, screen bounds, painter, overlay name, focus string, or viewscreen.
 
 The service exposes the current intent through a presentation-neutral
 subscription or observer boundary. Selection between those two equivalent
@@ -499,6 +503,7 @@ The later rendering plan may depend only on:
 - monotonically increasing intent revisions,
 - text already validated and snapshotted,
 - an anchor in documented screen-cell coordinates, and
+- the opaque source root already identified during hit testing, and
 - optional lifecycle diagnostics that do not expose input internals.
 
 It may not require the poller or detector to:

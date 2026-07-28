@@ -5,36 +5,41 @@
 
 local gui = require('gui')
 local tooltip = reqscript('dwarfui/tooltip')
+local input_service = reqscript('dwarfui/tooltip_service').service
 local target_detector = reqscript('dwarfui/tooltip_target_detector')
 
 API_VERSION = 1
-local SERVICE_SLOT = 'tooltip_service'
+local LEGACY_HOST_SLOT = 'tooltip_legacy_host'
 local STATE_CHANGE_KEY = 'dwarfui_tooltip_service'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
-local service = dfhack.dwarfui[SERVICE_SLOT]
-if service and service.api_version ~= API_VERSION then
-    error(('Conflicting DwarfUI tooltip service versions: ' ..
+local host = dfhack.dwarfui[LEGACY_HOST_SLOT]
+if host and host.api_version ~= API_VERSION then
+    error(('Conflicting DwarfUI tooltip legacy-host versions: ' ..
         'process has %s, requested %s.'):format(
-            tostring(service.api_version), tostring(API_VERSION)))
+            tostring(host.api_version), tostring(API_VERSION)))
 end
-if not service then
-    service = {
+if not host then
+    host = {
         api_version=API_VERSION,
-        registrations=setmetatable({}, {__mode='k'}),
-        sequence=0,
-        legacy_sample_sequence=0,
+        sample_sequence=0,
         screen=nil,
-        target=nil,
     }
-    dfhack.dwarfui[SERVICE_SLOT] = service
+    dfhack.dwarfui[LEGACY_HOST_SLOT] = host
 end
 
 local TooltipServiceScreen
 local ensure_screen
-service.legacy_sample_sequence = service.legacy_sample_sequence or 0
+host.sample_sequence = host.sample_sequence or host.legacy_sample_sequence or 0
+-- Retire data retained only by the pre-mediation host. Its old onDismiss
+-- closure can then release the migrated screen without repeating target
+-- callbacks or scheduling a replacement.
+host.target = nil
+host.registrations = setmetatable({}, {__mode='k'})
+host.sequence = nil
+host.legacy_sample_sequence = nil
 local detector = target_detector.TooltipTargetDetector.new{
-    registrations=service.registrations,
+    registrations=input_service:get_registrations(),
 }
 
 ---Returns whether the legacy tooltip ZScreen is currently safe to create.
@@ -43,79 +48,32 @@ local function map_is_loaded()
     return dfhack.isMapLoaded()
 end
 
----Reads validated tooltip text after pointer callbacks have run.
----@param target table|nil
----@return string|nil
-local function get_tooltip(target)
-    if not target then return nil end
-    local value = target.tooltip
-    if value == nil or value == '' then return nil end
-    assert(type(value) == 'string',
-        'DwarfUI tooltip must be a string, nil, or an empty string; got ' ..
-        type(value) .. '.')
-    return value
-end
-
 ---Counts weak registrations without retaining their widgets.
 ---@return integer
 local function registration_count()
-    local count = 0
-    for _ in pairs(service.registrations) do count = count + 1 end
-    return count
+    return input_service:registration_count()
 end
 
----Clears the process-wide target and visible tooltip.
+---Clears process-wide pointer and tooltip-intent state.
 local function clear_target()
-    local previous = service.target
-    if previous and previous.on_pointer_leave then
-        previous.on_pointer_leave(previous)
-    end
-    service.target = nil
-    if service.screen and service.screen.renderer then
-        service.screen.renderer:set_tooltip(nil, nil, nil,
-            service.screen.frame_parent_rect)
-    end
+    input_service:shutdown()
 end
 
----Samples the pointer once and presents the single winning tooltip.
+---Samples the pointer once and publishes one detector observation.
 ---@return table result
 local function update_service()
     local mouse_x, mouse_y = dfhack.screen.getMousePos()
     if mouse_x == nil or mouse_y == nil then
         mouse_x, mouse_y = nil, nil
     end
-    service.legacy_sample_sequence = service.legacy_sample_sequence + 1
+    host.sample_sequence = host.sample_sequence + 1
     local observation = detector:detect{
-        sequence=service.legacy_sample_sequence,
+        sequence=host.sample_sequence,
         x=mouse_x,
         y=mouse_y,
         coordinate_space='screen-cells',
     }
-    local target = observation.kind == 'target' and
-        observation.target or nil
-
-    local previous = service.target
-    if previous ~= target then
-        if previous and previous.on_pointer_leave then
-            previous.on_pointer_leave(previous)
-        end
-        if target and target.on_pointer_enter then
-            target.on_pointer_enter(
-                target, observation.local_x, observation.local_y)
-        end
-    end
-    if target and target.on_pointer_update then
-        target.on_pointer_update(
-            target, observation.local_x, observation.local_y)
-    end
-    service.target = target
-
-    local tooltip_text = get_tooltip(target)
-    service.screen.renderer:set_tooltip(
-        tooltip_text,
-        tooltip_text and mouse_x or nil,
-        tooltip_text and mouse_y or nil,
-        service.screen.frame_parent_rect)
+    input_service:accept_pointer_observation(observation)
     return observation
 end
 
@@ -144,6 +102,13 @@ end
 function TooltipServiceScreen:init()
     self.renderer = tooltip.TooltipRenderer{}
     self.renderer.parent_view = self
+    input_service:set_intent_observer(function(intent)
+        self.renderer:set_tooltip(
+            intent and intent.text or nil,
+            intent and intent.anchor_x or nil,
+            intent and intent.anchor_y or nil,
+            self.frame_parent_rect)
+    end)
 end
 
 ---Renders the complete parent stack, samples once, and draws the tooltip last.
@@ -184,12 +149,13 @@ end
 
 ---Releases only this screen generation when DFHack dismisses it.
 function TooltipServiceScreen:onDismiss()
-    if service.screen == self then
+    if host.screen == self then
         clear_target()
-        service.screen = nil
+        input_service:set_intent_observer(nil)
+        host.screen = nil
         if registration_count() > 0 and map_is_loaded() then
             dfhack.timeout(1, 'frames', function()
-                if not service.screen and registration_count() > 0 and
+                if not host.screen and registration_count() > 0 and
                         map_is_loaded() then
                     ensure_screen()
                 end
@@ -202,26 +168,27 @@ end
 ---@return table|nil screen
 ensure_screen = function()
     if not map_is_loaded() then return nil end
-    if service.screen and service.screen:isActive() then
-        return service.screen
+    if host.screen and host.screen:isActive() then
+        return host.screen
     end
-    service.screen = TooltipServiceScreen{}
-    service.screen:show()
-    return service.screen
+    host.screen = TooltipServiceScreen{}
+    host.screen:show()
+    return host.screen
 end
 
 ---Dismisses the legacy tooltip screen without scheduling its replacement.
 local function dismiss_screen()
-    if not service.screen then return end
+    if not host.screen then return end
     clear_target()
-    local screen = service.screen
-    service.screen = nil
+    input_service:set_intent_observer(nil)
+    local screen = host.screen
+    host.screen = nil
     if screen:isActive() then screen:dismiss() end
 end
 
 ---Dismisses the service screen after the final registration disappears.
 local function dismiss_if_unused()
-    if registration_count() ~= 0 or not service.screen then return end
+    if registration_count() ~= 0 or not host.screen then return end
     dismiss_screen()
 end
 
@@ -240,26 +207,17 @@ end
 ---@param widget table
 ---@return boolean created
 function register(widget)
-    assert(type(widget) == 'table',
-        'DwarfUI tooltip registration requires a widget table.')
-    if service.registrations[widget] then
-        ensure_screen()
-        return false
-    end
-    service.sequence = service.sequence + 1
-    service.registrations[widget] = {sequence=service.sequence}
+    local created = input_service:register(widget)
     ensure_screen()
-    return true
+    return created
 end
 
 ---Explicitly removes a registration; weak cleanup makes this optional.
 ---@param widget table
 ---@return boolean removed
 function unregister(widget)
-    local removed = service.registrations[widget] ~= nil
+    local removed = input_service:unregister(widget)
     if not removed then return false end
-    service.registrations[widget] = nil
-    if service.target == widget then clear_target() end
     dismiss_if_unused()
     return true
 end
@@ -267,12 +225,21 @@ end
 ---Returns observable singleton state for lifecycle probes.
 ---@return table diagnostics
 function get_diagnostics()
+    local diagnostics = input_service:get_diagnostics()
+    -- TEMPORARY: presentation compatibility fields remain until the legacy
+    -- ZScreen consumer is replaced by the rendering plan.
+    diagnostics.renderer_count = host.screen and 1 or 0
+    diagnostics.screen = host.screen
     return {
-        api_version=API_VERSION,
-        registration_count=registration_count(),
-        renderer_count=service.screen and 1 or 0,
-        screen=service.screen,
-        target=service.target,
+        api_version=diagnostics.api_version,
+        generation=diagnostics.generation,
+        registration_count=diagnostics.registration_count,
+        target=diagnostics.target,
+        intent=diagnostics.intent,
+        revision=diagnostics.revision,
+        last_sequence=diagnostics.last_sequence,
+        renderer_count=diagnostics.renderer_count,
+        screen=diagnostics.screen,
     }
 end
 
@@ -282,5 +249,5 @@ dfhack.onStateChange[STATE_CHANGE_KEY] = on_state_change
 
 -- Same-version reload keeps weak registrations but replaces the screen class
 -- and renderer so no live object retains closures from the previous module.
-if service.screen then dismiss_screen() end
+if host.screen then dismiss_screen() end
 if registration_count() > 0 then ensure_screen() end

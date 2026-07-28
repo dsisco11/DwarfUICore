@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 2 are complete. Phase 3 is the next implementation step. This
+Phases 0 through 3 are complete. Phase 4 is the next implementation step. This
 document is the execution contract for pointer sampling, registered-control
 hit testing, and tooltip-service notification.
 
@@ -409,51 +409,88 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 3: Convert the tooltip service to observation and intent mediation
 
-- [ ] Give the process-wide tooltip service one documented
+- [x] Give the process-wide tooltip service one documented
       `accept_pointer_observation(observation)` entrypoint.
-- [ ] Move current-target ownership and pointer transition callbacks into that
+- [x] Move current-target ownership and pointer transition callbacks into that
       entrypoint.
-- [ ] Preserve leave-before-enter ordering when the winning target changes.
-- [ ] Run `on_pointer_update` after any enter callback and before reading
+- [x] Preserve leave-before-enter ordering when the winning target changes.
+- [x] Run `on_pointer_update` after any enter callback and before reading
       tooltip text.
-- [ ] Preserve the validation rule that tooltip values are strings, `nil`, or
+- [x] Preserve the validation rule that tooltip values are strings, `nil`, or
       empty strings.
-- [ ] Treat `nil` and empty strings as no current intent without losing the
+- [x] Treat `nil` and empty strings as no current intent without losing the
       current hover target.
-- [ ] Snapshot nonempty tooltip text into a new immutable intent with the
+- [x] Snapshot nonempty tooltip text into a new immutable intent with the
       sample's screen-cell pointer coordinates as its anchor.
-- [ ] Increment the intent revision on every publish and clear operation that
+- [x] Increment the intent revision on every publish and clear operation that
       changes observable service state.
-- [ ] Reject or ignore out-of-order observations whose sample sequence is
+- [x] Reject or ignore out-of-order observations whose sample sequence is
       older than the last accepted sequence.
-- [ ] Expose current intent and revision through diagnostics without exposing
+- [x] Expose current intent and revision through diagnostics without exposing
       a renderer or screen.
-- [ ] Define a presentation-neutral intent observer boundary and make absence
+- [x] Define a presentation-neutral intent observer boundary and make absence
       of an observer valid.
-- [ ] Ensure observer replacement or removal cannot synthesize pointer enter,
+- [x] Ensure observer replacement or removal cannot synthesize pointer enter,
       leave, or update callbacks.
-- [ ] Clear intent and deliver one leave callback when the active registration
+- [x] Clear intent and deliver one leave callback when the active registration
       is removed, collected, detached, or becomes ineligible.
-- [ ] Clear intent and target state during deliberate shutdown and
+- [x] Clear intent and target state during deliberate shutdown and
       same-version reload.
-- [ ] Replace direct renderer mutation in the input path with intent
+- [x] Replace direct renderer mutation in the input path with intent
       publication.
-- [ ] Add focused service coverage for initial target, repeated update,
+- [x] Add focused service coverage for initial target, repeated update,
       target transition, blocked and miss clearing, dynamic text, empty text,
       invalid text, stale observation, unregister, collection, shutdown,
       reload, missing consumer, and consumer replacement.
-- [ ] Add a dependency-isolation test proving the service's input path can load
+- [x] Add a dependency-isolation test proving the service's input path can load
       and run with no tooltip renderer or `gui.ZScreen` implementation.
 
 ### Phase 3 completion gate
 
-- [ ] Pointer callbacks and tooltip text snapshots match the established
+- [x] Pointer callbacks and tooltip text snapshots match the established
       behavior.
-- [ ] The service publishes only text, anchor, coordinate space, and revision
+- [x] The service publishes only text, anchor, coordinate space, and revision
       data required by a future presenter.
-- [ ] Target loss clears intent immediately and exactly once.
-- [ ] No input-path module imports or calls a tooltip renderer.
-- [ ] Focused tooltip service tests pass.
+- [x] Target loss clears intent immediately and exactly once.
+- [x] No input-path module imports or calls a tooltip renderer.
+- [x] Focused tooltip service tests pass.
+
+### Phase 3 evidence
+
+- `src/scripts_modinstalled/dwarfui/tooltip_service.lua` exports the documented
+  `TooltipService` class and one process-wide `service` instance. The instance
+  owns its reload-safe state through `self` and mediates weak registrations,
+  current-target transitions, tooltip validation, immutable `TooltipIntent`
+  snapshots, monotonically increasing revisions, observation ordering, intent
+  observation, shutdown, and reload cleanup. The module imports no GUI,
+  overlay, tooltip renderer, ZScreen, or presentation module.
+- The service's diagnostics expose generation, registration count, target,
+  intent, revision, and accepted sequence without exposing a renderer, screen,
+  overlay, painter, frame, or rendering bounds. Intent snapshots contain only
+  text, anchor coordinates, screen-cell coordinate space, revision/source
+  sequence, and the opaque source root required by the confirmed contract.
+- `tooltip_registration.lua` now sends detector observations to
+  `accept_pointer_observation()`. Its temporary legacy ZScreen installs an
+  intent observer that mutates the renderer; the observation update path ends
+  at intent publication, while presentation remains in the legacy consumer.
+- `tests/tooltip_service.spec.lua` covers initial and repeated dynamic intent,
+  immutability, callback order, target transitions, blocked and miss clearing,
+  nil/empty/invalid text, stale and duplicate observations, unregister,
+  weak-registration collection and collected-entry loss, ineligibility,
+  missing/replaced/removed consumers, idempotent shutdown, same-version reload,
+  legacy-state migration, version conflicts, clean diagnostics, and loading
+  with no presentation implementation.
+- Focused service, registration, detector, registry, and package-contract tests
+  reported `58 successes / 0 failures / 0 errors`. The complete standalone
+  suite reported `227 successes / 0 failures / 0 errors`.
+- Lua 5.4.6 syntax validation passed for 19 production and 37 test/support
+  files. Unit-test naming, the non-live build, and `git diff --check` passed.
+- Expanded and zip package verification passed, and the published manifest
+  contained `scripts_modinstalled/dwarfui/tooltip_service.lua`. The task-owned
+  temporary package directory was removed after verification.
+- Two live `dwarfui reload` commands completed successfully. The first
+  exercised migration from the pre-mediation combined state; the second
+  exercised same-version target, intent, observer, and ordering cleanup.
 
 ## Phase 4: Wire registration demand to polling lifecycle
 
@@ -469,25 +506,31 @@ consumer without changing the polling, detection, or observation contracts.
       generation and start exactly one new generation.
 - [ ] Remove screen creation, screen resumption, raising, dismissal, and
       special native-screen lists from the registration lifecycle.
+- [ ] Delete `LEGACY_HOST_SLOT`, the
+      `dfhack.dwarfui.tooltip_legacy_host` process-wide value, the
+      pre-mediation host-migration path, and their compatibility tests.
+      Reload must also clear stale legacy-host state retained by a process that
+      previously ran the ZScreen implementation.
 - [ ] Do not add map-load gating as a substitute for correct lifecycle
       isolation.
 - [ ] Extend diagnostics with poller generation, running state, scheduled
       state, sample sequence, target, current intent, and registration count.
 - [ ] Remove diagnostics whose only meaning was a service screen or renderer
-      count from input-layer tests. Any temporary compatibility field must be
-      clearly marked for removal by the rendering plan.
+      count from production code and input-layer tests in this phase.
 - [ ] Update the module registry and reload ordering so the poller, pointer
       resolver, detector, and tooltip service are rebuilt as one coherent
       generation.
 - [ ] Add focused lifecycle coverage for zero-to-one, one-to-many,
       many-to-one, and one-to-zero registrations; collection; reload; and
-      repeated reload.
+      repeated reload, including cleanup of injected stale legacy-host state.
 
 ### Phase 4 completion gate
 
 - [ ] Registrations control exactly one process-wide polling chain.
 - [ ] No tooltip registration creates or manipulates a DFHack screen or
       overlay.
+- [ ] Initialization and reload leave no `tooltip_legacy_host` key or legacy
+      host object reachable from `dfhack.dwarfui`.
 - [ ] Repeated `dwarfui reload` leaves one current generation and no callbacks
       capable of reviving an older generation.
 - [ ] Focused registration, registry, and reload tests pass.

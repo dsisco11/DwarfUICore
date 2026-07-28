@@ -164,6 +164,11 @@ local function load_environment(state)
             require_modules={['plugins.overlay']=overlay},
             reqscript={['dwarfui/pointer']=pointer},
         })
+    local _, input_service_module = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {
+            globals={dfhack=dfhack},
+        })
+    local input_service = input_service_module.service
     local _, tooltip = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/tooltip.lua', {
             globals={
@@ -191,6 +196,7 @@ local function load_environment(state)
         require_modules={gui=gui, ['plugins.overlay']=overlay},
         reqscript={
             ['dwarfui/tooltip']=tooltip,
+            ['dwarfui/tooltip_service']=input_service_module,
             ['dwarfui/tooltip_target_detector']=target_detector,
         },
     }
@@ -208,6 +214,7 @@ local function load_environment(state)
         load_registration=load_registration,
         overlay=overlay,
         OverlayWidget=OverlayWidget,
+        input_service=input_service,
         tooltip=tooltip,
         state=state,
         widgets=widgets,
@@ -573,9 +580,9 @@ describe('singleton tooltip registration', function()
         assert.is_false(first_screen:isActive())
         assert.equals(1, second_module.API_VERSION)
 
-        env.dfhack.dwarfui.tooltip_service.api_version = 999
+        env.dfhack.dwarfui.tooltip_legacy_host.api_version = 999
         assert.has_error(function() env.load_registration() end,
-            'Conflicting DwarfUI tooltip service versions: ' ..
+            'Conflicting DwarfUI tooltip legacy-host versions: ' ..
             'process has 999, requested 1.')
     end)
 

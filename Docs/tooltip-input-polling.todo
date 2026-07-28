@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 and 1 are complete. Phase 2 is the next implementation step. This
+Phases 0 through 2 are complete. Phase 3 is the next implementation step. This
 document is the execution contract for pointer sampling, registered-control
 hit testing, and tooltip-service notification.
 
@@ -344,37 +344,68 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 2: Extract tooltip target detection
 
-- [ ] Move registration-root discovery, root eligibility, and cross-root
+- [x] Move registration-root discovery, root eligibility, and cross-root
       target arbitration out of the current screen-owned update path.
-- [ ] Implement a documented detector that accepts one `PointerSample` and
+- [x] Implement a documented detector that accepts one `PointerSample` and
       returns one `TooltipPointerObservation`.
-- [ ] Keep the existing `PointerDispatcher.resolve()` implementation as the
+- [x] Keep the existing `PointerDispatcher.resolve()` implementation as the
       within-root hit-testing authority.
-- [ ] Preserve weak registrations and registration sequence without retaining
+- [x] Preserve weak registrations and registration sequence without retaining
       widgets in poller-owned state.
-- [ ] Resolve each distinct eligible root at most once per sample.
-- [ ] Preserve target-local coordinates returned by the pointer dispatcher.
-- [ ] Produce explicit `target`, `blocked`, and `miss` observations.
-- [ ] Make a no-pointer sample produce a `miss` without running hit tests.
-- [ ] Isolate cross-root arbitration behind one documented policy function.
-- [ ] Remove every dependency from detection to `TooltipRenderer`,
+- [x] Resolve each distinct eligible root at most once per sample.
+- [x] Preserve target-local coordinates returned by the pointer dispatcher.
+- [x] Produce explicit `target`, `blocked`, and `miss` observations.
+- [x] Make a no-pointer sample produce a `miss` without running hit tests.
+- [x] Isolate cross-root arbitration behind one documented policy function.
+- [x] Remove every dependency from detection to `TooltipRenderer`,
       `gui.ZScreen`, rendering bounds, renderer visibility, and presentation
       refresh.
-- [ ] Add focused detector coverage for detached controls, invisible or
+- [x] Add focused detector coverage for detached controls, invisible or
       inactive ancestors, stale overlay instances, disabled overlays,
       viewscreen mismatch, native-mounted roots, overlapping subviews,
       blocked regions, unregistered resolved controls, overlapping roots, and
       no-pointer samples.
-- [ ] Add a test proving one sample cannot notify two registered controls even
+- [x] Add a test proving one sample cannot notify two registered controls even
       when their roots overlap.
 
 ### Phase 2 completion gate
 
-- [ ] Detection is deterministic for target, blocked, and miss results.
-- [ ] Eligibility and arbitration operate without creating or querying a
+- [x] Detection is deterministic for target, blocked, and miss results.
+- [x] Eligibility and arbitration operate without creating or querying a
       tooltip presentation host.
-- [ ] The detector performs no pointer callbacks and reads no tooltip text.
-- [ ] Focused pointer and detector tests pass.
+- [x] The detector performs no pointer callbacks and reads no tooltip text.
+- [x] Focused pointer and detector tests pass.
+
+### Phase 2 evidence
+
+- `src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua` owns attached
+  registration-root discovery, ancestor eligibility, overlay/native
+  presentation predicates, one-resolution-per-root hit testing, and
+  registration-sequence arbitration. Its only module dependencies are
+  `plugins.overlay` and `dwarfui/pointer`; it has no tooltip renderer,
+  `gui.ZScreen`, layout-presentation, refresh, or pointer-callback dependency.
+- `tooltip_registration.lua` now constructs a `PointerSample`, asks the
+  detector for one `TooltipPointerObservation`, and retains only the temporary
+  callback and renderer mediation that later phases will replace. The former
+  screen-owned discovery, eligibility, and arbitration functions were removed.
+- `tests/tooltip_target_detector.spec.lua` covers presentation dependency
+  isolation, detached and stale attachment, invisible and inactive
+  descendants/ancestors, missing layout, disabled/stale/mismatched overlays,
+  current native-root identity, overlapping subviews, target-local
+  coordinates, blocked regions, unregistered resolved controls, overlapping
+  roots, deterministic target and blocked arbitration, one resolution per
+  root, no-pointer short-circuiting, weak registration ownership, and the
+  absence of tooltip reads or pointer callbacks.
+- Focused pointer, detector, registration, registry, and package-contract tests
+  reported `55 successes / 0 failures / 0 errors`. The complete standalone
+  suite reported `209 successes / 0 failures / 0 errors`.
+- Lua 5.4.6 syntax validation passed for 18 production and 36 test/support
+  files. Unit-test naming, the non-live build, and `git diff --check` passed.
+- Expanded and zip package verification passed, and the published manifest
+  contained `scripts_modinstalled/dwarfui/tooltip_target_detector.lua`. The
+  task-owned temporary package directory was removed after verification.
+- A live `dwarfui reload` completed successfully with the detector ordered
+  between pointer acquisition/resolution and tooltip-registration consumers.
 
 ## Phase 3: Convert the tooltip service to observation and intent mediation
 

@@ -4,9 +4,8 @@
 -- regardless of how many controls or independently rendered roots register.
 
 local gui = require('gui')
-local overlay = require('plugins.overlay')
-local pointer = reqscript('dwarfui/pointer')
 local tooltip = reqscript('dwarfui/tooltip')
+local target_detector = reqscript('dwarfui/tooltip_target_detector')
 
 API_VERSION = 1
 local SERVICE_SLOT = 'tooltip_service'
@@ -24,6 +23,7 @@ if not service then
         api_version=API_VERSION,
         registrations=setmetatable({}, {__mode='k'}),
         sequence=0,
+        legacy_sample_sequence=0,
         screen=nil,
         target=nil,
     }
@@ -32,107 +32,15 @@ end
 
 local TooltipServiceScreen
 local ensure_screen
+service.legacy_sample_sequence = service.legacy_sample_sequence or 0
+local detector = target_detector.TooltipTargetDetector.new{
+    registrations=service.registrations,
+}
 
 ---Returns whether the legacy tooltip ZScreen is currently safe to create.
 ---@return boolean
 local function map_is_loaded()
     return dfhack.isMapLoaded()
-end
-
----Returns the DFHack class table for an instance in production or the tests.
----@param instance table
----@return table|nil
-local function get_instance_class(instance)
-    local class = getmetatable(instance)
-    if class and rawget(class, 'super') == nil and
-            type(rawget(class, '__index')) == 'table' then
-        class = rawget(class, '__index')
-    end
-    return class
-end
-
----Returns whether an instance inherits from the requested DFHack class.
----@param instance table
----@param expected table
----@return boolean
-local function is_instance(instance, expected)
-    local class = get_instance_class(instance)
-    while class do
-        if class == expected then return true end
-        class = rawget(class, 'super')
-    end
-    return false
-end
-
----Evaluates a DFHack boolean or boolean callback.
----@param value boolean|function|nil
----@return boolean
-local function getval(value)
-    if type(value) == 'function' then return value() end
-    return not not value
-end
-
----Returns the current top-level view for an attached widget.
----@param widget table
----@return table root
-local function find_root(widget)
-    local current = widget
-    local seen = {}
-    while current and current.parent_view and not seen[current] do
-        seen[current] = true
-        current = current.parent_view
-    end
-    return current
-end
-
----Returns whether a widget and every attached ancestor are eligible.
----@param widget table
----@return boolean
-local function ancestors_are_eligible(widget)
-    local current = widget
-    local seen = {}
-    while current and not seen[current] do
-        seen[current] = true
-        if not getval(current.visible) or not getval(current.active) then
-            return false
-        end
-        current = current.parent_view
-    end
-    return true
-end
-
----Returns whether an overlay declares the current underlying viewscreen.
----@param root table
----@return boolean
-local function overlay_matches_current_viewscreen(root)
-    local current = dfhack.gui.getDFViewscreen(true)
-    if not current then return false end
-    for _, focus in ipairs(overlay.normalize_list(root.viewscreens)) do
-        if focus == 'all' or dfhack.gui.matchFocusString(
-                overlay.simplify_viewscreen_name(focus), current) then
-            return true
-        end
-    end
-    return false
-end
-
----Returns whether a root is currently owned by an active rendering framework.
----@param root table
----@return boolean
-local function root_is_presented(root)
-    if is_instance(root, overlay.OverlayWidget) then
-        if not root.name or not overlay.isOverlayEnabled(root.name) then
-            return false
-        end
-        local overlay_state = overlay.get_state()
-        local entry = overlay_state.db[root.name]
-        return entry ~= nil and entry.widget == root and
-            overlay_matches_current_viewscreen(root)
-    end
-    if root._native and service.screen and service.screen._native then
-        return root._native == service.screen._native.parent
-    end
-    return true
 end
 
 ---Reads validated tooltip text after pointer callbacks have run.
@@ -169,49 +77,22 @@ local function clear_target()
     end
 end
 
----Chooses one registered target across all currently attached roots.
----Within a root, native reverse-subview traversal decides. Across independent
----roots, the most recently registered winning target has deterministic priority.
----@param mouse_x integer
----@param mouse_y integer
----@return table|nil target
----@return table|nil pointer_result
-local function resolve_target(mouse_x, mouse_y)
-    local roots = {}
-    for widget in pairs(service.registrations) do
-        if ancestors_are_eligible(widget) then
-            local root = find_root(widget)
-            if root and root ~= service.screen and root.frame_body and
-                    root_is_presented(root) then
-                roots[root] = true
-            end
-        end
-    end
-
-    local best_target, best_result, best_sequence
-    for root in pairs(roots) do
-        local result = pointer.PointerDispatcher.resolve(
-            root, mouse_x, mouse_y)
-        local target = result.kind == 'target' and result.target or nil
-        local registration = target and service.registrations[target] or nil
-        if registration and
-                (not best_sequence or registration.sequence > best_sequence) then
-            best_target = target
-            best_result = result
-            best_sequence = registration.sequence
-        end
-    end
-    return best_target, best_result
-end
-
 ---Samples the pointer once and presents the single winning tooltip.
 ---@return table result
 local function update_service()
     local mouse_x, mouse_y = dfhack.screen.getMousePos()
-    local target, result
-    if mouse_x ~= nil and mouse_y ~= nil then
-        target, result = resolve_target(mouse_x, mouse_y)
+    if mouse_x == nil or mouse_y == nil then
+        mouse_x, mouse_y = nil, nil
     end
+    service.legacy_sample_sequence = service.legacy_sample_sequence + 1
+    local observation = detector:detect{
+        sequence=service.legacy_sample_sequence,
+        x=mouse_x,
+        y=mouse_y,
+        coordinate_space='screen-cells',
+    }
+    local target = observation.kind == 'target' and
+        observation.target or nil
 
     local previous = service.target
     if previous ~= target then
@@ -219,11 +100,13 @@ local function update_service()
             previous.on_pointer_leave(previous)
         end
         if target and target.on_pointer_enter then
-            target.on_pointer_enter(target, result.x, result.y)
+            target.on_pointer_enter(
+                target, observation.local_x, observation.local_y)
         end
     end
     if target and target.on_pointer_update then
-        target.on_pointer_update(target, result.x, result.y)
+        target.on_pointer_update(
+            target, observation.local_x, observation.local_y)
     end
     service.target = target
 
@@ -233,7 +116,7 @@ local function update_service()
         tooltip_text and mouse_x or nil,
         tooltip_text and mouse_y or nil,
         service.screen.frame_parent_rect)
-    return result or {kind='miss'}
+    return observation
 end
 
 ---@class dwarfui.TooltipServiceScreen: gui.ZScreen

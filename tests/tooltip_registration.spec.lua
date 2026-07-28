@@ -121,7 +121,12 @@ local function load_environment(state)
         onStateChange={},
         gui={
             getCurViewscreen=function() return state.current_screen end,
-            getDFViewscreen=function() return {focus=state.focus or 'dwarfmode'} end,
+            getDFViewscreen=function()
+                return {
+                    focus=state.focus or 'dwarfmode',
+                    widgets=state.native_root,
+                }
+            end,
             matchFocusString=function(focus, viewscreen)
                 return focus == viewscreen.focus
             end,
@@ -153,6 +158,12 @@ local function load_environment(state)
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
         })
+    local _, target_detector = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua', {
+            globals={dfhack=dfhack},
+            require_modules={['plugins.overlay']=overlay},
+            reqscript={['dwarfui/pointer']=pointer},
+        })
     local _, tooltip = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/tooltip.lua', {
             globals={
@@ -179,8 +190,8 @@ local function load_environment(state)
         },
         require_modules={gui=gui, ['plugins.overlay']=overlay},
         reqscript={
-            ['dwarfui/pointer']=pointer,
             ['dwarfui/tooltip']=tooltip,
+            ['dwarfui/tooltip_target_detector']=target_detector,
         },
     }
 
@@ -357,14 +368,12 @@ describe('singleton tooltip registration', function()
             {l=1, t=1, w=6, h=3}, 'Covered screen')
         local current_root = env.widgets.Panel{subviews={current}}
         local covered_root = env.widgets.Panel{subviews={covered}}
-        current_root._native = {name='current'}
-        covered_root._native = {name='covered'}
         layout(current_root, env.state)
         layout(covered_root, env.state)
+        env.state.native_root = current_root
         registration.register(current)
         registration.register(covered)
         local screen = registration.get_diagnostics().screen
-        screen._native = {parent=current_root._native}
 
         screen:onRender()
 

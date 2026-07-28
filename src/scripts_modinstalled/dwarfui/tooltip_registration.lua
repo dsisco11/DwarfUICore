@@ -233,11 +233,22 @@ end
 ---@field renderer table
 TooltipServiceScreen = defclass(TooltipServiceScreen, gui.ZScreen)
 TooltipServiceScreen.ATTRS{
-    defocusable=false,
+    defocusable=true,
+    defocused=true,
     initial_pause=false,
     pass_mouse_clicks=true,
     pass_movement_keys=true,
 }
+
+---Keeps the service above newly opened screens without taking focus from them.
+---@param screen dwarfui.TooltipServiceScreen
+local function restore_screen_position(screen)
+    if not screen:isActive() then return end
+    if dfhack.gui.getCurViewscreen(true) ~= screen._native then
+        screen:raise()
+    end
+    screen.defocused = true
+end
 
 ---Constructs the singleton screen-owned tooltip renderer.
 function TooltipServiceScreen:init()
@@ -264,6 +275,7 @@ end
 ---@return boolean
 function TooltipServiceScreen:onInput(keys)
     self:sendInputToParent(keys)
+    restore_screen_position(self)
     return true
 end
 
@@ -271,7 +283,7 @@ end
 ---new screen has been placed above the tooltip service.
 function TooltipServiceScreen:onIdle()
     TooltipServiceScreen.super.onIdle(self)
-    if self:isActive() and not self:hasFocus() then self:raise() end
+    restore_screen_position(self)
 end
 
 ---Keeps the transparent service from ever claiming a mouse hit.

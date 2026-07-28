@@ -41,9 +41,10 @@ local function load_environment(state)
     ---@return table self
     function ZScreen:show()
         self.shown = true
+        self._native = self._native or {}
         self:updateLayout(widget_harness.rect(
             0, 0, state.width, state.height))
-        state.current_screen = self
+        state.current_screen = self._native
         table.insert(state.events, 'show')
         return self
     end
@@ -57,7 +58,7 @@ local function load_environment(state)
     ---Returns whether this screen currently owns z-order focus.
     ---@return boolean
     function ZScreen:hasFocus()
-        return state.current_screen == self
+        return not self.defocused and state.current_screen == self._native
     end
 
     ---Renders the simulated parent stack.
@@ -69,6 +70,9 @@ local function load_environment(state)
     ---@param keys table
     function ZScreen:sendInputToParent(keys)
         state.forwarded_keys = keys
+        if state.screen_opened_by_input then
+            state.current_screen = state.screen_opened_by_input
+        end
     end
 
     ---Advances the simulated parent screen logic.
@@ -80,7 +84,8 @@ local function load_environment(state)
     ---@return table self
     function ZScreen:raise()
         state.raise_count = (state.raise_count or 0) + 1
-        state.current_screen = self
+        state.current_screen = self._native
+        self.defocused = false
         return self
     end
 
@@ -112,6 +117,7 @@ local function load_environment(state)
 
     local dfhack = {
         gui={
+            getCurViewscreen=function() return state.current_screen end,
             getDFViewscreen=function() return {focus=state.focus or 'dwarfmode'} end,
             matchFocusString=function(focus, viewscreen)
                 return focus == viewscreen.focus
@@ -424,7 +430,8 @@ describe('singleton tooltip registration', function()
         assert.is_nil(registration.get_diagnostics().target)
     end)
 
-    it('forwards all input and raises itself over newly opened screens', function()
+    it('stays topmost and defocused while forwarding input and parent logic',
+            function()
         local env = load_environment()
         local registration = env.load_registration()
         local child = target(env.widgets,
@@ -433,15 +440,31 @@ describe('singleton tooltip registration', function()
         local screen = registration.get_diagnostics().screen
         local keys = {LEAVESCREEN=true, _MOUSE_L=true, CUSTOM=true}
 
+        assert.is_true(screen:isActive())
+        assert.is.equal(screen._native, env.state.current_screen)
+        assert.is_true(screen.defocused)
+        assert.is_false(screen:hasFocus())
+
+        env.state.screen_opened_by_input = {input_child=true}
         assert.is_true(screen:onInput(keys))
         assert.is.equal(keys, env.state.forwarded_keys)
         assert.is_false(screen:isMouseOver())
+        assert.equals(1, env.state.raise_count)
+        assert.is.equal(screen._native, env.state.current_screen)
+        assert.is_true(screen.defocused)
+        assert.is_false(screen:hasFocus())
 
         env.state.current_screen = {newer=true}
         screen:onIdle()
         assert.equals(1, env.state.parent_idle_count)
-        assert.equals(1, env.state.raise_count)
-        assert.is.equal(screen, env.state.current_screen)
+        assert.equals(2, env.state.raise_count)
+        assert.is.equal(screen._native, env.state.current_screen)
+        assert.is_true(screen.defocused)
+        assert.is_false(screen:hasFocus())
+
+        screen:onIdle()
+        assert.equals(2, env.state.parent_idle_count)
+        assert.equals(2, env.state.raise_count)
     end)
 
     it('replaces the singleton screen on reload and rejects version conflicts', function()

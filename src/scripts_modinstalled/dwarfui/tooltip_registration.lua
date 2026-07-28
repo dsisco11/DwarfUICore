@@ -10,6 +10,7 @@ local tooltip = reqscript('dwarfui/tooltip')
 
 API_VERSION = 1
 local SERVICE_SLOT = 'tooltip_service'
+local STATE_CHANGE_KEY = 'dwarfui_tooltip_service'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 local service = dfhack.dwarfui[SERVICE_SLOT]
@@ -31,6 +32,12 @@ end
 
 local TooltipServiceScreen
 local ensure_screen
+
+---Returns whether the legacy tooltip ZScreen is currently safe to create.
+---@return boolean
+local function map_is_loaded()
+    return dfhack.isMapLoaded()
+end
 
 ---Returns the DFHack class table for an instance in production or the tests.
 ---@param instance table
@@ -297,9 +304,10 @@ function TooltipServiceScreen:onDismiss()
     if service.screen == self then
         clear_target()
         service.screen = nil
-        if registration_count() > 0 then
+        if registration_count() > 0 and map_is_loaded() then
             dfhack.timeout(1, 'frames', function()
-                if not service.screen and registration_count() > 0 then
+                if not service.screen and registration_count() > 0 and
+                        map_is_loaded() then
                     ensure_screen()
                 end
             end)
@@ -308,8 +316,9 @@ function TooltipServiceScreen:onDismiss()
 end
 
 ---Creates and shows the singleton screen when registrations require it.
----@return table screen
+---@return table|nil screen
 ensure_screen = function()
+    if not map_is_loaded() then return nil end
     if service.screen and service.screen:isActive() then
         return service.screen
     end
@@ -318,13 +327,29 @@ ensure_screen = function()
     return service.screen
 end
 
----Dismisses the service screen after the final registration disappears.
-local function dismiss_if_unused()
-    if registration_count() ~= 0 or not service.screen then return end
+---Dismisses the legacy tooltip screen without scheduling its replacement.
+local function dismiss_screen()
+    if not service.screen then return end
     clear_target()
     local screen = service.screen
     service.screen = nil
     if screen:isActive() then screen:dismiss() end
+end
+
+---Dismisses the service screen after the final registration disappears.
+local function dismiss_if_unused()
+    if registration_count() ~= 0 or not service.screen then return end
+    dismiss_screen()
+end
+
+---Temporarily confines the legacy ZScreen host to loaded fortress maps.
+---@param code integer
+local function on_state_change(code)
+    if code == SC_MAP_LOADED then
+        if registration_count() > 0 then ensure_screen() end
+    elseif code == SC_MAP_UNLOADED or code == SC_WORLD_UNLOADED then
+        dismiss_screen()
+    end
 end
 
 ---Registers any widget for process-wide singleton tooltip targeting.
@@ -368,12 +393,11 @@ function get_diagnostics()
     }
 end
 
+-- TEMPORARY: the legacy renderer owns a ZScreen. Keep that screen out of
+-- title/load views until the planned render-hook cutover removes it entirely.
+dfhack.onStateChange[STATE_CHANGE_KEY] = on_state_change
+
 -- Same-version reload keeps weak registrations but replaces the screen class
 -- and renderer so no live object retains closures from the previous module.
-if service.screen then
-    clear_target()
-    local previous_screen = service.screen
-    service.screen = nil
-    if previous_screen:isActive() then previous_screen:dismiss() end
-end
+if service.screen then dismiss_screen() end
 if registration_count() > 0 then ensure_screen() end

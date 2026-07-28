@@ -24,6 +24,7 @@ local function load_environment(state)
     state.width = state.width or 40
     state.height = state.height or 20
     state.events = state.events or {}
+    if state.map_loaded == nil then state.map_loaded = true end
     local default_nil = widget_harness.default_nil()
     local widgets = widget_harness.widgets(nil, default_nil)
     widgets.Widget.ATTRS{visible=true, active=true}
@@ -116,6 +117,8 @@ local function load_environment(state)
     }
 
     local dfhack = {
+        isMapLoaded=function() return state.map_loaded end,
+        onStateChange={},
         gui={
             getCurViewscreen=function() return state.current_screen end,
             getDFViewscreen=function() return {focus=state.focus or 'dwarfmode'} end,
@@ -167,7 +170,13 @@ local function load_environment(state)
             },
         })
     local loader_options = {
-        globals={defclass=widget_harness.defclass, dfhack=dfhack},
+        globals={
+            SC_MAP_LOADED='map-loaded',
+            SC_MAP_UNLOADED='map-unloaded',
+            SC_WORLD_UNLOADED='world-unloaded',
+            defclass=widget_harness.defclass,
+            dfhack=dfhack,
+        },
         require_modules={gui=gui, ['plugins.overlay']=overlay},
         reqscript={
             ['dwarfui/pointer']=pointer,
@@ -239,6 +248,78 @@ describe('singleton tooltip registration', function()
         assert.is.equal(second, registration.get_diagnostics().target)
         assert.equals('Second tooltip', diagnostics.screen.renderer.tooltip_text)
         assert.equals(1, registration.get_diagnostics().renderer_count)
+    end)
+
+    it('defers the legacy screen until map load and retires it on unload',
+            function()
+        local env = load_environment{
+            map_loaded=false,
+            mouse_x=2,
+            mouse_y=2,
+        }
+        local registration = env.load_registration()
+        local child = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Map gated')
+        local root = env.widgets.Panel{subviews={child}}
+        layout(root, env.state)
+
+        assert.is_true(registration.register(child))
+        local diagnostics = registration.get_diagnostics()
+        assert.equals(1, diagnostics.registration_count)
+        assert.equals(0, diagnostics.renderer_count)
+        assert.is_nil(diagnostics.screen)
+
+        local state_change =
+            env.dfhack.onStateChange.dwarfui_tooltip_service
+        assert.is_function(state_change)
+        env.state.map_loaded = true
+        state_change('map-loaded')
+
+        local first_screen = registration.get_diagnostics().screen
+        assert.is_true(first_screen:isActive())
+        first_screen:onRender()
+        assert.is_equal(child, registration.get_diagnostics().target)
+
+        env.state.map_loaded = false
+        state_change('map-unloaded')
+        diagnostics = registration.get_diagnostics()
+        assert.equals(1, diagnostics.registration_count)
+        assert.equals(0, diagnostics.renderer_count)
+        assert.is_nil(diagnostics.screen)
+        assert.is_nil(diagnostics.target)
+        assert.is_false(first_screen:isActive())
+        assert.equals(0, env.state.timeout_count or 0)
+
+        state_change('world-unloaded')
+        assert.is_nil(registration.get_diagnostics().screen)
+
+        env.state.map_loaded = true
+        state_change('map-loaded')
+        local replacement = registration.get_diagnostics().screen
+        assert.is_not.equal(first_screen, replacement)
+        assert.is_true(replacement:isActive())
+    end)
+
+    it('replaces the temporary state callback without creating off-map screens',
+            function()
+        local env = load_environment{map_loaded=false}
+        local first = env.load_registration()
+        local child = target(env.widgets,
+            {l=1, t=1, w=4, h=2}, 'Reload gated')
+        first.register(child)
+        local first_callback =
+            env.dfhack.onStateChange.dwarfui_tooltip_service
+
+        local second = env.load_registration()
+        local second_callback =
+            env.dfhack.onStateChange.dwarfui_tooltip_service
+        assert.is_not.equal(first_callback, second_callback)
+        assert.equals(1, second.get_diagnostics().registration_count)
+        assert.is_nil(second.get_diagnostics().screen)
+
+        env.state.map_loaded = true
+        second_callback('map-loaded')
+        assert.is_true(second.get_diagnostics().screen:isActive())
     end)
 
     it('uses native traversal within a root and registration order across roots', function()

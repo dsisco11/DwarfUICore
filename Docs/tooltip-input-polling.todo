@@ -2,9 +2,9 @@
 
 ## Status
 
-Phase 0 is complete. Phase 1 is the next implementation step. This document is
-the execution contract for pointer sampling, registered-control hit testing,
-and tooltip-service notification.
+Phases 0 and 1 are complete. Phase 2 is the next implementation step. This
+document is the execution contract for pointer sampling, registered-control
+hit testing, and tooltip-service notification.
 
 Tooltip rendering is intentionally excluded. A separate plan will decide how
 tooltip presentation is placed above base-game and DFHack content without
@@ -276,40 +276,71 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 1: Implement the generic pointer poller
 
-- [ ] Add
+- [x] Add
       `src/scripts_modinstalled/dwarfui/pointer_poller.lua`.
-- [ ] Implement a documented `PointerPoller` with injected scheduler, pointer
+- [x] Implement a documented `PointerPoller` with injected scheduler, pointer
       sampler, and observer dependencies.
-- [ ] Keep the default production sampler limited to one
+- [x] Keep the default production sampler limited to one
       `dfhack.screen.getMousePos()` call per tick.
-- [ ] Normalize partial and complete no-pointer results to `x=nil, y=nil`.
-- [ ] Assign one monotonically increasing sample sequence per completed tick.
-- [ ] Prevent a second `start()` call from creating a second callback chain.
-- [ ] Invalidate queued callbacks through a generation token on stop and
+- [x] Normalize partial and complete no-pointer results to `x=nil, y=nil`.
+- [x] Assign one monotonically increasing sample sequence per completed tick.
+- [x] Prevent a second `start()` call from creating a second callback chain.
+- [x] Invalidate queued callbacks through a generation token on stop and
       reload.
-- [ ] Recheck demand before each sample and before each reschedule.
-- [ ] Ensure stopping the poller is idempotent.
-- [ ] Ensure observer failures cannot silently create duplicate or immortal
+- [x] Recheck demand before each sample and before each reschedule.
+- [x] Ensure stopping the poller is idempotent.
+- [x] Ensure observer failures cannot silently create duplicate or immortal
       polling chains.
-- [ ] Add the module to `dwarfui/module_registry.lua` before tooltip
+- [x] Add the module to `dwarfui/module_registry.lua` before tooltip
       registration consumers.
-- [ ] Add package-contract coverage for the new production module.
-- [ ] Add LuaDoc comments for the class, public methods, collaborator
+- [x] Add package-contract coverage for the new production module.
+- [x] Add LuaDoc comments for the class, public methods, collaborator
       contracts, and published sample record.
-- [ ] Add `tests/pointer_poller.spec.lua` coverage for start, duplicate start,
+- [x] Add `tests/pointer_poller.spec.lua` coverage for start, duplicate start,
       sample normalization, one read per tick, sequence ordering, stop,
       stale-generation callbacks, demand loss, observer failure, and restart.
-- [ ] Add a dependency-isolation test that loads the poller without `gui`,
+- [x] Add a dependency-isolation test that loads the poller without `gui`,
       `plugins.overlay`, `dwarfui/tooltip`, or any renderer module.
 
 ### Phase 1 completion gate
 
-- [ ] A controlled scheduler can drive pointer samples without creating or
+- [x] A controlled scheduler can drive pointer samples without creating or
       retaining UI objects.
-- [ ] Exactly one pointer read and one observer notification occur per active
+- [x] Exactly one pointer read and one observer notification occur per active
       tick.
-- [ ] Stop and reload make every previously queued callback inert.
-- [ ] Focused poller and package-contract tests pass.
+- [x] Stop and reload make every previously queued callback inert.
+- [x] Focused poller and package-contract tests pass.
+
+### Phase 1 evidence
+
+- `src/scripts_modinstalled/dwarfui/pointer_poller.lua` exports the documented
+  `PointerPoller` contract through the normal DFHack script environment. Its
+  default collaborators schedule one frame through `dfhack.timeout()` and
+  perform one `dfhack.screen.getMousePos()` call. Injected scheduler, sampler,
+  observer, and demand collaborators keep focused tests independent of GUI,
+  overlay, tooltip, and renderer modules.
+- Instance-generation tokens invalidate stop/restart callbacks, and the
+  process-wide module generation in `dfhack.dwarfui` invalidates callbacks
+  from cleared script environments. The stale-callback test executes an old
+  callback before a restarted chain and proves it cannot stop or duplicate the
+  newer chain.
+- `tests/pointer_poller.spec.lua` covers start, duplicate start, immutable
+  sample publication, missing-coordinate normalization, one read and one
+  notification per tick, monotonic sequence values, idempotent stop, stale
+  instance callbacks, demand loss before sampling and after observation,
+  observer failure, deliberate restart, module reload, production defaults,
+  and dependency isolation.
+- Focused poller, module-registry, and package-contract tests reported
+  `23 successes / 0 failures / 0 errors`. The complete standalone suite
+  reported `194 successes / 0 failures / 0 errors`.
+- Lua 5.4.6 syntax validation passed for 17 production and 35 test/support
+  files. Unit-test naming, the non-live build, and `git diff --check` passed.
+- Package publication and verification passed for both expanded and zip
+  artifacts. Both contained
+  `scripts_modinstalled/dwarfui/pointer_poller.lua`; the task-owned temporary
+  package directory was removed after verification.
+- No live reload or DwarfSpec run was required by the Phase 1 gate and none is
+  counted as Phase 1 evidence.
 
 ## Phase 2: Extract tooltip target detection
 

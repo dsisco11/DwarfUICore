@@ -1,0 +1,511 @@
+# Tooltip Input Polling Implementation Plan
+
+## Status
+
+Planning only. This document is the execution contract for pointer sampling,
+registered-control hit testing, and tooltip-service notification.
+
+Tooltip rendering is intentionally excluded. A separate plan will decide how
+tooltip presentation is placed above base-game and DFHack content without
+participating in focus, input, or logic.
+
+## Goal
+
+Replace tooltip hover detection that depends on a full-screen `gui.ZScreen`
+render or input lifecycle with a process-wide polling path that:
+
+- samples the current pointer independently of UI input consumption,
+- resolves at most one registered tooltip target for each sample,
+- preserves DwarfUI pointer enter, leave, and update behavior,
+- publishes a presentation-neutral tooltip intent to the tooltip service, and
+- creates no screen, overlay, widget, focus owner, input handler, or logic
+  participant.
+
+The polling and detection code must not know how, where, or whether a tooltip
+is eventually rendered.
+
+## Scope boundary
+
+This plan owns:
+
+- the recurring pointer-sampling lifecycle,
+- one `dfhack.screen.getMousePos()` read per polling tick,
+- registered-control hit testing,
+- target arbitration across eligible registered roots,
+- pointer enter, leave, and update transitions,
+- tooltip-text validation and snapshotting,
+- publication and clearing of the tooltip service's current intent,
+- reload-safe cancellation,
+- unit, package, and live automation evidence for those behaviors.
+
+This plan does not own:
+
+- `gui.ZScreen`, `OverlayWidget`, or any other presentation host,
+- tooltip drawing, painter selection, z-order, clipping, sizing, wrapping, or
+  screen-edge placement,
+- renderer activation, invalidation, or refresh cadence,
+- focus strings, `hasFocus()`, `getCurViewscreen()`, `isActive()`, or `raise()`,
+- forwarding or consuming mouse, keyboard, or game input,
+- choosing the final rendering integration.
+
+The existing renderer may remain temporarily available to tests and production
+code, but the polling implementation must not import it or call it. Production
+cutover is deferred until the rendering plan supplies a consumer for the
+published intent.
+
+## Confirmed architecture
+
+### Layer 1: process-wide pointer poller
+
+Add a generic `PointerPoller` that owns only scheduling and pointer
+acquisition. It must not import tooltip, overlay, or GUI presentation modules.
+
+For each tick it publishes exactly one immutable sample:
+
+```lua
+---@class dwarfui.PointerSample
+---@field sequence integer
+---@field x integer|nil
+---@field y integer|nil
+---@field coordinate_space '"screen-cells"'
+```
+
+Both coordinates are normalized to `nil` when the pointer is unavailable.
+`sequence` is monotonically increasing within the current service generation.
+
+The poller accepts an observer callback. It does not know that its observer is
+the tooltip system and does not retain any widget, root, renderer, or
+viewscreen.
+
+### Layer 2: tooltip target detector
+
+Add a tooltip-specific detector that consumes `PointerSample` values and the
+service's weak registration set. It uses the existing
+`PointerDispatcher.resolve()` contract to produce exactly one observation:
+
+```lua
+---@class dwarfui.TooltipPointerObservation
+---@field sequence integer
+---@field kind '"target"'|'"blocked"'|'"miss"'
+---@field pointer_x integer|nil
+---@field pointer_y integer|nil
+---@field target gui.View|nil
+---@field local_x integer|nil
+---@field local_y integer|nil
+---@field root gui.View|nil
+```
+
+The detector owns root eligibility and cross-root arbitration. It does not run
+pointer callbacks, read tooltip text, retain the current target, or call a
+presentation object.
+
+A pointer outside all eligible registered roots, an unavailable pointer, or a
+pointer blocked before reaching a registered target produces a non-target
+observation. The distinction between `blocked` and `miss` remains observable
+for diagnostics and focused tests, but neither can select a tooltip target.
+
+### Layer 3: tooltip service mediation
+
+The tooltip service accepts observations and owns semantic tooltip state:
+
+1. Compare the observed target with the prior target.
+2. Deliver `on_pointer_leave` and `on_pointer_enter` exactly once per target
+   transition.
+3. Deliver `on_pointer_update` for every target observation.
+4. Read and validate `target.tooltip` after callbacks have run so dynamic
+   tooltip text reflects the current target-local coordinates.
+5. Publish or clear one immutable `TooltipIntent`.
+
+```lua
+---@class dwarfui.TooltipIntent
+---@field revision integer
+---@field source_sequence integer
+---@field text string
+---@field anchor_x integer
+---@field anchor_y integer
+---@field coordinate_space '"screen-cells"'
+```
+
+The intent contains a text snapshot and a screen-cell anchor only. It does not
+contain a renderer frame, dimensions, wrapping result, screen bounds, painter,
+overlay name, focus string, or viewscreen.
+
+The service exposes the current intent through a presentation-neutral
+subscription or observer boundary. Selection between those two equivalent
+forms belongs to implementation, but the contract must provide:
+
+- immediate notification when a new intent replaces the prior intent,
+- immediate notification when the intent is cleared,
+- a monotonically increasing revision so consumers can reject stale work, and
+- no requirement that a consumer be present.
+
+The input path ends at this service boundary. The rendering plan will define a
+consumer without changing the polling, detection, or observation contracts.
+
+## Lifecycle and ownership decisions
+
+- The process-wide state remains in `dfhack.dwarfui` so same-version module
+  reloads can identify and retire older scheduled callbacks.
+- Registrations remain weak-keyed and must not keep controls alive.
+- The first live registration starts polling; removal or collection of the
+  final registration stops rescheduling.
+- At most one polling callback may be scheduled for the active generation.
+- Each start or reload establishes a new generation token. A callback whose
+  captured token is stale exits without sampling, notifying, or rescheduling.
+- Explicit shutdown increments the generation before clearing state so a
+  callback already queued by DFHack cannot resurrect the old service.
+- A tick re-counts live weak registrations before sampling and before
+  rescheduling. Collection of the final registration therefore converges to a
+  stopped poller without an explicit `unregister()`.
+- An observer error must not create duplicate callback chains. The error is
+  surfaced with context, and the service remains in a state where a deliberate
+  restart or reload can establish one new chain.
+- Polling is registration-gated, not map-load-gated. Since it creates no
+  viewscreen and performs no UI-stack operation, it can remain structurally
+  safe during title, world-selection, loading, and map transitions. Live
+  characterization must confirm the chosen DFHack scheduler behaves as
+  expected in those states.
+- The production cadence starts at one frame per sample. The scheduler and
+  sampler remain injectable in unit tests, and cadence can be made
+  configurable later without changing detector or service contracts.
+
+## Target eligibility and arbitration decisions
+
+- A registered widget is eligible only when it and every attached ancestor are
+  visible and active.
+- A detached widget remains registered but cannot win hit testing.
+- A root must have current layout bounds before it can be tested.
+- Registered `OverlayWidget` roots must still be the registry-owned enabled
+  instance and must declare the current native viewscreen.
+- Non-overlay roots require a presentation-state predicate that can be tested
+  without referring to the future tooltip renderer. Existing native-mounted
+  component behavior must be characterized before this predicate is changed.
+- Tooltip infrastructure itself is never a candidate root.
+- Each eligible root is resolved once through
+  `PointerDispatcher.resolve(root, x, y)`.
+- Only a resolved target that is itself currently registered can win. A
+  registered descendant cannot be inferred from an unrelated ancestor hit.
+- Reverse subview order remains the within-root z-order contract.
+- The currently established registration-sequence rule remains the
+  cross-root tie breaker until a supported, presentation-independent root
+  ordering source is proven. The detector must isolate this policy behind one
+  documented arbitration function so it can be replaced without changing
+  sampling or service mediation.
+- One sample yields no more than one winning target and one service
+  observation.
+
+## Phase 0: Characterize scheduler and current behavior
+
+- [ ] Record the current production registration, hit-testing, target
+      transition, dynamic-text, and teardown behavior in focused tests before
+      refactoring it.
+- [ ] Add a minimal live probe proving whether a recurring
+      `dfhack.timeout(1, 'frames', callback)` continues to run while the game is
+      paused and while a foreground widget consumes mouse input.
+- [ ] Prove that reading `dfhack.screen.getMousePos()` from the timeout callback
+      neither consumes input nor changes the current viewscreen or focus
+      string.
+- [ ] Characterize timeout behavior at the title screen, during a safe
+      load-state transition, and after map load without leaving a recurring
+      callback behind.
+- [ ] Confirm how native-mounted DwarfSpec roots can be recognized as
+      currently presented without consulting a tooltip presentation object.
+- [ ] Record the current cross-root arbitration result for overlapping
+      eligible roots.
+- [ ] Treat any scheduler behavior that depends on a screen's render,
+      `onInput`, or `onIdle` method as a failed feasibility result and stop
+      before production refactoring.
+
+### Phase 0 completion gate
+
+- [ ] The recurring scheduler has live evidence that it observes pointer
+      movement independently of UI input dispatch.
+- [ ] Pointer sampling has no observed focus, viewscreen, pause, or input
+      side effect.
+- [ ] Timeout teardown and reload behavior are understood well enough to write
+      deterministic lifecycle tests.
+- [ ] Root eligibility inputs are identified without referencing the tooltip
+      renderer.
+
+## Phase 1: Implement the generic pointer poller
+
+- [ ] Add
+      `src/scripts_modinstalled/dwarfui/pointer_poller.lua`.
+- [ ] Implement a documented `PointerPoller` with injected scheduler, pointer
+      sampler, and observer dependencies.
+- [ ] Keep the default production sampler limited to one
+      `dfhack.screen.getMousePos()` call per tick.
+- [ ] Normalize partial and complete no-pointer results to `x=nil, y=nil`.
+- [ ] Assign one monotonically increasing sample sequence per completed tick.
+- [ ] Prevent a second `start()` call from creating a second callback chain.
+- [ ] Invalidate queued callbacks through a generation token on stop and
+      reload.
+- [ ] Recheck demand before each sample and before each reschedule.
+- [ ] Ensure stopping the poller is idempotent.
+- [ ] Ensure observer failures cannot silently create duplicate or immortal
+      polling chains.
+- [ ] Add the module to `dwarfui/module_registry.lua` before tooltip
+      registration consumers.
+- [ ] Add package-contract coverage for the new production module.
+- [ ] Add LuaDoc comments for the class, public methods, collaborator
+      contracts, and published sample record.
+- [ ] Add `tests/pointer_poller.spec.lua` coverage for start, duplicate start,
+      sample normalization, one read per tick, sequence ordering, stop,
+      stale-generation callbacks, demand loss, observer failure, and restart.
+- [ ] Add a dependency-isolation test that loads the poller without `gui`,
+      `plugins.overlay`, `dwarfui/tooltip`, or any renderer module.
+
+### Phase 1 completion gate
+
+- [ ] A controlled scheduler can drive pointer samples without creating or
+      retaining UI objects.
+- [ ] Exactly one pointer read and one observer notification occur per active
+      tick.
+- [ ] Stop and reload make every previously queued callback inert.
+- [ ] Focused poller and package-contract tests pass.
+
+## Phase 2: Extract tooltip target detection
+
+- [ ] Move registration-root discovery, root eligibility, and cross-root
+      target arbitration out of the current screen-owned update path.
+- [ ] Implement a documented detector that accepts one `PointerSample` and
+      returns one `TooltipPointerObservation`.
+- [ ] Keep the existing `PointerDispatcher.resolve()` implementation as the
+      within-root hit-testing authority.
+- [ ] Preserve weak registrations and registration sequence without retaining
+      widgets in poller-owned state.
+- [ ] Resolve each distinct eligible root at most once per sample.
+- [ ] Preserve target-local coordinates returned by the pointer dispatcher.
+- [ ] Produce explicit `target`, `blocked`, and `miss` observations.
+- [ ] Make a no-pointer sample produce a `miss` without running hit tests.
+- [ ] Isolate cross-root arbitration behind one documented policy function.
+- [ ] Remove every dependency from detection to `TooltipRenderer`,
+      `gui.ZScreen`, rendering bounds, renderer visibility, and presentation
+      refresh.
+- [ ] Add focused detector coverage for detached controls, invisible or
+      inactive ancestors, stale overlay instances, disabled overlays,
+      viewscreen mismatch, native-mounted roots, overlapping subviews,
+      blocked regions, unregistered resolved controls, overlapping roots, and
+      no-pointer samples.
+- [ ] Add a test proving one sample cannot notify two registered controls even
+      when their roots overlap.
+
+### Phase 2 completion gate
+
+- [ ] Detection is deterministic for target, blocked, and miss results.
+- [ ] Eligibility and arbitration operate without creating or querying a
+      tooltip presentation host.
+- [ ] The detector performs no pointer callbacks and reads no tooltip text.
+- [ ] Focused pointer and detector tests pass.
+
+## Phase 3: Convert the tooltip service to observation and intent mediation
+
+- [ ] Give the process-wide tooltip service one documented
+      `accept_pointer_observation(observation)` entrypoint.
+- [ ] Move current-target ownership and pointer transition callbacks into that
+      entrypoint.
+- [ ] Preserve leave-before-enter ordering when the winning target changes.
+- [ ] Run `on_pointer_update` after any enter callback and before reading
+      tooltip text.
+- [ ] Preserve the validation rule that tooltip values are strings, `nil`, or
+      empty strings.
+- [ ] Treat `nil` and empty strings as no current intent without losing the
+      current hover target.
+- [ ] Snapshot nonempty tooltip text into a new immutable intent with the
+      sample's screen-cell pointer coordinates as its anchor.
+- [ ] Increment the intent revision on every publish and clear operation that
+      changes observable service state.
+- [ ] Reject or ignore out-of-order observations whose sample sequence is
+      older than the last accepted sequence.
+- [ ] Expose current intent and revision through diagnostics without exposing
+      a renderer or screen.
+- [ ] Define a presentation-neutral intent observer boundary and make absence
+      of an observer valid.
+- [ ] Ensure observer replacement or removal cannot synthesize pointer enter,
+      leave, or update callbacks.
+- [ ] Clear intent and deliver one leave callback when the active registration
+      is removed, collected, detached, or becomes ineligible.
+- [ ] Clear intent and target state during deliberate shutdown and
+      same-version reload.
+- [ ] Replace direct renderer mutation in the input path with intent
+      publication.
+- [ ] Add focused service coverage for initial target, repeated update,
+      target transition, blocked and miss clearing, dynamic text, empty text,
+      invalid text, stale observation, unregister, collection, shutdown,
+      reload, missing consumer, and consumer replacement.
+- [ ] Add a dependency-isolation test proving the service's input path can load
+      and run with no tooltip renderer or `gui.ZScreen` implementation.
+
+### Phase 3 completion gate
+
+- [ ] Pointer callbacks and tooltip text snapshots match the established
+      behavior.
+- [ ] The service publishes only text, anchor, coordinate space, and revision
+      data required by a future presenter.
+- [ ] Target loss clears intent immediately and exactly once.
+- [ ] No input-path module imports or calls a tooltip renderer.
+- [ ] Focused tooltip service tests pass.
+
+## Phase 4: Wire registration demand to polling lifecycle
+
+- [ ] Start the singleton poller when the first live tooltip registration is
+      created.
+- [ ] Preserve idempotent duplicate registration.
+- [ ] Keep the poller running while at least one live weak registration
+      remains, including when all current roots are temporarily ineligible.
+- [ ] Stop the poller after explicit removal or collection of the final
+      registration.
+- [ ] Make a no-registration reload leave no active or resuming timeout chain.
+- [ ] Make a same-version reload with live registrations retire the old
+      generation and start exactly one new generation.
+- [ ] Remove screen creation, screen resumption, raising, dismissal, and
+      special native-screen lists from the registration lifecycle.
+- [ ] Do not add map-load gating as a substitute for correct lifecycle
+      isolation.
+- [ ] Extend diagnostics with poller generation, running state, scheduled
+      state, sample sequence, target, current intent, and registration count.
+- [ ] Remove diagnostics whose only meaning was a service screen or renderer
+      count from input-layer tests. Any temporary compatibility field must be
+      clearly marked for removal by the rendering plan.
+- [ ] Update the module registry and reload ordering so the poller, pointer
+      resolver, detector, and tooltip service are rebuilt as one coherent
+      generation.
+- [ ] Add focused lifecycle coverage for zero-to-one, one-to-many,
+      many-to-one, and one-to-zero registrations; collection; reload; and
+      repeated reload.
+
+### Phase 4 completion gate
+
+- [ ] Registrations control exactly one process-wide polling chain.
+- [ ] No tooltip registration creates or manipulates a DFHack screen or
+      overlay.
+- [ ] Repeated `dwarfui reload` leaves one current generation and no callbacks
+      capable of reviving an older generation.
+- [ ] Focused registration, registry, and reload tests pass.
+
+## Phase 5: Add live automation for input independence
+
+- [ ] Add a focused `.ds.lua` test whose filename ends only in `.ds.lua`.
+- [ ] Use the actual registered minecart overlay and its real zoom button as
+      the tooltip target.
+- [ ] Open the native Hauling menu through public DwarfSpec input APIs.
+- [ ] Move the pointer through DwarfSpec onto the rendered production zoom
+      button without calling detector, service-update, render, or input methods
+      directly.
+- [ ] Await diagnostics that identify the production button as the current
+      target and report the exact text `Zoom to this stop`.
+- [ ] Assert the published anchor equals the sampled screen-cell pointer
+      position.
+- [ ] Move within the button and prove target-local update can change dynamic
+      tooltip text before the service snapshots it.
+- [ ] Move off the button and prove the intent clears and the leave callback
+      occurs without synthetic input.
+- [ ] Place an input-consuming widget in the normal dispatch path and prove
+      pointer polling still updates the target and intent.
+- [ ] Assert DwarfSpec's focus string and current native viewscreen are
+      unchanged by registration, pointer movement, intent publication, and
+      target clearing.
+- [ ] Assert polling diagnostics expose no screen, overlay, renderer, or input
+      ownership created by the input subsystem.
+- [ ] Run `dwarfui reload` with a live registration and prove sampling resumes
+      through one new generation without duplicate callbacks or a lost
+      Hauling overlay.
+- [ ] Close and reopen the Hauling menu and prove temporarily ineligible
+      registrations neither publish stale intent nor require re-registration.
+- [ ] Include a safe title/load/map transition probe if Phase 0 confirms that
+      it can be automated without modifying the prepared save.
+- [ ] Restore pointer position, native menu state, scroll position, focus,
+      mounted subjects, and all test-owned registrations even when an
+      assertion fails.
+- [ ] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
+      subjects, and pointer ownership.
+
+### Phase 5 completion gate
+
+- [ ] Real pointer movement selects and clears the real minecart zoom tooltip
+      target through the polling path.
+- [ ] An input consumer cannot prevent the polling path from observing hover.
+- [ ] Focus, native viewscreen identity, pause state, and input routing remain
+      unchanged.
+- [ ] Reload leaves exactly one live poller generation and the registered
+      Hauling overlay remains available.
+- [ ] Focused live automation passes with confirmed cleanup.
+
+## Phase 6: Verification and handoff to rendering design
+
+- [ ] Run focused unit tests for pointer dispatch, pointer polling, tooltip
+      detection, tooltip mediation, registration, module registry, reload, and
+      package contracts.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run Lua syntax validation for production, test, and support sources.
+- [ ] Run unit-test naming validation.
+- [ ] Run package verification and inspect the packaged script manifest for
+      every new production module.
+- [ ] Run the focused DwarfSpec input-polling test through the unchanged thin
+      `Tools/Run-AutomationTests.ps1` pass-through.
+- [ ] Run the existing native minecart interaction tests to detect registration
+      or reload regressions.
+- [ ] Run the focused live proof twice to detect leaked timeout generations.
+- [ ] Record focused, full-suite, syntax, naming, package, live, repeat-run, and
+      cleanup evidence separately.
+- [ ] Do not count a published intent as proof that a tooltip is visually
+      rendered.
+- [ ] Produce the rendering plan against the stable `TooltipIntent` boundary
+      without revising pointer acquisition or target detection.
+
+### Phase 6 completion gate
+
+- [ ] All focused and complete verification categories pass.
+- [ ] Package contents include the poller and detector modules in valid reload
+      order.
+- [ ] Live evidence proves input independence and lifecycle invisibility.
+- [ ] No rendering claim is made until the separate rendering plan is
+      implemented and verified.
+
+## Planned file impact
+
+Expected production changes:
+
+- `src/scripts_modinstalled/dwarfui/pointer_poller.lua` — generic recurring
+  pointer acquisition.
+- `src/scripts_modinstalled/dwarfui/pointer.lua` — retain the generic resolver;
+  adjust only if observation extraction requires a presentation-independent
+  helper.
+- `src/scripts_modinstalled/dwarfui/tooltip_registration.lua` — weak
+  registrations, target detection, observation mediation, intent publication,
+  polling demand, diagnostics, and reload lifecycle.
+- `src/scripts_modinstalled/dwarfui/tooltip.lua` — public registration and
+  intent-facing API cleanup; renderer code remains outside the polling path.
+- `src/scripts_modinstalled/dwarfui/module_registry.lua` — dependency and
+  reload ordering.
+
+Expected test changes:
+
+- `tests/pointer_poller.spec.lua`
+- `tests/pointer.spec.lua`
+- `tests/tooltip_registration.spec.lua`
+- `tests/module_registry.spec.lua`
+- `tests/package_contract.spec.lua`
+- `tests/minecart_route/minecart_route_tooltip.ds.lua`
+
+The exact live-test filename may change if keeping polling evidence separate
+from the later rendering evidence produces a clearer DwarfSpec contract.
+
+## Rendering-plan handoff contract
+
+The later rendering plan may depend only on:
+
+- a current `TooltipIntent` or clear notification,
+- monotonically increasing intent revisions,
+- text already validated and snapshotted,
+- an anchor in documented screen-cell coordinates, and
+- optional lifecycle diagnostics that do not expose input internals.
+
+It may not require the poller or detector to:
+
+- create a presentation surface,
+- calculate a tooltip frame or wrapped dimensions,
+- request z-order or focus,
+- forward or consume input,
+- know which rendering technology is selected, or
+- change its polling cadence to make rendering occur.

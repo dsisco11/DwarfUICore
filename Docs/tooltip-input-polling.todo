@@ -2,9 +2,9 @@
 
 ## Status
 
-Phases 0 through 5 are complete. Phase 6 is the next implementation step. This
-document is the execution contract for pointer sampling, registered-control
-hit testing, and tooltip-service notification.
+Phases 0 through 6 are complete. This document records the completed execution
+contract for pointer sampling, registered-control hit testing, and
+tooltip-service notification.
 
 Tooltip rendering is intentionally excluded. A separate plan will decide how
 tooltip presentation is placed above base-game and DFHack content without
@@ -659,34 +659,71 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 6: Verification and handoff to rendering design
 
-- [ ] Run focused unit tests for pointer dispatch, pointer polling, tooltip
+- [x] Run focused unit tests for pointer dispatch, pointer polling, tooltip
       detection, tooltip mediation, registration, module registry, reload, and
       package contracts.
-- [ ] Run the complete standalone unit suite.
-- [ ] Run Lua syntax validation for production, test, and support sources.
-- [ ] Run unit-test naming validation.
-- [ ] Run package verification and inspect the packaged script manifest for
+- [x] Run the complete standalone unit suite.
+- [x] Run Lua syntax validation for production, test, and support sources.
+- [x] Run unit-test naming validation.
+- [x] Run package verification and inspect the packaged script manifest for
       every new production module.
-- [ ] Run the focused DwarfSpec input-polling test through the unchanged thin
+- [x] Run the focused DwarfSpec input-polling test through the unchanged thin
       `Tools/Run-AutomationTests.ps1` pass-through.
-- [ ] Run the existing native minecart interaction tests to detect registration
+- [x] Run the existing native minecart interaction tests to detect registration
       or reload regressions.
-- [ ] Run the focused live proof twice to detect leaked timeout generations.
-- [ ] Record focused, full-suite, syntax, naming, package, live, repeat-run, and
+- [x] Run the focused live proof twice to detect leaked timeout generations.
+- [x] Record focused, full-suite, syntax, naming, package, live, repeat-run, and
       cleanup evidence separately.
-- [ ] Do not count a published intent as proof that a tooltip is visually
+- [x] Do not count a published intent as proof that a tooltip is visually
       rendered.
-- [ ] Produce the rendering plan against the stable `TooltipIntent` boundary
+- [x] Produce the rendering plan against the stable `TooltipIntent` boundary
       without revising pointer acquisition or target detection.
 
 ### Phase 6 completion gate
 
-- [ ] All focused and complete verification categories pass.
-- [ ] Package contents include the poller and detector modules in valid reload
+- [x] All focused and complete verification categories pass.
+- [x] Package contents include the poller and detector modules in valid reload
       order.
-- [ ] Live evidence proves input independence and lifecycle invisibility.
-- [ ] No rendering claim is made until the separate rendering plan is
+- [x] Live evidence proves input independence and lifecycle invisibility.
+- [x] No rendering claim is made until the separate rendering plan is
       implemented and verified.
+
+### Phase 6 evidence
+
+- Focused standalone units passed at
+  `83 successes / 0 failures / 0 errors / 0 pending`, covering pointer
+  dispatch and polling, tooltip target detection and mediation, registration,
+  reload, module registry, and package contracts.
+- The complete standalone unit suite passed at
+  `218 successes / 0 failures / 0 errors / 0 pending`.
+- Lua 5.4.6 syntax validation passed for 19 production and 36 test/support
+  files. Unit-test naming validation and `git diff --check` also passed.
+- Expanded-package and zip-package verification passed. The 20-file expanded
+  manifest contained `pointer.lua`, `pointer_poller.lua`,
+  `tooltip_target_detector.lua`, `tooltip_service.lua`, `tooltip.lua`,
+  `tooltip_registration.lua`, and `module_registry.lua`.
+- The packaged registry placed pointer acquisition and tooltip mediation in
+  dependency order: `pointer.lua` at registry line 24,
+  `pointer_poller.lua` at line 29, `tooltip_target_detector.lua` at line 34,
+  `tooltip_service.lua` at line 39, and `tooltip_registration.lua` at line 64.
+- The focused native input-polling proof passed through the unchanged
+  `Tools/Run-AutomationTests.ps1` pass-through. Its two-repeat run produced
+  `2 successes / 0 failures / 0 errors`; DwarfSpec reported
+  `cleanup_confirmed=true` and `mount_cleanup_verified=true`.
+- The existing native minecart marker interaction test passed after its map
+  pan used the documented top-left coordinate origin. The complete live suite
+  passed at `13 successes / 0 failures / 0 errors`, including minecart,
+  polling, registration, scheduler, popover, and tooltip component coverage.
+- The input-polling proof establishes that pointer movement publishes and
+  clears the expected immutable intent without routed mouse input, a tooltip
+  screen, a renderer, or an overlay. It does not establish visual tooltip
+  presentation.
+- A direct `dwarfui reload` completed successfully after the live runs.
+  DwarfSpec subsequently reported executor `idle`, queue `0`, and quarantine
+  `none`.
+- `Docs/tooltip-render-hook.todo` is the separate planning-only rendering
+  contract. It consumes the stable `TooltipIntent` boundary and does not
+  revise pointer acquisition, hit testing, or target detection.
 
 ## Planned file impact
 

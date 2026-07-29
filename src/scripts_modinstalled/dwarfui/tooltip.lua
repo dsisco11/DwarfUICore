@@ -14,6 +14,40 @@ local BACKGROUND = dfhack.pen.parse{
 }
 local TEXT = dfhack.pen.parse{fg=COLOR_WHITE, bg=COLOR_BLACK}
 
+---An exact fortress-map tile used only for map-target hit detection.
+---@class dwarfui.MapTilePosition
+---@field x integer
+---@field y integer
+---@field z integer
+
+---Options for registering one exact map tile as a tooltip target.
+---The owner is not the hit target. Its ancestor root supplies presentation
+---transport and lifecycle eligibility independently from exact tile matching.
+---Registration is valid before attachment, but cannot become eligible until
+---the owner resolves to a currently presented root.
+---@class dwarfui.MapTileTooltipRegistrationOptions
+---@field owner gui.View
+---@field pos dwarfui.MapTilePosition
+---@field tooltip string|nil
+
+---Complete replacement state for an existing map-tile registration.
+---The owner and handle identity are immutable. Position and text change
+---atomically so detection cannot observe values from different updates.
+---@class dwarfui.MapTileTooltipUpdate
+---@field pos dwarfui.MapTilePosition
+---@field tooltip string|nil
+
+---Opaque stable identity for one map-tile tooltip registration.
+---This handle is not a gui.View and has no layout, render, focus, or input
+---role. Every registration call returns a distinct handle, including calls for
+---the same exact tile. Registration order resolves duplicate-tile precedence.
+---`update_map_tile()` replaces the complete mutable state and returns false
+---for an unknown or removed handle. `unregister_map_tile()` deactivates the
+---handle immediately, returns true exactly once, and returns false thereafter.
+---The process registry must not keep an otherwise abandoned handle alive;
+---explicit unregistration remains available for immediate removal.
+---@class dwarfui.MapTileTooltipRegistration
+
 -- A moving tooltip is presentation layered over a host, not a Panel or Window.
 -- Keeping it a plain Widget avoids their global layout/redraw lifecycle inside
 -- the host's render pass.

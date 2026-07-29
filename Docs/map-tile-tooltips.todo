@@ -39,13 +39,13 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 - [ ] Add `tooltip.register_map_tile(options)`, returning a stable registration
       handle.
-- [ ] Add `tooltip.update_map_tile(handle, changes)` for atomic position and
+- [ ] Add `tooltip.update_map_tile(handle, state)` for atomic position and
       text changes without replacing target identity.
 - [ ] Add `tooltip.unregister_map_tile(handle)` for immediate idempotent
       removal.
 - [ ] Require `options.owner` to identify the GUI view whose current root owns
       the target's eligibility, lifetime, and presentation transport.
-- [ ] Require `options.pos` to contain numeric `x`, `y`, and `z` fields and
+- [ ] Require `options.pos` to contain integer `x`, `y`, and `z` fields and
       copy those values into registration-owned state.
 - [ ] Accept tooltip text under the same string, empty-string, and `nil`
       semantics as widget tooltips.
@@ -68,27 +68,27 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 ## Phase 0: Lock the generic contract and regression baseline
 
-- [ ] Add contract tests for the new public registration functions and handle
+- [x] Add contract tests for the new public registration functions and handle
       behavior before integrating a production consumer.
-- [ ] Specify the registration handle's identity, update, removal, weak
+- [x] Specify the registration handle's identity, update, removal, weak
       lifetime, and duplicate-tile behavior in LuaDoc.
-- [ ] Specify owner-to-root resolution independently from map hit testing.
-- [ ] Specify that exact map coordinates are hit data while the owner root is
+- [x] Specify owner-to-root resolution independently from map hit testing.
+- [x] Specify that exact map coordinates are hit data while the owner root is
       presentation and lifecycle data.
-- [ ] Specify that map registrations do not need, create, or imitate
+- [x] Specify that map registrations do not need, create, or imitate
       `gui.View` instances.
-- [ ] Record the current focused tooltip and minecart test baseline.
-- [ ] Preserve package-contract assertions that `TooltipAgent` is absent and
+- [x] Record the current focused tooltip and minecart test baseline.
+- [x] Preserve package-contract assertions that `TooltipAgent` is absent and
       tooltip input modules do not depend on presentation modules.
-- [ ] Add LuaDoc comments to every new or modified class and method.
+- [x] Add LuaDoc comments to every new or modified class and method.
 
 ### Phase 0 completion gate
 
-- [ ] The public API and lifecycle rules are represented by failing contract
+- [x] The public API and lifecycle rules are represented by failing contract
       tests with no minecart-specific assumptions.
-- [ ] Existing widget registration behavior remains captured by its current
+- [x] Existing widget registration behavior remains captured by its current
       unit and package-contract coverage.
-- [ ] The implementation boundary explicitly excludes off-z targets and manual
+- [x] The implementation boundary explicitly excludes off-z targets and manual
       screen-to-map projection.
 
 ## Phase 1: Extend immutable pointer sampling with map coordinates
@@ -317,7 +317,9 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 2026-07-28 | Pre-implementation focused baseline | `.\tools\Run-UnitTests.ps1 tests/minecart_route.spec.lua tests/minecart_route_overlay.spec.lua tests/tooltip_target_detector.spec.lua tests/tooltip_service.spec.lua tests/tooltip_presenter.spec.lua` | Passed: 74 successes, 0 failures | Existing coverage includes minecart projection/overlay behavior and the current widget-only tooltip detector, service, and presenter. It does not prove map-tile hover. |
+| 2026-07-28 | Phase 0 broad pre-implementation baseline | `.\tools\Run-UnitTests.ps1 tests\pointer.spec.lua tests\pointer_poller.spec.lua tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_service.spec.lua tests\tooltip_presenter.spec.lua tests\tooltip_render_hook.spec.lua tests\package_contract.spec.lua tests\minecart_route.spec.lua tests\minecart_route_overlay.spec.lua --exclude-tags=map_tile_contract` | Passed: 154 successes, 0 failures, 0 errors, 0 pending | Proves the current widget registration, pointer, detector, service, presenter, render-hook, package, and minecart baseline remains green after adding the future contract. It does not prove map-tile behavior. |
+| 2026-07-28 | Phase 0 expected-red public and lifecycle contract | `.\tools\Run-UnitTests.ps1 tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\package_contract.spec.lua --tags=map_tile_contract` | Expected red: 0 successes, 5 failures, 0 errors, 0 pending | Every failure reports that `register_map_tile`, `update_map_tile`, or `unregister_map_tile` is not yet a function. The generic tests cover facade delegation, opaque identity, duplicate exact tiles, update/removal semantics, validation, weak lifetime, diagnostics, and the shipped public API without a minecart dependency. |
+| 2026-07-28 | Phase 0 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the LuaDoc contract and all new expected-red tests. |
 | | Public map-tile registration contract | Focused unit suite | Pending | Record handle, update, removal, weak lifetime, and exact-coordinate behavior. |
 | | Pointer sampling and generic map detection | Focused unit suite | Pending | Record screen/map sampling, nil behavior, indexing, arbitration, and reload safety. |
 | | Minecart same-z consumer | Focused unit suite | Pending | Record current names/positions, route changes, lifecycle cleanup, and explicit off-z exclusion. |

@@ -148,6 +148,46 @@ describe('DwarfUI tooltip renderer', function()
         assert.is.equal(widget, state.unregistered)
     end)
 
+    it('delegates the exact map-tile registration lifecycle ' ..
+            '#map_tile_contract', function()
+        local state = {registration_service={}}
+        local handle = {}
+        state.registration_service.register_map_tile = function(options)
+            state.map_registration = options
+            return handle
+        end
+        state.registration_service.update_map_tile = function(target, update)
+            state.map_update_target = target
+            state.map_update = update
+            return true
+        end
+        state.registration_service.unregister_map_tile = function(target)
+            state.map_unregistration = target
+            return true
+        end
+        local tooltip = load_tooltip(state)
+        local options = {
+            owner={},
+            pos={x=11, y=22, z=3},
+            tooltip='Exact tile',
+        }
+        local update = {
+            pos={x=12, y=23, z=4},
+            tooltip=nil,
+        }
+
+        assert.equals('function', type(tooltip.register_map_tile))
+        assert.equals('function', type(tooltip.update_map_tile))
+        assert.equals('function', type(tooltip.unregister_map_tile))
+        assert.is_equal(handle, tooltip.register_map_tile(options))
+        assert.is_equal(options, state.map_registration)
+        assert.is_true(tooltip.update_map_tile(handle, update))
+        assert.is_equal(handle, state.map_update_target)
+        assert.is_equal(update, state.map_update)
+        assert.is_true(tooltip.unregister_map_tile(handle))
+        assert.is_equal(handle, state.map_unregistration)
+    end)
+
     it('is a hidden plain Widget with the required pens and exclusion policy', function()
         local state = {}
         local tooltip, widgets = load_tooltip(state)

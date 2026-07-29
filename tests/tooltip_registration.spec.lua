@@ -177,6 +177,117 @@ describe('singleton tooltip registration polling', function()
         assert.equals(0, #env.state.callbacks)
     end)
 
+    it('owns opaque exact-tile handles independently of gui views ' ..
+            '#map_tile_contract', function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+        local pos = {x=10, y=20, z=3}
+
+        assert.equals('function', type(registration.register_map_tile))
+        assert.equals('function', type(registration.update_map_tile))
+        assert.equals('function', type(registration.unregister_map_tile))
+
+        local first = registration.register_map_tile{
+            owner=owner,
+            pos=pos,
+            tooltip='First',
+        }
+        local second = registration.register_map_tile{
+            owner=owner,
+            pos=pos,
+            tooltip='Second',
+        }
+
+        assert.is_not_nil(first)
+        assert.is_not_nil(second)
+        assert.is_not_equal(first, second)
+        assert.is_not_equal(owner, first)
+        assert.is_nil(first.updateLayout)
+        assert.is_nil(first.render)
+
+        local diagnostics = registration.get_diagnostics()
+        assert.equals(0, diagnostics.widget_registration_count)
+        assert.equals(2, diagnostics.map_registration_count)
+        assert.equals(2, diagnostics.registration_count)
+
+        assert.is_true(registration.update_map_tile(first, {
+            pos={x=11, y=21, z=4},
+            tooltip=nil,
+        }))
+        assert.is_false(registration.update_map_tile({}, {
+            pos={x=11, y=21, z=4},
+            tooltip='Unknown',
+        }))
+
+        assert.is_true(registration.unregister_map_tile(first))
+        assert.is_false(registration.unregister_map_tile(first))
+        assert.is_false(registration.update_map_tile(first, {
+            pos={x=12, y=22, z=5},
+            tooltip='Removed',
+        }))
+        assert.is_true(registration.unregister_map_tile(second))
+
+        diagnostics = registration.get_diagnostics()
+        assert.equals(0, diagnostics.map_registration_count)
+        assert.equals(0, diagnostics.registration_count)
+    end)
+
+    it('requires an owner and exact integer tile coordinates ' ..
+            '#map_tile_contract', function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+
+        assert.equals('function', type(registration.register_map_tile))
+        for _, options in ipairs({
+                {pos={x=1, y=2, z=3}, tooltip='Missing owner'},
+                {owner=owner, tooltip='Missing position'},
+                {owner=owner, pos={x=1, y=2}, tooltip='Missing z'},
+                {owner=owner, pos={x=1.5, y=2, z=3}, tooltip='Fractional x'},
+                {owner=owner, pos={x='1', y=2, z=3}, tooltip='String x'},
+                {owner=owner, pos={x=1, y=2, z=3}, tooltip=42},
+            }) do
+            assert.has_error(function()
+                registration.register_map_tile(options)
+            end)
+        end
+
+        local handle = registration.register_map_tile{
+            owner=owner,
+            pos={x=1, y=2, z=3},
+            tooltip=nil,
+        }
+        assert.is_not_nil(handle)
+        assert.is_true(registration.unregister_map_tile(handle))
+    end)
+
+    it('does not retain an abandoned map-tile registration handle ' ..
+            '#map_tile_contract', function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+        local weak_handle = setmetatable({}, {__mode='v'})
+
+        assert.equals('function', type(registration.register_map_tile))
+        do
+            local handle = registration.register_map_tile{
+                owner=owner,
+                pos={x=1, y=2, z=3},
+                tooltip='Transient',
+            }
+            weak_handle[1] = handle
+        end
+
+        collectgarbage('collect')
+        collectgarbage('collect')
+        assert.is_nil(weak_handle[1])
+
+        local diagnostics = registration.get_diagnostics()
+        assert.equals(0, diagnostics.map_registration_count)
+        assert.equals(0, diagnostics.registration_count)
+    end)
+
     it('polls through detector and service without a presentation host',
             function()
         local env = load_environment{mouse_x=3, mouse_y=2}

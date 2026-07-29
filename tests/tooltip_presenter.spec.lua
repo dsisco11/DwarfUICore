@@ -84,37 +84,45 @@ local function load_environment()
         'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {
             globals={dfhack=process},
         })
-    local _, hook_module = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua', {
-            globals={dfhack=process},
-            require_modules={['plugins.overlay']=overlay},
-        })
-    local _, tooltip = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip.lua', {
-            globals={
-                COLOR_BLACK='black',
-                COLOR_WHITE='white',
-                DEFAULT_NIL=default_nil,
-                defclass=widget_harness.defclass,
-                dfhack=process,
-            },
-            require_modules={
-                gui=gui,
-                ['gui.widgets']=widgets,
-                ['plugins.overlay']=overlay,
-            },
-            reqscript={
-                ['dwarfui/widget_extensions']=extensions,
-                ['dwarfui/pointer']=pointer,
-                ['dwarfui/text']=text,
-                ['dwarfui/tooltip_service']=service_module,
-                ['dwarfui/tooltip_render_hook']=hook_module,
-                ['dwarfui/tooltip_registration']={
-                    register=function() end,
-                    unregister=function() end,
+    local function load_hook_generation()
+        local _, result = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua', {
+                globals={dfhack=process},
+                require_modules={['plugins.overlay']=overlay},
+            })
+        return result
+    end
+    local function load_tooltip_generation(hook)
+        local _, result = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/tooltip.lua', {
+                globals={
+                    COLOR_BLACK='black',
+                    COLOR_WHITE='white',
+                    DEFAULT_NIL=default_nil,
+                    defclass=widget_harness.defclass,
+                    dfhack=process,
                 },
-            },
-        })
+                require_modules={
+                    gui=gui,
+                    ['gui.widgets']=widgets,
+                    ['plugins.overlay']=overlay,
+                },
+                reqscript={
+                    ['dwarfui/widget_extensions']=extensions,
+                    ['dwarfui/pointer']=pointer,
+                    ['dwarfui/text']=text,
+                    ['dwarfui/tooltip_service']=service_module,
+                    ['dwarfui/tooltip_render_hook']=hook,
+                    ['dwarfui/tooltip_registration']={
+                        register=function() end,
+                        unregister=function() end,
+                    },
+                },
+            })
+        return result
+    end
+    local hook_module = load_hook_generation()
+    local tooltip = load_tooltip_generation(hook_module)
     return {
         state=state,
         process=process,
@@ -126,6 +134,8 @@ local function load_environment()
         Screen=Screen,
         ZScreen=gui.ZScreen,
         widgets=widgets,
+        load_hook_generation=load_hook_generation,
+        load_tooltip_generation=load_tooltip_generation,
     }
 end
 
@@ -393,5 +403,44 @@ describe('DwarfUI intent-driven tooltip presenter', function()
         assert.equals('inactive-intent',
             presenter:get_diagnostics().surface_reason)
         assert.is_false(presenter:start())
+    end)
+
+    it('reloads presenter and renderer while adopting one active trampoline',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Reloaded')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+        env.overlay.render_viewscreen_widgets()
+
+        local first_presenter = env.tooltip.presenter
+        local first_renderer = first_presenter._renderer
+        local trampoline = env.overlay.render_viewscreen_widgets
+        local first_generation =
+            env.hook.manager:get_diagnostics().generation
+
+        local next_hook = env.load_hook_generation()
+        local next_tooltip = env.load_tooltip_generation(next_hook)
+        local diagnostics = next_hook.manager:get_diagnostics()
+        assert.is_not_equal(first_presenter, next_tooltip.presenter)
+        assert.is_not_equal(first_renderer,
+            next_tooltip.presenter._renderer)
+        assert.is_equal(trampoline,
+            env.overlay.render_viewscreen_widgets)
+        assert.equals(first_generation + 1, diagnostics.generation)
+        assert.equals(diagnostics.generation,
+            diagnostics.overlay.generation)
+        assert.is_true(diagnostics.overlay.outermost)
+
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(1, first_presenter:get_diagnostics().render_count)
+        assert.equals(1,
+            next_tooltip.presenter:get_diagnostics().render_count)
+        assert.equals(2,
+            next_hook.manager:get_diagnostics().render_count)
     end)
 end)

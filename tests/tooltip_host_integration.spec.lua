@@ -72,6 +72,7 @@ local function load_environment(state)
             return {generation=1}
         end,
         set_presenter=function() end,
+        set_current_intent_revision=function() end,
         ensure_overlay=function() end,
         clear_selection=function() end,
     }

@@ -22,6 +22,43 @@ local function overlay_with(renderer)
 end
 
 describe('DwarfUI tooltip render-hook manager', function()
+    it('chains unrelated overlay and screen wrappers installed first',
+            function()
+        local events = {}
+        local overlay = overlay_with(function()
+            table.insert(events, 'overlay-original')
+        end)
+        local overlay_original = overlay.render_viewscreen_widgets
+        overlay.render_viewscreen_widgets = function(...)
+            table.insert(events, 'overlay-foreign')
+            return overlay_original(...)
+        end
+        local screen_original = function()
+            table.insert(events, 'screen-original')
+        end
+        local screen = {onRender=function(...)
+            table.insert(events, 'screen-foreign')
+            return screen_original(...)
+        end}
+        local module = load_hook({dwarfui={}}, function() return overlay end)
+        module.manager:set_presenter(function(transport)
+            table.insert(events,
+                transport == module.TooltipRenderTransport.OVERLAY and
+                    'overlay-presenter' or 'screen-presenter')
+            return 1
+        end)
+
+        module.manager:ensure_overlay()
+        overlay.render_viewscreen_widgets()
+        module.manager:ensure_screen(screen)
+        screen:onRender()
+
+        assert.same({
+            'overlay-foreign', 'overlay-original', 'overlay-presenter',
+            'screen-foreign', 'screen-original', 'screen-presenter',
+        }, events)
+    end)
+
     it('calls the overlay predecessor first and preserves all returns',
             function()
         local events = {}
@@ -133,6 +170,51 @@ describe('DwarfUI tooltip render-hook manager', function()
             module.manager:get_diagnostics().overlay.owner)
     end)
 
+    it('keeps one presenter after repeated outermost repairs', function()
+        local overlay = overlay_with(function() end)
+        local presentations = 0
+        local module = load_hook({dwarfui={}}, function() return overlay end)
+        module.manager:set_presenter(function()
+            presentations = presentations + 1
+            return presentations
+        end)
+        module.manager:ensure_overlay()
+        local first = overlay.render_viewscreen_widgets
+        overlay.render_viewscreen_widgets =
+            function(...) return first(...) end
+
+        assert.is_true(module.manager:ensure_overlay())
+        assert.is_false(module.manager:ensure_overlay())
+        assert.is_false(module.manager:ensure_overlay())
+        overlay.render_viewscreen_widgets()
+
+        assert.equals(1, presentations)
+        assert.equals(1, module.manager:get_diagnostics().render_count)
+    end)
+
+    it('preserves its overlay trampoline across rescan', function()
+        local overlay = overlay_with(function() end)
+        overlay.rescan = function()
+            overlay.rescan_count = (overlay.rescan_count or 0) + 1
+        end
+        local presentations = 0
+        local module = load_hook({dwarfui={}}, function() return overlay end)
+        module.manager:set_presenter(function()
+            presentations = presentations + 1
+            return 1
+        end)
+        module.manager:ensure_overlay()
+        local trampoline = overlay.render_viewscreen_widgets
+
+        overlay.rescan()
+        assert.is_false(module.manager:ensure_overlay())
+        assert.is_equal(trampoline, overlay.render_viewscreen_widgets)
+        overlay.render_viewscreen_widgets()
+
+        assert.equals(1, overlay.rescan_count)
+        assert.equals(1, presentations)
+    end)
+
     it('wraps, repairs, and conditionally restores a screen method',
             function()
         local events = {}
@@ -165,6 +247,11 @@ describe('DwarfUI tooltip render-hook manager', function()
             table.insert(events, 'foreign')
             return dwarfui_inner(...)
         end)
+        local pending = module.manager:get_diagnostics().selected_screen
+        assert.is_false(pending.installed)
+        assert.is_false(pending.chained)
+        assert.is_true(pending.method_replacement_pending)
+        assert.is_true(pending.replaced_method)
         assert.is_true(module.manager:ensure_screen(screen))
         events = {}
         screen:onRender('two')
@@ -189,6 +276,24 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.is_true(module.manager:shutdown())
         assert.is_nil(rawget(screen, 'onRender'))
         assert.is_equal(inherited, screen.onRender)
+    end)
+
+    it('restores inheritance without shadowing later class changes',
+            function()
+        local original = function() return 'original' end
+        local replacement = function() return 'replacement' end
+        local class = {onRender=original}
+        local screen = setmetatable({}, {__index=class})
+        local module = load_hook({dwarfui={}},
+            function() return overlay_with(function() end) end)
+
+        module.manager:ensure_screen(screen)
+        module.manager:shutdown()
+        class.onRender = replacement
+
+        assert.is_nil(rawget(screen, 'onRender'))
+        assert.is_equal(replacement, screen.onRender)
+        assert.equals('replacement', screen:onRender())
     end)
 
     it('restores an initially raw method exactly on shutdown', function()
@@ -276,11 +381,47 @@ describe('DwarfUI tooltip render-hook manager', function()
             return inner(...)
         end
         diagnostics = module.manager:get_diagnostics()
+        assert.is_false(diagnostics.overlay.installed)
         assert.is_false(diagnostics.overlay.outermost)
+        assert.is_false(diagnostics.overlay.chained)
+        assert.is_true(
+            diagnostics.overlay.method_replacement_pending)
+        assert.is_true(diagnostics.overlay.replaced_method)
         module.manager:ensure_overlay()
         diagnostics = module.manager:get_diagnostics()
+        assert.is_true(diagnostics.overlay.installed)
         assert.is_true(diagnostics.overlay.outermost)
         assert.equals(1, diagnostics.overlay.repair_count)
+        assert.is_true(diagnostics.overlay.chained)
+        assert.is_true(diagnostics.overlay.replaced_method)
+        assert.equals(1,
+            diagnostics.overlay.method_replacement_count)
+    end)
+
+    it('distinguishes module and screen-method replacement diagnostics',
+            function()
+        local first_overlay = overlay_with(function() end)
+        local current_overlay = first_overlay
+        local module = load_hook({dwarfui={}},
+            function() return current_overlay end)
+        module.manager:set_current_intent_revision(4)
+        module.manager:ensure_overlay()
+        current_overlay = overlay_with(function() end)
+        module.manager:ensure_overlay()
+        local diagnostics = module.manager:get_diagnostics()
+        assert.is_true(diagnostics.overlay.replaced_module)
+        assert.equals(1,
+            diagnostics.overlay.module_replacement_count)
+
+        local screen = {onRender=function() end}
+        module.manager:ensure_screen(screen)
+        screen.onRender = function() end
+        module.manager:ensure_screen(screen)
+        diagnostics = module.manager:get_diagnostics()
+        assert.is_true(diagnostics.selected_screen.replaced_method)
+        assert.equals(1,
+            diagnostics.selected_screen.method_replacement_count)
+        assert.is_false(diagnostics.inactive_intent)
     end)
 
     it('reports every retained screen hook after selection transfer',
@@ -316,7 +457,11 @@ describe('DwarfUI tooltip render-hook manager', function()
         local process = {dwarfui={}}
         local module = load_hook(process,
             function() return overlay_with(function() end) end)
-        module.manager:set_presenter(function() end)
+        local presentations = 0
+        module.manager:set_presenter(function()
+            presentations = presentations + 1
+            return presentations
+        end)
         local weak_owner = setmetatable({}, {__mode='v'})
         do
             local screen = {onRender=function() end}
@@ -332,6 +477,113 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.is_nil(weak_owner[1])
         assert.equals(0,
             module.manager:get_diagnostics().screen_hook_count)
+
+        local next_screen = {onRender=function() end}
+        module.manager:ensure_screen(next_screen)
+        next_screen:onRender()
+        assert.equals(2, presentations)
+        assert.equals(1,
+            module.manager:get_diagnostics().screen_hook_count)
+    end)
+
+    it('isolates a failed presenter and explicitly recovers a new generation',
+            function()
+        local process
+        process = {
+            dwarfui={},
+            printerr=function()
+                process.log_count = (process.log_count or 0) + 1
+            end,
+        }
+        local overlay_predecessors = 0
+        local overlay = overlay_with(function()
+            overlay_predecessors = overlay_predecessors + 1
+        end)
+        local screen = {
+            predecessor_count=0,
+            onRender=function(self)
+                self.predecessor_count = self.predecessor_count + 1
+            end,
+        }
+        local module = load_hook(process, function() return overlay end)
+        local failed_calls = 0
+        module.manager:set_current_intent_revision(17)
+        module.manager:set_presenter(function()
+            failed_calls = failed_calls + 1
+            error('injected presenter failure')
+        end)
+        module.manager:ensure_overlay()
+
+        assert.has_no.errors(function()
+            overlay.render_viewscreen_widgets()
+            overlay.render_viewscreen_widgets()
+        end)
+        module.manager:ensure_screen(screen)
+        assert.has_no.errors(function()
+            screen:onRender()
+            screen:onRender()
+        end)
+        local failed = module.manager:get_diagnostics()
+        assert.equals(2, overlay_predecessors)
+        assert.equals(2, screen.predecessor_count)
+        assert.equals(1, failed_calls)
+        assert.equals(1, process.log_count)
+        assert.is_true(failed.disabled)
+        assert.equals(failed.generation, failed.disabled_generation)
+        assert.equals(1, failed.failure_count)
+        assert.equals(17, failed.last_failure.revision)
+        assert.equals(
+            module.TooltipRenderTransport.OVERLAY,
+            failed.last_failure.transport)
+        assert.is_equal(overlay, failed.last_failure.owner)
+        assert.is_truthy(failed.last_failure.error:find(
+            'injected presenter failure', 1, true))
+
+        local failed_generation = failed.generation
+        local recovered_calls = 0
+        module.manager:set_presenter(function()
+            recovered_calls = recovered_calls + 1
+            return 18
+        end)
+        local adopted = module.manager:get_diagnostics()
+        assert.equals(failed_generation + 1, adopted.generation)
+        assert.equals(adopted.generation,
+            adopted.overlay.generation)
+        assert.equals(adopted.generation,
+            adopted.selected_screen.generation)
+        screen:onRender()
+        local recovered = module.manager:get_diagnostics()
+        assert.equals(failed_generation + 1, recovered.generation)
+        assert.is_false(recovered.disabled)
+        assert.equals(1, recovered_calls)
+        assert.equals(3, screen.predecessor_count)
+        assert.equals(18, recovered.last_rendered_revision)
+        assert.equals(recovered.generation,
+            recovered.selected_screen.generation)
+    end)
+
+    it('does not reinterpret predecessor failures as presenter failures',
+            function()
+        local overlay = overlay_with(function()
+            error('overlay predecessor failure')
+        end)
+        local module = load_hook({dwarfui={}}, function() return overlay end)
+        local presenter_calls = 0
+        module.manager:set_presenter(function()
+            presenter_calls = presenter_calls + 1
+            return 1
+        end)
+        module.manager:ensure_overlay()
+
+        local ok, failure = pcall(overlay.render_viewscreen_widgets)
+        local diagnostics = module.manager:get_diagnostics()
+        assert.is_false(ok)
+        assert.is_truthy(tostring(failure):find(
+            'overlay predecessor failure', 1, true))
+        assert.equals(0, presenter_calls)
+        assert.equals(0, diagnostics.failure_count)
+        assert.is_false(diagnostics.disabled)
+        assert.is_nil(diagnostics.last_failure)
     end)
 
     it('rejects incompatible process state versions', function()

@@ -35,11 +35,21 @@ if not process_state then
         last_transport=nil,
         last_error=nil,
         disabled_generation=nil,
+        current_intent_revision=nil,
+        failure_count=0,
+        last_failure=nil,
+        overlay_module_replacement_count=0,
+        overlay_method_replacement_count=0,
         selected_transport=nil,
         selected_owner=nil,
     }
     dfhack.dwarfui[STATE_SLOT] = process_state
 end
+process_state.failure_count = process_state.failure_count or 0
+process_state.overlay_module_replacement_count =
+    process_state.overlay_module_replacement_count or 0
+process_state.overlay_method_replacement_count =
+    process_state.overlay_method_replacement_count or 0
 
 ---@class dwarfui.TooltipRenderHookRecord
 ---@field transport dwarfui.TooltipRenderTransport
@@ -53,6 +63,10 @@ end
 ---@field owner_raw_method function|nil
 ---@field generation integer
 ---@field repair_count integer
+---@field chained boolean
+---@field module_replaced boolean|nil
+---@field method_replaced boolean
+---@field method_replacement_count integer
 
 ---@class dwarfui.TooltipRenderHookState
 ---@field api_version integer
@@ -66,6 +80,11 @@ end
 ---@field last_transport dwarfui.TooltipRenderTransport|nil
 ---@field last_error string|nil
 ---@field disabled_generation integer|nil
+---@field current_intent_revision integer|nil
+---@field failure_count integer
+---@field last_failure table|nil
+---@field overlay_module_replacement_count integer
+---@field overlay_method_replacement_count integer
 ---@field selected_transport dwarfui.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 
@@ -74,6 +93,11 @@ end
 ---@field generation integer
 ---@field presenter_installed boolean
 ---@field disabled_generation integer|nil
+---@field disabled boolean
+---@field current_intent_revision integer|nil
+---@field failure_count integer
+---@field last_failure table|nil
+---@field inactive_intent boolean
 ---@field selected_transport dwarfui.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 ---@field render_count integer
@@ -120,6 +144,23 @@ local function present(state, transport, owner)
     if not ok then
         state.last_error = rendered_revision
         state.disabled_generation = state.generation
+        state.failure_count = state.failure_count + 1
+        local owner_ref = transport == TooltipRenderTransport.SCREEN and
+            setmetatable({owner}, {__mode='v'}) or nil
+        state.last_failure = {
+            generation=state.generation,
+            revision=state.current_intent_revision,
+            transport=transport,
+            owner=transport == TooltipRenderTransport.OVERLAY and
+                owner or nil,
+            owner_ref=owner_ref,
+            error=rendered_revision,
+        }
+        if dfhack.printerr then
+            pcall(dfhack.printerr,
+                'DwarfUI tooltip presenter failed:\n' ..
+                    tostring(rendered_revision))
+        end
         return
     end
     if rendered_revision == nil then return end
@@ -175,9 +216,28 @@ function TooltipRenderHookManager:set_presenter(presenter)
     assert(presenter == nil or type(presenter) == 'function',
         'DwarfUI tooltip presenter must be a function or nil.')
     local state = self._state
+    if presenter ~= nil and
+            (state.disabled_generation == state.generation or
+                (state.presenter ~= nil and state.presenter ~= presenter)) then
+        state.generation = state.generation + 1
+        if state.overlay_hook then
+            state.overlay_hook.generation = state.generation
+        end
+        for _, record in pairs(state.screen_hooks) do
+            record.generation = state.generation
+        end
+    end
     state.presenter = presenter
     state.disabled_generation = nil
     state.last_error = nil
+end
+
+---Records the authoritative intent revision for failure diagnostics.
+---@param revision integer|nil
+function TooltipRenderHookManager:set_current_intent_revision(revision)
+    assert(revision == nil or type(revision) == 'number',
+        'DwarfUI tooltip intent revision must be a number or nil.')
+    self._state.current_intent_revision = revision
 end
 
 ---Selects and idempotently repairs the exported native-overlay render seam.
@@ -194,9 +254,23 @@ function TooltipRenderHookManager:ensure_overlay()
     local previous = state.overlay_hook
     if state.overlay_module == overlay and previous and
             current == previous.active_trampoline then
+        previous.generation = state.generation
         return false
     end
 
+    local module_replaced =
+        state.overlay_module ~= nil and state.overlay_module ~= overlay
+    local method_replaced =
+        state.overlay_module == overlay and previous ~= nil and
+            current ~= previous.active_trampoline
+    if module_replaced then
+        state.overlay_module_replacement_count =
+            state.overlay_module_replacement_count + 1
+    end
+    if method_replaced then
+        state.overlay_method_replacement_count =
+            state.overlay_method_replacement_count + 1
+    end
     local repair_count = previous and previous.repair_count + 1 or 0
     local trampoline = make_trampoline(
         TooltipRenderTransport.OVERLAY, overlay, current)
@@ -207,6 +281,11 @@ function TooltipRenderHookManager:ensure_overlay()
         predecessor=current,
         generation=state.generation,
         repair_count=repair_count,
+        chained=true,
+        module_replaced=module_replaced,
+        method_replaced=method_replaced,
+        method_replacement_count=
+            state.overlay_method_replacement_count,
     }
     state.overlay_module = overlay
     state.overlay_hook = record
@@ -229,9 +308,12 @@ function TooltipRenderHookManager:ensure_screen(owner)
     state.selected_owner = owner
     local previous = state.screen_hooks[owner]
     if previous and current == previous.active_trampoline then
+        previous.generation = state.generation
         return false
     end
 
+    local method_replaced =
+        previous ~= nil and current ~= previous.active_trampoline
     local raw_method = rawget(owner, SCREEN_RENDER_METHOD)
     local had_raw_method = raw_method ~= nil
     local original_had_raw_method = had_raw_method
@@ -256,6 +338,10 @@ function TooltipRenderHookManager:ensure_screen(owner)
         owner_raw_method=original_raw_method,
         generation=state.generation,
         repair_count=previous and previous.repair_count + 1 or 0,
+        chained=true,
+        method_replaced=method_replaced,
+        method_replacement_count=previous and
+            (previous.method_replacement_count or 0) + 1 or 0,
     }
     state.screen_hooks[owner] = record
     rawset(owner, SCREEN_RENDER_METHOD, trampoline)
@@ -278,6 +364,7 @@ function TooltipRenderHookManager:shutdown()
     state.selected_transport = nil
     state.selected_owner = nil
     state.disabled_generation = state.generation
+    state.current_intent_revision = nil
 
     local overlay_record = state.overlay_hook
     if overlay_record and
@@ -311,18 +398,40 @@ end
 function TooltipRenderHookManager:get_diagnostics()
     local state = self._state
     local overlay_record = state.overlay_hook
+    local overlay_ok, current_overlay =
+        pcall(require, 'plugins.overlay')
+    if not overlay_ok then current_overlay = nil end
+    local overlay_module_current = overlay_record ~= nil and
+        current_overlay == overlay_record.owner
+    local overlay_outermost = overlay_module_current and
+        current_overlay[OVERLAY_RENDER_METHOD] ==
+            overlay_record.active_trampoline
+    local overlay_module_replacement_pending =
+        overlay_record ~= nil and current_overlay ~= nil and
+            not overlay_module_current
+    local overlay_method_replacement_pending =
+        overlay_module_current and not overlay_outermost
     local screen_count = 0
     local screens = {}
     local selected_screen
     for owner, record in pairs(state.screen_hooks) do
         screen_count = screen_count + 1
+        local outermost = rawget(owner, SCREEN_RENDER_METHOD) ==
+            record.active_trampoline
+        local method_replacement_pending = not outermost
         local screen = {
             owner=owner,
-            installed=true,
-            outermost=rawget(owner, SCREEN_RENDER_METHOD) ==
-                record.active_trampoline,
+            tracked=true,
+            installed=outermost,
+            outermost=outermost,
             generation=record.generation,
             repair_count=record.repair_count,
+            chained=outermost and record.predecessor ~= nil,
+            replaced_method=record.method_replaced or
+                method_replacement_pending,
+            method_replacement_pending=method_replacement_pending,
+            method_replacement_count=
+                record.method_replacement_count or 0,
             owner_had_raw_method=record.owner_had_raw_method,
             selected=
                 state.selected_transport == TooltipRenderTransport.SCREEN and
@@ -331,11 +440,26 @@ function TooltipRenderHookManager:get_diagnostics()
         table.insert(screens, screen)
         if screen.selected then selected_screen = screen end
     end
+    local failure = state.last_failure
+    local failure_owner = failure and
+        (failure.owner or
+            (failure.owner_ref and failure.owner_ref[1])) or nil
     return {
         api_version=state.api_version,
         generation=state.generation,
         presenter_installed=type(state.presenter) == 'function',
         disabled_generation=state.disabled_generation,
+        disabled=state.disabled_generation == state.generation,
+        current_intent_revision=state.current_intent_revision,
+        failure_count=state.failure_count,
+        last_failure=failure and {
+            generation=failure.generation,
+            revision=failure.revision,
+            transport=failure.transport,
+            owner=failure_owner,
+            error=failure.error,
+        } or nil,
+        inactive_intent=state.current_intent_revision == nil,
         selected_transport=state.selected_transport,
         selected_owner=state.selected_owner,
         render_count=state.render_count,
@@ -344,13 +468,28 @@ function TooltipRenderHookManager:get_diagnostics()
         last_error=state.last_error,
         overlay={
             owner=overlay_record and overlay_record.owner or nil,
-            installed=overlay_record ~= nil,
-            outermost=overlay_record ~= nil and
-                overlay_record.owner[OVERLAY_RENDER_METHOD] ==
-                    overlay_record.active_trampoline,
+            tracked=overlay_record ~= nil,
+            installed=overlay_outermost,
+            outermost=overlay_outermost,
             generation=overlay_record and overlay_record.generation or nil,
             repair_count=overlay_record and
                 overlay_record.repair_count or 0,
+            chained=overlay_outermost and
+                overlay_record.predecessor ~= nil,
+            replaced_module=overlay_record and
+                (overlay_record.module_replaced or
+                    overlay_module_replacement_pending) or false,
+            module_replacement_pending=
+                overlay_module_replacement_pending,
+            module_replacement_count=
+                state.overlay_module_replacement_count,
+            replaced_method=overlay_record and
+                (overlay_record.method_replaced or
+                    overlay_method_replacement_pending) or false,
+            method_replacement_pending=
+                overlay_method_replacement_pending,
+            method_replacement_count=
+                state.overlay_method_replacement_count,
         },
         screens=screens,
         selected_screen=selected_screen,

@@ -95,6 +95,9 @@ local function load_tooltip(state)
             self.selected_transport = nil
             self.selected_owner = nil
         end,
+        set_current_intent_revision=function(self, revision)
+            self.current_intent_revision = revision
+        end,
         shutdown=function() end,
     }
     local _, tooltip = module_loader.load(repo_root, tooltip_path, {

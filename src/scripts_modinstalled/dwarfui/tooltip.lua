@@ -273,6 +273,8 @@ end
 function TooltipPresenter:_select_current_intent()
     local intent = self._service:get_intent()
     self._selected_revision = intent and intent.revision or nil
+    self._hook_manager:set_current_intent_revision(
+        self._selected_revision)
     self._layout_revision = nil
     if not intent then
         self._supported_surface = false
@@ -371,6 +373,7 @@ function TooltipPresenter:shutdown()
     if not self._active then return false end
     self._active = false
     self._service:set_intent_observer(nil)
+    self._hook_manager:set_current_intent_revision(nil)
     self._renderer:set_tooltip(nil, nil, nil, nil)
     self._hook_manager:shutdown()
     self._redraw_count = self._redraw_count + 1

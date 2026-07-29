@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 2 complete. This document is the execution contract for
+Phases 0 through 3 complete. This document is the execution contract for
 rendering the current process-wide tooltip intent after its owning native
 overlay or Lua screen has completed rendering.
 
@@ -504,43 +504,53 @@ than hidden behind screen-type exception lists.
 
 ## Phase 3: Harden chaining, reload, and failure isolation
 
-- [ ] Cover an unrelated wrapper installed before DwarfUI and prove it runs
+- [x] Cover an unrelated wrapper installed before DwarfUI and prove it runs
       before the tooltip.
-- [ ] Cover an unrelated wrapper installed after DwarfUI, repair around it,
+- [x] Cover an unrelated wrapper installed after DwarfUI, repair around it,
       and prove the former active trampoline becomes presentation-inert.
-- [ ] Repeat both wrapper-order cases for an instance-level screen
+- [x] Repeat both wrapper-order cases for an instance-level screen
       `onRender()` method.
-- [ ] Prove repeated repair does not render the tooltip twice.
-- [ ] Prove same-version `dwarfui reload` replaces stale renderer and presenter
+- [x] Prove repeated repair does not render the tooltip twice.
+- [x] Prove same-version `dwarfui reload` replaces stale renderer and presenter
       objects while preserving one active hook generation.
-- [ ] Prove `plugins.overlay.rescan()` neither removes nor duplicates the
+- [x] Prove `plugins.overlay.rescan()` neither removes nor duplicates the
       trampoline.
-- [ ] Simulate overlay module replacement and prove the next ensure operation
+- [x] Simulate overlay module replacement and prove the next ensure operation
       installs against the replacement module.
-- [ ] Prove shutdown restores the predecessor when DwarfUI remains outermost.
-- [ ] Prove shutdown does not overwrite another outer wrapper.
-- [ ] Prove restoration of an inherited `onRender()` method does not leave a
+- [x] Prove shutdown restores the predecessor when DwarfUI remains outermost.
+- [x] Prove shutdown does not overwrite another outer wrapper.
+- [x] Prove restoration of an inherited `onRender()` method does not leave a
       stale raw instance method that shadows a later class change.
-- [ ] Transfer an intent between two displayed Lua screens and prove only the
+- [x] Transfer an intent between two displayed Lua screens and prove only the
       current owner paints.
-- [ ] Dismiss a wrapped screen and prove its weak hook record does not retain
+- [x] Dismiss a wrapped screen and prove its weak hook record does not retain
       the screen or affect the next screen.
-- [ ] Inject a presenter failure and prove the predecessor completed, the
+- [x] Inject a presenter failure and prove the predecessor completed, the
       generation disabled, the error recorded once, and subsequent native
       overlay and Lua-screen renders continued.
-- [ ] Replace the failed presenter generation and prove explicit recovery.
-- [ ] Add diagnostics that distinguish transport, owner, installed, outermost,
+- [x] Replace the failed presenter generation and prove explicit recovery.
+- [x] Add diagnostics that distinguish transport, owner, installed, outermost,
       chained, disabled, replaced-module, replaced-method,
       unsupported-surface, and inactive-intent states.
 
 ### Phase 3 completion gate
 
-- [ ] Both hook types survive reload, rescan, method replacement, repair,
+- [x] Both hook types survive reload, rescan, method replacement, repair,
       dismissal, and shutdown without losing another wrapper.
-- [ ] Exactly one current presenter can paint per selected owner render.
-- [ ] Presenter failures cannot stop or repeatedly fault normal overlay or
+- [x] Exactly one current presenter can paint per selected owner render.
+- [x] Presenter failures cannot stop or repeatedly fault normal overlay or
       Lua-screen rendering.
-- [ ] Focused lifecycle and failure-containment tests pass.
+- [x] Focused lifecycle and failure-containment tests pass.
+
+### Phase 3 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1 tests/tooltip_render_hook.spec.lua tests/tooltip_presenter.spec.lua tests/package_contract.spec.lua tests/module_registry.spec.lua` | 45 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 250 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 syntax passed for 20 production and 40 test/support files. |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/tooltip/tooltip_render_seams.ds.lua --timeout 120` | 2 successes, 0 failures, 0 errors, `cleanup_confirmed=true`; real `plugins.overlay.rescan()` preserved the exported wrapper and final appended paint. |
+| 2026-07-28 | `git diff --check` | Passed. |
 
 ## Phase 4: Cut over the tooltip service
 

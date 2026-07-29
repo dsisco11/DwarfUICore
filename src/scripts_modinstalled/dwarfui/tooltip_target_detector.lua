@@ -134,16 +134,20 @@ local function overlay_root_is_presented(root)
         overlay_matches_current_viewscreen(root)
 end
 
----Recognizes the root borrowed by the current native DF viewscreen.
+---Recognizes a current Lua screen or the root borrowed by the native screen.
 ---@param root gui.View
 ---@return boolean
 local function default_non_overlay_root_is_presented(root)
-    local current = dfhack.gui.getDFViewscreen(true)
-    if not current then return false end
+    local screen_native = rawget(root, '_native')
+    if screen_native ~= nil then
+        return dfhack.gui.getCurViewscreen(true) == screen_native
+    end
+    local native = dfhack.gui.getDFViewscreen(true)
+    if not native then return false end
     -- Older/custom hosts do not always expose widgets. They retain the
     -- established attached-root behavior, while native DwarfSpec roots use
     -- the authoritative widgets identity characterized by the live probe.
-    return current.widgets == nil or current.widgets == root
+    return native.widgets == nil or native.widgets == root
 end
 
 ---Returns whether a discovered root has current layout and presentation state.

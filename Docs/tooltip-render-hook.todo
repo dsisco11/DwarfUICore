@@ -606,69 +606,80 @@ than hidden behind screen-type exception lists.
 
 ## Phase 5: Prove native and Lua-screen final rendering
 
-- [ ] Update the focused minecart tooltip `.ds.lua` test to use the actual
+- [x] Update the focused minecart tooltip `.ds.lua` test to use the actual
       registered minecart overlay and zoom button.
-- [ ] Open the native Hauling menu through public DwarfSpec input APIs.
-- [ ] Move the pointer onto the production zoom button and await the published
+- [x] Open the native Hauling menu through public DwarfSpec input APIs.
+- [x] Move the pointer onto the production zoom button and await the published
       `Zoom to this stop` intent.
-- [ ] Assert the tooltip is painted at the expected screen cells without any
+- [x] Assert the tooltip is painted at the expected screen cells without any
       tooltip `ZScreen`.
-- [ ] Enable a controlled viewscreen-specific test overlay that paints a
+- [x] Enable a controlled viewscreen-specific test overlay that paints a
       conflicting sentinel into the tooltip cells and prove the tooltip is
       final.
-- [ ] Enable a controlled `viewscreens='all'` test overlay that paints the same
+- [x] Enable a controlled `viewscreens='all'` test overlay that paints the same
       conflicting sentinel and prove the tooltip is final.
-- [ ] Install a controlled foreign render wrapper, repair on the next intent
+- [x] Install a controlled foreign render wrapper, repair on the next intent
       notification, and prove both wrappers execute while the tooltip remains
       final and appears exactly once.
-- [ ] Move the pointer off the button and prove the underlying native and
+- [x] Move the pointer off the button and prove the underlying native and
       overlay content is restored on the requested redraw.
-- [ ] Assert the native focus string, current viewscreen, pause state, and input
+- [x] Assert the native focus string, current viewscreen, pause state, and input
       routing do not change when the tooltip appears or clears.
-- [ ] Assert render-hook diagnostics report installed, outermost, one active
+- [x] Assert render-hook diagnostics report installed, outermost, one active
       presenter generation, and the expected rendered intent revision.
-- [ ] Run `dwarfui reload` while the Hauling menu remains open and prove the
+- [x] Run `dwarfui reload` while the Hauling menu remains open and prove the
       production overlay, poller, render hook, and tooltip all recover without
       duplication.
-- [ ] Add a foreground DwarfSpec `ZScreen` fixture containing a real registered
+- [x] Add a foreground DwarfSpec `ZScreen` fixture containing a real registered
       tooltip control.
-- [ ] Give the fixture a class-specific `onRender()` implementation that paints
+- [x] Give the fixture a class-specific `onRender()` implementation that paints
       a conflicting sentinel after rendering its parent and content.
-- [ ] Move the pointer onto that control and prove the instance screen hook
+- [x] Move the pointer onto that control and prove the instance screen hook
       paints the tooltip after the sentinel.
-- [ ] Stack a second DwarfSpec `ZScreen` above the wrapped fixture and prove the
+- [x] Stack a second DwarfSpec `ZScreen` above the wrapped fixture and prove the
       lower screen hook does not paint while it is not current.
-- [ ] Register a tooltip target on the upper screen and prove presentation
+- [x] Register a tooltip target on the upper screen and prove presentation
       transfers to the upper instance without the overlay hook or lower screen
       also painting.
-- [ ] Assert the wrapped screen's focus, current viewscreen identity, input
+- [x] Assert the wrapped screen's focus, current viewscreen identity, input
       delivery, logic cadence, parent relationship, and dismissal behavior are
       unchanged.
-- [ ] Run `dwarfui reload` while the foreground fixture remains open and prove
+- [x] Run `dwarfui reload` while the foreground fixture remains open and prove
       its existing trampoline resolves the new presenter generation without
       duplicate painting.
-- [ ] Dismiss the wrapped screens and prove their weak hook records and test
+- [x] Dismiss the wrapped screens and prove their weak hook records and test
       subjects are released.
-- [ ] Restore the original exported overlay render function, every wrapped
+- [x] Restore the original exported overlay render function, every wrapped
       screen method, controlled test overlays, pointer, Hauling state, focus,
       and mounted DwarfSpec subjects even when an assertion fails.
-- [ ] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
+- [x] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
       subjects, pointer ownership, test overlays, screen wrappers, or foreign
       wrappers.
 
+### Phase 5 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_tooltip.ds.lua --timeout 120 --results tests/.test-results/dwarfspec/phase5-native.json` | 2 successes, 0 failures, 0 errors, `cleanup_confirmed=true`, and `mount_cleanup_verified=true`; final `Z` tooltip paint followed viewscreen-specific `V`, `all` `A`, and foreign wrapper painting, with pointer-clear restoration and reload recovery. |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/tooltip/tooltip_screen_final_render.ds.lua --timeout 120 --results tests/.test-results/dwarfspec/phase5-screen-wrapped-dismiss.json` | 1 success, 0 failures, 0 errors, `cleanup_confirmed=true`, and `mount_cleanup_verified=true`; lower and upper real controls transferred ownership, rendered after class sentinels, survived reload without duplication, and dismissed normally while wrapped before exact method restoration. |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/tooltip/tooltip_render_seams.ds.lua --timeout 120 --results tests/.test-results/dwarfspec/phase5-seams.json` | 2 successes, 0 failures, 0 errors, `cleanup_confirmed=true`, and `mount_cleanup_verified=true`; the installed native export and current screen instance method remained the characterized final seams. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1 tests/tooltip_target_detector.spec.lua tests/tooltip.spec.lua tests/tooltip_render_hook.spec.lua` | 43 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 240 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests`, `Tools/Check-UnitTestNaming.ps1`, and `git diff --check` | Lua 5.4.6 syntax passed for 20 production and 40 test/support files; naming and diff checks passed. |
+
 ### Phase 5 completion gate
 
-- [ ] The production zoom tooltip is visibly above native Hauling UI,
+- [x] The production zoom tooltip is visibly above native Hauling UI,
       viewscreen-specific overlays, and `all` overlays.
-- [ ] A tooltip owned by a foreground `ZScreen` is visibly above that screen's
+- [x] A tooltip owned by a foreground `ZScreen` is visibly above that screen's
       complete class-specific rendering.
-- [ ] Nested screens select only the current top owner for presentation.
-- [ ] Showing and clearing the tooltip changes no focus, viewscreen, pause, or
+- [x] Nested screens select only the current top owner for presentation.
+- [x] Showing and clearing the tooltip changes no focus, viewscreen, pause, or
       input state.
-- [ ] Reload produces no duplicate render callbacks or missing minecart
+- [x] Reload produces no duplicate render callbacks or missing minecart
       overlay.
-- [ ] Screen dismissal leaves no retained owner or active presentation hook.
-- [ ] Focused live automation passes with confirmed cleanup.
+- [x] Screen dismissal leaves no retained owner or active presentation hook.
+- [x] Focused live automation passes with confirmed cleanup.
 
 ## Phase 6: Verification and documentation
 

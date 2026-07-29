@@ -36,6 +36,9 @@ local function load_environment(state)
             getDFViewscreen=function()
                 return {focus=state.focus, widgets=state.native_root}
             end,
+            getCurViewscreen=function()
+                return state.current_viewscreen
+            end,
             matchFocusString=function(focus, viewscreen)
                 return focus == viewscreen.focus
             end,
@@ -246,6 +249,43 @@ describe('DwarfUI tooltip target detector', function()
         assert.equals('target', result.kind)
         assert.is_equal(current, result.target)
         assert.is_equal(current_root, result.root)
+    end)
+
+    it('recognizes only the current displayed Lua-screen root by identity',
+            function()
+        local env = load_environment()
+        local values, register = registrations()
+        local current = env.widgets.Label{
+            frame={l=1, t=1, w=5, h=2},
+        }
+        local covered = env.widgets.Label{
+            frame={l=1, t=1, w=5, h=2},
+        }
+        local current_root = env.widgets.Panel{subviews={current}}
+        local covered_root = env.widgets.Panel{subviews={covered}}
+        local current_native = {}
+        local covered_native = {}
+        rawset(current_root, '_native', current_native)
+        rawset(covered_root, '_native', covered_native)
+        layout(current_root)
+        layout(covered_root)
+        env.state.current_viewscreen = current_native
+        register(current)
+        register(covered)
+        local detector = env.new_detector(values, {
+            use_default_presentation=true,
+        })
+
+        local result = detector:detect(sample(1, 2, 2))
+        assert.equals('target', result.kind)
+        assert.is_equal(current, result.target)
+        assert.is_equal(current_root, result.root)
+
+        env.state.current_viewscreen = covered_native
+        result = detector:detect(sample(2, 2, 2))
+        assert.equals('target', result.kind)
+        assert.is_equal(covered, result.target)
+        assert.is_equal(covered_root, result.root)
     end)
 
     it('preserves reverse-subview priority and target-local coordinates',

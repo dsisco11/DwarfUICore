@@ -5,12 +5,14 @@
 -- queries a tooltip renderer, screen, or overlay host.
 
 local pointer = reqscript('dwarfui/pointer')
+local target_types = reqscript('dwarfui/tooltip_target')
+local ObservationKind = target_types.TooltipPointerObservationKind
 local TooltipRootResolver =
     reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
 
 ---@class dwarfui.TooltipPointerObservation
 ---@field sequence integer
----@field kind '"target"'|'"blocked"'|'"miss"'
+---@field kind dwarfui.TooltipPointerObservationKind
 ---@field pointer_x integer|nil
 ---@field pointer_y integer|nil
 ---@field target gui.View|nil
@@ -23,6 +25,7 @@ local TooltipRootResolver =
 ---@field resolve fun(root: gui.View, x: integer, y: integer): table|nil
 ---@field is_non_overlay_root_presented dwarfui.TooltipRootPresentationPredicate|nil
 ---@field root_resolver dwarfui.TooltipRootResolver|nil
+---@field additional_roots fun(): table<gui.View, integer>|nil
 
 ---@class dwarfui.TooltipTargetCandidate
 ---@field target gui.View
@@ -39,12 +42,13 @@ local TooltipRootResolver =
 ---@field _registrations table<gui.View, table>
 ---@field _resolve fun(root: gui.View, x: integer, y: integer): table
 ---@field _root_resolver dwarfui.TooltipRootResolver
+---@field _additional_roots fun(): table<gui.View, integer>|nil
 TooltipTargetDetector = {}
 TooltipTargetDetector.__index = TooltipTargetDetector
 
 ---Builds a presentation-neutral observation.
 ---@param sample dwarfui.PointerSample
----@param kind '"target"'|'"blocked"'|'"miss"'
+---@param kind dwarfui.TooltipPointerObservationKind
 ---@param candidate dwarfui.TooltipTargetCandidate|dwarfui.TooltipBlockedCandidate|nil
 ---@return dwarfui.TooltipPointerObservation
 local function observation(sample, kind, candidate)
@@ -89,6 +93,9 @@ function TooltipTargetDetector.new(options)
     assert(options.root_resolver == nil or
             type(options.root_resolver) == 'table',
         'DwarfUI tooltip root resolver must be a table.')
+    assert(options.additional_roots == nil or
+            type(options.additional_roots) == 'function',
+        'DwarfUI additional tooltip roots must be provided by a function.')
     return setmetatable({
         _registrations=options.registrations,
         _resolve=options.resolve or pointer.PointerDispatcher.resolve,
@@ -96,6 +103,7 @@ function TooltipTargetDetector.new(options)
             is_non_overlay_root_presented=
                 options.is_non_overlay_root_presented,
         },
+        _additional_roots=options.additional_roots,
     }, TooltipTargetDetector)
 end
 
@@ -108,7 +116,7 @@ function TooltipTargetDetector:detect(sample)
     assert(type(sample.sequence) == 'number',
         'DwarfUI pointer sample sequence must be a number.')
     if sample.x == nil or sample.y == nil then
-        return observation(sample, 'miss')
+        return observation(sample, ObservationKind.MISS)
     end
 
     local roots = {}
@@ -116,6 +124,14 @@ function TooltipTargetDetector:detect(sample)
         local root = self._root_resolver:resolve(widget, false)
         if root then
             local sequence = registration.sequence
+            local existing = roots[root]
+            if not existing or sequence > existing then
+                roots[root] = sequence
+            end
+        end
+    end
+    if self._additional_roots then
+        for root, sequence in pairs(self._additional_roots()) do
             local existing = roots[root]
             if not existing or sequence > existing then
                 roots[root] = sequence
@@ -138,6 +154,9 @@ function TooltipTargetDetector:detect(sample)
                         local_y=result.y,
                         sequence=registration.sequence,
                     })
+            else
+                blocked = TooltipTargetDetector.prefer_later_registration(
+                    blocked, {root=root, sequence=root_sequence})
             end
         elseif result.kind == 'blocked' then
             blocked = TooltipTargetDetector.prefer_later_registration(
@@ -145,7 +164,11 @@ function TooltipTargetDetector:detect(sample)
         end
     end
 
-    if winner then return observation(sample, 'target', winner) end
-    if blocked then return observation(sample, 'blocked', blocked) end
-    return observation(sample, 'miss')
+    if winner then
+        return observation(sample, ObservationKind.TARGET, winner)
+    end
+    if blocked then
+        return observation(sample, ObservationKind.BLOCKED, blocked)
+    end
+    return observation(sample, ObservationKind.MISS)
 end

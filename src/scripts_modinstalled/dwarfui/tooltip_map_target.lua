@@ -4,6 +4,8 @@
 
 local TooltipRootResolver =
     reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
+local target_types = reqscript('dwarfui/tooltip_target')
+local ObservationKind = target_types.TooltipPointerObservationKind
 
 API_VERSION = 1
 local REGISTRY_SLOT = 'tooltip_map_target_registry'
@@ -44,7 +46,7 @@ process_state.generation = process_state.generation + 1
 
 ---@class dwarfui.MapTileTargetObservation
 ---@field sequence integer
----@field kind '"target"'|'"miss"'
+---@field kind dwarfui.TooltipPointerObservationKind
 ---@field pointer_x integer|nil
 ---@field pointer_y integer|nil
 ---@field map_x integer|nil
@@ -52,7 +54,7 @@ process_state.generation = process_state.generation + 1
 ---@field map_z integer|nil
 ---@field target dwarfui.MapTileTooltipRegistration|nil
 ---@field identity dwarfui.MapTileTooltipRegistration|nil
----@field target_kind '"map-tile"'|nil
+---@field target_kind dwarfui.TooltipTargetKind|nil
 ---@field root gui.View|nil
 ---@field source_root gui.View|nil
 ---@field registration_sequence integer|nil
@@ -111,7 +113,7 @@ end
 local function miss(sample)
     return {
         sequence=sample.sequence,
-        kind='miss',
+        kind=ObservationKind.MISS,
         pointer_x=sample.x,
         pointer_y=sample.y,
         map_x=sample.map_x,
@@ -231,6 +233,35 @@ function TooltipMapTargetRegistry:registration_count()
     return count
 end
 
+---Returns whether one opaque handle remains registered.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@return boolean
+function TooltipMapTargetRegistry:contains(handle)
+    return self._state.registrations[handle] ~= nil
+end
+
+---Returns one handle's current tooltip value without exposing its record.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@return string|nil
+function TooltipMapTargetRegistry:get_tooltip(handle)
+    local record = self._state.registrations[handle]
+    return record and record.tooltip or nil
+end
+
+---Builds the current presented owner-root set for screen-space occlusion.
+---@return table<gui.View, integer>
+function TooltipMapTargetRegistry:get_owner_roots()
+    local roots = {}
+    for _, record in pairs(self._state.registrations) do
+        local root = self._root_resolver:resolve(record.owner, true)
+        if root and (roots[root] == nil or
+                record.sequence > roots[root]) then
+            roots[root] = record.sequence
+        end
+    end
+    return roots
+end
+
 ---Detects one deterministic eligible target at the sampled exact map tile.
 ---@param sample dwarfui.PointerSample
 ---@return dwarfui.MapTileTargetObservation
@@ -264,7 +295,7 @@ function TooltipMapTargetRegistry:detect(sample)
 
     return {
         sequence=sample.sequence,
-        kind='target',
+        kind=ObservationKind.TARGET,
         pointer_x=sample.x,
         pointer_y=sample.y,
         map_x=sample.map_x,
@@ -272,7 +303,7 @@ function TooltipMapTargetRegistry:detect(sample)
         map_z=sample.map_z,
         target=winner.handle,
         identity=winner.handle,
-        target_kind='map-tile',
+        target_kind=target_types.TooltipTargetKind.MAP_TILE,
         root=winner.root,
         source_root=winner.root,
         registration_sequence=winner.record.sequence,

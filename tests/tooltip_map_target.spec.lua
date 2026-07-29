@@ -6,6 +6,11 @@ local ROOT_RESOLVER_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
 local MAP_TARGET_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_map_target.lua'
+local TARGET_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+local _, target_types = module_loader.load(repo_root, TARGET_PATH)
+local ObservationKind = target_types.TooltipPointerObservationKind
+local TargetKind = target_types.TooltipTargetKind
 
 ---Builds a reloadable exact-map-target test environment.
 ---@return table environment
@@ -64,6 +69,7 @@ local function load_environment()
                 globals={dfhack=dfhack},
                 reqscript={
                     ['dwarfui/tooltip_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip_target']=target_types,
                 },
             })
         return map_target
@@ -74,6 +80,7 @@ local function load_environment()
         load_generation=load_generation,
         overlay=overlay,
         state=state,
+        target_types=target_types,
         widgets=widgets,
     }
 end
@@ -122,14 +129,14 @@ describe('DwarfUI exact map-tile tooltip targets', function()
         pos.x = 99
 
         local hit = registry:detect(sample(7, 4, 5, 10, 20, 3))
-        assert.equals('target', hit.kind)
+        assert.equals(ObservationKind.TARGET, hit.kind)
         assert.equals(7, hit.sequence)
         assert.equals(4, hit.pointer_x)
         assert.equals(5, hit.pointer_y)
         assert.equals(10, hit.map_x)
         assert.equals(20, hit.map_y)
         assert.equals(3, hit.map_z)
-        assert.equals('map-tile', hit.target_kind)
+        assert.equals(TargetKind.MAP_TILE, hit.target_kind)
         assert.equals(handle, hit.target)
         assert.equals(handle, hit.identity)
         assert.equals(owner, hit.root)
@@ -160,7 +167,8 @@ describe('DwarfUI exact map-tile tooltip targets', function()
             sample(8, 4, nil, 10, 20, 3),
         }
         for _, value in ipairs(misses) do
-            assert.equals('miss', registry:detect(value).kind)
+            assert.equals(ObservationKind.MISS,
+                registry:detect(value).kind)
         end
         local z_miss = registry:detect(misses[3])
         assert.equals(10, z_miss.map_x)
@@ -222,7 +230,7 @@ describe('DwarfUI exact map-tile tooltip targets', function()
             pos={x=4, y=5, z=6},
             tooltip='After',
         }))
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(2, 1, 1, 1, 2, 3)).kind)
         local hit = registry:detect(sample(3, 1, 1, 4, 5, 6))
         assert.equals(handle, hit.target)
@@ -259,7 +267,7 @@ describe('DwarfUI exact map-tile tooltip targets', function()
         local diagnostics = registry:get_diagnostics()
         assert.equals(0, diagnostics.registration_count)
         assert.equals(0, diagnostics.coordinate_bucket_count)
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(1, 1, 1, 1, 2, 3)).kind)
     end)
 
@@ -276,22 +284,22 @@ describe('DwarfUI exact map-tile tooltip targets', function()
             tooltip='Attached',
         }
 
-        assert.equals('target',
+        assert.equals(ObservationKind.TARGET,
             registry:detect(sample(1, 1, 1, 1, 2, 3)).kind)
         root.active = false
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(2, 1, 1, 1, 2, 3)).kind)
         root.active = true
         owner.visible = false
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(3, 1, 1, 1, 2, 3)).kind)
         owner.visible = true
         root.subviews = {}
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(4, 1, 1, 1, 2, 3)).kind)
         root.subviews = {owner}
         env.state.native_root = env.widgets.Panel{}
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(5, 1, 1, 1, 2, 3)).kind)
     end)
 
@@ -310,18 +318,18 @@ describe('DwarfUI exact map-tile tooltip targets', function()
             tooltip='Overlay',
         }
 
-        assert.equals('target',
+        assert.equals(ObservationKind.TARGET,
             registry:detect(sample(1, 1, 1, 1, 2, 3)).kind)
         env.state.overlay_state.config[owner.name].enabled = false
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(2, 1, 1, 1, 2, 3)).kind)
         env.state.overlay_state.config[owner.name].enabled = true
         env.state.overlay_state.db[owner.name].widget = env.OverlayWidget{}
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(3, 1, 1, 1, 2, 3)).kind)
         env.state.overlay_state.db[owner.name].widget = owner
         env.state.focus = 'other'
-        assert.equals('miss',
+        assert.equals(ObservationKind.MISS,
             registry:detect(sample(4, 1, 1, 1, 2, 3)).kind)
     end)
 

@@ -4,23 +4,22 @@
 -- registrations, pointer transitions, and immutable presentation intent, but
 -- has no presentation implementation or UI-host dependency.
 
-API_VERSION = 1
+local target_adapters = reqscript('dwarfui/tooltip_target')
+local ObservationKind = target_adapters.TooltipPointerObservationKind
+
+API_VERSION = 2
 local SERVICE_SLOT = 'tooltip_service'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 local process_state = dfhack.dwarfui[SERVICE_SLOT]
 
-if process_state and process_state.api_version ~= API_VERSION then
-    error(('Conflicting DwarfUI tooltip service versions: ' ..
-        'process has %s, requested %s.'):format(
-            tostring(process_state.api_version), tostring(API_VERSION)))
-end
-if not process_state then
+if not process_state or process_state.api_version ~= API_VERSION then
     process_state = {
         api_version=API_VERSION,
         registrations=setmetatable({}, {__mode='k'}),
         registration_sequence=0,
         target=nil,
+        target_adapter=nil,
         intent=nil,
         revision=0,
         last_sequence=0,
@@ -46,7 +45,8 @@ end
 ---@field api_version integer
 ---@field registrations table<gui.View, table>
 ---@field registration_sequence integer
----@field target gui.View|nil
+---@field target any|nil
+---@field target_adapter dwarfui.TooltipTargetAdapter|nil
 ---@field intent dwarfui.TooltipIntent|nil
 ---@field revision integer
 ---@field last_sequence integer
@@ -68,11 +68,11 @@ function TooltipService.new(state)
 end
 
 ---Returns validated tooltip text after pointer callbacks have run.
----@param target gui.View|nil
+---@param target dwarfui.TooltipTargetAdapter|nil
 ---@return string|nil
 local function get_tooltip(target)
     if not target then return nil end
-    local value = target.tooltip
+    local value = target:get_tooltip()
     if value == nil or value == '' then return nil end
     assert(type(value) == 'string',
         'DwarfUI tooltip must be a string, nil, or an empty string; got ' ..
@@ -141,11 +141,10 @@ end
 ---@return boolean changed
 function TooltipService:_clear_target()
     local state = self._state
-    local previous = state.target
-    if previous and previous.on_pointer_leave then
-        previous.on_pointer_leave(previous)
-    end
+    local previous = state.target_adapter
+    if previous then previous:on_pointer_leave() end
     state.target = nil
+    state.target_adapter = nil
     local intent_changed = self:_clear_intent()
     return previous ~= nil or intent_changed
 end
@@ -196,6 +195,14 @@ function TooltipService:unregister(widget)
     return true
 end
 
+---Immediately releases an active target identity from any hit domain.
+---@param identity any
+---@return boolean changed
+function TooltipService:release_target(identity)
+    if self._state.target ~= identity then return false end
+    return self:_clear_target()
+end
+
 ---Replaces or removes this service's presentation-neutral intent observer.
 ---Replacement never replays intent or synthesizes pointer callbacks.
 ---@param observer dwarfui.TooltipIntentObserver|nil
@@ -213,35 +220,46 @@ function TooltipService:accept_pointer_observation(observation)
         'DwarfUI tooltip service requires a pointer observation.')
     assert(type(observation.sequence) == 'number',
         'DwarfUI tooltip observation sequence must be a number.')
-    assert(observation.kind == 'target' or
-        observation.kind == 'blocked' or observation.kind == 'miss',
+    assert(observation.kind == ObservationKind.TARGET or
+        observation.kind == ObservationKind.BLOCKED or
+        observation.kind == ObservationKind.MISS,
         'DwarfUI tooltip observation kind must be target, blocked, or miss.')
     local state = self._state
     if observation.sequence <= state.last_sequence then return false end
     state.last_sequence = observation.sequence
 
-    local target = observation.kind == 'target' and
+    local target = observation.kind == ObservationKind.TARGET and
         observation.target or nil
-    if target and not state.registrations[target] then target = nil end
+    if target and not target_adapters.is_adapter(target) then
+        if state.registrations[target] then
+            target = target_adapters.adapt_widget(
+                target, observation.root, state.registrations)
+        else
+            target = nil
+        end
+    end
+    if target and not target:is_current() then target = nil end
 
-    local previous = state.target
-    if previous ~= target then
-        if previous and previous.on_pointer_leave then
-            previous.on_pointer_leave(previous)
-        end
-        if target and target.on_pointer_enter then
-            target.on_pointer_enter(
-                target, observation.local_x, observation.local_y)
+    local identity = target and target:get_identity() or nil
+    local previous_identity = state.target
+    local previous_adapter = state.target_adapter
+    if previous_identity ~= identity then
+        if previous_adapter then previous_adapter:on_pointer_leave() end
+        if target then
+            target:on_pointer_enter(
+                observation.local_x, observation.local_y)
         end
     end
-    if target and target.on_pointer_update then
-        target.on_pointer_update(
-            target, observation.local_x, observation.local_y)
+    if target then
+        target:on_pointer_update(
+            observation.local_x, observation.local_y)
     end
-    state.target = target
+    state.target = identity
+    state.target_adapter = target
 
     local text = get_tooltip(target)
     if text then
+        observation.root = target:get_source_root()
         self:_publish_intent(observation, text)
     else
         self:_clear_intent()

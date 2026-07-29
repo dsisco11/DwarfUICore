@@ -1,6 +1,9 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
+local _, target_types = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfui/tooltip_target.lua')
+local ObservationKind = target_types.TooltipPointerObservationKind
 
 local function load_environment()
     local state = {
@@ -85,6 +88,9 @@ local function load_environment()
     local _, service_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {
             globals={dfhack=process},
+            reqscript={
+                ['dwarfui/tooltip_target']=target_types,
+            },
         })
     local function load_hook_generation()
         local _, result = module_loader.load(repo_root,
@@ -130,6 +136,7 @@ local function load_environment()
         state=state,
         process=process,
         service=service_module.service,
+        target_adapter=target_types,
         hook=hook_module,
         tooltip=tooltip,
         overlay=overlay,
@@ -149,7 +156,8 @@ end
 local function observation(sequence, target_widget, root, x, y)
     return {
         sequence=sequence,
-        kind=target_widget and 'target' or 'miss',
+        kind=target_widget and ObservationKind.TARGET or
+            ObservationKind.MISS,
         pointer_x=x,
         pointer_y=y,
         target=target_widget,
@@ -160,6 +168,40 @@ local function observation(sequence, target_widget, root, x, y)
 end
 
 describe('DwarfUI intent-driven tooltip presenter', function()
+    it('renders a normalized map target through its owner-selected seam',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local handle = {}
+        local registry = {
+            contains=function(_, candidate)
+                return candidate == handle
+            end,
+            get_tooltip=function(_, candidate)
+                return candidate == handle and 'Map tooltip' or nil
+            end,
+        }
+        local map_target = env.target_adapter.adapt_map_tile({
+            kind=ObservationKind.TARGET,
+            identity=handle,
+            source_root=root,
+        }, registry)
+
+        env.service:accept_pointer_observation(
+            observation(1, map_target, root, 3, 4))
+        env.overlay.render_viewscreen_widgets()
+
+        local diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_true(env.tooltip.presenter._renderer.visible)
+        assert.equals('Map tooltip',
+            env.tooltip.presenter._renderer.label.text)
+        assert.equals(1, diagnostics.render_count)
+        assert.is_equal(root,
+            env.service:get_intent().source_root)
+    end)
+
     it('renders native and overlay-widget intents through one visual contract',
             function()
         local env = load_environment()

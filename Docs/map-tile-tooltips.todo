@@ -157,43 +157,43 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 ## Phase 3: Unify widget and map candidates in tooltip mediation
 
-- [ ] Introduce a normalized tooltip-target adapter understood by
+- [x] Introduce a normalized tooltip-target adapter understood by
       `TooltipService` without requiring every target to be a `gui.View`.
-- [ ] Give adapters stable target identity, current tooltip-text access,
+- [x] Give adapters stable target identity, current tooltip-text access,
       source-root access, and optional enter/update/leave transitions.
-- [ ] Adapt existing widget targets without changing their callback order,
+- [x] Adapt existing widget targets without changing their callback order,
       local coordinates, text validation, or weak registration semantics.
-- [ ] Adapt map registrations without adding widget-only fields or methods to
+- [x] Adapt map registrations without adding widget-only fields or methods to
       their handles.
-- [ ] Build the screen-space root set from both widget registrations and
+- [x] Build the screen-space root set from both widget registrations and
       map-registration owners.
-- [ ] Distinguish a genuine screen-space miss from a non-tooltip widget that
+- [x] Distinguish a genuine screen-space miss from a non-tooltip widget that
       nevertheless owns or blocks the pointer cell.
-- [ ] Select a registered widget tooltip before considering a map candidate.
-- [ ] Suppress map fallback for target-owned or blocked UI regions.
-- [ ] Allow map fallback only after pointer-transparent screen-space misses.
-- [ ] Publish the existing immutable tooltip intent shape with the sampled
+- [x] Select a registered widget tooltip before considering a map candidate.
+- [x] Suppress map fallback for target-owned or blocked UI regions.
+- [x] Allow map fallback only after pointer-transparent screen-space misses.
+- [x] Publish the existing immutable tooltip intent shape with the sampled
       screen anchor and owning source root.
-- [ ] Leave `TooltipPresenter`, tooltip layout, and render-hook transport
+- [x] Leave `TooltipPresenter`, tooltip layout, and render-hook transport
       selection unchanged unless a failing contract demonstrates a required
       correction.
-- [ ] Count widget and map registrations together for poller demand while
+- [x] Count widget and map registrations together for poller demand while
       exposing separate counts in diagnostics.
-- [ ] Version process-owned service state deliberately and retire incompatible
+- [x] Version process-owned service state deliberately and retire incompatible
       targets, intents, observers, and callbacks during reload.
-- [ ] Add service and registration coverage for widget-to-map, map-to-widget,
+- [x] Add service and registration coverage for widget-to-map, map-to-widget,
       map-to-map, blocked-to-map, map-to-miss, removal, and text-update
       transitions.
-- [ ] Add package-contract coverage proving the expanded input path remains
+- [x] Add package-contract coverage proving the expanded input path remains
       independent from tooltip presentation modules.
 
 ### Phase 3 completion gate
 
-- [ ] Widgets and exact map tiles feed one ordered tooltip service without fake
+- [x] Widgets and exact map tiles feed one ordered tooltip service without fake
       views or duplicate presenters.
-- [ ] UI controls and blockers cannot leak an underlying map tooltip.
-- [ ] Existing widget tooltip tests pass unchanged in behavior.
-- [ ] Map intents render through the existing owner-selected final render seam.
+- [x] UI controls and blockers cannot leak an underlying map tooltip.
+- [x] Existing widget tooltip tests pass unchanged in behavior.
+- [x] Map intents render through the existing owner-selected final render seam.
 
 ## Phase 4: Integrate same-z minecart route-stop markers
 
@@ -327,13 +327,16 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 | 2026-07-28 | Phase 1 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the updated poller, LuaDoc, and unit harnesses. |
 | 2026-07-28 | Generic map detection | `.\tools\Run-UnitTests.ps1 tests\tooltip_map_target.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua` | Passed: 33 successes, 0 failures, 0 errors, 0 pending | Covers exact indexed lookup and z misses, duplicate precedence, atomic reindexing, explicit and weak cleanup, shared owner-root eligibility, map-demand sampling, and reload safety without entering tooltip mediation. |
 | 2026-07-29 | DFHack class-model correction | `.\tools\Run-UnitTests.ps1 tests\class.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_presenter.spec.lua tests\hover_action_rail.spec.lua tests\package_contract.spec.lua tests\module_registry.spec.lua` | Passed: 80 successes, 0 failures, 0 errors, 0 pending | Replaces wrapper-metatable inference with one direct instance-metatable and `super` predicate, makes the widget harness match DFHack `mkinstance()`, and covers root eligibility, presentation, rails, package inclusion, and reload order. |
+| 2026-07-29 | Phase 3 focused mediation | `.\tools\Run-UnitTests.ps1 tests\tooltip_target.spec.lua tests\tooltip_service.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_presenter.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | Passed: 84 successes, 0 failures, 0 errors, 0 pending | Covers normalized widget and map adapters; widget/map, map/widget, map/map, blocked/map, map/miss, removal, and text-update transitions; combined and separate demand diagnostics; incompatible service-state retirement; package independence; and map intent rendering through the existing owner-selected seam. |
+| 2026-07-29 | Numeric tooltip discriminator correction | `.\tools\Run-UnitTests.ps1 tests\tooltip_target.spec.lua tests\tooltip_service.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_presenter.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | Passed: 86 successes, 0 failures, 0 errors, 0 pending | Replaces string target-domain and tooltip-observation discriminators with exported numeric `TooltipTargetKind` and `TooltipPointerObservationKind` enums. Pointer dispatcher result strings remain private to generic screen-space traversal. |
 | | Minecart same-z consumer | Focused unit suite | Pending | Record current names/positions, route changes, lifecycle cleanup, and explicit off-z exclusion. |
 | | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 <map-tooltip-file>.ds.lua` | Pending | Move the physical pointer to a real same-z marker and verify final rendering plus cleanup. |
-| 2026-07-29 | Complete unit suite through Phase 2 | `.\tools\Run-UnitTests.ps1` | Passed: 264 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite after correcting the class model; later-phase mediation, minecart consumption, and native automation remain unimplemented and therefore unproven. |
+| 2026-07-29 | Complete unit suite through Phase 3 | `.\tools\Run-UnitTests.ps1` | Passed: 270 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite after unified widget/map mediation. Minecart consumption and native automation remain unimplemented and therefore unproven. |
+| 2026-07-29 | Complete unit suite after numeric enum correction | `.\tools\Run-UnitTests.ps1` | Passed: 272 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite with numeric target-domain and tooltip-observation contracts. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured results and `cleanup_confirmed`. |
-| 2026-07-29 | Syntax validation through Phase 2 | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 23 production and 42 test/support files | Covers the generic map registry, shared class and root helpers, public API wiring, and their tests. No later native `.ds.lua` map-tooltip consumer exists yet. |
-| | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Do not treat this as installed or live evidence. |
-| | Expanded package verification | `.\tools\VerifyPackage.ps1 -SourceDir <source> -ZipPath <archive> -ExpandedPath <expanded>` | Pending | Verify every new production module is shipped. |
-| | Archive package verification | `.\tools\Publish.ps1` | Pending | Verify the distributable archive separately. |
-| 2026-07-29 | Diff validation through Phase 2 | `git diff --check` | Passed with no whitespace errors | Git emitted only the existing LF-to-CRLF checkout warnings. |
+| 2026-07-29 | Syntax validation through Phase 3 | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 24 production and 43 test/support files | Covers the normalized adapter, unified mediation, generic map registry, shared class/root helpers, and tests. No later native `.ds.lua` map-tooltip consumer exists yet. |
+| 2026-07-29 | Offline build through Phase 3 | `.\tools\Build.ps1 -LiveReload:$false` | Passed | The default live-reload build was unavailable because no DFHack runner is configured; the offline build passed and is not installed or live evidence. |
+| 2026-07-29 | Expanded package verification through Phase 3 | `.\tools\Publish.ps1` | Passed | The generated `dist\DwarfUI` manifest and content match `src`, including the new normalized target module. |
+| 2026-07-29 | Archive package verification through Phase 3 | `.\tools\Publish.ps1` | Passed | The generated `dist\DwarfUI-0.1.0.zip` manifest and content match `src`. |
+| 2026-07-29 | Diff validation through Phase 3 | `git diff --check` | Passed with no whitespace errors | Git emitted only LF-to-CRLF checkout warnings. |
 | | Live packaged behavior | Prepared fortress Minecart Routes menu | Pending | Verify exact same-z hover, no off-z hover, UI occlusion, refresh, reload, and cleanup. |

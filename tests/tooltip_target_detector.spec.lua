@@ -6,6 +6,8 @@ local DETECTOR_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
 local ROOT_RESOLVER_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+local TARGET_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
 
 ---Builds a detector harness with real generic pointer resolution.
 ---@param state table|nil
@@ -52,6 +54,7 @@ local function load_environment(state)
         })
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/class.lua')
+    local _, target_types = module_loader.load(repo_root, TARGET_PATH)
     local _, root_resolver = module_loader.load(
         repo_root, ROOT_RESOLVER_PATH, {
             globals={dfhack=dfhack},
@@ -64,6 +67,7 @@ local function load_environment(state)
             reqscript={
                 ['dwarfui/pointer']=pointer,
                 ['dwarfui/tooltip_root_resolver']=root_resolver,
+                ['dwarfui/tooltip_target']=target_types,
             },
         })
 
@@ -91,6 +95,7 @@ local function load_environment(state)
         overlay=overlay,
         OverlayWidget=OverlayWidget,
         pointer=pointer,
+        ObservationKind=target_types.TooltipPointerObservationKind,
         state=state,
         widgets=widgets,
     }
@@ -140,7 +145,8 @@ describe('DwarfUI tooltip target detector', function()
         local detector = env.new_detector(values)
 
         assert.equals('table', type(env.module.TooltipTargetDetector))
-        assert.equals('miss', detector:detect(sample(1, nil, nil)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(1, nil, nil)).kind)
     end)
 
     it('skips detached controls and stale parent links', function()
@@ -152,12 +158,14 @@ describe('DwarfUI tooltip target detector', function()
         register(detached)
         local detector = env.new_detector(values)
 
-        assert.equals('miss', detector:detect(sample(1, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(1, 2, 2)).kind)
 
         local root = env.widgets.Panel{subviews={detached}}
         layout(root)
         root.subviews = {}
-        assert.equals('miss', detector:detect(sample(2, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(2, 2, 2)).kind)
     end)
 
     it('skips invisible and inactive controls or ancestors', function()
@@ -173,13 +181,16 @@ describe('DwarfUI tooltip target detector', function()
         local detector = env.new_detector(values)
 
         parent.visible = false
-        assert.equals('miss', detector:detect(sample(1, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(1, 2, 2)).kind)
         parent.visible = true
         target.active = false
-        assert.equals('miss', detector:detect(sample(2, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(2, 2, 2)).kind)
         target.active = true
         root.active = false
-        assert.equals('miss', detector:detect(sample(3, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(3, 2, 2)).kind)
     end)
 
     it('requires current layout bounds before resolving a root', function()
@@ -198,7 +209,8 @@ describe('DwarfUI tooltip target detector', function()
             end,
         })
 
-        assert.equals('miss', detector:detect(sample(1, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(1, 2, 2)).kind)
         assert.equals(0, resolve_count)
     end)
 
@@ -220,17 +232,20 @@ describe('DwarfUI tooltip target detector', function()
         state.config[root.name] = {enabled=false}
         state.db[root.name] = {widget=root}
 
-        assert.equals('miss', detector:detect(sample(1, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(1, 2, 2)).kind)
 
         state.config[root.name].enabled = true
         state.db[root.name] = {
             widget=env.OverlayWidget{name=root.name},
         }
-        assert.equals('miss', detector:detect(sample(2, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(2, 2, 2)).kind)
 
         state.db[root.name] = {widget=root}
         env.state.focus = 'title'
-        assert.equals('miss', detector:detect(sample(3, 2, 2)).kind)
+        assert.equals(env.ObservationKind.MISS,
+            detector:detect(sample(3, 2, 2)).kind)
 
         env.state.focus = 'dwarfmode'
         assert.is_equal(target,
@@ -258,7 +273,7 @@ describe('DwarfUI tooltip target detector', function()
         })
 
         local result = detector:detect(sample(1, 2, 2))
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(current, result.target)
         assert.is_equal(current_root, result.root)
     end)
@@ -289,13 +304,13 @@ describe('DwarfUI tooltip target detector', function()
         })
 
         local result = detector:detect(sample(1, 2, 2))
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(current, result.target)
         assert.is_equal(current_root, result.root)
 
         env.state.current_viewscreen = covered_native
         result = detector:detect(sample(2, 2, 2))
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(covered, result.target)
         assert.is_equal(covered_root, result.root)
     end)
@@ -316,7 +331,7 @@ describe('DwarfUI tooltip target detector', function()
         register(behind)
         local result = env.new_detector(values):detect(sample(9, 4, 3))
 
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(front, result.target)
         assert.same({4, 3}, {result.pointer_x, result.pointer_y})
         assert.same({2, 1}, {result.local_x, result.local_y})
@@ -341,7 +356,7 @@ describe('DwarfUI tooltip target detector', function()
         local detector = env.new_detector(values)
 
         local blocked = detector:detect(sample(1, 3, 3))
-        assert.equals('blocked', blocked.kind)
+        assert.equals(env.ObservationKind.BLOCKED, blocked.kind)
         assert.is_nil(blocked.target)
         assert.is_equal(root, blocked.root)
 
@@ -350,10 +365,10 @@ describe('DwarfUI tooltip target detector', function()
         }
         root:addviews{unregistered}
         layout(root)
-        local miss = detector:detect(sample(2, 11, 2))
-        assert.equals('miss', miss.kind)
-        assert.is_nil(miss.target)
-        assert.is_nil(miss.root)
+        local blocked_control = detector:detect(sample(2, 11, 2))
+        assert.equals(env.ObservationKind.BLOCKED, blocked_control.kind)
+        assert.is_nil(blocked_control.target)
+        assert.is_equal(root, blocked_control.root)
     end)
 
     it('uses registration sequence deterministically across overlapping roots',
@@ -375,7 +390,7 @@ describe('DwarfUI tooltip target detector', function()
         local detector = env.new_detector(values)
 
         local result = detector:detect(sample(1, 2, 2))
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(second, result.target)
         assert.is_equal(second_root, result.root)
     end)
@@ -407,7 +422,7 @@ describe('DwarfUI tooltip target detector', function()
         register(second)
         local result = env.new_detector(values):detect(sample(1, 2, 2))
 
-        assert.equals('blocked', result.kind)
+        assert.equals(env.ObservationKind.BLOCKED, result.kind)
         assert.is_equal(second_root, result.root)
         assert.is_not.equal(first_root, result.root)
     end)
@@ -439,7 +454,7 @@ describe('DwarfUI tooltip target detector', function()
         assert.equals(1, resolve_count)
 
         local result = detector:detect(sample(2, nil, nil))
-        assert.equals('miss', result.kind)
+        assert.equals(env.ObservationKind.MISS, result.kind)
         assert.is_nil(result.pointer_x)
         assert.is_nil(result.pointer_y)
         assert.equals(1, resolve_count)
@@ -481,7 +496,7 @@ describe('DwarfUI tooltip target detector', function()
         register(second)
         local result = env.new_detector(values):detect(sample(1, 2, 2))
 
-        assert.equals('target', result.kind)
+        assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(second, result.target)
         assert.equals(0, callbacks)
     end)

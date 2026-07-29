@@ -3,6 +3,10 @@ local repo_root = require('support.repo_root')
 
 local SERVICE_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
+local TARGET_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+local _, target_types = module_loader.load(repo_root, TARGET_PATH)
+local ObservationKind = target_types.TooltipPointerObservationKind
 
 ---Loads one service generation over isolated process-wide state.
 ---@param process table|nil
@@ -13,7 +17,7 @@ local function load_service(process)
     local _, service_module = module_loader.load(repo_root, SERVICE_PATH, {
         globals={dfhack=dfhack},
         require_modules={},
-        reqscript={},
+        reqscript={['dwarfui/tooltip_target']=target_types},
     })
     return {
         dfhack=dfhack,
@@ -32,9 +36,15 @@ end
 ---@param y integer|nil
 ---@return dwarfui.TooltipPointerObservation
 local function observation(sequence, kind, target, root, x, y)
+    local numeric_kind = ({
+        target=ObservationKind.TARGET,
+        blocked=ObservationKind.BLOCKED,
+        miss=ObservationKind.MISS,
+    })[kind]
+    assert(numeric_kind, 'unknown test observation kind')
     return {
         sequence=sequence,
-        kind=kind,
+        kind=numeric_kind,
         pointer_x=x,
         pointer_y=y,
         target=target,
@@ -436,18 +446,31 @@ describe('DwarfUI tooltip service', function()
         }, diagnostic_fields)
     end)
 
-    it('rejects incompatible process-wide service versions', function()
+    it('retires incompatible process-wide service versions', function()
+        local stale_target = {}
+        local stale_intent = {}
+        local stale_observer = function() end
+        local stale_state = {
+            api_version=999,
+            registrations={[stale_target]={sequence=1}},
+            target=stale_target,
+            intent=stale_intent,
+            intent_observer=stale_observer,
+        }
         local process = {
             dwarfui={
-                tooltip_service={
-                    api_version=999,
-                },
+                tooltip_service=stale_state,
             },
         }
 
-        assert.has_error(function() load_service(process) end,
-            'Conflicting DwarfUI tooltip service versions: ' ..
-            'process has 999, requested 1.')
+        local harness = load_service(process)
+
+        assert.is_not_equal(stale_state,
+            process.dwarfui.tooltip_service)
+        assert.equals(2, process.dwarfui.tooltip_service.api_version)
+        assert.equals(0, harness.service:registration_count())
+        assert.is_nil(harness.service:get_intent())
+        assert.is_nil(harness.service:get_diagnostics().target)
     end)
 
     it('loads with no GUI, tooltip renderer, or ZScreen implementation',

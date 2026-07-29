@@ -12,6 +12,8 @@ local MAP_TARGET_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_map_target.lua'
 local SERVICE_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
+local TARGET_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
 local REGISTRATION_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_registration.lua'
 
@@ -79,6 +81,7 @@ local function load_environment(state)
         })
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/class.lua')
+    local _, target_adapter = module_loader.load(repo_root, TARGET_PATH)
 
     ---Loads one coherent poller, detector, service, and registration generation.
     ---@return table registration
@@ -97,6 +100,7 @@ local function load_environment(state)
                 reqscript={
                     ['dwarfui/pointer']=pointer,
                     ['dwarfui/tooltip_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip_target']=target_adapter,
                 },
             })
         local _, map_target = module_loader.load(
@@ -104,10 +108,14 @@ local function load_environment(state)
                 globals={dfhack=dfhack},
                 reqscript={
                     ['dwarfui/tooltip_root_resolver']=root_resolver,
+                    ['dwarfui/tooltip_target']=target_adapter,
                 },
             })
         local _, service = module_loader.load(repo_root, SERVICE_PATH, {
             globals={dfhack=dfhack},
+            reqscript={
+                ['dwarfui/tooltip_target']=target_adapter,
+            },
         })
         local _, registration = module_loader.load(
             repo_root, REGISTRATION_PATH, {
@@ -118,6 +126,7 @@ local function load_environment(state)
                     ['dwarfui/tooltip_target_detector']=target_detector,
                     ['dwarfui/tooltip_map_target']=map_target,
                     ['dwarfui/tooltip_service']=service,
+                    ['dwarfui/tooltip_target']=target_adapter,
                 },
             })
         return registration
@@ -363,6 +372,154 @@ describe('singleton tooltip registration polling', function()
         assert.equals(1, diagnostics.last_sequence)
         assert.equals(1, env.state.mouse_reads)
         assert.equals(0, env.state.map_reads or 0)
+    end)
+
+    it('mediates widget and map transitions with widget precedence',
+            function()
+        local env = load_environment{
+            mouse_x=3,
+            mouse_y=2,
+            map_pos={x=10, y=20, z=3},
+        }
+        local registration = env.load_generation()
+        local events = {}
+        local child = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Widget')
+        child.on_pointer_enter=function()
+            table.insert(events, 'widget-enter')
+        end
+        child.on_pointer_update=function()
+            table.insert(events, 'widget-update')
+        end
+        child.on_pointer_leave=function()
+            table.insert(events, 'widget-leave')
+        end
+        local root = env.widgets.Panel{subviews={child}}
+        layout(root, env.state)
+        local map = registration.register_map_tile{
+            owner=root,
+            pos={x=10, y=20, z=3},
+            tooltip='Map',
+        }
+        registration.register(child)
+
+        assert.is_true(env.run_next())
+        local diagnostics = registration.get_diagnostics()
+        assert.equals(2, diagnostics.registration_count)
+        assert.equals(1, diagnostics.widget_registration_count)
+        assert.equals(1, diagnostics.map_registration_count)
+        assert.is_equal(child, diagnostics.target)
+        assert.equals('Widget', diagnostics.intent.text)
+        assert.same({'widget-enter', 'widget-update'}, events)
+
+        env.state.mouse_x = 20
+        env.state.mouse_y = 15
+        assert.is_true(env.run_next())
+        diagnostics = registration.get_diagnostics()
+        assert.is_equal(map, diagnostics.target)
+        assert.equals('Map', diagnostics.intent.text)
+        assert.same({
+            'widget-enter',
+            'widget-update',
+            'widget-leave',
+        }, events)
+
+        env.state.mouse_x = 3
+        env.state.mouse_y = 2
+        assert.is_true(env.run_next())
+        diagnostics = registration.get_diagnostics()
+        assert.is_equal(child, diagnostics.target)
+        assert.equals('Widget', diagnostics.intent.text)
+        assert.same({
+            'widget-enter',
+            'widget-update',
+            'widget-leave',
+            'widget-enter',
+            'widget-update',
+        }, events)
+    end)
+
+    it('suppresses map fallback under blockers and unregistered controls',
+            function()
+        local env = load_environment{
+            mouse_x=3,
+            mouse_y=2,
+            map_pos={x=10, y=20, z=3},
+        }
+        local registration = env.load_generation()
+        local blocker = env.widgets.Panel{
+            frame={l=1, t=1, w=6, h=3},
+            pointer_policy='block',
+        }
+        local root = env.widgets.Panel{subviews={blocker}}
+        layout(root, env.state)
+        local map = registration.register_map_tile{
+            owner=root,
+            pos={x=10, y=20, z=3},
+            tooltip='Map',
+        }
+
+        assert.is_true(env.run_next())
+        assert.is_nil(registration.get_diagnostics().target)
+        assert.is_nil(registration.get_diagnostics().intent)
+
+        blocker.pointer_policy = 'target'
+        assert.is_true(env.run_next())
+        assert.is_nil(registration.get_diagnostics().target)
+
+        blocker.pointer_policy = 'none'
+        assert.is_true(env.run_next())
+        local diagnostics = registration.get_diagnostics()
+        assert.is_equal(map, diagnostics.target)
+        assert.equals('Map', diagnostics.intent.text)
+    end)
+
+    it('mediates map replacement, update, miss, and immediate removal',
+            function()
+        local env = load_environment{
+            mouse_x=20,
+            mouse_y=15,
+            map_pos={x=10, y=20, z=3},
+        }
+        local registration = env.load_generation()
+        local root = env.widgets.Panel{}
+        layout(root, env.state)
+        local first = registration.register_map_tile{
+            owner=root,
+            pos={x=10, y=20, z=3},
+            tooltip='First',
+        }
+        local second = registration.register_map_tile{
+            owner=root,
+            pos={x=10, y=20, z=3},
+            tooltip='Second',
+        }
+
+        assert.is_true(env.run_next())
+        local diagnostics = registration.get_diagnostics()
+        assert.is_equal(second, diagnostics.target)
+        assert.equals('Second', diagnostics.intent.text)
+
+        assert.is_true(registration.unregister_map_tile(second))
+        assert.is_nil(registration.get_diagnostics().target)
+        assert.is_nil(registration.get_diagnostics().intent)
+        assert.is_true(env.run_next())
+        diagnostics = registration.get_diagnostics()
+        assert.is_equal(first, diagnostics.target)
+        assert.equals('First', diagnostics.intent.text)
+
+        assert.is_true(registration.update_map_tile(first, {
+            pos={x=10, y=20, z=3},
+            tooltip='Updated',
+        }))
+        assert.is_true(env.run_next())
+        assert.equals('Updated',
+            registration.get_diagnostics().intent.text)
+
+        env.state.map_pos = {x=10, y=20, z=4}
+        assert.is_true(env.run_next())
+        assert.is_nil(registration.get_diagnostics().target)
+        assert.is_nil(registration.get_diagnostics().intent)
     end)
 
     it('keeps polling while every registered root is ineligible', function()

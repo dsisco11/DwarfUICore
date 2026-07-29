@@ -93,32 +93,32 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 ## Phase 1: Extend immutable pointer sampling with map coordinates
 
-- [ ] Extend `dwarfui.PointerSample` with optional scalar `map_x`, `map_y`, and
+- [x] Extend `dwarfui.PointerSample` with optional scalar `map_x`, `map_y`, and
       `map_z` fields while preserving existing screen `x` and `y` fields.
-- [ ] Read screen and map positions during the same scheduled pointer-poller
+- [x] Read screen and map positions during the same scheduled pointer-poller
       callback.
-- [ ] Read `dfhack.gui.getMousePos()` only while at least one live map-tile
-      registration requires map sampling.
-- [ ] Preserve screen-only widget-tooltip behavior when no map registration
+- [x] Read `dfhack.gui.getMousePos()` only while the caller's
+      live-map-registration demand predicate requires map sampling.
+- [x] Preserve screen-only widget-tooltip behavior when no map registration
       exists.
-- [ ] Ensure every scheduled callback still emits at most one immutable sample
+- [x] Ensure every scheduled callback still emits at most one immutable sample
       with one monotonically increasing sequence number.
-- [ ] Preserve independent nil semantics: a screen anchor may exist while no
+- [x] Preserve independent nil semantics: a screen anchor may exist while no
       valid map tile exists.
-- [ ] Add injected-sampler coverage for valid map coordinates, nil map
+- [x] Add injected-sampler coverage for valid map coordinates, nil map
       coordinates, map-position changes, stopped demand, and module reload.
-- [ ] Add immutability coverage proving observers cannot mutate either
+- [x] Add immutability coverage proving observers cannot mutate either
       coordinate space in a published sample.
-- [ ] Add regression coverage proving stale callbacks from an earlier poller
+- [x] Add regression coverage proving stale callbacks from an earlier poller
       generation cannot publish map samples.
 
 ### Phase 1 completion gate
 
-- [ ] One demanded poller callback produces a coherent screen/map snapshot
+- [x] One demanded poller callback produces a coherent screen/map snapshot
       without any map projection code in DwarfUI.
-- [ ] Widget-only registrations do not introduce unnecessary map sampling.
-- [ ] Nil map positions clear or miss map targets without disturbing valid
-      widget targeting.
+- [x] Widget-only registrations do not introduce unnecessary map sampling.
+- [x] Nil map positions publish map-miss data without disturbing valid
+      widget-targeting screen coordinates.
 
 ## Phase 2: Implement exact map-tile registration and detection
 
@@ -321,7 +321,11 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 | 2026-07-28 | Phase 0 expected-red public and lifecycle contract | `.\tools\Run-UnitTests.ps1 tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\package_contract.spec.lua --tags=map_tile_contract` | Expected red: 0 successes, 5 failures, 0 errors, 0 pending | Every failure reports that `register_map_tile`, `update_map_tile`, or `unregister_map_tile` is not yet a function. The generic tests cover facade delegation, opaque identity, duplicate exact tiles, update/removal semantics, validation, weak lifetime, diagnostics, and the shipped public API without a minecart dependency. |
 | 2026-07-28 | Phase 0 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the LuaDoc contract and all new expected-red tests. |
 | | Public map-tile registration contract | Focused unit suite | Pending | Record handle, update, removal, weak lifetime, and exact-coordinate behavior. |
-| | Pointer sampling and generic map detection | Focused unit suite | Pending | Record screen/map sampling, nil behavior, indexing, arbitration, and reload safety. |
+| 2026-07-28 | Phase 1 demand-controlled pointer sampling | `.\tools\Run-UnitTests.ps1 tests\pointer_poller.spec.lua` | Passed: 15 successes, 0 failures, 0 errors, 0 pending | Covers coherent screen/map snapshots, copied scalar coordinates, nil and partial map positions, map-position changes, demand transitions, immutable fields, default DFHack samplers, instance-generation retirement, and module-reload retirement. |
+| 2026-07-28 | Phase 1 widget-only registration integration | `.\tools\Run-UnitTests.ps1 tests\tooltip_registration.spec.lua --exclude-tags=map_tile_contract` | Passed: 7 successes, 0 failures, 0 errors, 0 pending | Existing widget-only polling performs one screen read and zero map reads. Live map-registration demand will be wired by the generic registry work rather than inferred by the poller. |
+| 2026-07-28 | Phase 1 complete unit suite excluding future expected-red contracts | `.\tools\Run-UnitTests.ps1 --exclude-tags=map_tile_contract` | Passed: 245 successes, 0 failures, 0 errors, 0 pending | The five Phase 0 map-registration contracts remain intentionally excluded until the public registration API is implemented. |
+| 2026-07-28 | Phase 1 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the updated poller, LuaDoc, and unit harnesses. |
+| | Generic map detection | Focused unit suite | Pending | Record indexing, exact-coordinate matching, arbitration, and detector reload safety. |
 | | Minecart same-z consumer | Focused unit suite | Pending | Record current names/positions, route changes, lifecycle cleanup, and explicit off-z exclusion. |
 | | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 <map-tooltip-file>.ds.lua` | Pending | Move the physical pointer to a real same-z marker and verify final rendering plus cleanup. |
 | | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |

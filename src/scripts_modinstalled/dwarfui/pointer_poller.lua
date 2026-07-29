@@ -13,6 +13,9 @@ local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
 ---@field sequence integer
 ---@field x integer|nil
 ---@field y integer|nil
+---@field map_x integer|nil
+---@field map_y integer|nil
+---@field map_z integer|nil
 ---@field coordinate_space '"screen-cells"'
 
 ---Queues one callback for later execution without invoking it synchronously.
@@ -20,6 +23,9 @@ local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
 
 ---Returns one pointer position in screen-cell coordinates.
 ---@alias dwarfui.PointerPollerSampler fun(): integer|nil, integer|nil
+
+---Returns the exact map tile under the pointer, or nil outside the map.
+---@alias dwarfui.PointerPollerMapSampler fun(): {x: integer, y: integer, z: integer}|nil
 
 ---Accepts one immutable sample and must not retain mutable poller state.
 ---@alias dwarfui.PointerPollerObserver fun(sample: dwarfui.PointerSample)
@@ -30,14 +36,18 @@ local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
 ---@class dwarfui.PointerPollerOptions
 ---@field scheduler dwarfui.PointerPollerScheduler|nil
 ---@field sample_pointer dwarfui.PointerPollerSampler|nil
+---@field sample_map_pointer dwarfui.PointerPollerMapSampler|nil
 ---@field observer dwarfui.PointerPollerObserver
 ---@field has_demand dwarfui.PointerPollerDemand
+---@field has_map_demand dwarfui.PointerPollerDemand|nil
 
 ---@class dwarfui.PointerPoller
 ---@field _scheduler dwarfui.PointerPollerScheduler
 ---@field _sample_pointer dwarfui.PointerPollerSampler
+---@field _sample_map_pointer dwarfui.PointerPollerMapSampler
 ---@field _observer dwarfui.PointerPollerObserver
 ---@field _has_demand dwarfui.PointerPollerDemand
+---@field _has_map_demand dwarfui.PointerPollerDemand
 ---@field _module_generation integer
 ---@field _generation integer
 ---@field _sequence integer
@@ -59,16 +69,34 @@ local function default_sampler()
     return dfhack.screen.getMousePos()
 end
 
+---Reads the current exact map tile exactly once.
+---@return {x: integer, y: integer, z: integer}|nil
+local function default_map_sampler()
+    return dfhack.gui.getMousePos()
+end
+
+---Reports that no map-coordinate consumer currently requires sampling.
+---@return boolean
+local function no_map_demand()
+    return false
+end
+
 ---Creates one read-only pointer sample.
 ---@param sequence integer
 ---@param x integer|nil
 ---@param y integer|nil
+---@param map_x integer|nil
+---@param map_y integer|nil
+---@param map_z integer|nil
 ---@return dwarfui.PointerSample
-local function make_sample(sequence, x, y)
+local function make_sample(sequence, x, y, map_x, map_y, map_z)
     local values = {
         sequence=sequence,
         x=x,
         y=y,
+        map_x=map_x,
+        map_y=map_y,
+        map_z=map_z,
         coordinate_space='screen-cells',
     }
     return setmetatable({}, {
@@ -94,15 +122,23 @@ function PointerPoller.new(options)
     assert(options.sample_pointer == nil or
         type(options.sample_pointer) == 'function',
         'DwarfUI pointer poller sampler must be a function.')
+    assert(options.sample_map_pointer == nil or
+        type(options.sample_map_pointer) == 'function',
+        'DwarfUI map pointer sampler must be a function.')
     assert(type(options.observer) == 'function',
         'DwarfUI pointer poller observer must be a function.')
     assert(type(options.has_demand) == 'function',
         'DwarfUI pointer poller demand predicate must be a function.')
+    assert(options.has_map_demand == nil or
+        type(options.has_map_demand) == 'function',
+        'DwarfUI map pointer demand predicate must be a function.')
     return setmetatable({
         _scheduler=options.scheduler or default_scheduler,
         _sample_pointer=options.sample_pointer or default_sampler,
+        _sample_map_pointer=options.sample_map_pointer or default_map_sampler,
         _observer=options.observer,
         _has_demand=options.has_demand,
+        _has_map_demand=options.has_map_demand or no_map_demand,
         _module_generation=module_generation,
         _generation=0,
         _sequence=0,
@@ -148,6 +184,14 @@ function PointerPoller:_demand_exists()
     return not not demand
 end
 
+---Returns current map-sampling demand through the guarded boundary.
+---@return boolean
+function PointerPoller:_map_demand_exists()
+    local _, demand =
+        self:_call('map demand predicate', self._has_map_demand)
+    return not not demand
+end
+
 ---Queues the sole callback for the current instance generation.
 function PointerPoller:_schedule_next()
     local instance_generation = self._generation
@@ -181,12 +225,27 @@ function PointerPoller:_tick(expected_generation,
         return
     end
 
+    local map_demand = self:_map_demand_exists()
     local _, x, y = self:_call('pointer sampler', self._sample_pointer)
     if x == nil or y == nil then
         x, y = nil, nil
     end
+
+    local map_x, map_y, map_z
+    if map_demand then
+        local _, map_pos =
+            self:_call('map pointer sampler', self._sample_map_pointer)
+        local map_pos_type = type(map_pos)
+        if (map_pos_type == 'table' or map_pos_type == 'userdata') and
+                map_pos.x ~= nil and map_pos.y ~= nil and
+                map_pos.z ~= nil then
+            map_x, map_y, map_z = map_pos.x, map_pos.y, map_pos.z
+        end
+    end
+
     self._sequence = self._sequence + 1
-    local sample = make_sample(self._sequence, x, y)
+    local sample = make_sample(
+        self._sequence, x, y, map_x, map_y, map_z)
     self:_call('observer', function() self._observer(sample) end)
 
     if expected_generation ~= self._generation or

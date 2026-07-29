@@ -49,6 +49,10 @@ local function load_environment(state)
                     widgets=state.native_root,
                 }
             end,
+            getMousePos=function()
+                state.map_reads = (state.map_reads or 0) + 1
+                return state.map_pos
+            end,
             matchFocusString=function(focus, viewscreen)
                 return focus == viewscreen.focus
             end,
@@ -311,6 +315,7 @@ describe('singleton tooltip registration polling', function()
         assert.equals(1, diagnostics.sample_sequence)
         assert.equals(1, diagnostics.last_sequence)
         assert.equals(1, env.state.mouse_reads)
+        assert.equals(0, env.state.map_reads or 0)
     end)
 
     it('keeps polling while every registered root is ineligible', function()

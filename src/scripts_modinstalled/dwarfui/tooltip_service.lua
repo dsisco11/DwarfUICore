@@ -164,6 +164,12 @@ function TooltipService:get_registrations()
     return self._state.registrations
 end
 
+---Returns the authoritative immutable presentation intent, if any.
+---@return dwarfui.TooltipIntent|nil
+function TooltipService:get_intent()
+    return self._state.intent
+end
+
 ---Registers one tooltip target with deterministic cross-root sequence.
 ---@param widget gui.View
 ---@return boolean created

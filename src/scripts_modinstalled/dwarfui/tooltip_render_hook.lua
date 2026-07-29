@@ -77,6 +77,7 @@ end
 ---@field selected_transport dwarfui.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 ---@field render_count integer
+---@field last_rendered_revision integer|nil
 ---@field last_transport dwarfui.TooltipRenderTransport|nil
 ---@field last_error string|nil
 ---@field overlay table
@@ -113,15 +114,17 @@ local function present(state, transport, owner)
             type(state.presenter) ~= 'function' then
         return
     end
-    local ok, failure = xpcall(
-        function() state.presenter(transport, owner) end,
+    local ok, rendered_revision = xpcall(
+        function() return state.presenter(transport, owner) end,
         debug.traceback)
     if not ok then
-        state.last_error = failure
+        state.last_error = rendered_revision
         state.disabled_generation = state.generation
         return
     end
+    if rendered_revision == nil then return end
     state.render_count = state.render_count + 1
+    state.last_rendered_revision = rendered_revision
     state.last_transport = transport
 end
 
@@ -336,6 +339,7 @@ function TooltipRenderHookManager:get_diagnostics()
         selected_transport=state.selected_transport,
         selected_owner=state.selected_owner,
         render_count=state.render_count,
+        last_rendered_revision=state.last_rendered_revision,
         last_transport=state.last_transport,
         last_error=state.last_error,
         overlay={

@@ -43,20 +43,43 @@ local function load_environment(state)
 
     local dfhack = {
         pen={parse=function(value) return value end},
+        gui={
+            getDFViewscreen=function() return nil end,
+            getCurViewscreen=function() return nil end,
+        },
         screen={
             getMousePos=function()
                 state.mouse_samples = (state.mouse_samples or 0) + 1
                 return state.mouse_x, state.mouse_y
             end,
             getWindowSize=function() return state.width, state.height end,
+            invalidate=function() end,
         },
     }
     local gui = {
+        Screen=ZScreen,
         ZScreen=ZScreen,
         FRAME_INTERIOR='interior',
+        Painter={new=function()
+            return widget_harness.rect(0, 0, state.width, state.height)
+        end},
         paint_frame=function() end,
     }
     local overlay = {OverlayWidget=OverlayWidget}
+    local transport = {OVERLAY=1, SCREEN=2}
+    local hook_manager = {
+        get_diagnostics=function()
+            return {generation=1}
+        end,
+        set_presenter=function() end,
+        ensure_overlay=function() end,
+        clear_selection=function() end,
+    }
+    local service = {
+        get_intent=function() return nil end,
+        get_diagnostics=function() return {revision=0} end,
+        set_intent_observer=function() end,
+    }
 
     local _, extensions = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
@@ -78,11 +101,24 @@ local function load_environment(state)
                 defclass=widget_harness.defclass,
                 dfhack=dfhack,
             },
-            require_modules={gui=gui, ['gui.widgets']=widgets},
+            require_modules={
+                gui=gui,
+                ['gui.widgets']=widgets,
+                ['plugins.overlay']=overlay,
+            },
             reqscript={
                 ['dwarfui/widget_extensions']=extensions,
                 ['dwarfui/pointer']=pointer,
                 ['dwarfui/text']=text,
+                ['dwarfui/tooltip_service']={service=service},
+                ['dwarfui/tooltip_render_hook']={
+                    manager=hook_manager,
+                    TooltipRenderTransport=transport,
+                },
+                ['dwarfui/tooltip_registration']={
+                    register=function() end,
+                    unregister=function() end,
+                },
             },
         })
     return {

@@ -2,9 +2,9 @@
 
 ## Status
 
-Phases 0 and 1 complete. This document is the execution contract for rendering
-the current process-wide tooltip intent after its owning native overlay or Lua
-screen has completed rendering.
+Phases 0 through 2 complete. This document is the execution contract for
+rendering the current process-wide tooltip intent after its owning native
+overlay or Lua screen has completed rendering.
 
 It depends on the polling, detection, and intent contracts in
 `Docs/tooltip-input-polling.todo`. It does not replace or absorb any input
@@ -453,45 +453,54 @@ than hidden behind screen-type exception lists.
 
 ## Phase 2: Implement the intent-driven presenter
 
-- [ ] Add a documented presentation adapter under the generic DwarfUI tooltip
+- [x] Add a documented presentation adapter under the generic DwarfUI tooltip
       namespace.
-- [ ] Subscribe the adapter to tooltip intent publish and clear notifications.
-- [ ] Keep the tooltip service authoritative; do not maintain a divergent
+- [x] Subscribe the adapter to tooltip intent publish and clear notifications.
+- [x] Keep the tooltip service authoritative; do not maintain a divergent
       second intent state.
-- [ ] Repair the render hook and request redraw from the presentation adapter,
+- [x] Repair the render hook and request redraw from the presentation adapter,
       not from pointer polling or target detection.
-- [ ] Create one `TooltipRenderer` per presenter generation.
-- [ ] Reuse the current tooltip border, colors, wrapping limit, pointer offset,
+- [x] Create one `TooltipRenderer` per presenter generation.
+- [x] Reuse the current tooltip border, colors, wrapping limit, pointer offset,
       and screen-edge clamping behavior.
-- [ ] Recalculate layout when intent revision or screen dimensions change.
-- [ ] Render against an unclipped full-window UI painter.
-- [ ] Render nothing when the service has no current intent.
-- [ ] Use the intent's opaque `source_root` only to select the native-overlay
+- [x] Recalculate layout when intent revision or screen dimensions change.
+- [x] Render against an unclipped full-window UI painter.
+- [x] Render nothing when the service has no current intent.
+- [x] Use the intent's opaque `source_root` only to select the native-overlay
       or exact Lua-screen render transport.
-- [ ] Recognize displayed `gui.Screen` and `gui.ZScreen` owners without
+- [x] Recognize displayed `gui.Screen` and `gui.ZScreen` owners without
       modifying their focus, input, logic, or subview state.
-- [ ] Require exact owner equality and current-top-screen identity before a
+- [x] Require exact owner equality and current-top-screen identity before a
       screen trampoline can present.
-- [ ] Make the overlay trampoline reject screen-owned intents.
-- [ ] Make every non-selected screen trampoline reject the current intent.
-- [ ] Do not ask the input system for a renderer, overlay name, focus string,
+- [x] Make the overlay trampoline reject screen-owned intents.
+- [x] Make every non-selected screen trampoline reject the current intent.
+- [x] Do not ask the input system for a renderer, overlay name, focus string,
       viewscreen, dimensions, or painter.
-- [ ] Reject unsupported source roots without altering target or hover state.
-- [ ] Record current intent revision, last rendered revision, last screen
+- [x] Reject unsupported source roots without altering target or hover state.
+- [x] Record current intent revision, last rendered revision, last screen
       dimensions, supported-surface decision, and render count in diagnostics.
-- [ ] Keep the presenter independent of registration lifetime and pointer
+- [x] Keep the presenter independent of registration lifetime and pointer
       polling cadence.
-- [ ] Add LuaDoc comments for all new or modified classes and methods.
+- [x] Add LuaDoc comments for all new or modified classes and methods.
 
 ### Phase 2 completion gate
 
-- [ ] Valid native-overlay and Lua-screen intents render through the same
+- [x] Valid native-overlay and Lua-screen intents render through the same
       visual contract.
-- [ ] Clear notification removes the tooltip on the next requested redraw.
-- [ ] Unsupported roots produce no painting and a diagnostic reason.
-- [ ] Each intent revision selects exactly one transport owner.
-- [ ] No input-layer module imports the presenter or render-hook manager.
-- [ ] Focused presenter and renderer tests pass.
+- [x] Clear notification removes the tooltip on the next requested redraw.
+- [x] Unsupported roots produce no painting and a diagnostic reason.
+- [x] Each intent revision selects exactly one transport owner.
+- [x] No input-layer module imports the presenter or render-hook manager.
+- [x] Focused presenter and renderer tests pass.
+
+### Phase 2 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1 tests/tooltip_presenter.spec.lua tests/tooltip.spec.lua tests/tooltip_render_hook.spec.lua tests/tooltip_service.spec.lua tests/package_contract.spec.lua tests/module_registry.spec.lua` | 70 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 242 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 syntax passed for 20 production and 40 test/support files. |
+| 2026-07-28 | `git diff --check` | Passed. |
 
 ## Phase 3: Harden chaining, reload, and failure isolation
 

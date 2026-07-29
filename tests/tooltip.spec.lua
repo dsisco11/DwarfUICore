@@ -34,7 +34,11 @@ local function load_tooltip(state)
         },
     }
     local gui = {
+        Screen={},
         FRAME_INTERIOR='interior',
+        Painter={new=function()
+            return widget_harness.rect(0, 0, state.width, state.height)
+        end},
         paint_frame=function(_, rect, style)
             state.frame_paints = (state.frame_paints or 0) + 1
             state.painted_rect = rect
@@ -54,19 +58,78 @@ local function load_tooltip(state)
         register=function() return true end,
         unregister=function() return true end,
     }
+    local service = {
+        intent=nil,
+        revision=0,
+        get_intent=function(self) return self.intent end,
+        get_diagnostics=function(self)
+            return {revision=self.revision}
+        end,
+        set_intent_observer=function(self, observer)
+            self.observer = observer
+        end,
+    }
+    local transport = {OVERLAY=1, SCREEN=2}
+    local overlay = {OverlayWidget={}}
+    local hook_manager = {
+        generation=1,
+        get_diagnostics=function(self)
+            return {
+                generation=self.generation,
+                selected_transport=self.selected_transport,
+                selected_owner=self.selected_owner,
+            }
+        end,
+        set_presenter=function(self, presenter)
+            self.presenter = presenter
+        end,
+        ensure_overlay=function(self)
+            self.selected_transport = transport.OVERLAY
+            self.selected_owner = overlay
+        end,
+        ensure_screen=function(self, owner)
+            self.selected_transport = transport.SCREEN
+            self.selected_owner = owner
+        end,
+        clear_selection=function(self)
+            self.selected_transport = nil
+            self.selected_owner = nil
+        end,
+        shutdown=function() end,
+    }
     local _, tooltip = module_loader.load(repo_root, tooltip_path, {
         globals={
             COLOR_BLACK='black',
             COLOR_WHITE='white',
             DEFAULT_NIL=default_nil,
             defclass=widget_harness.defclass,
-            dfhack=dfhack,
+            dfhack={
+                pen=dfhack.pen,
+                gui={
+                    getDFViewscreen=function() return nil end,
+                    getCurViewscreen=function() return nil end,
+                },
+                screen={
+                    getMousePos=dfhack.screen.getMousePos,
+                    getWindowSize=dfhack.screen.getWindowSize,
+                    invalidate=function() end,
+                },
+            },
         },
-        require_modules={gui=gui, ['gui.widgets']=widgets},
+        require_modules={
+            gui=gui,
+            ['gui.widgets']=widgets,
+            ['plugins.overlay']=overlay,
+        },
         reqscript={
             ['dwarfui/widget_extensions']=extensions,
             ['dwarfui/pointer']=pointer,
             ['dwarfui/tooltip_registration']=registration,
+            ['dwarfui/tooltip_service']={service=service},
+            ['dwarfui/tooltip_render_hook']={
+                manager=hook_manager,
+                TooltipRenderTransport=transport,
+            },
             ['dwarfui/text']=text,
         },
     })

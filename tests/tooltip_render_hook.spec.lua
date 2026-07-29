@@ -35,6 +35,7 @@ describe('DwarfUI tooltip render-hook manager', function()
                 module.TooltipRenderTransport.OVERLAY, transport)
             assert.is_equal(overlay, owner)
             table.insert(events, 'presenter')
+            return 1
         end)
 
         assert.is_true(module.manager:ensure_overlay())
@@ -47,6 +48,8 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.is_nil(packed[2])
         assert.equals(3, packed[3])
         assert.equals(1, module.manager:get_diagnostics().render_count)
+        assert.equals(1,
+            module.manager:get_diagnostics().last_rendered_revision)
     end)
 
     it('installs idempotently and adopts its hook on module reload',

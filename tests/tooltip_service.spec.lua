@@ -410,6 +410,7 @@ describe('DwarfUI tooltip service', function()
         service:accept_pointer_observation(
             observation(1, 'target', widget, {}, 11, 6))
         local diagnostics = service:get_diagnostics()
+        assert.is_equal(diagnostics.intent, service:get_intent())
         local intent_fields = {}
         for key in pairs(diagnostics.intent) do intent_fields[key] = true end
 

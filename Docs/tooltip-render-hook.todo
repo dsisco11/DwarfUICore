@@ -2,7 +2,7 @@
 
 ## Status
 
-Planning only. This document is the execution contract for rendering the
+Phase 0 complete. This document is the execution contract for rendering the
 current process-wide tooltip intent after its owning native overlay or Lua
 screen has completed rendering.
 
@@ -325,48 +325,72 @@ than hidden behind screen-type exception lists.
 
 ## Phase 0: Characterize both render seams
 
-- [ ] Add a focused live probe proving that replacing
+- [x] Add a focused live probe proving that replacing
       `plugins.overlay.render_viewscreen_widgets` changes the function called
       by the native C++ overlay interpose hook.
-- [ ] Record the exact function arguments and return values received by the
+- [x] Record the exact function arguments and return values received by the
       installed DFHack version.
-- [ ] Prove the wrapped predecessor renders viewscreen-specific overlays and
+- [x] Prove the wrapped predecessor renders viewscreen-specific overlays and
       `viewscreens='all'` overlays before the appended callback.
-- [ ] Prove the appended callback can paint a known cell above a native
+- [x] Prove the appended callback can paint a known cell above a native
       viewscreen and above both overlay groups.
-- [ ] Verify screen-global pointer coordinates align with a full-window
+- [x] Verify screen-global pointer coordinates align with a full-window
       `gui.Painter` in classic and graphics modes supported by the test
       environment.
-- [ ] Characterize the redraw API needed to show and clear appended painting
+- [x] Characterize the redraw API needed to show and clear appended painting
       immediately while the game is paused.
-- [ ] Verify `plugins.overlay.rescan()` preserves a runtime replacement of the
+- [x] Verify `plugins.overlay.rescan()` preserves a runtime replacement of the
       exported render function.
-- [ ] Characterize behavior when the overlay Lua module environment is cleared
+- [x] Characterize behavior when the overlay Lua module environment is cleared
       and reloaded.
-- [ ] Confirm that a foreground `gui.ZScreen` paints after the native overlay
+- [x] Confirm that a foreground `gui.ZScreen` paints after the native overlay
       hook.
-- [ ] Add a focused live probe that wraps the effective `onRender()` method on
+- [x] Add a focused live probe that wraps the effective `onRender()` method on
       an actual displayed `gui.ZScreen` instance.
-- [ ] Prove the instance predecessor completes its parent render, frame,
+- [x] Prove the instance predecessor completes its parent render, frame,
       content, and child rendering before the appended callback paints.
-- [ ] Prove the C++ Lua-screen render path looks up the instance's current
+- [x] Prove the C++ Lua-screen render path looks up the instance's current
       `onRender` field on every render instead of caching the original method.
-- [ ] Characterize a screen class that overrides `onRender()` and prove
+- [x] Characterize a screen class that overrides `onRender()` and prove
       instance wrapping preserves and follows that override.
-- [ ] Characterize nested Lua screens and prove only the current top screen is
+- [x] Characterize nested Lua screens and prove only the current top screen is
       eligible to present.
-- [ ] Prove assignment and conditional restoration of an instance
+- [x] Prove assignment and conditional restoration of an instance
       `onRender()` method do not alter its focus, input, logic, dismissal, or
       parent relationships.
 
+### Phase 0 characterization evidence
+
+| Surface | Installed-version result |
+| --- | --- |
+| Native arguments | The C++ interpose calls the exported function with exactly `('viewscreen_dwarfmodest', native_viewscreen)` on the fortress screen. |
+| Native returns | The installed predecessor returns no values; the wrapper preserves that empty return list. |
+| Native ordering | The viewscreen-specific probe paints `V`, the `all` probe paints `A`, and the appended full-window painter paints `H` last through the real `dfhack.screen.paintTile` path. |
+| Coordinates and mode | In the configured graphics-mode environment, `dfhack.screen.getMousePos()`, a full-window `gui.Painter`, and the real paint call agree on the same screen-global cell. The environment does not provide an automation-safe runtime switch to classic mode. |
+| Paused redraw | `ds.redraw()` immediately shows the appended paint and restores the predecessor's `A` cell when appended painting is disabled while paused. |
+| Rescan and reload | `plugins.overlay.rescan()` retains the replacement function. `reload('plugins.overlay')` retains the module-table identity but overwrites the exported function with a new module-generation function. |
+| Screen ordering | The native overlay callback occurs inside `ZScreen:renderParent()` before frame, content, child, and class-specific override rendering; the instance callback then paints last. |
+| Dynamic screen lookup | Replacing the displayed instance's `onRender` field is observed on the next render, with zero arguments and zero predecessor return values. |
+| Nested screens | A lower screen still renders as a parent but fails the current-native identity check; only the current top screen is eligible to append paint. |
+| Restoration and behavior | Raw instance ownership is restored exactly, including clearing an originally inherited method. Focus strings, input, idle logic, parents, and normal dismissal remain intact. |
+
+### Phase 0 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/tooltip/tooltip_render_seams.ds.lua --timeout 120` | Passed twice after final implementation: 2 successes, 0 failures, 0 errors, `cleanup_confirmed=true`. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 218 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 syntax passed for 19 production and 38 test/support files. |
+| 2026-07-28 | `Tools/Check-UnitTestNaming.ps1` and staged/unstaged `git diff --check` | Passed. |
+
 ### Phase 0 completion gate
 
-- [ ] The exported Lua function is proven to be the live native overlay render
+- [x] The exported Lua function is proven to be the live native overlay render
       seam.
-- [ ] The appended painter is visibly last within the native overlay pipeline.
-- [ ] An instance `onRender()` wrapper is visibly last within its foreground
+- [x] The appended painter is visibly last within the native overlay pipeline.
+- [x] An instance `onRender()` wrapper is visibly last within its foreground
       Lua screen.
-- [ ] Coordinate, redraw, rescan, module-replacement, override, nested-screen,
+- [x] Coordinate, redraw, rescan, module-replacement, override, nested-screen,
       and restoration behavior are known.
 
 ## Phase 1: Implement the versioned render-hook manager

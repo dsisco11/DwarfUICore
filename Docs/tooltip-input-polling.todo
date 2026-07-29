@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 4 are complete. Phase 5 is the next implementation step. This
+Phases 0 through 5 are complete. Phase 6 is the next implementation step. This
 document is the execution contract for pointer sampling, registered-control
 hit testing, and tooltip-service notification.
 
@@ -561,51 +561,100 @@ consumer without changing the polling, detection, or observation contracts.
 
 ## Phase 5: Add live automation for input independence
 
-- [ ] Add a focused `.ds.lua` test whose filename ends only in `.ds.lua`.
-- [ ] Use the actual registered minecart overlay and its real zoom button as
+- [x] Add a focused `.ds.lua` test whose filename ends only in `.ds.lua`.
+- [x] Use the actual registered minecart overlay and its real zoom button as
       the tooltip target.
-- [ ] Open the native Hauling menu through public DwarfSpec input APIs.
-- [ ] Move the pointer through DwarfSpec onto the rendered production zoom
+- [x] Open the native Hauling menu through public DwarfSpec input APIs.
+- [x] Move the pointer through DwarfSpec onto the rendered production zoom
       button without calling detector, service-update, render, or input methods
       directly.
-- [ ] Await diagnostics that identify the production button as the current
+- [x] Await diagnostics that identify the production button as the current
       target and report the exact text `Zoom to this stop`.
-- [ ] Assert the published anchor equals the sampled screen-cell pointer
+- [x] Assert the published anchor equals the sampled screen-cell pointer
       position.
-- [ ] Move within the button and prove target-local update can change dynamic
+- [x] Move within the button and prove target-local update can change dynamic
       tooltip text before the service snapshots it.
-- [ ] Move off the button and prove the intent clears and the leave callback
+- [x] Move off the button and prove the intent clears and the leave callback
       occurs without synthetic input.
-- [ ] Place an input-consuming widget in the normal dispatch path and prove
+- [x] Place an input-consuming widget in the normal dispatch path and prove
       pointer polling still updates the target and intent.
-- [ ] Assert DwarfSpec's focus string and current native viewscreen are
+- [x] Assert DwarfSpec's focus string and current native viewscreen are
       unchanged by registration, pointer movement, intent publication, and
       target clearing.
-- [ ] Assert polling diagnostics expose no screen, overlay, renderer, or input
+- [x] Assert polling diagnostics expose no screen, overlay, renderer, or input
       ownership created by the input subsystem.
-- [ ] Run `dwarfui reload` with a live registration and prove sampling resumes
+- [x] Run `dwarfui reload` with a live registration and prove sampling resumes
       through one new generation without duplicate callbacks or a lost
       Hauling overlay.
-- [ ] Close and reopen the Hauling menu and prove temporarily ineligible
+- [x] Close and reopen the Hauling menu and prove temporarily ineligible
       registrations neither publish stale intent nor require re-registration.
-- [ ] Include a safe title/load/map transition probe if Phase 0 confirms that
+- [x] Include a safe title/load/map transition probe if Phase 0 confirms that
       it can be automated without modifying the prepared save.
-- [ ] Restore pointer position, native menu state, scroll position, focus,
+- [x] Restore pointer position, native menu state, scroll position, focus,
       mounted subjects, and all test-owned registrations even when an
       assertion fails.
-- [ ] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
+- [x] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
       subjects, and pointer ownership.
 
 ### Phase 5 completion gate
 
-- [ ] Real pointer movement selects and clears the real minecart zoom tooltip
+- [x] Real pointer movement selects and clears the real minecart zoom tooltip
       target through the polling path.
-- [ ] An input consumer cannot prevent the polling path from observing hover.
-- [ ] Focus, native viewscreen identity, pause state, and input routing remain
+- [x] An input consumer cannot prevent the polling path from observing hover.
+- [x] Focus, native viewscreen identity, pause state, and input routing remain
       unchanged.
-- [ ] Reload leaves exactly one live poller generation and the registered
+- [x] Reload leaves exactly one live poller generation and the registered
       Hauling overlay remains available.
-- [ ] Focused live automation passes with confirmed cleanup.
+- [x] Focused live automation passes with confirmed cleanup.
+
+### Phase 5 evidence
+
+- `tests/minecart_route/minecart_route_tooltip.ds.lua` mounts the current
+  native screen, opens Hauling through `ds.input()`, resolves the registered
+  production minecart overlay and its real `AssetButton`, and moves the
+  virtual pointer only through `ds.move_pointer()` and public redraw/wait
+  commands. It never calls the detector, service update, widget render, or
+  input methods to produce tooltip observations.
+- The focused proof observes the exact static text `Zoom to this stop` and
+  asserts the intent anchor equals DwarfSpec's screen-cell pointer result. It
+  then moves between two cells in the three-cell production button and uses a
+  test-owned pointer-update override to prove the service snapshots changed
+  target-local dynamic text after the callback runs.
+- A test-owned leave wrapper proves moving back to the native stop row clears
+  target and intent and invokes leave without synthetic input. A test-owned
+  `onInput` override on the same production button consumes routed left-click
+  input; subsequent samples, revisions, target updates, and dynamic intent
+  continue advancing.
+- Environment snapshots use DwarfSpec's `Subject:getFocusList()` and
+  `ds.isGamePaused()` together with current/native viewscreen identities.
+  Registration, unregistration, pointer movement, intent publication,
+  consumed input, clearing, and reload preserve those values. Diagnostics
+  explicitly expose no screen, overlay, renderer, viewscreen, input owner, or
+  input handler.
+- The test runs `dwarfui reload` while the production registration and intent
+  are live. Service and poller module generations each advance exactly once,
+  the rebuilt overlay remains discoverable, the tooltip is reacquired, and a
+  controlled three-frame wait produces exactly three samples. Closing Hauling
+  clears ineligible target state while polling remains demanded; reopening
+  reacquires the same feature without changing the registration count.
+- Phase 0 established transition behavior from DFHack scheduler source but did
+  not establish a safe automated title/load/save transition for the prepared
+  fortress. The conditional transition probe was therefore intentionally not
+  added to this save-mutating focused test.
+- The test restores its action overrides, pointer position, Hauling open state,
+  scroll position, pause state, overlay state, and native mount through an
+  always-run cleanup path. The focused run passed once, followed by a
+  two-repeat run in which both repetitions passed.
+  DwarfSpec reported `cleanup_confirmed=true` and
+  `mount_cleanup_verified=true`; that cleanup gate requires zero active/owned
+  screens, mounts, subjects, and pointer ownership. Final service status was
+  executor idle, queue `0`, and quarantine `none`.
+- The complete standalone unit suite remained green at
+  `218 successes / 0 failures / 0 errors`. Lua 5.4.6 syntax validation passed
+  for 19 production and 37 test/support files. Unit-test naming, the non-live
+  build, and `git diff --check` passed. Final fortress state was
+  `dwarfmode/Default` on the native dwarfmode viewscreen with no current
+  tooltip target or intent and one current running polling chain.
 
 ## Phase 6: Verification and handoff to rendering design
 

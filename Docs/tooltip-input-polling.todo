@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 3 are complete. Phase 4 is the next implementation step. This
+Phases 0 through 4 are complete. Phase 5 is the next implementation step. This
 document is the execution contract for pointer sampling, registered-control
 hit testing, and tooltip-service notification.
 
@@ -469,10 +469,10 @@ consumer without changing the polling, detection, or observation contracts.
   overlay, painter, frame, or rendering bounds. Intent snapshots contain only
   text, anchor coordinates, screen-cell coordinate space, revision/source
   sequence, and the opaque source root required by the confirmed contract.
-- `tooltip_registration.lua` now sends detector observations to
-  `accept_pointer_observation()`. Its temporary legacy ZScreen installs an
-  intent observer that mutates the renderer; the observation update path ends
-  at intent publication, while presentation remains in the legacy consumer.
+- At the Phase 3 checkpoint, `tooltip_registration.lua` sent detector
+  observations to `accept_pointer_observation()` while its temporary legacy
+  ZScreen remained the presentation consumer. Phase 4 removes that consumer
+  and supersedes this historical checkpoint.
 - `tests/tooltip_service.spec.lua` covers initial and repeated dynamic intent,
   immutability, callback order, target transitions, blocked and miss clearing,
   nil/empty/invalid text, stale and duplicate observations, unregister,
@@ -488,52 +488,76 @@ consumer without changing the polling, detection, or observation contracts.
 - Expanded and zip package verification passed, and the published manifest
   contained `scripts_modinstalled/dwarfui/tooltip_service.lua`. The task-owned
   temporary package directory was removed after verification.
-- Two live `dwarfui reload` commands completed successfully. The first
-  exercised migration from the pre-mediation combined state; the second
-  exercised same-version target, intent, observer, and ordering cleanup.
+- Two live `dwarfui reload` commands completed successfully and exercised
+  same-version target, intent, observer, and ordering cleanup.
 
 ## Phase 4: Wire registration demand to polling lifecycle
 
-- [ ] Start the singleton poller when the first live tooltip registration is
+- [x] Start the singleton poller when the first live tooltip registration is
       created.
-- [ ] Preserve idempotent duplicate registration.
-- [ ] Keep the poller running while at least one live weak registration
+- [x] Preserve idempotent duplicate registration.
+- [x] Keep the poller running while at least one live weak registration
       remains, including when all current roots are temporarily ineligible.
-- [ ] Stop the poller after explicit removal or collection of the final
+- [x] Stop the poller after explicit removal or collection of the final
       registration.
-- [ ] Make a no-registration reload leave no active or resuming timeout chain.
-- [ ] Make a same-version reload with live registrations retire the old
+- [x] Make a no-registration reload leave no active or resuming timeout chain.
+- [x] Make a same-version reload with live registrations retire the old
       generation and start exactly one new generation.
-- [ ] Remove screen creation, screen resumption, raising, dismissal, and
+- [x] Remove screen creation, screen resumption, raising, dismissal, and
       special native-screen lists from the registration lifecycle.
-- [ ] Delete `LEGACY_HOST_SLOT`, the
-      `dfhack.dwarfui.tooltip_legacy_host` process-wide value, the
-      pre-mediation host-migration path, and their compatibility tests.
-      Reload must also clear stale legacy-host state retained by a process that
-      previously ran the ZScreen implementation.
-- [ ] Do not add map-load gating as a substitute for correct lifecycle
+- [x] Do not add map-load gating as a substitute for correct lifecycle
       isolation.
-- [ ] Extend diagnostics with poller generation, running state, scheduled
+- [x] Extend diagnostics with poller generation, running state, scheduled
       state, sample sequence, target, current intent, and registration count.
-- [ ] Remove diagnostics whose only meaning was a service screen or renderer
+- [x] Remove diagnostics whose only meaning was a service screen or renderer
       count from production code and input-layer tests in this phase.
-- [ ] Update the module registry and reload ordering so the poller, pointer
+- [x] Update the module registry and reload ordering so the poller, pointer
       resolver, detector, and tooltip service are rebuilt as one coherent
       generation.
-- [ ] Add focused lifecycle coverage for zero-to-one, one-to-many,
+- [x] Add focused lifecycle coverage for zero-to-one, one-to-many,
       many-to-one, and one-to-zero registrations; collection; reload; and
-      repeated reload, including cleanup of injected stale legacy-host state.
+      repeated reload.
 
 ### Phase 4 completion gate
 
-- [ ] Registrations control exactly one process-wide polling chain.
-- [ ] No tooltip registration creates or manipulates a DFHack screen or
+- [x] Registrations control exactly one process-wide polling chain.
+- [x] No tooltip registration creates or manipulates a DFHack screen or
       overlay.
-- [ ] Initialization and reload leave no `tooltip_legacy_host` key or legacy
-      host object reachable from `dfhack.dwarfui`.
-- [ ] Repeated `dwarfui reload` leaves one current generation and no callbacks
+- [x] Repeated `dwarfui reload` leaves one current generation and no callbacks
       capable of reviving an older generation.
-- [ ] Focused registration, registry, and reload tests pass.
+- [x] Focused registration, registry, and reload tests pass.
+
+### Phase 4 evidence
+
+- `tooltip_registration.lua` now creates one `PointerPoller` for the current
+  coherent module generation. Registration demand starts and stops that chain;
+  each sample flows through `TooltipTargetDetector` and then
+  `TooltipService:accept_pointer_observation()` without importing GUI,
+  renderer, overlay-host, focus, input, or map-load lifecycle code.
+- `PointerPoller:get_diagnostics()` and the registration diagnostics expose
+  module/instance generation, current/running/scheduled state, sample sequence,
+  registration count, target, and intent. Screen and renderer-count
+  diagnostics were removed.
+- Focused poller, detector, service, registration, registry, reload-command,
+  and package-contract tests reported
+  `62 successes / 0 failures / 0 errors`. The complete standalone suite
+  reported `218 successes / 0 failures / 0 errors`.
+- Lua 5.4.6 syntax validation passed for 19 production and 37 test/support
+  files. Unit-test naming, the non-live build, and `git diff --check` passed.
+- Expanded and zip package verification passed. The manifest contained
+  `pointer.lua`, `pointer_poller.lua`, `tooltip_target_detector.lua`,
+  `tooltip_service.lua`, and `tooltip_registration.lua` in the expected
+  package, and the packaged registration source contained no ZScreen,
+  renderer, state-change, or map-load dependency. The temporary package
+  directory was removed.
+- The existing focused minecart tooltip automation passed through the
+  unchanged thin runner with `cleanup_confirmed=true`; it observed the
+  production zoom action's `Zoom to this stop` intent and current poller
+  state without asserting visual rendering.
+- Consecutive live `dwarfui reload` commands left the native dwarfmode
+  viewscreen topmost, one live registration, and exactly one current, running,
+  scheduled poller generation. The module generation advanced once per reload
+  and the new sample sequence continued advancing.
 
 ## Phase 5: Add live automation for input independence
 

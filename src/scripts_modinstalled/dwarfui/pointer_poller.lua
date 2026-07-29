@@ -220,3 +220,16 @@ function PointerPoller:stop()
     self:_halt()
     return true
 end
+
+---Returns lifecycle diagnostics without exposing poller collaborators.
+---@return table diagnostics
+function PointerPoller:get_diagnostics()
+    return {
+        module_generation=self._module_generation,
+        generation=self._generation,
+        running=self._running,
+        scheduled=self._scheduled,
+        sample_sequence=self._sequence,
+        current=self:_module_is_current(),
+    }
+end

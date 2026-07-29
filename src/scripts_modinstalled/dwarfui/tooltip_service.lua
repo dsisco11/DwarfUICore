@@ -6,29 +6,9 @@
 
 API_VERSION = 1
 local SERVICE_SLOT = 'tooltip_service'
-local LEGACY_HOST_SLOT = 'tooltip_legacy_host'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 local process_state = dfhack.dwarfui[SERVICE_SLOT]
-
--- TEMPORARY: migrate the pre-mediation service shape without importing or
--- manipulating its presentation objects. The legacy registration module
--- retires the moved host after this input service has loaded.
-if process_state and process_state.screen ~= nil then
-    dfhack.dwarfui[LEGACY_HOST_SLOT] = process_state
-    process_state = {
-        api_version=API_VERSION,
-        registrations=process_state.registrations,
-        registration_sequence=process_state.sequence or 0,
-        target=process_state.target,
-        intent=nil,
-        revision=0,
-        last_sequence=0,
-        intent_observer=nil,
-        generation=0,
-    }
-    dfhack.dwarfui[SERVICE_SLOT] = process_state
-end
 
 if process_state and process_state.api_version ~= API_VERSION then
     error(('Conflicting DwarfUI tooltip service versions: ' ..

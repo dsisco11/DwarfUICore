@@ -2,103 +2,28 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
+local POINTER_POLLER_PATH =
+    'src/scripts_modinstalled/dwarfui/pointer_poller.lua'
+local TARGET_DETECTOR_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
+local SERVICE_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
 local REGISTRATION_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_registration.lua'
 
----Creates the minimal painter surface required by the tooltip renderer.
----@param state table
----@return table painter
-local function painter(state)
-    return {
-        fill=function()
-            state.fill_count = (state.fill_count or 0) + 1
-        end,
-    }
-end
-
----Builds isolated DFHack collaborators for singleton-service probes.
+---Builds isolated collaborators for polling-lifecycle integration probes.
 ---@param state? table
 ---@return table environment
 local function load_environment(state)
     state = state or {}
     state.width = state.width or 40
     state.height = state.height or 20
-    state.events = state.events or {}
-    if state.map_loaded == nil then state.map_loaded = true end
+    state.callbacks = state.callbacks or {}
     local default_nil = widget_harness.default_nil()
     local widgets = widget_harness.widgets(nil, default_nil)
     widgets.Widget.ATTRS{visible=true, active=true}
 
-    ---@class tests.SingletonTooltipZScreen
-    local ZScreen = widget_harness.defclass(nil, widgets.Widget)
-    ZScreen.ATTRS{
-        defocusable=true,
-        initial_pause=false,
-        pass_mouse_clicks=true,
-        pass_movement_keys=false,
-    }
-
-    ---Shows and lays out this controlled screen.
-    ---@return table self
-    function ZScreen:show()
-        self.shown = true
-        self._native = self._native or {}
-        self:updateLayout(widget_harness.rect(
-            0, 0, state.width, state.height))
-        state.current_screen = self._native
-        table.insert(state.events, 'show')
-        return self
-    end
-
-    ---Returns whether this controlled screen is active.
-    ---@return boolean
-    function ZScreen:isActive()
-        return self.shown == true
-    end
-
-    ---Returns whether this screen currently owns z-order focus.
-    ---@return boolean
-    function ZScreen:hasFocus()
-        return not self.defocused and state.current_screen == self._native
-    end
-
-    ---Renders the simulated parent stack.
-    function ZScreen:renderParent()
-        table.insert(state.events, 'parent-render')
-    end
-
-    ---Forwards input into the simulated parent screen.
-    ---@param keys table
-    function ZScreen:sendInputToParent(keys)
-        state.forwarded_keys = keys
-        if state.screen_opened_by_input then
-            state.current_screen = state.screen_opened_by_input
-        end
-    end
-
-    ---Advances the simulated parent screen logic.
-    function ZScreen:onIdle()
-        state.parent_idle_count = (state.parent_idle_count or 0) + 1
-    end
-
-    ---Raises this screen over a newly opened child screen.
-    ---@return table self
-    function ZScreen:raise()
-        state.raise_count = (state.raise_count or 0) + 1
-        state.current_screen = self._native
-        self.defocused = false
-        return self
-    end
-
-    ---Dismisses and notifies this controlled screen.
-    function ZScreen:dismiss()
-        if not self.shown then return end
-        self.shown = false
-        table.insert(state.events, 'dismiss')
-        if self.onDismiss then self:onDismiss() end
-    end
-
-    ---@class tests.SingletonTooltipOverlay
+    ---@class tests.TooltipPollingOverlay
     local OverlayWidget = widget_harness.defclass(nil, widgets.Panel)
     local overlay_state = {config={}, db={}}
     local overlay = {
@@ -115,12 +40,9 @@ local function load_environment(state)
             return value
         end,
     }
-
     local dfhack = {
-        isMapLoaded=function() return state.map_loaded end,
-        onStateChange={},
+        dwarfui=state.dwarfui or {},
         gui={
-            getCurViewscreen=function() return state.current_screen end,
             getDFViewscreen=function()
                 return {
                     focus=state.focus or 'dwarfmode',
@@ -131,98 +53,72 @@ local function load_environment(state)
                 return focus == viewscreen.focus
             end,
         },
-        pen={parse=function(value) return value end},
-        timeout=function(_, _, callback)
-            state.timeout_count = (state.timeout_count or 0) + 1
-            callback()
-        end,
         screen={
-            getMousePos=function() return state.mouse_x, state.mouse_y end,
-            getWindowSize=function() return state.width, state.height end,
+            getMousePos=function()
+                state.mouse_reads = (state.mouse_reads or 0) + 1
+                return state.mouse_x, state.mouse_y
+            end,
         },
+        timeout=function(_, _, callback)
+            table.insert(state.callbacks, callback)
+        end,
     }
-    local gui = {
-        ZScreen=ZScreen,
-        FRAME_INTERIOR='interior',
-        Painter={new=function() return painter(state) end},
-        paint_frame=function() end,
-    }
-    local _, extensions = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
-            globals={DEFAULT_NIL=default_nil},
-            require_modules={['gui.widgets']=widgets},
-        })
-    local _, text = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/text.lua')
+    state.dwarfui = dfhack.dwarfui
+
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
         })
-    local _, target_detector = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua', {
-            globals={dfhack=dfhack},
-            require_modules={['plugins.overlay']=overlay},
-            reqscript={['dwarfui/pointer']=pointer},
-        })
-    local _, input_service_module = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {
-            globals={dfhack=dfhack},
-        })
-    local input_service = input_service_module.service
-    local _, tooltip = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/tooltip.lua', {
-            globals={
-                COLOR_BLACK='black',
-                COLOR_WHITE='white',
-                DEFAULT_NIL=default_nil,
-                defclass=widget_harness.defclass,
-                dfhack=dfhack,
-            },
-            require_modules={gui=gui, ['gui.widgets']=widgets},
-            reqscript={
-                ['dwarfui/widget_extensions']=extensions,
-                ['dwarfui/pointer']=pointer,
-                ['dwarfui/text']=text,
-            },
-        })
-    local loader_options = {
-        globals={
-            SC_MAP_LOADED='map-loaded',
-            SC_MAP_UNLOADED='map-unloaded',
-            SC_WORLD_UNLOADED='world-unloaded',
-            defclass=widget_harness.defclass,
-            dfhack=dfhack,
-        },
-        require_modules={gui=gui, ['plugins.overlay']=overlay},
-        reqscript={
-            ['dwarfui/tooltip']=tooltip,
-            ['dwarfui/tooltip_service']=input_service_module,
-            ['dwarfui/tooltip_target_detector']=target_detector,
-        },
-    }
 
-    ---Loads a fresh module generation against the shared process state.
+    ---Loads one coherent poller, detector, service, and registration generation.
     ---@return table registration
-    local function load_registration()
+    local function load_generation()
+        local _, pointer_poller = module_loader.load(
+            repo_root, POINTER_POLLER_PATH, {globals={dfhack=dfhack}})
+        local _, target_detector = module_loader.load(
+            repo_root, TARGET_DETECTOR_PATH, {
+                globals={dfhack=dfhack},
+                require_modules={['plugins.overlay']=overlay},
+                reqscript={['dwarfui/pointer']=pointer},
+            })
+        local _, service = module_loader.load(repo_root, SERVICE_PATH, {
+            globals={dfhack=dfhack},
+        })
         local _, registration = module_loader.load(
-            repo_root, REGISTRATION_PATH, loader_options)
+            repo_root, REGISTRATION_PATH, {
+                globals={dfhack=dfhack},
+                require_modules={},
+                reqscript={
+                    ['dwarfui/pointer_poller']=pointer_poller,
+                    ['dwarfui/tooltip_target_detector']=target_detector,
+                    ['dwarfui/tooltip_service']=service,
+                },
+            })
         return registration
+    end
+
+    ---Executes the oldest queued timeout callback.
+    ---@return boolean executed
+    local function run_next()
+        local callback = table.remove(state.callbacks, 1)
+        if not callback then return false end
+        callback()
+        return true
     end
 
     return {
         dfhack=dfhack,
-        load_registration=load_registration,
+        load_generation=load_generation,
         overlay=overlay,
         OverlayWidget=OverlayWidget,
-        input_service=input_service,
-        tooltip=tooltip,
+        run_next=run_next,
         state=state,
         widgets=widgets,
     }
 end
 
 ---Lays out a root against the controlled screen rectangle.
----@param root table
+---@param root gui.View
 ---@param state table
 local function layout(root, state)
     root:updateLayout(widget_harness.rect(
@@ -232,437 +128,94 @@ end
 ---Creates a tooltip-bearing label.
 ---@param widgets table
 ---@param frame table
----@param text string
----@return table target
+---@param text string|nil
+---@return gui.View target
 local function target(widgets, frame, text)
     return widgets.Label{frame=frame, tooltip=text}
 end
 
-describe('singleton tooltip registration', function()
-    it('uses one screen renderer for every registered control', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local first = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'First tooltip')
-        local second = target(env.widgets,
-            {l=10, t=1, w=6, h=3}, 'Second tooltip')
-        local root = env.widgets.Panel{subviews={first, second}}
-        layout(root, env.state)
+describe('singleton tooltip registration polling', function()
+    it('drives one chain across zero-to-one-to-many-to-zero demand',
+            function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local first = target(env.widgets, {l=1, t=1, w=4, h=2}, 'First')
+        local second = target(env.widgets, {l=6, t=1, w=4, h=2}, 'Second')
+
+        local initial = registration.get_diagnostics()
+        assert.equals(0, initial.registration_count)
+        assert.is_false(initial.poller_running)
+        assert.is_false(initial.poller_scheduled)
+        assert.equals(0, #env.state.callbacks)
 
         assert.is_true(registration.register(first))
-        assert.is_true(registration.register(second))
         assert.is_false(registration.register(first))
-        local diagnostics = registration.get_diagnostics()
-        assert.equals(2, diagnostics.registration_count)
-        assert.equals(1, diagnostics.renderer_count)
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(registration.get_diagnostics().poller_running)
+        assert.is_true(registration.get_diagnostics().poller_scheduled)
 
-        diagnostics.screen:onRender()
-        assert.is.equal(first, registration.get_diagnostics().target)
-        assert.equals('First tooltip', diagnostics.screen.renderer.tooltip_text)
-        assert.same({'show', 'parent-render'}, env.state.events)
+        assert.is_true(registration.register(second))
+        assert.equals(2, registration.get_diagnostics().registration_count)
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(registration.unregister(first))
+        assert.is_true(registration.get_diagnostics().poller_running)
+        assert.is_false(registration.unregister(first))
 
-        env.state.mouse_x = 11
-        diagnostics.screen:onRender()
-        assert.is.equal(second, registration.get_diagnostics().target)
-        assert.equals('Second tooltip', diagnostics.screen.renderer.tooltip_text)
-        assert.equals(1, registration.get_diagnostics().renderer_count)
+        assert.is_true(registration.unregister(second))
+        local final = registration.get_diagnostics()
+        assert.equals(0, final.registration_count)
+        assert.is_false(final.poller_running)
+        assert.is_false(final.poller_scheduled)
+        assert.is_false(env.run_next() and
+            registration.get_diagnostics().poller_running)
+        assert.equals(0, #env.state.callbacks)
     end)
 
-    it('defers the legacy screen until map load and retires it on unload',
+    it('polls through detector and service without a presentation host',
             function()
-        local env = load_environment{
-            map_loaded=false,
-            mouse_x=2,
-            mouse_y=2,
-        }
-        local registration = env.load_registration()
+        local env = load_environment{mouse_x=3, mouse_y=2}
+        local registration = env.load_generation()
         local child = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'Map gated')
+            {l=1, t=1, w=6, h=3}, nil)
+        child.on_pointer_update = function(self, x, y)
+            self.tooltip = ('Dynamic %d,%d'):format(x, y)
+        end
         local root = env.widgets.Panel{subviews={child}}
         layout(root, env.state)
 
-        assert.is_true(registration.register(child))
+        registration.register(child)
+        assert.is_true(env.run_next())
+
+        local diagnostics = registration.get_diagnostics()
+        assert.is_equal(child, diagnostics.target)
+        assert.equals('Dynamic 2,1', diagnostics.intent.text)
+        assert.equals(3, diagnostics.intent.anchor_x)
+        assert.equals(2, diagnostics.intent.anchor_y)
+        assert.equals(1, diagnostics.sample_sequence)
+        assert.equals(1, diagnostics.last_sequence)
+        assert.equals(1, env.state.mouse_reads)
+    end)
+
+    it('keeps polling while every registered root is ineligible', function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local registration = env.load_generation()
+        local child = target(env.widgets,
+            {l=1, t=1, w=5, h=2}, 'Detached')
+
+        registration.register(child)
+        assert.is_true(env.run_next())
+
         local diagnostics = registration.get_diagnostics()
         assert.equals(1, diagnostics.registration_count)
-        assert.equals(0, diagnostics.renderer_count)
-        assert.is_nil(diagnostics.screen)
-
-        local state_change =
-            env.dfhack.onStateChange.dwarfui_tooltip_service
-        assert.is_function(state_change)
-        env.state.map_loaded = true
-        state_change('map-loaded')
-
-        local first_screen = registration.get_diagnostics().screen
-        assert.is_true(first_screen:isActive())
-        first_screen:onRender()
-        assert.is_equal(child, registration.get_diagnostics().target)
-
-        env.state.map_loaded = false
-        state_change('map-unloaded')
-        diagnostics = registration.get_diagnostics()
-        assert.equals(1, diagnostics.registration_count)
-        assert.equals(0, diagnostics.renderer_count)
-        assert.is_nil(diagnostics.screen)
         assert.is_nil(diagnostics.target)
-        assert.is_false(first_screen:isActive())
-        assert.equals(0, env.state.timeout_count or 0)
-
-        state_change('world-unloaded')
-        assert.is_nil(registration.get_diagnostics().screen)
-
-        env.state.map_loaded = true
-        state_change('map-loaded')
-        local replacement = registration.get_diagnostics().screen
-        assert.is_not.equal(first_screen, replacement)
-        assert.is_true(replacement:isActive())
+        assert.is_true(diagnostics.poller_running)
+        assert.is_true(diagnostics.poller_scheduled)
+        assert.equals(1, #env.state.callbacks)
     end)
 
-    it('replaces the temporary state callback without creating off-map screens',
-            function()
-        local env = load_environment{map_loaded=false}
-        local first = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=4, h=2}, 'Reload gated')
-        first.register(child)
-        local first_callback =
-            env.dfhack.onStateChange.dwarfui_tooltip_service
-
-        local second = env.load_registration()
-        local second_callback =
-            env.dfhack.onStateChange.dwarfui_tooltip_service
-        assert.is_not.equal(first_callback, second_callback)
-        assert.equals(1, second.get_diagnostics().registration_count)
-        assert.is_nil(second.get_diagnostics().screen)
-
-        env.state.map_loaded = true
-        second_callback('map-loaded')
-        assert.is_true(second.get_diagnostics().screen:isActive())
-    end)
-
-    it('uses native traversal within a root and registration order across roots', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local behind = target(env.widgets,
-            {l=1, t=1, w=8, h=4}, 'Behind')
-        local front = target(env.widgets,
-            {l=1, t=1, w=8, h=4}, 'Front')
-        local other = target(env.widgets,
-            {l=1, t=1, w=8, h=4}, 'Other root')
-        local first_root = env.widgets.Panel{subviews={behind, front}}
-        local second_root = env.widgets.Panel{subviews={other}}
-        layout(first_root, env.state)
-        layout(second_root, env.state)
-
-        registration.register(front)
-        registration.register(behind)
-        local screen = registration.get_diagnostics().screen
-        screen:onRender()
-        assert.is.equal(front, registration.get_diagnostics().target)
-
-        registration.register(other)
-        screen:onRender()
-        assert.is.equal(other, registration.get_diagnostics().target)
-        assert.equals('Other root', screen.renderer.tooltip_text)
-    end)
-
-    it('excludes registered controls below the current native screen', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local current = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'Current screen')
-        local covered = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'Covered screen')
-        local current_root = env.widgets.Panel{subviews={current}}
-        local covered_root = env.widgets.Panel{subviews={covered}}
-        layout(current_root, env.state)
-        layout(covered_root, env.state)
-        env.state.native_root = current_root
-        registration.register(current)
-        registration.register(covered)
-        local screen = registration.get_diagnostics().screen
-
-        screen:onRender()
-
-        assert.is.equal(current, registration.get_diagnostics().target)
-        assert.equals('Current screen', screen.renderer.tooltip_text)
-    end)
-
-    it('honors modal blocking in the registered control root', function()
-        local env = load_environment{mouse_x=3, mouse_y=3}
-        local registration = env.load_registration()
-        local behind = target(env.widgets,
-            {l=0, t=0, w=20, h=10}, 'Behind modal')
-        local modal = env.widgets.Window{
-            frame={l=2, t=2, w=8, h=5},
-            frame_inset=1,
-        }
-        local root = env.widgets.Panel{subviews={behind, modal}}
-        layout(root, env.state)
-        registration.register(behind)
-        local screen = registration.get_diagnostics().screen
-
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.is_false(screen.renderer.visible)
-
-        env.state.mouse_x, env.state.mouse_y = 15, 8
-        screen:onRender()
-        assert.is.equal(behind, registration.get_diagnostics().target)
-    end)
-
-    it('follows attachment and reparenting without changing registration', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'Reparented')
-        assert.is_true(registration.register(child))
-        local screen = registration.get_diagnostics().screen
-
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-
-        local first_root = env.widgets.Panel{subviews={child}}
-        layout(first_root, env.state)
-        screen:onRender()
-        assert.is.equal(child, registration.get_diagnostics().target)
-
-        first_root.subviews = {}
-        local second_root = env.widgets.Panel{}
-        second_root:addviews{child}
-        layout(second_root, env.state)
-        screen:onRender()
-        assert.is.equal(child, registration.get_diagnostics().target)
-
-        second_root.subviews = {}
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.is_false(screen.renderer.visible)
-    end)
-
-    it('skips hidden ancestors and clears dynamic pointer ownership', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local leave_count = 0
-        local child = target(env.widgets,
-            {l=1, t=1, w=6, h=3}, 'Visible')
-        child.on_pointer_leave = function()
-            leave_count = leave_count + 1
-        end
-        local parent = env.widgets.Panel{subviews={child}}
-        local root = env.widgets.Panel{subviews={parent}}
-        layout(root, env.state)
-        registration.register(child)
-        local screen = registration.get_diagnostics().screen
-        screen:onRender()
-        assert.is.equal(child, registration.get_diagnostics().target)
-
-        parent.visible = false
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-        assert.equals(1, leave_count)
-        assert.is_false(screen.renderer.visible)
-    end)
-
-    it('escapes an independently clipped root through screen layout', function()
-        local env = load_environment{
-            mouse_x=12,
-            mouse_y=6,
-            width=50,
-            height=20,
-        }
-        local registration = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=4, h=1},
-            'A long singleton tooltip that extends beyond the overlay panel.')
-        local clipped_root = env.widgets.Panel{
-            frame={l=10, t=5, w=7, h=4},
-            subviews={child},
-        }
-        layout(clipped_root, env.state)
-        registration.register(child)
-        local screen = registration.get_diagnostics().screen
-
-        screen:onRender()
-
-        assert.is_true(screen.renderer.visible)
-        assert.is.equal(screen.frame_parent_rect,
-            screen.renderer.frame_parent_rect)
-        assert.is_true(screen.renderer.frame.l +
-            screen.renderer.frame.w - 1 > clipped_root.frame_body.clip_x2)
-    end)
-
-    it('excludes disabled and replaced overlay roots', function()
-        local env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=5, h=2}, 'Overlay')
-        local root = env.OverlayWidget{
-            name='test-overlay',
-            viewscreens='dwarfmode',
-            subviews={child},
-        }
-        layout(root, env.state)
-        local overlay_state = env.overlay.get_state()
-        overlay_state.config[root.name] = {enabled=true}
-        overlay_state.db[root.name] = {widget=root}
-        registration.register(child)
-        local screen = registration.get_diagnostics().screen
-
-        screen:onRender()
-        assert.is.equal(child, registration.get_diagnostics().target)
-
-        overlay_state.config[root.name].enabled = false
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-
-        overlay_state.config[root.name].enabled = true
-        overlay_state.db[root.name] = {widget=env.OverlayWidget{name=root.name}}
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-
-        overlay_state.db[root.name] = {widget=root}
-        env.state.focus = 'title'
-        screen:onRender()
-        assert.is_nil(registration.get_diagnostics().target)
-    end)
-
-    it('stays topmost and defocused while forwarding input and parent logic',
-            function()
+    it('stops after collection of the final weak registration', function()
         local env = load_environment()
-        local registration = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=4, h=2}, 'Input')
-        registration.register(child)
-        local screen = registration.get_diagnostics().screen
-        local keys = {LEAVESCREEN=true, _MOUSE_L=true, CUSTOM=true}
-
-        assert.is_true(screen:isActive())
-        assert.is.equal(screen._native, env.state.current_screen)
-        assert.is_true(screen.defocused)
-        assert.is_false(screen:hasFocus())
-
-        env.state.screen_opened_by_input = {input_child=true}
-        assert.is_true(screen:onInput(keys))
-        assert.is.equal(keys, env.state.forwarded_keys)
-        assert.is_false(screen:isMouseOver())
-        assert.equals(1, env.state.raise_count)
-        assert.is.equal(screen._native, env.state.current_screen)
-        assert.is_true(screen.defocused)
-        assert.is_false(screen:hasFocus())
-
-        env.state.current_screen = {newer=true}
-        screen:onIdle()
-        assert.equals(1, env.state.parent_idle_count)
-        assert.equals(2, env.state.raise_count)
-        assert.is.equal(screen._native, env.state.current_screen)
-        assert.is_true(screen.defocused)
-        assert.is_false(screen:hasFocus())
-
-        screen:onIdle()
-        assert.equals(2, env.state.parent_idle_count)
-        assert.equals(2, env.state.raise_count)
-    end)
-
-    it('replaces the singleton screen on reload and rejects version conflicts', function()
-        local env = load_environment()
-        local first_module = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=4, h=2}, 'Reload')
-        first_module.register(child)
-        local first_screen = first_module.get_diagnostics().screen
-
-        local second_module = env.load_registration()
-        local second_diagnostics = second_module.get_diagnostics()
-        assert.equals(1, second_diagnostics.registration_count)
-        assert.equals(1, second_diagnostics.renderer_count)
-        assert.is_not.equal(first_screen, second_diagnostics.screen)
-        assert.is_false(first_screen:isActive())
-        assert.equals(1, second_module.API_VERSION)
-
-        env.dfhack.dwarfui.tooltip_legacy_host.api_version = 999
-        assert.has_error(function() env.load_registration() end,
-            'Conflicting DwarfUI tooltip legacy-host versions: ' ..
-            'process has 999, requested 1.')
-    end)
-
-    it('recreates an externally dismissed service while registrations remain', function()
-        local env = load_environment()
-        local registration = env.load_registration()
-        local child = target(env.widgets,
-            {l=1, t=1, w=4, h=2}, 'Persistent')
-        registration.register(child)
-        local first_screen = registration.get_diagnostics().screen
-
-        first_screen:dismiss()
-
-        local replacement = registration.get_diagnostics().screen
-        assert.is_not.equal(first_screen, replacement)
-        assert.is_true(replacement:isActive())
-        assert.equals(1, env.state.timeout_count)
-        assert.equals(1, registration.get_diagnostics().renderer_count)
-    end)
-
-    it('matches explicit-agent dynamic targeting and removal behavior', function()
-        local explicit_env = load_environment{mouse_x=2, mouse_y=2}
-        local explicit_target = target(explicit_env.widgets,
-            {l=1, t=1, w=6, h=3}, nil)
-        ---Updates explicit tooltip text from pointer-local coordinates.
-        explicit_target.on_pointer_update = function(self, x, y)
-            self.tooltip = ('Dynamic %d,%d'):format(x, y)
-        end
-        local explicit_root = explicit_env.widgets.Panel{
-            subviews={explicit_target},
-        }
-        layout(explicit_root, explicit_env.state)
-        local explicit_renderer = explicit_env.tooltip.TooltipRenderer{}
-        local explicit_agent = explicit_env.tooltip.TooltipAgent.new(
-            explicit_root, explicit_renderer)
-        explicit_agent:update()
-        local expected_text = explicit_renderer.tooltip_text
-        explicit_root.subviews = {}
-        explicit_agent:update()
-        assert.is_false(explicit_renderer.visible)
-
-        local automatic_env = load_environment{mouse_x=2, mouse_y=2}
-        local registration = automatic_env.load_registration()
-        local automatic_target = target(automatic_env.widgets,
-            {l=1, t=1, w=6, h=3}, nil)
-        ---Updates automatic tooltip text from pointer-local coordinates.
-        automatic_target.on_pointer_update = function(self, x, y)
-            self.tooltip = ('Dynamic %d,%d'):format(x, y)
-        end
-        local automatic_root = automatic_env.widgets.Panel{
-            subviews={automatic_target},
-        }
-        layout(automatic_root, automatic_env.state)
-        registration.register(automatic_target)
-        local screen = registration.get_diagnostics().screen
-        screen:onRender()
-        assert.equals(expected_text, screen.renderer.tooltip_text)
-        automatic_root.subviews = {}
-        screen:onRender()
-        assert.is_false(screen.renderer.visible)
-    end)
-
-    it('dismisses after explicit removal and weakly releases dead controls', function()
-        local env = load_environment()
-        local registration = env.load_registration()
-        local first = target(env.widgets,
-            {l=1, t=1, w=4, h=2}, 'First')
-        local second = target(env.widgets,
-            {l=6, t=1, w=4, h=2}, 'Second')
-        registration.register(first)
-        registration.register(second)
-        local screen = registration.get_diagnostics().screen
-
-        assert.is_true(registration.unregister(first))
-        assert.is_false(registration.unregister(first))
-        assert.is_true(screen:isActive())
-        assert.is_true(registration.unregister(second))
-        assert.is_false(screen:isActive())
-        assert.equals(0, registration.get_diagnostics().renderer_count)
-
+        local registration = env.load_generation()
         local weak_widget = setmetatable({}, {__mode='v'})
         do
             local transient = target(env.widgets,
@@ -670,13 +223,76 @@ describe('singleton tooltip registration', function()
             weak_widget[1] = transient
             registration.register(transient)
         end
+
         collectgarbage('collect')
         collectgarbage('collect')
         assert.is_nil(weak_widget[1])
         assert.equals(0, registration.get_diagnostics().registration_count)
-        local transient_screen = registration.get_diagnostics().screen
-        transient_screen:onRender()
-        assert.is_false(transient_screen:isActive())
-        assert.equals(0, registration.get_diagnostics().renderer_count)
+        assert.is_true(env.run_next())
+
+        local diagnostics = registration.get_diagnostics()
+        assert.is_false(diagnostics.poller_running)
+        assert.is_false(diagnostics.poller_scheduled)
+        assert.equals(0, diagnostics.sample_sequence)
+        assert.equals(0, #env.state.callbacks)
     end)
+
+    it('leaves no resuming chain after a no-registration reload', function()
+        local env = load_environment()
+        local first = env.load_generation()
+        local child = target(env.widgets,
+            {l=1, t=1, w=4, h=2}, 'Removed')
+        first.register(child)
+        first.unregister(child)
+        assert.equals(1, #env.state.callbacks)
+
+        local second = env.load_generation()
+        local diagnostics = second.get_diagnostics()
+        assert.equals(0, diagnostics.registration_count)
+        assert.is_false(diagnostics.poller_running)
+        assert.is_false(diagnostics.poller_scheduled)
+
+        assert.is_true(env.run_next())
+        assert.equals(0, #env.state.callbacks)
+        assert.equals(0, env.state.mouse_reads or 0)
+    end)
+
+    it('retires old callbacks and starts one new chain on repeated reload',
+            function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local first = env.load_generation()
+        local child = target(env.widgets,
+            {l=1, t=1, w=4, h=2}, 'Reloaded')
+        local root = env.widgets.Panel{subviews={child}}
+        layout(root, env.state)
+        first.register(child)
+        local first_generation =
+            first.get_diagnostics().poller_module_generation
+
+        local second = env.load_generation()
+        local second_generation =
+            second.get_diagnostics().poller_module_generation
+        assert.equals(first_generation + 1, second_generation)
+        assert.equals(2, #env.state.callbacks)
+
+        assert.is_true(env.run_next())
+        assert.equals(0, env.state.mouse_reads or 0)
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(env.run_next())
+        assert.equals(1, env.state.mouse_reads)
+        assert.equals(1, #env.state.callbacks)
+
+        local third = env.load_generation()
+        assert.equals(second_generation + 1,
+            third.get_diagnostics().poller_module_generation)
+        assert.equals(2, #env.state.callbacks)
+        assert.is_true(env.run_next())
+        assert.equals(1, env.state.mouse_reads)
+        assert.is_true(env.run_next())
+        assert.equals(2, env.state.mouse_reads)
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(third.get_diagnostics().poller_current)
+        assert.is_true(third.get_diagnostics().poller_running)
+    end)
+
 end)

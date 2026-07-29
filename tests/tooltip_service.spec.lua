@@ -401,40 +401,6 @@ describe('DwarfUI tooltip service', function()
         assert.equals(2, notifications)
     end)
 
-    it('migrates the pre-mediation service shape without retaining its target',
-            function()
-        local events = {}
-        local widget = target(events, 'Legacy')
-        local registrations = setmetatable({
-            [widget]={sequence=7},
-        }, {__mode='k'})
-        local legacy_screen = {}
-        local process = {
-            dwarfui={
-                tooltip_service={
-                    api_version=1,
-                    registrations=registrations,
-                    sequence=7,
-                    legacy_sample_sequence=12,
-                    screen=legacy_screen,
-                    target=widget,
-                },
-            },
-        }
-
-        local service = load_service(process).service
-
-        assert.same({'leave'}, events)
-        assert.is_equal(registrations, service:get_registrations())
-        assert.is_equal(legacy_screen,
-            process.dwarfui.tooltip_legacy_host.screen)
-        assert.is_nil(service:get_diagnostics().target)
-        local next_widget = target({}, 'Next')
-        service:register(next_widget)
-        assert.equals(8,
-            service:get_registrations()[next_widget].sequence)
-    end)
-
     it('exposes only presentation-neutral diagnostics and intent fields',
             function()
         local harness = load_service()
@@ -456,9 +422,17 @@ describe('DwarfUI tooltip service', function()
             source_sequence=true,
             text=true,
         }, intent_fields)
-        assert.is_nil(diagnostics.screen)
-        assert.is_nil(diagnostics.renderer)
-        assert.is_nil(diagnostics.overlay)
+        local diagnostic_fields = {}
+        for key in pairs(diagnostics) do diagnostic_fields[key] = true end
+        assert.same({
+            api_version=true,
+            generation=true,
+            intent=true,
+            last_sequence=true,
+            registration_count=true,
+            revision=true,
+            target=true,
+        }, diagnostic_fields)
     end)
 
     it('rejects incompatible process-wide service versions', function()

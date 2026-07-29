@@ -40,6 +40,7 @@ if not process_state then
         last_failure=nil,
         overlay_module_replacement_count=0,
         overlay_method_replacement_count=0,
+        reorderable_wrappers=setmetatable({}, {__mode='k'}),
         selected_transport=nil,
         selected_owner=nil,
     }
@@ -50,6 +51,9 @@ process_state.overlay_module_replacement_count =
     process_state.overlay_module_replacement_count or 0
 process_state.overlay_method_replacement_count =
     process_state.overlay_method_replacement_count or 0
+process_state.reorderable_wrappers =
+    process_state.reorderable_wrappers or
+        setmetatable({}, {__mode='k'})
 
 ---@class dwarfui.TooltipRenderHookRecord
 ---@field transport dwarfui.TooltipRenderTransport
@@ -85,6 +89,7 @@ process_state.overlay_method_replacement_count =
 ---@field last_failure table|nil
 ---@field overlay_module_replacement_count integer
 ---@field overlay_method_replacement_count integer
+---@field reorderable_wrappers table<function, boolean>
 ---@field selected_transport dwarfui.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 
@@ -125,6 +130,54 @@ end
 ---@return ...
 local function unpack_returns(packed)
     return table.unpack(packed, 1, packed.n)
+end
+
+---Returns whether an upvalue graph retains the requested predecessor.
+---The bounded traversal skips `_ENV` but follows functions and plain table
+---records, which covers direct predecessor captures and wrapper records.
+---@param value any
+---@param predecessor function
+---@param visited table<any, boolean>
+---@param budget {remaining: integer}
+---@return boolean
+local function value_wraps(value, predecessor, visited, budget)
+    if value == predecessor then return true end
+    local value_type = type(value)
+    if value_type ~= 'function' and value_type ~= 'table' then
+        return false
+    end
+    if visited[value] or budget.remaining <= 0 then return false end
+    visited[value] = true
+    budget.remaining = budget.remaining - 1
+    if value_type == 'function' then
+        local index = 1
+        while true do
+            local name, upvalue = debug.getupvalue(value, index)
+            if name == nil then return false end
+            if name ~= '_ENV' and
+                    value_wraps(
+                        upvalue, predecessor, visited, budget) then
+                return true
+            end
+            index = index + 1
+        end
+    end
+    for key, field in next, value do
+        if value_wraps(key, predecessor, visited, budget) or
+                value_wraps(field, predecessor, visited, budget) then
+            return true
+        end
+    end
+    return false
+end
+
+---Returns whether a wrapper closure retains the requested predecessor.
+---@param wrapper function
+---@param predecessor function
+---@return boolean
+local function function_wraps(wrapper, predecessor)
+    return value_wraps(
+        wrapper, predecessor, {}, {remaining=256})
 end
 
 ---Invokes the current presenter only for the selected active trampoline.
@@ -240,6 +293,20 @@ function TooltipRenderHookManager:set_current_intent_revision(revision)
     self._state.current_intent_revision = revision
 end
 
+---Allows one outer wrapper to be placed beneath a later DwarfUI trampoline.
+---Wrapper owners must opt in because reordering changes the function identity
+---in the exported slot and can invalidate exact-identity cleanup contracts.
+---@param wrapper function
+---@return boolean changed
+function TooltipRenderHookManager:mark_wrapper_reorderable(wrapper)
+    assert(type(wrapper) == 'function',
+        'DwarfUI reorderable render wrapper must be a function.')
+    local wrappers = self._state.reorderable_wrappers
+    if wrappers[wrapper] then return false end
+    wrappers[wrapper] = true
+    return true
+end
+
 ---Selects and idempotently repairs the exported native-overlay render seam.
 ---@return boolean changed
 function TooltipRenderHookManager:ensure_overlay()
@@ -254,6 +321,15 @@ function TooltipRenderHookManager:ensure_overlay()
     local previous = state.overlay_hook
     if state.overlay_module == overlay and previous and
             current == previous.active_trampoline then
+        previous.generation = state.generation
+        return false
+    end
+    if state.overlay_module == overlay and previous and
+            function_wraps(current, previous.active_trampoline) and
+            not state.reorderable_wrappers[current] then
+        -- The other extension still owns the exported slot and DwarfUI is
+        -- already in its predecessor chain. Replacing that wrapper would
+        -- invalidate exact-identity cleanup contracts.
         previous.generation = state.generation
         return false
     end
@@ -308,6 +384,14 @@ function TooltipRenderHookManager:ensure_screen(owner)
     state.selected_owner = owner
     local previous = state.screen_hooks[owner]
     if previous and current == previous.active_trampoline then
+        previous.generation = state.generation
+        return false
+    end
+    if previous and function_wraps(
+            current, previous.active_trampoline) and
+            not state.reorderable_wrappers[current] then
+        -- Preserve another owner's raw instance method while the active
+        -- DwarfUI trampoline remains reachable through its wrapper.
         previous.generation = state.generation
         return false
     end
@@ -406,29 +490,41 @@ function TooltipRenderHookManager:get_diagnostics()
     local overlay_outermost = overlay_module_current and
         current_overlay[OVERLAY_RENDER_METHOD] ==
             overlay_record.active_trampoline
+    local overlay_in_chain = overlay_module_current and
+        type(current_overlay[OVERLAY_RENDER_METHOD]) == 'function' and
+        function_wraps(current_overlay[OVERLAY_RENDER_METHOD],
+            overlay_record.active_trampoline)
     local overlay_module_replacement_pending =
         overlay_record ~= nil and current_overlay ~= nil and
             not overlay_module_current
     local overlay_method_replacement_pending =
-        overlay_module_current and not overlay_outermost
+        overlay_module_current and
+            (not overlay_in_chain or
+                (not overlay_outermost and
+                    state.reorderable_wrappers[
+                        current_overlay[OVERLAY_RENDER_METHOD]] == true))
     local screen_count = 0
     local screens = {}
     local selected_screen
     for owner, record in pairs(state.screen_hooks) do
         screen_count = screen_count + 1
-        local outermost = rawget(owner, SCREEN_RENDER_METHOD) ==
+        local current_method = rawget(owner, SCREEN_RENDER_METHOD)
+        local outermost = current_method ==
             record.active_trampoline
-        local method_replacement_pending = not outermost
+        local in_chain = type(current_method) == 'function' and
+            function_wraps(current_method, record.active_trampoline)
+        local method_replacement_pending = not in_chain or
+            (not outermost and
+                state.reorderable_wrappers[current_method] == true)
         local screen = {
             owner=owner,
             tracked=true,
-            installed=outermost,
+            installed=in_chain,
             outermost=outermost,
             generation=record.generation,
             repair_count=record.repair_count,
-            chained=outermost and record.predecessor ~= nil,
-            replaced_method=record.method_replaced or
-                method_replacement_pending,
+            chained=in_chain and record.predecessor ~= nil,
+            replaced_method=record.method_replaced or not outermost,
             method_replacement_pending=method_replacement_pending,
             method_replacement_count=
                 record.method_replacement_count or 0,
@@ -469,12 +565,12 @@ function TooltipRenderHookManager:get_diagnostics()
         overlay={
             owner=overlay_record and overlay_record.owner or nil,
             tracked=overlay_record ~= nil,
-            installed=overlay_outermost,
+            installed=overlay_in_chain,
             outermost=overlay_outermost,
             generation=overlay_record and overlay_record.generation or nil,
             repair_count=overlay_record and
                 overlay_record.repair_count or 0,
-            chained=overlay_outermost and
+            chained=overlay_in_chain and
                 overlay_record.predecessor ~= nil,
             replaced_module=overlay_record and
                 (overlay_record.module_replaced or
@@ -485,7 +581,7 @@ function TooltipRenderHookManager:get_diagnostics()
                 state.overlay_module_replacement_count,
             replaced_method=overlay_record and
                 (overlay_record.method_replaced or
-                    overlay_method_replacement_pending) or false,
+                    not overlay_outermost) or false,
             method_replacement_pending=
                 overlay_method_replacement_pending,
             method_replacement_count=

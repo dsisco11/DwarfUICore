@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 4 complete. This document is the execution contract for
+Phases 0 through 6 complete. This document is the execution contract for
 rendering the current process-wide tooltip intent after its owning native
 overlay or Lua screen has completed rendering.
 
@@ -180,10 +180,10 @@ skip unless:
 These checks prevent the native overlay hook or a lower parent screen from
 painting an early tooltip that a foreground screen could subsequently cover.
 
-### Outermost repair
+### Chain ownership and repair
 
 When the renderer receives a new or cleared intent, reloads, or explicitly
-checks its installation, it repairs the selected transport:
+checks its installation, it verifies the selected transport:
 
 - For the overlay transport, compare the exported
   `plugins.overlay.render_viewscreen_widgets` function with the active overlay
@@ -191,20 +191,26 @@ checks its installation, it repairs the selected transport:
 - For the screen transport, compare `source_root.onRender` with that owner's
   active screen trampoline.
 - If the corresponding function is already active, no change is required.
+- If the current function is an ordinary wrapper whose function-upvalue chain
+  retains the active DwarfUI trampoline, DwarfUI remains installed but is not
+  outermost. Preserve the wrapper's ownership and exact restoration contract.
+- A wrapper owner can explicitly mark its function reorderable through the
+  hook manager. DwarfUI may repair above only that opted-in wrapper, allowing
+  tooltip painting after the wrapper's post-render work.
 - If the overlay module was replaced, install against the replacement module.
-- If another wrapper or screen method is currently installed, wrap that
-  function and designate the new trampoline as active for its owner.
+- If the current function no longer chains the active DwarfUI trampoline, wrap
+  that true replacement and designate the new trampoline as active.
 
 Older DwarfUI trampolines remain in the predecessor chain but observe that
-they are no longer active and skip presentation. This allows DwarfUI to regain
-the outermost position without drawing the tooltip more than once. Screen
-trampolines belonging to a previous source root remain inert unless that exact
-screen becomes the current intent owner again.
+they are no longer active and skip presentation. This allows true replacement
+repair without drawing the tooltip more than once. Screen trampolines
+belonging to a previous source root remain inert unless that exact screen
+becomes the current intent owner again.
 
-The system must not continuously fight another extension for outermost
-position on every render. Repair occurs only at explicit lifecycle boundaries
-and intent notifications. Diagnostics report whether the active trampoline is
-currently installed for each transport owner.
+The system does not fight an unmarked extension for the exported slot.
+Verification and permitted repair occur only at explicit lifecycle boundaries
+and intent notifications. Diagnostics distinguish installed-in-chain from
+outermost ownership and from a replacement that requires or permits repair.
 
 ### Presenter
 
@@ -261,13 +267,16 @@ The implementation guarantees:
 - older DwarfUI trampolines do not paint;
 - one selected active trampoline paints at most once per completed owner
   render;
-- an intent notification repairs DwarfUI to the outermost wrapper for the
-  selected owner at that moment.
+- an intent notification preserves a proven outer owner unless it explicitly
+  permits reordering, and repairs a true replacement that no longer chains
+  DwarfUI.
 
 The implementation cannot guarantee:
 
-- ordering against another extension that replaces the exported function
-  afterward and does not cooperate with wrapper chaining;
+- ordering after work performed by another extension's outer wrapper, even
+  when that wrapper cooperatively calls DwarfUI in its predecessor chain;
+- recognizing a wrapper that hides its predecessor outside the bounded
+  function-and-table Lua upvalue graph available through `debug.getupvalue`;
 - rendering on native viewscreen classes that the DFHack overlay plugin does
   not interpose;
 - rendering above a Lua screen that does not own the tooltip target and is not
@@ -417,8 +426,9 @@ than hidden behind screen-type exception lists.
 - [x] Detect screen method replacement by owner identity and current
       `onRender` function identity.
 - [x] Record raw instance-method ownership before the first screen wrap.
-- [x] Implement outermost repair that chains the current exported function
-      or instance method instead of replacing or bypassing it.
+- [x] Preserve a current wrapper that already chains DwarfUI unless its owner
+      explicitly permits reordering, and repair by chaining rather than
+      replacing or bypassing the current function.
 - [x] Keep screen-hook records weakly keyed by their owner instances.
 - [x] Implement safe shutdown and conditional predecessor restoration for both
       transport types.
@@ -506,11 +516,15 @@ than hidden behind screen-type exception lists.
 
 - [x] Cover an unrelated wrapper installed before DwarfUI and prove it runs
       before the tooltip.
-- [x] Cover an unrelated wrapper installed after DwarfUI, repair around it,
-      and prove the former active trampoline becomes presentation-inert.
+- [x] Cover an unrelated wrapper installed after DwarfUI, preserve its exact
+      ownership and restoration contract, and prove DwarfUI remains installed
+      once in its predecessor chain.
+- [x] Cover an explicitly reorderable wrapper installed after DwarfUI and prove
+      the tooltip repairs above its post-render work.
 - [x] Repeat both wrapper-order cases for an instance-level screen
       `onRender()` method.
-- [x] Prove repeated repair does not render the tooltip twice.
+- [x] Prove repeated chain verification and true-replacement repair do not
+      render the tooltip twice.
 - [x] Prove same-version `dwarfui reload` replaces stale renderer and presenter
       objects while preserving one active hook generation.
 - [x] Prove `plugins.overlay.rescan()` neither removes nor duplicates the
@@ -683,36 +697,54 @@ than hidden behind screen-type exception lists.
 
 ## Phase 6: Verification and documentation
 
-- [ ] Run focused unit tests for tooltip rendering, render-hook management,
+- [x] Run focused unit tests for tooltip rendering, render-hook management,
       intent mediation, registration, polling, module registry, reload, and
       package contracts.
-- [ ] Run the complete standalone unit suite.
-- [ ] Run Lua syntax validation for production, test, and support sources.
-- [ ] Run unit-test naming validation.
-- [ ] Run package verification and inspect the packaged manifest for every new
+- [x] Run the complete standalone unit suite.
+- [x] Run Lua syntax validation for production, test, and support sources.
+- [x] Run unit-test naming validation.
+- [x] Run package verification and inspect the packaged manifest for every new
       production module.
-- [ ] Run the focused native Hauling tooltip test through the unchanged thin
+- [x] Run the focused native Hauling tooltip test through the unchanged thin
       `Tools/Run-AutomationTests.ps1` pass-through.
-- [ ] Run the existing native minecart interaction tests to detect overlay or
+- [x] Run the existing native minecart interaction tests to detect overlay or
       input regressions.
-- [ ] Run the focused native and Lua-screen tooltip proofs twice to detect
+- [x] Run the focused native and Lua-screen tooltip proofs twice to detect
       retained wrappers, stale presenter generations, or duplicate painting.
-- [ ] Document native-overlay and on-demand Lua-screen transport selection in
+- [x] Document native-overlay and on-demand Lua-screen transport selection in
       the public tooltip API.
-- [ ] Document the remaining lack of an engine-level post-compositor hook and
+- [x] Document the remaining lack of an engine-level post-compositor hook and
       the requirement that a supported Lua root expose a callable
       `onRender()` method.
-- [ ] Record focused, full-suite, syntax, naming, package, live, repeat-run,
+- [x] Record focused, full-suite, syntax, naming, package, live, repeat-run,
       failure-containment, and cleanup evidence separately.
 
 ### Phase 6 completion gate
 
-- [ ] All focused and complete verification categories pass.
-- [ ] Package contents and module order include the hook and presenter.
-- [ ] Live evidence proves final native-overlay and foreground Lua-screen
+- [x] All focused and complete verification categories pass.
+- [x] Package contents and module order include the hook and presenter.
+- [x] Live evidence proves final native-overlay and foreground Lua-screen
       ordering with system non-interference.
-- [ ] No claim exceeds registered native-overlay roots and wrapped Lua screen
+- [x] No claim exceeds registered native-overlay roots and wrapped Lua screen
       owners.
+
+### Phase 6 execution evidence
+
+| Category | Command or evidence | Result |
+| --- | --- | --- |
+| Focused unit | `Tools/Run-UnitTests.ps1 tests/tooltip.spec.lua tests/tooltip_render_hook.spec.lua tests/tooltip_presenter.spec.lua tests/tooltip_service.spec.lua tests/tooltip_registration.spec.lua tests/tooltip_target_detector.spec.lua tests/pointer_poller.spec.lua tests/module_registry.spec.lua tests/dwarfui_command.spec.lua tests/package_contract.spec.lua` | 108 successes, 0 failures, 0 errors, 0 pending. |
+| Complete unit | `Tools/Run-UnitTests.ps1` | 242 successes, 0 failures, 0 errors, 0 pending. |
+| Syntax | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 passed for 20 production and 40 test/support files. |
+| Naming | `Tools/Check-UnitTestNaming.ps1` | Passed with no diagnostics. |
+| Patch hygiene | `git diff --check` | Passed; only Git line-ending conversion warnings were emitted. |
+| Package | Isolated `Tools/Publish.ps1` output under a unique temporary directory | Expanded and zip verification passed. Six tooltip production modules were present; packaged registry indices placed `dwarfui/tooltip_render_hook` at 1127 before `dwarfui/tooltip` at 1652. Temporary output was removed. |
+| Native focused | `Tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_tooltip.ds.lua --timeout 120` | 2 successes, 0 failures, 0 errors, `cleanup_confirmed=true`. |
+| Native regression | `Tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua --timeout 120` | 1 success, 0 failures, 0 errors, `cleanup_confirmed=true`; the unchanged test restored DwarfSpec's render observer without test-side hook shutdown. |
+| Native repeat | Native final-render example selected from `minecart_route_tooltip.ds.lua` with `--repeat 2` | Passed both repeats with final paint above viewscreen, `all`, and explicitly reorderable post-render wrappers; `cleanup_confirmed=true`. |
+| Lua-screen repeat | `Tools/Run-AutomationTests.ps1 tests/tooltip/tooltip_screen_final_render.ds.lua --repeat 2 --timeout 120` | Passed both repeats with final class-override ordering, top-screen transfer, dismissal, and `cleanup_confirmed=true`. |
+| Interaction repeat | Native polling example selected from `minecart_route_tooltip.ds.lua` with `--repeat 2` | Passed both repeats with consumed-input independence, reload recovery, automatic recreated-control registration, and `cleanup_confirmed=true`. |
+| Failure containment | Focused `tooltip_render_hook.spec.lua` presenter-failure and predecessor-failure cases | Presenter failure disabled and logged one generation without stopping either predecessor; predecessor failures propagated without being reclassified. |
+| Public boundary | `README.md` tooltip API | Documents exact native-overlay and foreground Lua-screen selection, callable `onRender()`, wrapper ownership and opt-in reordering, and the absence of a universal engine post-compositor guarantee. |
 
 ## Planned file impact
 

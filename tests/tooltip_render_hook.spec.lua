@@ -137,7 +137,7 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.equals(1, calls)
     end)
 
-    it('repairs around external overlay wrappers and module replacement',
+    it('preserves owning overlay wrappers and repairs true replacement',
             function()
         local events = {}
         local original = function() table.insert(events, 'original') end
@@ -150,13 +150,50 @@ describe('DwarfUI tooltip render-hook manager', function()
         module.manager:ensure_overlay()
 
         local dwarfui_inner = first_overlay.render_viewscreen_widgets
-        first_overlay.render_viewscreen_widgets = function(...)
-            table.insert(events, 'foreign')
-            return dwarfui_inner(...)
+        local foreign_record = {predecessor=dwarfui_inner}
+        local foreign = function(...)
+            table.insert(events, 'foreign-before')
+            local returns = table.pack(foreign_record.predecessor(...))
+            table.insert(events, 'foreign-after')
+            return table.unpack(returns, 1, returns.n)
         end
+        first_overlay.render_viewscreen_widgets = foreign
+        assert.is_false(module.manager:ensure_overlay())
+        assert.is_equal(foreign,
+            first_overlay.render_viewscreen_widgets)
+        first_overlay.render_viewscreen_widgets()
+        assert.same({
+            'foreign-before', 'original', 'presenter', 'foreign-after',
+        }, events)
+        local preserved = module.manager:get_diagnostics().overlay
+        assert.is_true(preserved.installed)
+        assert.is_false(preserved.outermost)
+        assert.is_false(preserved.method_replacement_pending)
+        assert.equals(0,
+            module.manager:get_diagnostics().overlay.repair_count)
+
+        local function restore_foreign()
+            assert.is_equal(foreign,
+                first_overlay.render_viewscreen_widgets)
+            first_overlay.render_viewscreen_widgets = dwarfui_inner
+        end
+        assert.has_no.errors(restore_foreign)
+
+        events = {}
+        local reorderable = function(...)
+            table.insert(events, 'reorderable-before')
+            local returns = table.pack(dwarfui_inner(...))
+            table.insert(events, 'reorderable-after')
+            return table.unpack(returns, 1, returns.n)
+        end
+        module.manager:mark_wrapper_reorderable(reorderable)
+        first_overlay.render_viewscreen_widgets = reorderable
         assert.is_true(module.manager:ensure_overlay())
         first_overlay.render_viewscreen_widgets()
-        assert.same({'foreign', 'original', 'presenter'}, events)
+        assert.same({
+            'reorderable-before', 'original', 'reorderable-after',
+            'presenter',
+        }, events)
         assert.equals(1,
             module.manager:get_diagnostics().overlay.repair_count)
 
@@ -170,7 +207,7 @@ describe('DwarfUI tooltip render-hook manager', function()
             module.manager:get_diagnostics().overlay.owner)
     end)
 
-    it('keeps one presenter after repeated outermost repairs', function()
+    it('keeps one presenter while another wrapper owns the export', function()
         local overlay = overlay_with(function() end)
         local presentations = 0
         local module = load_hook({dwarfui={}}, function() return overlay end)
@@ -183,7 +220,7 @@ describe('DwarfUI tooltip render-hook manager', function()
         overlay.render_viewscreen_widgets =
             function(...) return first(...) end
 
-        assert.is_true(module.manager:ensure_overlay())
+        assert.is_false(module.manager:ensure_overlay())
         assert.is_false(module.manager:ensure_overlay())
         assert.is_false(module.manager:ensure_overlay())
         overlay.render_viewscreen_widgets()
@@ -215,7 +252,7 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.equals(1, presentations)
     end)
 
-    it('wraps, repairs, and conditionally restores a screen method',
+    it('preserves an owning screen wrapper and its exact restoration',
             function()
         local events = {}
         local class = {
@@ -243,27 +280,89 @@ describe('DwarfUI tooltip render-hook manager', function()
         assert.is_nil(returns[2])
 
         local dwarfui_inner = rawget(screen, 'onRender')
-        rawset(screen, 'onRender', function(...)
-            table.insert(events, 'foreign')
-            return dwarfui_inner(...)
-        end)
-        local pending = module.manager:get_diagnostics().selected_screen
-        assert.is_false(pending.installed)
-        assert.is_false(pending.chained)
-        assert.is_true(pending.method_replacement_pending)
-        assert.is_true(pending.replaced_method)
-        assert.is_true(module.manager:ensure_screen(screen))
+        local foreign = function(...)
+            table.insert(events, 'foreign-before')
+            local returns = table.pack(dwarfui_inner(...))
+            table.insert(events, 'foreign-after')
+            return table.unpack(returns, 1, returns.n)
+        end
+        rawset(screen, 'onRender', foreign)
+        local preserved = module.manager:get_diagnostics().selected_screen
+        assert.is_true(preserved.installed)
+        assert.is_true(preserved.chained)
+        assert.is_false(preserved.outermost)
+        assert.is_false(preserved.method_replacement_pending)
+        assert.is_true(preserved.replaced_method)
+        assert.is_false(module.manager:ensure_screen(screen))
         events = {}
         screen:onRender('two')
-        assert.same({'foreign', 'inherited:two', 'presenter'}, events)
+        assert.same({
+            'foreign-before', 'inherited:two', 'presenter', 'foreign-after',
+        }, events)
         assert.is_false(module.manager:get_diagnostics().
             selected_screen.owner_had_raw_method)
 
+        local function restore_foreign()
+            assert.is_equal(foreign, rawget(screen, 'onRender'))
+            rawset(screen, 'onRender', dwarfui_inner)
+        end
+        assert.has_no.errors(restore_foreign)
         assert.is_true(module.manager:shutdown())
-        assert.is_not_nil(rawget(screen, 'onRender'))
+        assert.is_nil(rawget(screen, 'onRender'))
         events = {}
         screen:onRender('three')
-        assert.same({'foreign', 'inherited:three'}, events)
+        assert.same({'inherited:three'}, events)
+    end)
+
+    it('repairs a screen method that no longer chains DwarfUI', function()
+        local original = function() return 'original' end
+        local replacement = function() return 'replacement' end
+        local screen = {onRender=original}
+        local module = load_hook({dwarfui={}},
+            function() return overlay_with(function() end) end)
+
+        module.manager:ensure_screen(screen)
+        rawset(screen, 'onRender', replacement)
+        assert.is_true(module.manager:ensure_screen(screen))
+        assert.equals('replacement', screen:onRender())
+        assert.equals(1,
+            module.manager:get_diagnostics().selected_screen.repair_count)
+        assert.is_true(module.manager:shutdown())
+        assert.is_equal(replacement, rawget(screen, 'onRender'))
+    end)
+
+    it('repairs above an explicitly reorderable screen wrapper', function()
+        local events = {}
+        local screen = {onRender=function()
+            table.insert(events, 'original')
+        end}
+        local module = load_hook({dwarfui={}},
+            function() return overlay_with(function() end) end)
+        module.manager:set_presenter(function()
+            table.insert(events, 'presenter')
+        end)
+
+        module.manager:ensure_screen(screen)
+        local inner = screen.onRender
+        local reorderable = function(...)
+            table.insert(events, 'wrapper-before')
+            local returns = table.pack(inner(...))
+            table.insert(events, 'wrapper-after')
+            return table.unpack(returns, 1, returns.n)
+        end
+        assert.is_true(
+            module.manager:mark_wrapper_reorderable(reorderable))
+        assert.is_false(
+            module.manager:mark_wrapper_reorderable(reorderable))
+        screen.onRender = reorderable
+        assert.is_true(module.manager:ensure_screen(screen))
+        screen:onRender()
+
+        assert.same({
+            'wrapper-before', 'original', 'wrapper-after', 'presenter',
+        }, events)
+        assert.is_true(module.manager:shutdown())
+        assert.is_equal(reorderable, rawget(screen, 'onRender'))
     end)
 
     it('clears an initially inherited method on shutdown', function()
@@ -381,20 +480,20 @@ describe('DwarfUI tooltip render-hook manager', function()
             return inner(...)
         end
         diagnostics = module.manager:get_diagnostics()
-        assert.is_false(diagnostics.overlay.installed)
+        assert.is_true(diagnostics.overlay.installed)
         assert.is_false(diagnostics.overlay.outermost)
-        assert.is_false(diagnostics.overlay.chained)
-        assert.is_true(
+        assert.is_true(diagnostics.overlay.chained)
+        assert.is_false(
             diagnostics.overlay.method_replacement_pending)
         assert.is_true(diagnostics.overlay.replaced_method)
         module.manager:ensure_overlay()
         diagnostics = module.manager:get_diagnostics()
         assert.is_true(diagnostics.overlay.installed)
-        assert.is_true(diagnostics.overlay.outermost)
-        assert.equals(1, diagnostics.overlay.repair_count)
+        assert.is_false(diagnostics.overlay.outermost)
+        assert.equals(0, diagnostics.overlay.repair_count)
         assert.is_true(diagnostics.overlay.chained)
         assert.is_true(diagnostics.overlay.replaced_method)
-        assert.equals(1,
+        assert.equals(0,
             diagnostics.overlay.method_replacement_count)
     end)
 

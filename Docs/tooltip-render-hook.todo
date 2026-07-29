@@ -2,8 +2,8 @@
 
 ## Status
 
-Phase 0 complete. This document is the execution contract for rendering the
-current process-wide tooltip intent after its owning native overlay or Lua
+Phases 0 and 1 complete. This document is the execution contract for rendering
+the current process-wide tooltip intent after its owning native overlay or Lua
 screen has completed rendering.
 
 It depends on the polling, detection, and intent contracts in
@@ -105,13 +105,14 @@ Keep hook ownership in a versioned process-wide slot:
 ---@field generation integer
 ---@field render_count integer
 ---@field last_rendered_revision integer|nil
----@field last_transport '"overlay"'|'"screen"'|nil
+---@field last_transport dwarfui.TooltipRenderTransport|nil
 ---@field last_error string|nil
 ---@field disabled_generation integer|nil
 
 ---@class dwarfui.TooltipRenderHookRecord
----@field transport '"overlay"'|'"screen"'
----@field owner table
+---@field transport dwarfui.TooltipRenderTransport
+---@field owner table|nil Strong overlay-module owner only.
+---@field owner_ref table|nil Weak-value screen-owner reference only.
 ---@field active_trampoline function|nil
 ---@field predecessor function|nil
 ---@field owner_had_raw_method boolean|nil
@@ -126,6 +127,10 @@ from the cleared module environment. `screen_hooks` uses weak keys so hook
 diagnostics and lifecycle tracking do not keep dismissed screens alive.
 
 ### Chained render trampolines
+
+Transport identity uses the exported numeric
+`dwarfui.TooltipRenderTransport` enum. Hook state, records, diagnostics, and
+presenter callbacks never exchange string transport tags.
 
 Each installed trampoline captures:
 
@@ -395,47 +400,56 @@ than hidden behind screen-type exception lists.
 
 ## Phase 1: Implement the versioned render-hook manager
 
-- [ ] Add
+- [x] Add
       `src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua`.
-- [ ] Define the documented versioned process-state contract.
-- [ ] Implement idempotent installation around the function currently
+- [x] Define the documented versioned process-state contract.
+- [x] Implement idempotent installation around the function currently
       exported by `plugins.overlay`.
-- [ ] Implement idempotent installation around the effective `onRender()`
+- [x] Implement idempotent installation around the effective `onRender()`
       function currently exposed by one selected Lua screen instance.
-- [ ] Preserve predecessor arguments, call order, and return values.
-- [ ] Make each trampoline consult the stable process slot instead of calling
+- [x] Preserve predecessor arguments, call order, and return values.
+- [x] Make each trampoline consult the stable process slot instead of calling
       module-generation state directly.
-- [ ] Ensure only the designated active trampoline for the selected transport
+- [x] Ensure only the designated active trampoline for the selected transport
       owner can invoke the presenter.
-- [ ] Detect overlay module replacement by module-table identity and exported
+- [x] Detect overlay module replacement by module-table identity and exported
       function identity.
-- [ ] Detect screen method replacement by owner identity and current
+- [x] Detect screen method replacement by owner identity and current
       `onRender` function identity.
-- [ ] Record raw instance-method ownership before the first screen wrap.
-- [ ] Implement outermost repair that chains the current exported function
+- [x] Record raw instance-method ownership before the first screen wrap.
+- [x] Implement outermost repair that chains the current exported function
       or instance method instead of replacing or bypassing it.
-- [ ] Keep screen-hook records weakly keyed by their owner instances.
-- [ ] Implement safe shutdown and conditional predecessor restoration for both
+- [x] Keep screen-hook records weakly keyed by their owner instances.
+- [x] Implement safe shutdown and conditional predecessor restoration for both
       transport types.
-- [ ] Restore a screen's raw `onRender` value exactly, or clear the raw field
+- [x] Restore a screen's raw `onRender` value exactly, or clear the raw field
       when the predecessor was inherited.
-- [ ] Expose installation, transport, owner identity, generation, outermost
+- [x] Expose installation, transport, owner identity, generation, outermost
       status, and chain-repair counters through diagnostics.
-- [ ] Add LuaDoc comments for the hook manager, public methods, process state,
+- [x] Add LuaDoc comments for the hook manager, public methods, process state,
       trampoline contract, and diagnostics record.
-- [ ] Add the hook module to `dwarfui/module_registry.lua` after tooltip intent
+- [x] Add the hook module to `dwarfui/module_registry.lua` after tooltip intent
       mediation and before presentation consumers.
-- [ ] Add package-contract coverage for the hook module.
+- [x] Add package-contract coverage for the hook module.
 
 ### Phase 1 completion gate
 
-- [ ] Initial installation for either transport calls the selected predecessor
+- [x] Initial installation for either transport calls the selected predecessor
       first and the presenter last.
-- [ ] Repeated installation with no external change is a no-op.
-- [ ] Reload changes the presenter generation without double presentation.
-- [ ] External overlay and screen wrappers remain in their predecessor chains.
-- [ ] Dismissed screen owners can be collected despite hook diagnostics.
-- [ ] Focused hook-manager and package-contract tests pass.
+- [x] Repeated installation with no external change is a no-op.
+- [x] Reload changes the presenter generation without double presentation.
+- [x] External overlay and screen wrappers remain in their predecessor chains.
+- [x] Dismissed screen owners can be collected despite hook diagnostics.
+- [x] Focused hook-manager and package-contract tests pass.
+
+### Phase 1 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1 tests/tooltip_render_hook.spec.lua tests/package_contract.spec.lua tests/module_registry.spec.lua` | 28 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 233 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 syntax passed for 20 production and 39 test/support files. |
+| 2026-07-28 | `git diff --check` | Passed. |
 
 ## Phase 2: Implement the intent-driven presenter
 

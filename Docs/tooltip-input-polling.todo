@@ -590,9 +590,9 @@ consumer without changing the polling, detection, or observation contracts.
       registrations neither publish stale intent nor require re-registration.
 - [x] Include a safe title/load/map transition probe if Phase 0 confirms that
       it can be automated without modifying the prepared save.
-- [x] Restore pointer position, native menu state, scroll position, focus,
-      mounted subjects, and all test-owned registrations even when an
-      assertion fails.
+- [x] Restore native menu state, scroll position, overlay state, method
+      overrides, and test-owned registrations even when an assertion fails;
+      rely on DwarfSpec's run cleanup for its pointer and mounted subjects.
 - [x] Require `cleanup_confirmed=true` and zero retained DwarfSpec screens,
       subjects, and pointer ownership.
 
@@ -641,10 +641,11 @@ consumer without changing the polling, detection, or observation contracts.
   not establish a safe automated title/load/save transition for the prepared
   fortress. The conditional transition probe was therefore intentionally not
   added to this save-mutating focused test.
-- The test restores its action overrides, pointer position, Hauling open state,
-  scroll position, pause state, overlay state, and native mount through an
-  always-run cleanup path. The focused run passed once, followed by a
-  two-repeat run in which both repetitions passed.
+- The test's always-run cleanup restores only state outside DwarfSpec's
+  ownership: action overrides, an interrupted product registration, Hauling
+  open state, scroll position, and overlay state. DwarfSpec's run cleanup
+  restores its virtual pointer and borrowed native mount. The focused run
+  passed once, followed by a two-repeat run in which both repetitions passed.
   DwarfSpec reported `cleanup_confirmed=true` and
   `mount_cleanup_verified=true`; that cleanup gate requires zero active/owned
   screens, mounts, subjects, and pointer ownership. Final service status was

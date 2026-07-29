@@ -1,0 +1,332 @@
+# Map-tile tooltip implementation checklist
+
+## Goal
+
+Extend DwarfUI's process-wide tooltip system so a feature can register an
+exact fortress-map tile as a tooltip target. While a registration is eligible,
+hovering the corresponding `{x, y, z}` tile must publish and render a normal
+DwarfUI tooltip through the existing intent and presentation pipeline.
+
+The first production consumer is the selected Minecart Route overlay. Its
+same-z route-stop markers must expose map-tile tooltips without creating fake
+widgets or adding minecart-specific behavior to the generic tooltip modules.
+
+## Confirmed boundaries
+
+- [ ] Use `dfhack.screen.getMousePos()` for the screen-cell tooltip anchor.
+- [ ] Use `dfhack.gui.getMousePos()` for the map tile under the mouse.
+- [ ] Copy the returned map coordinates into the immutable pointer sample; do
+      not retain a mutable coordinate object across frames.
+- [ ] Treat a missing or invalid map position as a map-target miss.
+- [ ] Match map targets by exact integer `x`, `y`, and `z` equality.
+- [ ] Keep `tooltip.register(widget)` and `tooltip.unregister(widget)`
+      backward compatible.
+- [ ] Keep the current process-wide invariant of at most one active tooltip
+      target, intent, and rendered tooltip.
+- [ ] Keep tooltip registration, sampling, hit detection, and intent mediation
+      independent from rendering hosts.
+- [ ] Continue presenting through the existing native-overlay or owning
+      Lua-screen render seam selected from the intent's source root.
+- [ ] Do not restore the retired `TooltipAgent` API.
+- [ ] Do not construct a tooltip `gui.ZScreen`, `OverlayWidget`, focus owner,
+      input recipient, or independent renderer.
+- [ ] Do not manually reproduce DFHack's text-mode or Premium map projection.
+- [ ] Do not add off-z, projected-column, rectangular-region, radius, or
+      arbitrary-predicate hit modes.
+- [ ] Do not make map-tile tooltips consume clicks or other native input.
+
+## Public behavior contract
+
+- [ ] Add `tooltip.register_map_tile(options)`, returning a stable registration
+      handle.
+- [ ] Add `tooltip.update_map_tile(handle, changes)` for atomic position and
+      text changes without replacing target identity.
+- [ ] Add `tooltip.unregister_map_tile(handle)` for immediate idempotent
+      removal.
+- [ ] Require `options.owner` to identify the GUI view whose current root owns
+      the target's eligibility, lifetime, and presentation transport.
+- [ ] Require `options.pos` to contain numeric `x`, `y`, and `z` fields and
+      copy those values into registration-owned state.
+- [ ] Accept tooltip text under the same string, empty-string, and `nil`
+      semantics as widget tooltips.
+- [ ] Retain weak cleanup as the safety net when a caller abandons a handle
+      without explicit removal.
+- [ ] Permit registration before owner attachment, but skip the target until
+      the owner resolves to an eligible presented root.
+- [ ] Make hidden, inactive, detached, disabled, stale, or viewscreen-mismatched
+      owners ineligible.
+- [ ] Permit multiple registrations at the same exact tile and resolve them
+      with a documented deterministic registration order.
+- [ ] Anchor the rendered tooltip to the sampled screen-cell pointer position,
+      not to a separately projected tile position.
+- [ ] Treat a registered widget target as higher precedence than a map-tile
+      target.
+- [ ] Prevent a map-tile tooltip from appearing through a DwarfUI widget or
+      blocking region that owns the sampled screen cell.
+- [ ] Permit pointer-transparent DwarfUI regions to fall through to an eligible
+      map-tile target.
+
+## Phase 0: Lock the generic contract and regression baseline
+
+- [ ] Add contract tests for the new public registration functions and handle
+      behavior before integrating a production consumer.
+- [ ] Specify the registration handle's identity, update, removal, weak
+      lifetime, and duplicate-tile behavior in LuaDoc.
+- [ ] Specify owner-to-root resolution independently from map hit testing.
+- [ ] Specify that exact map coordinates are hit data while the owner root is
+      presentation and lifecycle data.
+- [ ] Specify that map registrations do not need, create, or imitate
+      `gui.View` instances.
+- [ ] Record the current focused tooltip and minecart test baseline.
+- [ ] Preserve package-contract assertions that `TooltipAgent` is absent and
+      tooltip input modules do not depend on presentation modules.
+- [ ] Add LuaDoc comments to every new or modified class and method.
+
+### Phase 0 completion gate
+
+- [ ] The public API and lifecycle rules are represented by failing contract
+      tests with no minecart-specific assumptions.
+- [ ] Existing widget registration behavior remains captured by its current
+      unit and package-contract coverage.
+- [ ] The implementation boundary explicitly excludes off-z targets and manual
+      screen-to-map projection.
+
+## Phase 1: Extend immutable pointer sampling with map coordinates
+
+- [ ] Extend `dwarfui.PointerSample` with optional scalar `map_x`, `map_y`, and
+      `map_z` fields while preserving existing screen `x` and `y` fields.
+- [ ] Read screen and map positions during the same scheduled pointer-poller
+      callback.
+- [ ] Read `dfhack.gui.getMousePos()` only while at least one live map-tile
+      registration requires map sampling.
+- [ ] Preserve screen-only widget-tooltip behavior when no map registration
+      exists.
+- [ ] Ensure every scheduled callback still emits at most one immutable sample
+      with one monotonically increasing sequence number.
+- [ ] Preserve independent nil semantics: a screen anchor may exist while no
+      valid map tile exists.
+- [ ] Add injected-sampler coverage for valid map coordinates, nil map
+      coordinates, map-position changes, stopped demand, and module reload.
+- [ ] Add immutability coverage proving observers cannot mutate either
+      coordinate space in a published sample.
+- [ ] Add regression coverage proving stale callbacks from an earlier poller
+      generation cannot publish map samples.
+
+### Phase 1 completion gate
+
+- [ ] One demanded poller callback produces a coherent screen/map snapshot
+      without any map projection code in DwarfUI.
+- [ ] Widget-only registrations do not introduce unnecessary map sampling.
+- [ ] Nil map positions clear or miss map targets without disturbing valid
+      widget targeting.
+
+## Phase 2: Implement exact map-tile registration and detection
+
+- [ ] Add a presentation-independent map-tile registration module or class
+      with caller-owned registration handles.
+- [ ] Keep live handles in weak registration state so the service does not
+      retain abandoned consumers.
+- [ ] Maintain an exact-coordinate index instead of scanning every registered
+      tile on every pointer sample.
+- [ ] Reindex a handle atomically when its position changes.
+- [ ] Remove empty coordinate buckets after updates, explicit removal, or weak
+      cleanup.
+- [ ] Reuse one shared owner-root eligibility implementation for widget and
+      map registrations instead of duplicating overlay, native-root, and
+      Lua-screen rules.
+- [ ] Resolve only registrations whose owners currently map to an eligible
+      presented root.
+- [ ] Return a presentation-neutral map-target candidate containing stable
+      identity, source root, registration sequence, current text, and screen
+      anchor data.
+- [ ] Resolve duplicate exact-tile registrations deterministically.
+- [ ] Add unit coverage for exact hits, x/y/z misses, nil map positions,
+      duplicate tiles, position updates, removal, garbage collection,
+      detachment, hidden/inactive owners, overlay disablement, wrong
+      viewscreens, and reload.
+- [ ] Add regression coverage proving an equal `x,y` with a different `z`
+      never hits.
+
+### Phase 2 completion gate
+
+- [ ] Exact `{x, y, z}` lookup returns one deterministic eligible candidate or
+      a miss.
+- [ ] Registration updates and cleanup leave no stale coordinate-index entry.
+- [ ] The map detector has no minecart, renderer, screen-host, or input
+      dependency.
+
+## Phase 3: Unify widget and map candidates in tooltip mediation
+
+- [ ] Introduce a normalized tooltip-target adapter understood by
+      `TooltipService` without requiring every target to be a `gui.View`.
+- [ ] Give adapters stable target identity, current tooltip-text access,
+      source-root access, and optional enter/update/leave transitions.
+- [ ] Adapt existing widget targets without changing their callback order,
+      local coordinates, text validation, or weak registration semantics.
+- [ ] Adapt map registrations without adding widget-only fields or methods to
+      their handles.
+- [ ] Build the screen-space root set from both widget registrations and
+      map-registration owners.
+- [ ] Distinguish a genuine screen-space miss from a non-tooltip widget that
+      nevertheless owns or blocks the pointer cell.
+- [ ] Select a registered widget tooltip before considering a map candidate.
+- [ ] Suppress map fallback for target-owned or blocked UI regions.
+- [ ] Allow map fallback only after pointer-transparent screen-space misses.
+- [ ] Publish the existing immutable tooltip intent shape with the sampled
+      screen anchor and owning source root.
+- [ ] Leave `TooltipPresenter`, tooltip layout, and render-hook transport
+      selection unchanged unless a failing contract demonstrates a required
+      correction.
+- [ ] Count widget and map registrations together for poller demand while
+      exposing separate counts in diagnostics.
+- [ ] Version process-owned service state deliberately and retire incompatible
+      targets, intents, observers, and callbacks during reload.
+- [ ] Add service and registration coverage for widget-to-map, map-to-widget,
+      map-to-map, blocked-to-map, map-to-miss, removal, and text-update
+      transitions.
+- [ ] Add package-contract coverage proving the expanded input path remains
+      independent from tooltip presentation modules.
+
+### Phase 3 completion gate
+
+- [ ] Widgets and exact map tiles feed one ordered tooltip service without fake
+      views or duplicate presenters.
+- [ ] UI controls and blockers cannot leak an underlying map tooltip.
+- [ ] Existing widget tooltip tests pass unchanged in behavior.
+- [ ] Map intents render through the existing owner-selected final render seam.
+
+## Phase 4: Integrate same-z minecart route-stop markers
+
+- [ ] Keep all minecart-specific text, stop lookup, and selection rules in the
+      minecart route overlay or its model.
+- [ ] Maintain map-tooltip registrations keyed by stable stop ID; do not retain
+      native stop pointers across frames.
+- [ ] Derive each handle's current position and text from freshly resolved
+      selected-route data.
+- [ ] Use the current custom stop name in the tooltip, with the existing
+      unnamed-stop fallback.
+- [ ] Register or enable targets only for marker descriptors whose
+      `marker_kind` is `same_z`.
+- [ ] Do not register a target for `above` or `below` marker descriptors.
+- [ ] Restrict the hit region to the marker's exact world tile; labels in
+      adjacent screen cells are not map-tile targets.
+- [ ] Update registrations when stops are added, removed, renamed, moved, or
+      reordered and when the selected route changes.
+- [ ] Clear minecart-owned registrations when selection clears, the route is
+      deleted, the Hauling menu closes, the world unloads, the overlay is
+      disabled, or the module reloads.
+- [ ] Preserve route-list click pass-through and all existing marker and label
+      rendering.
+- [ ] Avoid world scans and inspect only the selected route and its stops.
+- [ ] Add focused overlay tests for same-z registration, exact position,
+      current name, unnamed stops, position/name updates, duplicate stop
+      positions, route changes, z-level changes, stale selection, and cleanup.
+- [ ] Add explicit regression coverage proving off-z markers never create or
+      retain tooltip targets.
+
+### Phase 4 completion gate
+
+- [ ] Hovering a same-z selected-route marker produces the current stop
+      tooltip through the generic map-tile API.
+- [ ] Hovering an off-z marker produces no map-tile tooltip.
+- [ ] Minecart code contains no screen-to-map projection, tooltip renderer, or
+      generic hit-system special case.
+- [ ] Selection, route editing, marker rendering, and native input behavior
+      remain unchanged outside the new tooltip.
+
+## Phase 5: Add native integration and complete validation
+
+- [ ] Extend or add a DwarfSpec test whose filename ends only in `.ds.lua`.
+- [ ] Mount the production Minecart Route overlay against the real native
+      Hauling viewscreen and real `plotinfo.hauling` data.
+- [ ] Move the physical test pointer over an actual rendered same-z marker
+      before asserting hover behavior.
+- [ ] Assert the sampled map position equals the native stop's exact
+      `{x, y, z}` coordinates.
+- [ ] Assert the final rendered tooltip contains the current native stop name,
+      not duplicated fixture text.
+- [ ] Move the pointer to the same `x,y` on a different z-level and verify the
+      tooltip clears while the off-z marker remains non-interactive.
+- [ ] Move the pointer over native or DwarfUI-owned UI covering the map and
+      verify the map tooltip does not shine through.
+- [ ] Rename or move only a disposable stop when mutation coverage is
+      required, then verify the registration follows the fresh native data.
+- [ ] Verify selection clear, Hauling-menu close, overlay disable, world
+      unload, and `dwarfui reload` remove active map targets and rendered
+      intent.
+- [ ] Restore viewport, cursor, pointer position, selected route, overlay
+      configuration, native route-menu state, and any disposable fixture even
+      when an assertion fails.
+- [ ] Require DwarfSpec to report `cleanup_confirmed=true` with no retained
+      screen, subject, pointer patch, tooltip target, or changed game state.
+- [ ] Run focused pointer, tooltip, map-target, minecart model, and minecart
+      overlay unit tests.
+- [ ] Run the focused DwarfSpec map-tooltip consumer test through
+      `tools/Run-AutomationTests.ps1`.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run the complete DwarfSpec suite through the same pass-through wrapper.
+- [ ] Run Lua syntax validation for production, unit, support, and `.ds.lua`
+      files.
+- [ ] Run the offline build and verify expanded package contents.
+- [ ] Run archive package verification.
+- [ ] Run `git diff --check`.
+- [ ] Install the packaged mod into the configured live DFHack instance and
+      run `dwarfui reload`.
+- [ ] Visually verify a same-z marker tooltip, the absence of off-z marker
+      tooltips, UI occlusion, route switching, stop rename/move refresh, and
+      cleanup.
+- [ ] Review the DFHack console and logs for Lua errors after hover, movement,
+      z-level changes, overlay disablement, and reload.
+- [ ] Record focused, complete, syntax, package, cleanup, and live evidence
+      separately.
+
+### Phase 5 completion gate
+
+- [ ] Focused and complete unit and DwarfSpec suites pass with zero failures.
+- [ ] Syntax, offline build, expanded package, archive package, and diff checks
+      pass.
+- [ ] Native automation proves exact tile matching, final tooltip rendering,
+      UI occlusion, same-z-only behavior, and confirmed cleanup.
+- [ ] Live DFHack evidence confirms the packaged implementation without
+      overstating unit, component, or offline-build coverage.
+
+## Definition of done
+
+- [ ] Any eligible DwarfUI owner can register an exact `{x, y, z}` map tile as
+      a tooltip target through the public tooltip module.
+- [ ] The pointer poller samples DFHack-provided map coordinates only while
+      map-tooltip demand exists.
+- [ ] Map-tile hit detection is indexed, deterministic, exact-z, and
+      presentation independent.
+- [ ] Widget targets and UI blockers take precedence over map-tile targets.
+- [ ] Map registrations use their owner only for root eligibility, lifetime,
+      and presentation transport.
+- [ ] The existing intent, presenter, and final render seams display map
+      tooltips without a new screen, overlay, renderer, or input owner.
+- [ ] Same-z Minecart Route stop markers show current stop-name tooltips.
+- [ ] Off-z Minecart Route markers never show or retain map-tile tooltips.
+- [ ] Stop, route, owner, viewscreen, overlay, world, and reload lifecycle
+      changes leave no stale registration or intent.
+- [ ] Existing widget-tooltip behavior and native Minecart Route input/render
+      behavior remain intact.
+- [ ] All new and modified classes and methods have LuaDoc comments.
+- [ ] Focused, complete, syntax, package, cleanup, and live verification
+      evidence are recorded independently.
+
+## Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 2026-07-28 | Pre-implementation focused baseline | `.\tools\Run-UnitTests.ps1 tests/minecart_route.spec.lua tests/minecart_route_overlay.spec.lua tests/tooltip_target_detector.spec.lua tests/tooltip_service.spec.lua tests/tooltip_presenter.spec.lua` | Passed: 74 successes, 0 failures | Existing coverage includes minecart projection/overlay behavior and the current widget-only tooltip detector, service, and presenter. It does not prove map-tile hover. |
+| | Public map-tile registration contract | Focused unit suite | Pending | Record handle, update, removal, weak lifetime, and exact-coordinate behavior. |
+| | Pointer sampling and generic map detection | Focused unit suite | Pending | Record screen/map sampling, nil behavior, indexing, arbitration, and reload safety. |
+| | Minecart same-z consumer | Focused unit suite | Pending | Record current names/positions, route changes, lifecycle cleanup, and explicit off-z exclusion. |
+| | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 <map-tooltip-file>.ds.lua` | Pending | Move the physical pointer to a real same-z marker and verify final rendering plus cleanup. |
+| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
+| | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured results and `cleanup_confirmed`. |
+| | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and `.ds.lua` files. |
+| | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Do not treat this as installed or live evidence. |
+| | Expanded package verification | `.\tools\VerifyPackage.ps1 -SourceDir <source> -ZipPath <archive> -ExpandedPath <expanded>` | Pending | Verify every new production module is shipped. |
+| | Archive package verification | `.\tools\Publish.ps1` | Pending | Verify the distributable archive separately. |
+| | Diff validation | `git diff --check` | Pending | Record whitespace result separately. |
+| | Live packaged behavior | Prepared fortress Minecart Routes menu | Pending | Verify exact same-z hover, no off-z hover, UI occlusion, refresh, reload, and cleanup. |

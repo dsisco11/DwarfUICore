@@ -3,7 +3,6 @@
 local gui = require('gui')
 local widgets = require('gui.widgets')
 reqscript('dwarfui/widget_extensions')
-local pointer = reqscript('dwarfui/pointer')
 local text_helpers = reqscript('dwarfui/text')
 local tooltip_service_module = reqscript('dwarfui/tooltip_service')
 local render_hook_module = reqscript('dwarfui/tooltip_render_hook')
@@ -402,54 +401,6 @@ function TooltipPresenter:get_diagnostics()
         render_count=self._render_count,
         redraw_count=self._redraw_count,
     }
-end
-
----@class dwarfui.TooltipAgent
----@field root gui.View
----@field pointer_context dwarfui.PointerContext
----@field renderer dwarfui.TooltipRenderer
-TooltipAgent = {}
-TooltipAgent.__index = TooltipAgent
-
----@param root gui.View
----@param renderer table
----@return table
-function TooltipAgent.new(root, renderer)
-    assert(root, 'DwarfUI TooltipAgent requires a pointer root.')
-    assert(renderer, 'DwarfUI TooltipAgent requires a tooltip renderer.')
-    return setmetatable({
-        root=root,
-        pointer_context=pointer.PointerContext.new(root),
-        renderer=renderer,
-    }, TooltipAgent)
-end
-
-local function get_tooltip(target)
-    if not target then return nil end
-    local value = target.tooltip
-    if value == nil or value == '' then return nil end
-    assert(type(value) == 'string',
-        'DwarfUI tooltip must be a string, nil, or an empty string; got ' ..
-        type(value) .. '.')
-    return value
-end
-
----@return table pointer_result
-function TooltipAgent:update()
-    -- One read feeds dispatch and placement, including the no-pointer case.
-    local mouse_x, mouse_y = dfhack.screen.getMousePos()
-    local result = pointer.PointerDispatcher.sample(
-        self.pointer_context, mouse_x, mouse_y)
-    -- Dispatch happens first so a terminal callback can update tooltip text for
-    -- these exact local coordinates before presentation reads the current value.
-    local tooltip_text = result.kind == 'target' and
-        get_tooltip(result.target) or nil
-    self.renderer:set_tooltip(
-        tooltip_text,
-        mouse_x,
-        mouse_y,
-        self.root.frame_parent_rect)
-    return result
 end
 
 ---Registers a widget with the process-wide singleton tooltip service.

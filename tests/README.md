@@ -28,12 +28,10 @@ DwarfUI owns only its tooltip specs, registration support source,
 configuration, and tooltip-state command. Run them with:
 
 ```powershell
-dwarfspec run tests/tooltip/tooltip.ds.lua
-dwarfspec run tests/tooltip/tooltip_overlay.ds.lua
 dwarfspec run tests/tooltip/tooltip_overlay_registration_integration.ds.lua
 ```
 
-The first two commands mount components without installing scripts. The last
-command is the separate real overlay discovery and registration integration.
+The command stages a test overlay through real overlay discovery and exercises
+the process-wide registration and intent path.
 
 The local Busted unit runner does not discover or execute live DwarfSpec files.

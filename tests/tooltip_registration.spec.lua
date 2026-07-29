@@ -146,6 +146,12 @@ describe('singleton tooltip registration polling', function()
         assert.equals(0, initial.registration_count)
         assert.is_false(initial.poller_running)
         assert.is_false(initial.poller_scheduled)
+        assert.is_nil(initial.screen)
+        assert.is_nil(initial.renderer)
+        assert.is_nil(initial.renderer_count)
+        assert.is_nil(initial.input_owner)
+        assert.is_nil(initial.input_handler)
+        assert.is_nil(initial.viewscreen)
         assert.equals(0, #env.state.callbacks)
 
         assert.is_true(registration.register(first))
@@ -211,6 +217,33 @@ describe('singleton tooltip registration polling', function()
         assert.is_true(diagnostics.poller_running)
         assert.is_true(diagnostics.poller_scheduled)
         assert.equals(1, #env.state.callbacks)
+    end)
+
+    it('does not inspect disabled or failed presentation state', function()
+        local failed_hook = setmetatable({}, {
+            __index=function()
+                error('input service inspected render-hook state')
+            end,
+        })
+        local env = load_environment{
+            mouse_x=2,
+            mouse_y=2,
+            dwarfui={tooltip_render_hook=failed_hook},
+        }
+        local registration = env.load_generation()
+        local child = target(env.widgets,
+            {l=1, t=1, w=5, h=2}, 'Independent')
+        local root = env.widgets.Panel{subviews={child}}
+        layout(root, env.state)
+
+        registration.register(child)
+        assert.is_true(env.run_next())
+
+        local diagnostics = registration.get_diagnostics()
+        assert.is_equal(child, diagnostics.target)
+        assert.equals('Independent', diagnostics.intent.text)
+        assert.is_true(diagnostics.poller_running)
+        assert.equals(1, diagnostics.sample_sequence)
     end)
 
     it('stops after collection of the final weak registration', function()

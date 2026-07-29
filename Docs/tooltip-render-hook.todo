@@ -2,7 +2,7 @@
 
 ## Status
 
-Phases 0 through 3 complete. This document is the execution contract for
+Phases 0 through 4 complete. This document is the execution contract for
 rendering the current process-wide tooltip intent after its owning native
 overlay or Lua screen has completed rendering.
 
@@ -554,43 +554,55 @@ than hidden behind screen-type exception lists.
 
 ## Phase 4: Cut over the tooltip service
 
-- [ ] Remove `TooltipServiceScreen` and all screen creation, resumption,
+- [x] Remove `TooltipServiceScreen` and all screen creation, resumption,
       raising, dismissal, input forwarding, and parent-logic code from
       production tooltip registration.
-- [ ] Remove native-screen special lists introduced solely to protect the
+- [x] Remove native-screen special lists introduced solely to protect the
       service `ZScreen`.
-- [ ] Remove renderer ownership from registration and input-service state.
-- [ ] Connect the intent service to the render presenter through the
+- [x] Remove renderer ownership from registration and input-service state.
+- [x] Connect the intent service to the render presenter through the
       presentation-neutral notification boundary.
-- [ ] Keep registration and input polling operational when the presenter is
+- [x] Keep registration and input polling operational when the presenter is
       absent, disabled, or failed.
-- [ ] Update public diagnostics so screen and renderer counts are no longer
+- [x] Update public diagnostics so screen and renderer counts are no longer
       input-service concepts.
-- [ ] Add render-hook diagnostics to DwarfSpec's tooltip-state inspection
+- [x] Add render-hook diagnostics to DwarfSpec's tooltip-state inspection
       without exposing mutable implementation tables.
-- [ ] Update `dwarfui reload` ordering so the intent service exists before the
+- [x] Update `dwarfui reload` ordering so the intent service exists before the
       presenter, the global hook is installed before live overlays are
       rescanned, and screen hooks always resolve the current presenter
       generation dynamically.
-- [ ] Ensure no production tooltip path constructs a `gui.ZScreen`.
-- [ ] Ensure no production tooltip path registers another `OverlayWidget`.
-- [ ] Ensure screen-owned tooltips wrap only the root's effective `onRender`
+- [x] Ensure no production tooltip path constructs a `gui.ZScreen`.
+- [x] Ensure no production tooltip path registers another `OverlayWidget`.
+- [x] Ensure screen-owned tooltips wrap only the root's effective `onRender`
       method and do not add subviews or modify screen configuration
       attributes.
-- [ ] Remove obsolete unit fixtures that emulate a tooltip service screen.
-- [ ] Preserve useful renderer appearance and placement tests at their proper
+- [x] Remove obsolete unit fixtures that emulate a tooltip service screen.
+- [x] Preserve useful renderer appearance and placement tests at their proper
       method-contract layer.
 
 ### Phase 4 completion gate
 
-- [ ] Tooltip registration creates no screen, overlay widget, focus owner, or
+- [x] Tooltip registration creates no screen, overlay widget, focus owner, or
       input recipient.
-- [ ] The process-wide intent service and renderer are connected only through
+- [x] The process-wide intent service and renderer are connected only through
       intent notifications and reads.
-- [ ] Reload leaves one current poller generation, one current presenter
+- [x] Reload leaves one current poller generation, one current presenter
       generation, one active overlay hook, and at most one active hook per
       wrapped screen owner.
-- [ ] Focused registration, reload, registry, and package tests pass.
+- [x] Focused registration, reload, registry, and package tests pass.
+
+### Phase 4 execution evidence
+
+| Date | Evidence | Result |
+| --- | --- | --- |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1 tests/tooltip_registration.spec.lua tests/tooltip_presenter.spec.lua tests/tooltip_render_hook.spec.lua tests/dwarfspec_config.spec.lua tests/dwarfui_command.spec.lua tests/module_registry.spec.lua tests/package_contract.spec.lua tests/tooltip.spec.lua` | 65 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Run-UnitTests.ps1` | 239 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-07-28 | `Tools/Check-LuaSyntax.ps1 -IncludeTests` | Lua 5.4.6 syntax passed for 20 production and 39 test/support files. |
+| 2026-07-28 | `Tools/Check-UnitTestNaming.ps1` | Passed. |
+| 2026-07-28 | `Tools/Run-AutomationTests.ps1 tests/minecart_route/minecart_route_tooltip.ds.lua --timeout 120` | 1 success, 0 failures, 0 errors, `cleanup_confirmed=true`; production registration, sanitized hook/presenter diagnostics, and reload recovery passed. |
+| 2026-07-28 | Production source and checklist audit | 17 of 17 items checked; no `TooltipServiceScreen`, `TooltipAgent`, tooltip `gui.ZScreen`/`OverlayWidget` construction, legacy host slot, input-forwarding method, or input-layer renderer count remains. |
+| 2026-07-28 | `git diff --check` | Passed. |
 
 ## Phase 5: Prove native and Lua-screen final rendering
 

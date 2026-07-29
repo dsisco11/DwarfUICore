@@ -122,37 +122,37 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 ## Phase 2: Implement exact map-tile registration and detection
 
-- [ ] Add a presentation-independent map-tile registration module or class
+- [x] Add a presentation-independent map-tile registration module or class
       with caller-owned registration handles.
-- [ ] Keep live handles in weak registration state so the service does not
+- [x] Keep live handles in weak registration state so the service does not
       retain abandoned consumers.
-- [ ] Maintain an exact-coordinate index instead of scanning every registered
+- [x] Maintain an exact-coordinate index instead of scanning every registered
       tile on every pointer sample.
-- [ ] Reindex a handle atomically when its position changes.
-- [ ] Remove empty coordinate buckets after updates, explicit removal, or weak
+- [x] Reindex a handle atomically when its position changes.
+- [x] Remove empty coordinate buckets after updates, explicit removal, or weak
       cleanup.
-- [ ] Reuse one shared owner-root eligibility implementation for widget and
+- [x] Reuse one shared owner-root eligibility implementation for widget and
       map registrations instead of duplicating overlay, native-root, and
       Lua-screen rules.
-- [ ] Resolve only registrations whose owners currently map to an eligible
+- [x] Resolve only registrations whose owners currently map to an eligible
       presented root.
-- [ ] Return a presentation-neutral map-target candidate containing stable
+- [x] Return a presentation-neutral map-target candidate containing stable
       identity, source root, registration sequence, current text, and screen
       anchor data.
-- [ ] Resolve duplicate exact-tile registrations deterministically.
-- [ ] Add unit coverage for exact hits, x/y/z misses, nil map positions,
+- [x] Resolve duplicate exact-tile registrations deterministically.
+- [x] Add unit coverage for exact hits, x/y/z misses, nil map positions,
       duplicate tiles, position updates, removal, garbage collection,
       detachment, hidden/inactive owners, overlay disablement, wrong
       viewscreens, and reload.
-- [ ] Add regression coverage proving an equal `x,y` with a different `z`
+- [x] Add regression coverage proving an equal `x,y` with a different `z`
       never hits.
 
 ### Phase 2 completion gate
 
-- [ ] Exact `{x, y, z}` lookup returns one deterministic eligible candidate or
+- [x] Exact `{x, y, z}` lookup returns one deterministic eligible candidate or
       a miss.
-- [ ] Registration updates and cleanup leave no stale coordinate-index entry.
-- [ ] The map detector has no minecart, renderer, screen-host, or input
+- [x] Registration updates and cleanup leave no stale coordinate-index entry.
+- [x] The map detector has no minecart, renderer, screen-host, or input
       dependency.
 
 ## Phase 3: Unify widget and map candidates in tooltip mediation
@@ -320,19 +320,20 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 | 2026-07-28 | Phase 0 broad pre-implementation baseline | `.\tools\Run-UnitTests.ps1 tests\pointer.spec.lua tests\pointer_poller.spec.lua tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_service.spec.lua tests\tooltip_presenter.spec.lua tests\tooltip_render_hook.spec.lua tests\package_contract.spec.lua tests\minecart_route.spec.lua tests\minecart_route_overlay.spec.lua --exclude-tags=map_tile_contract` | Passed: 154 successes, 0 failures, 0 errors, 0 pending | Proves the current widget registration, pointer, detector, service, presenter, render-hook, package, and minecart baseline remains green after adding the future contract. It does not prove map-tile behavior. |
 | 2026-07-28 | Phase 0 expected-red public and lifecycle contract | `.\tools\Run-UnitTests.ps1 tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\package_contract.spec.lua --tags=map_tile_contract` | Expected red: 0 successes, 5 failures, 0 errors, 0 pending | Every failure reports that `register_map_tile`, `update_map_tile`, or `unregister_map_tile` is not yet a function. The generic tests cover facade delegation, opaque identity, duplicate exact tiles, update/removal semantics, validation, weak lifetime, diagnostics, and the shipped public API without a minecart dependency. |
 | 2026-07-28 | Phase 0 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the LuaDoc contract and all new expected-red tests. |
-| | Public map-tile registration contract | Focused unit suite | Pending | Record handle, update, removal, weak lifetime, and exact-coordinate behavior. |
+| 2026-07-28 | Public map-tile registration contract | `.\tools\Run-UnitTests.ps1 tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\package_contract.spec.lua --tags=map_tile_contract` | Passed: 5 successes, 0 failures, 0 errors, 0 pending | The formerly expected-red facade, opaque-handle, update/removal, validation, weak-lifetime, diagnostics, and package contracts are green. |
 | 2026-07-28 | Phase 1 demand-controlled pointer sampling | `.\tools\Run-UnitTests.ps1 tests\pointer_poller.spec.lua` | Passed: 15 successes, 0 failures, 0 errors, 0 pending | Covers coherent screen/map snapshots, copied scalar coordinates, nil and partial map positions, map-position changes, demand transitions, immutable fields, default DFHack samplers, instance-generation retirement, and module-reload retirement. |
 | 2026-07-28 | Phase 1 widget-only registration integration | `.\tools\Run-UnitTests.ps1 tests\tooltip_registration.spec.lua --exclude-tags=map_tile_contract` | Passed: 7 successes, 0 failures, 0 errors, 0 pending | Existing widget-only polling performs one screen read and zero map reads. Live map-registration demand will be wired by the generic registry work rather than inferred by the poller. |
 | 2026-07-28 | Phase 1 complete unit suite excluding future expected-red contracts | `.\tools\Run-UnitTests.ps1 --exclude-tags=map_tile_contract` | Passed: 245 successes, 0 failures, 0 errors, 0 pending | The five Phase 0 map-registration contracts remain intentionally excluded until the public registration API is implemented. |
 | 2026-07-28 | Phase 1 Lua syntax | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 20 production and 40 test/support files | Covers the updated poller, LuaDoc, and unit harnesses. |
-| | Generic map detection | Focused unit suite | Pending | Record indexing, exact-coordinate matching, arbitration, and detector reload safety. |
+| 2026-07-28 | Generic map detection | `.\tools\Run-UnitTests.ps1 tests\tooltip_map_target.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua` | Passed: 33 successes, 0 failures, 0 errors, 0 pending | Covers exact indexed lookup and z misses, duplicate precedence, atomic reindexing, explicit and weak cleanup, shared owner-root eligibility, map-demand sampling, and reload safety without entering tooltip mediation. |
+| 2026-07-29 | DFHack class-model correction | `.\tools\Run-UnitTests.ps1 tests\class.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_presenter.spec.lua tests\hover_action_rail.spec.lua tests\package_contract.spec.lua tests\module_registry.spec.lua` | Passed: 80 successes, 0 failures, 0 errors, 0 pending | Replaces wrapper-metatable inference with one direct instance-metatable and `super` predicate, makes the widget harness match DFHack `mkinstance()`, and covers root eligibility, presentation, rails, package inclusion, and reload order. |
 | | Minecart same-z consumer | Focused unit suite | Pending | Record current names/positions, route changes, lifecycle cleanup, and explicit off-z exclusion. |
 | | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 <map-tooltip-file>.ds.lua` | Pending | Move the physical pointer to a real same-z marker and verify final rendering plus cleanup. |
-| | Complete unit suite | `.\tools\Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
+| 2026-07-29 | Complete unit suite through Phase 2 | `.\tools\Run-UnitTests.ps1` | Passed: 264 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite after correcting the class model; later-phase mediation, minecart consumption, and native automation remain unimplemented and therefore unproven. |
 | | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured results and `cleanup_confirmed`. |
-| | Syntax validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and `.ds.lua` files. |
+| 2026-07-29 | Syntax validation through Phase 2 | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 23 production and 42 test/support files | Covers the generic map registry, shared class and root helpers, public API wiring, and their tests. No later native `.ds.lua` map-tooltip consumer exists yet. |
 | | Offline build | `.\tools\Build.ps1 -LiveReload:$false` | Pending | Do not treat this as installed or live evidence. |
 | | Expanded package verification | `.\tools\VerifyPackage.ps1 -SourceDir <source> -ZipPath <archive> -ExpandedPath <expanded>` | Pending | Verify every new production module is shipped. |
 | | Archive package verification | `.\tools\Publish.ps1` | Pending | Verify the distributable archive separately. |
-| | Diff validation | `git diff --check` | Pending | Record whitespace result separately. |
+| 2026-07-29 | Diff validation through Phase 2 | `git diff --check` | Passed with no whitespace errors | Git emitted only the existing LF-to-CRLF checkout warnings. |
 | | Live packaged behavior | Prepared fortress Minecart Routes menu | Pending | Verify exact same-z hover, no off-z hover, UI occlusion, refresh, reload, and cleanup. |

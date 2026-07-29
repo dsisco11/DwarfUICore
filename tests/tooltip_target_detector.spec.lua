@@ -4,6 +4,8 @@ local widget_harness = require('support.widget_harness')
 
 local DETECTOR_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
+local ROOT_RESOLVER_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
 
 ---Builds a detector harness with real generic pointer resolution.
 ---@param state table|nil
@@ -48,11 +50,21 @@ local function load_environment(state)
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
         })
+    local _, class_helpers = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/class.lua')
+    local _, root_resolver = module_loader.load(
+        repo_root, ROOT_RESOLVER_PATH, {
+            globals={dfhack=dfhack},
+            require_modules={['plugins.overlay']=overlay},
+            reqscript={['dwarfui/class']=class_helpers},
+        })
     local _, detector_module = module_loader.load(
         repo_root, DETECTOR_PATH, {
             globals={dfhack=dfhack},
-            require_modules={['plugins.overlay']=overlay},
-            reqscript={['dwarfui/pointer']=pointer},
+            reqscript={
+                ['dwarfui/pointer']=pointer,
+                ['dwarfui/tooltip_root_resolver']=root_resolver,
+            },
         })
 
     ---Creates one detector over a caller-owned weak registration table.
@@ -447,7 +459,7 @@ describe('DwarfUI tooltip target detector', function()
                 on_pointer_update=function() callbacks = callbacks + 1 end,
                 on_pointer_leave=function() callbacks = callbacks + 1 end,
             }
-            local class = getmetatable(target).__index
+            local class = getmetatable(target)
             setmetatable(target, {
                 __index=function(_, key)
                     if key == 'tooltip' then

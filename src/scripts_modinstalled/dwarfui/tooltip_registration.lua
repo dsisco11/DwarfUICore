@@ -8,6 +8,8 @@ local PointerPoller =
     reqscript('dwarfui/pointer_poller').PointerPoller
 local TooltipTargetDetector =
     reqscript('dwarfui/tooltip_target_detector').TooltipTargetDetector
+local map_targets =
+    reqscript('dwarfui/tooltip_map_target').registry
 
 API_VERSION = 1
 
@@ -16,10 +18,22 @@ local detector = TooltipTargetDetector.new{
 }
 local poller
 
----Counts live weak registrations without retaining their widgets.
+---Counts live weak widget registrations without retaining their views.
+---@return integer
+local function widget_registration_count()
+    return input_service:registration_count()
+end
+
+---Counts live weak map registrations without retaining their handles.
+---@return integer
+local function map_registration_count()
+    return map_targets:registration_count()
+end
+
+---Counts all live tooltip registrations across both target domains.
 ---@return integer
 local function registration_count()
-    return input_service:registration_count()
+    return widget_registration_count() + map_registration_count()
 end
 
 ---Returns whether tooltip registrations still require pointer samples.
@@ -28,6 +42,12 @@ local function has_polling_demand()
     local has_demand = registration_count() > 0
     if not has_demand then input_service:shutdown() end
     return has_demand
+end
+
+---Returns whether a live map registration requires exact map sampling.
+---@return boolean
+local function has_map_sampling_demand()
+    return map_registration_count() > 0
 end
 
 ---Detects and mediates one presentation-independent pointer sample.
@@ -39,6 +59,7 @@ end
 poller = PointerPoller.new{
     observer=observe_pointer,
     has_demand=has_polling_demand,
+    has_map_demand=has_map_sampling_demand,
 }
 
 ---Registers any widget for process-wide singleton tooltip targeting.
@@ -64,15 +85,51 @@ function unregister(widget)
     return true
 end
 
+---Registers one exact map tile with an independent owner and opaque handle.
+---@param options dwarfui.MapTileTooltipRegistrationOptions
+---@return dwarfui.MapTileTooltipRegistration
+function register_map_tile(options)
+    local handle = map_targets:register(options)
+    poller:start()
+    return handle
+end
+
+---Atomically replaces one map registration's exact position and text.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@param update dwarfui.MapTileTooltipUpdate
+---@return boolean updated
+function update_map_tile(handle, update)
+    return map_targets:update(handle, update)
+end
+
+---Explicitly removes one map registration and releases idle polling.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@return boolean removed
+function unregister_map_tile(handle)
+    local removed = map_targets:unregister(handle)
+    if not removed then return false end
+    if registration_count() == 0 then
+        poller:stop()
+        input_service:shutdown()
+    end
+    return true
+end
+
 ---Returns presentation-neutral input and mediation diagnostics.
 ---@return table diagnostics
 function get_diagnostics()
     local service_diagnostics = input_service:get_diagnostics()
     local poller_diagnostics = poller:get_diagnostics()
+    local map_diagnostics = map_targets:get_diagnostics()
     return {
         api_version=service_diagnostics.api_version,
         generation=service_diagnostics.generation,
-        registration_count=service_diagnostics.registration_count,
+        registration_count=registration_count(),
+        widget_registration_count=widget_registration_count(),
+        map_registration_count=map_registration_count(),
+        map_registry_generation=map_diagnostics.generation,
+        map_coordinate_bucket_count=
+            map_diagnostics.coordinate_bucket_count,
         target=service_diagnostics.target,
         intent=service_diagnostics.intent,
         revision=service_diagnostics.revision,

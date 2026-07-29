@@ -6,6 +6,10 @@ local POINTER_POLLER_PATH =
     'src/scripts_modinstalled/dwarfui/pointer_poller.lua'
 local TARGET_DETECTOR_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_target_detector.lua'
+local ROOT_RESOLVER_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
+local MAP_TARGET_PATH =
+    'src/scripts_modinstalled/dwarfui/tooltip_map_target.lua'
 local SERVICE_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_service.lua'
 local REGISTRATION_PATH =
@@ -73,17 +77,34 @@ local function load_environment(state)
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
         })
+    local _, class_helpers = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/class.lua')
 
     ---Loads one coherent poller, detector, service, and registration generation.
     ---@return table registration
     local function load_generation()
         local _, pointer_poller = module_loader.load(
             repo_root, POINTER_POLLER_PATH, {globals={dfhack=dfhack}})
+        local _, root_resolver = module_loader.load(
+            repo_root, ROOT_RESOLVER_PATH, {
+                globals={dfhack=dfhack},
+                require_modules={['plugins.overlay']=overlay},
+                reqscript={['dwarfui/class']=class_helpers},
+            })
         local _, target_detector = module_loader.load(
             repo_root, TARGET_DETECTOR_PATH, {
                 globals={dfhack=dfhack},
-                require_modules={['plugins.overlay']=overlay},
-                reqscript={['dwarfui/pointer']=pointer},
+                reqscript={
+                    ['dwarfui/pointer']=pointer,
+                    ['dwarfui/tooltip_root_resolver']=root_resolver,
+                },
+            })
+        local _, map_target = module_loader.load(
+            repo_root, MAP_TARGET_PATH, {
+                globals={dfhack=dfhack},
+                reqscript={
+                    ['dwarfui/tooltip_root_resolver']=root_resolver,
+                },
             })
         local _, service = module_loader.load(repo_root, SERVICE_PATH, {
             globals={dfhack=dfhack},
@@ -95,6 +116,7 @@ local function load_environment(state)
                 reqscript={
                     ['dwarfui/pointer_poller']=pointer_poller,
                     ['dwarfui/tooltip_target_detector']=target_detector,
+                    ['dwarfui/tooltip_map_target']=map_target,
                     ['dwarfui/tooltip_service']=service,
                 },
             })
@@ -290,6 +312,31 @@ describe('singleton tooltip registration polling', function()
         local diagnostics = registration.get_diagnostics()
         assert.equals(0, diagnostics.map_registration_count)
         assert.equals(0, diagnostics.registration_count)
+    end)
+
+    it('samples map coordinates only while map registrations demand them',
+            function()
+        local env = load_environment{
+            mouse_x=3,
+            mouse_y=4,
+            map_pos={x=10, y=20, z=3},
+        }
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+        local handle = registration.register_map_tile{
+            owner=owner,
+            pos={x=10, y=20, z=3},
+            tooltip='Map demand',
+        }
+
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(env.run_next())
+        assert.equals(1, env.state.mouse_reads)
+        assert.equals(1, env.state.map_reads)
+        assert.equals(1, registration.get_diagnostics().sample_sequence)
+
+        assert.is_true(registration.unregister_map_tile(handle))
+        assert.is_false(registration.get_diagnostics().poller_running)
     end)
 
     it('polls through detector and service without a presentation host',

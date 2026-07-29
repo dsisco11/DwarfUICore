@@ -45,6 +45,8 @@ local function load_tooltip(state)
         require_modules={['gui.widgets']=widgets},
     })
     local _, text = module_loader.load(repo_root, text_path)
+    local _, class_helpers = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/class.lua')
     local registration = state.registration_service or {
         register=function() return true end,
         unregister=function() return true end,
@@ -115,6 +117,7 @@ local function load_tooltip(state)
             ['plugins.overlay']=overlay,
         },
         reqscript={
+            ['dwarfui/class']=class_helpers,
             ['dwarfui/widget_extensions']=extensions,
             ['dwarfui/tooltip_registration']=registration,
             ['dwarfui/tooltip_service']={service=service},

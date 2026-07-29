@@ -3,6 +3,7 @@
 local gui = require('gui')
 local widgets = require('gui.widgets')
 reqscript('dwarfui/widget_extensions')
+local class_helpers = reqscript('dwarfui/class')
 local text_helpers = reqscript('dwarfui/text')
 local tooltip_service_module = reqscript('dwarfui/tooltip_service')
 local render_hook_module = reqscript('dwarfui/tooltip_render_hook')
@@ -153,31 +154,6 @@ function TooltipRenderer:onRenderFrame(dc, rect)
     gui.paint_frame(dc, rect, self.frame_style)
 end
 
----Returns the DFHack class table for an instance in production or tests.
----@param instance table
----@return table|nil
-local function get_instance_class(instance)
-    local class = getmetatable(instance)
-    if class and rawget(class, 'super') == nil and
-            type(rawget(class, '__index')) == 'table' then
-        class = rawget(class, '__index')
-    end
-    return class
-end
-
----Returns whether an instance inherits from the requested DFHack class.
----@param instance table
----@param expected table
----@return boolean
-local function is_instance(instance, expected)
-    local class = get_instance_class(instance)
-    while class do
-        if class == expected then return true end
-        class = rawget(class, 'super')
-    end
-    return false
-end
-
 ---@class dwarfui.TooltipPresenterOptions
 ---@field service dwarfui.TooltipService
 ---@field hook_manager dwarfui.TooltipRenderHookManager
@@ -282,7 +258,7 @@ function TooltipPresenter:_classify_root(root)
     if type(root) ~= 'table' then
         return nil, nil, 'unsupported-root'
     end
-    if is_instance(root, self._screen_class) then
+    if class_helpers.is_instance_of(root, self._screen_class) then
         if root._native ~= nil and type(root.onRender) == 'function' then
             return self._transport.SCREEN, root, 'lua-screen'
         end
@@ -290,7 +266,8 @@ function TooltipPresenter:_classify_root(root)
     end
     local overlay_module = self._get_overlay_module()
     if type(overlay_module.OverlayWidget) == 'table' and
-            is_instance(root, overlay_module.OverlayWidget) then
+            class_helpers.is_instance_of(
+                root, overlay_module.OverlayWidget) then
         return self._transport.OVERLAY,
             overlay_module, 'overlay-widget'
     end
@@ -449,6 +426,31 @@ end
 ---@return boolean removed
 function unregister(widget)
     return reqscript('dwarfui/tooltip_registration').unregister(widget)
+end
+
+---Registers one exact map tile with owner-scoped tooltip eligibility.
+---@param options dwarfui.MapTileTooltipRegistrationOptions
+---@return dwarfui.MapTileTooltipRegistration
+function register_map_tile(options)
+    local registration = reqscript('dwarfui/tooltip_registration')
+    return registration.register_map_tile(options)
+end
+
+---Atomically replaces one map registration's exact position and tooltip.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@param update dwarfui.MapTileTooltipUpdate
+---@return boolean updated
+function update_map_tile(handle, update)
+    local registration = reqscript('dwarfui/tooltip_registration')
+    return registration.update_map_tile(handle, update)
+end
+
+---Explicitly removes one exact map-tile registration.
+---@param handle dwarfui.MapTileTooltipRegistration
+---@return boolean removed
+function unregister_map_tile(handle)
+    local registration = reqscript('dwarfui/tooltip_registration')
+    return registration.unregister_map_tile(handle)
 end
 
 presenter = TooltipPresenter.new{

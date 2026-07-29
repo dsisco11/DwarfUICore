@@ -76,6 +76,8 @@ local function load_environment()
         })
     local _, text = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/text.lua')
+    local _, class_helpers = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/class.lua')
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=process},
@@ -108,6 +110,7 @@ local function load_environment()
                     ['plugins.overlay']=overlay,
                 },
                 reqscript={
+                    ['dwarfui/class']=class_helpers,
                     ['dwarfui/widget_extensions']=extensions,
                     ['dwarfui/pointer']=pointer,
                     ['dwarfui/text']=text,

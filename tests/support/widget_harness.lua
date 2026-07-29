@@ -172,9 +172,16 @@ local function merge_methods(base, overrides)
     return result
 end
 
+---Creates a harness class with DFHack's direct instance-metatable layout.
+---@param kind string
+---@param parent table|nil
+---@param default_nil table
+---@param methods table|nil
+---@return table class_table
 local function class(kind, parent, default_nil, methods)
     local attributes = {}
     local result = {widget_kind=kind, super=parent}
+    result.__index = result
     result.ATTRS = setmetatable(attributes, {
         __call=function(_, additions)
             for key, value in pairs(additions) do attributes[key] = value end
@@ -188,7 +195,7 @@ local function class(kind, parent, default_nil, methods)
             info = info or {}
             local instance = {subviews={}}
             apply_attributes(instance, class_table, info, default_nil)
-            setmetatable(instance, {__index=class_table})
+            setmetatable(instance, class_table)
             if info.subviews then instance:addviews(info.subviews) end
             if class_table.init then class_table.init(instance, info) end
             return instance

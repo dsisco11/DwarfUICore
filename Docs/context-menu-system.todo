@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: planned
+Status: Phase 0 complete; production implementation not started
 
 ## Goal
 
@@ -67,9 +67,9 @@ while the map viewport moves.
       for any external state captured by that function.
 - [ ] Entry colors resolve independently in this order: entry override,
       menu-level default, system default.
-- [ ] Every `fg` and `bg` value is a valid integer `dfhack.color` value such as
-      a `COLOR_*` constant; pens, strings, callable values, and out-of-domain
-      integers are rejected.
+- [ ] Every `fg` and `bg` value is an integer display color in the inclusive
+      `COLOR_BLACK` through `COLOR_WHITE` domain (`0..15`); `COLOR_RESET`,
+      pens, strings, callable values, and out-of-domain integers are rejected.
 - [ ] The initial system uses `COLOR_WHITE` as the system foreground default
       and `COLOR_BLACK` as the system background default.
 - [ ] The resolved menu-level foreground/background pen colors the Window
@@ -207,13 +207,13 @@ definition table by side effect.
 
 ```text
 src/scripts_modinstalled/dwarfui/
+  map_projection.lua
   context_menu/
     api.lua
     definition.lua
     input_hook.lua
     input_sample.lua
     map_target.lua
-    projection.lua
     registration.lua
     renderer.lua
     root_discovery.lua
@@ -223,93 +223,247 @@ src/scripts_modinstalled/dwarfui/
     target.lua
 ```
 
-Map projection may live outside this directory only when the same change makes
-it a real shared dependency of at least two production consumers, including
-migration of the existing minecart projection. Otherwise the projection
-module remains context-menu-owned and lives under `context_menu/`. The
-context-menu adapter, session logic, and focused tests always remain inside
-their dedicated directories. The separately approved shared pointer enum
-refactor modifies `dwarfui/pointer.lua` and its existing consumers; it is shared
-infrastructure rather than a context-menu-owned module.
+The projection decision is frozen: extract `dwarfui/map_projection.lua` and
+migrate the existing minecart projection in the same implementation change.
+The context-menu adapter, session logic, and focused tests remain inside their
+dedicated directories. The separately approved shared pointer enum refactor
+modifies `dwarfui/pointer.lua` and its existing consumers; both shared modules
+are infrastructure rather than context-menu-owned modules.
+
+## Phase 0 audit record
+
+This audit was completed on 2026-07-30 before adding any context-menu
+production module.
+
+### Audited revisions and worktree state
+
+- DwarfUI was audited on branch `context-menu-system`, two commits ahead of
+  `origin/context-menu-system`, at
+  `028d4fcb7ea6fa1b485b27ff75b38caee7f4a35a`
+  (`docs: revise context menu system plan`). The tracked and untracked
+  DwarfUI worktree was clean before this planning-document update.
+- DFHack source was audited from the detached, tracked-clean
+  `53.15-r1` checkout at
+  `b12f73a323863761992faf93f15a70a3e8ad2acd`
+  (`Changelog and modules for 53.15-r1`). Generated untracked build outputs in
+  that checkout are pre-existing and were not used as source evidence.
+
+### Input and ownership seams
+
+- `library/LuaTools.cpp::PushInterfaceKeys()` independently copies
+  `_MOUSE_R` from the one-shot `mouse_rbut` flag and `_MOUSE_R_DOWN` from the
+  held `mouse_rbut_down` flag. They can therefore appear separately or
+  together in one Lua key table. The same relationship holds for `_MOUSE_L`
+  and `_MOUSE_L_DOWN`.
+- `Lua::Core::Reset()` inhibits a delivered click until the physical button is
+  released. There is no later actionable release key in the Lua input table.
+  The actionable context-menu boundary is `_MOUSE_R`; a coalesced down flag is
+  part of that same table, while a down-only table is held-state observation.
+- A focused search of the active DFHack Lua GUI sources found no
+  `_MOUSE_R_DOWN` action consumer. `gui.ZScreen`, dialogs, labels, materials,
+  and panel context actions use `_MOUSE_R`. `_MOUSE_L_DOWN` is used only for
+  continuing drag or text-selection state; List activation and Window drag
+  initiation use `_MOUSE_L`. This supports transparent down-only routing
+  without a latch or trailing-event suppression.
+- `plugins/overlay.cpp` calls
+  `plugins.overlay.feed_viewscreen_widgets()` before native viewscreen feed.
+  A truthy Lua return skips the native predecessor and calls
+  `markInputAsHandled()`; false delegates the original native input. The Lua
+  overlay dispatcher likewise stops at the first truthy widget result.
+  Context-menu opening must therefore either own the complete table or call
+  the prior Lua function once with that same table. Partial reinjection and a
+  reentrancy guard would violate this seam.
+- `library/modules/Screen.cpp` dynamically resolves the Lua screen's effective
+  `onInput` method on every feed and passes one key table. This permits a
+  reversible instance-method wrapper. A handled return marks the input
+  handled; an opening miss must invoke the captured effective predecessor
+  exactly once with the original `self` and table and return all predecessor
+  values unchanged.
+- The tooltip pointer poller is a one-frame `dfhack.timeout()` sampling chain.
+  It observes pointer state after dispatch and has no return path to the
+  active input feed. It remains useful precedent for registration-gated
+  discovery, but cannot be the opening or consumption seam.
+- Event ownership is deliberately table-level. Once Escape, actionable right
+  click, outside actionable left click, or a handled Window/List action owns
+  the table, every coalesced field is consumed. A miss or irrelevant table is
+  passed unchanged; no synthetic remainder is constructed.
+
+### ZScreen, Window, and List behavior
+
+- `gui.ZScreen:render()` renders its parent first, then itself. `hasFocus()`
+  requires its native screen to be current. Its default `onInput()` may raise
+  a defocused screen under the mouse, dismisses on `LEAVESCREEN` or
+  `_MOUSE_R`, and conditionally forwards pause, movement, and mouse input with
+  `sendInputToParent()`.
+- The context-menu screen will not use that default dispatcher for owned
+  input. It will explicitly set `initial_pause=false`, `force_pause=false`,
+  `pass_pause=true`, `pass_movement_keys=false`, `pass_mouse_clicks=false`,
+  and `defocusable=false`; classify owned tables itself; and delegate complete
+  irrelevant tables through `sendInputToParent()`. If another ZScreen becomes
+  current, ordinary screen-stack routing applies and the menu neither raises
+  itself nor traps focus.
+- `widgets.List:onInput()` offers the table to its scrollbar first, then uses
+  one `if`/`elseif` chain for `SELECT`, `SELECT_ALL`, `_MOUSE_L`, scrolling,
+  choice hotkeys, and label keys. Each successful branch returns, so one intact
+  table causes at most one List transition. `_MOUSE_L` selects and immediately
+  submits the pointed row. The embedded scrollbar consumes wheel keys only
+  while the pointer is within the parent List and uses `_MOUSE_L` for its
+  clickable controls.
+- Native List painting applies cursor/default/hover pens to rendered label
+  fragments, not a guaranteed whole-row background fill. The context-menu
+  renderer must paint each complete row with its resolved entry pen before
+  using native List input, selection, scrolling, and submission behavior.
+- A non-draggable, non-resizable `widgets.Window` delegates to its Panel
+  subviews and does not consume an otherwise-unhandled `_MOUSE_L` on its frame
+  or empty body. The context-menu screen must preserve any native subview
+  handling, then consume such a click inside the complete Window as a no-op.
+- DwarfDirect's command menu confirms the intended native composition:
+  `widgets.Window` containing `widgets.List`, with
+  `gui.FRAME_INTERIOR()` and native submission. Context-menu construction
+  additionally disables the Window defaults for dragging and resizing so its
+  anchor cannot be mutated by chrome interaction.
+
+### Reused tooltip contracts and deliberate deviations
+
+- Reuse weak, idempotent widget registration; exact integer x/y/z map handles;
+  weak map handle/coordinate indexing; atomic map updates; latest-registration
+  tie-breaking; exact parent/subview attachment checks; and visible, active,
+  enabled, currently presented root eligibility.
+- Reuse pointer traversal within each root, widget-over-map precedence, a
+  target in any eligible root winning over blockers elsewhere, and blocker
+  suppression of map fallback when no widget target wins. Preserve the latest
+  original registration sequence for deterministic cross-root selection.
+- Reuse the render-hook ownership rule for input wrappers: restore an
+  outermost owned wrapper exactly; never overwrite a foreign outer wrapper;
+  and leave an unremovable superseded trampoline inert and diagnosable.
+- Deliberately do not reuse tooltip registration persistence on reload.
+  Context-menu definitions own executable handler closures, so reload closes
+  presentation and destructively drops all registrations and session state.
+- Opening eligibility uses the strict tooltip root resolver. During an open
+  session, the context-menu ZScreen is allowed to sit above the source root:
+  validate that the weak source owner remains attached through the menu's
+  still-live presented parent/root chain. A later ZScreen above the menu does
+  not itself invalidate that chain. Hidden, inactive, detached, disabled, or
+  otherwise unpresented owners do invalidate it.
+
+### Projection, enums, colors, and API boundaries
+
+- `dwarfui/minecart_route.lua` contains the authoritative project precedent:
+  `Viewport:tileToScreen()` in text mode and Premium viewport-corner,
+  `viewport_zoom_factor // 4`, and tile-pixel-to-interface-cell math in
+  graphics mode. DFHack 53.15-r1 exposes no public Premium-aware helper with
+  the same contract. Extract this math to shared
+  `dwarfui/map_projection.lua` and migrate both minecart and context-menu
+  consumers atomically.
+- Freeze `ContextMenuTargetKind` as `WIDGET=1`, `MAP_TILE=2`;
+  `ContextMenuAnchorKind` as `SCREEN_POSITION=1`, `MAP_TILE=2`;
+  shared `PointerPolicy` as `TARGET=1`, `PASS=2`, `BLOCK=3`, `NONE=4`; and
+  shared `PointerResultKind` as `TARGET=1`, `BLOCKED=2`, `MISS=3`. Production
+  code must expose immutable tables and compare named members.
+- The pointer-string migration inventory is:
+  `dwarfui/pointer.lua`, `dwarfui/tooltip_target_detector.lua`,
+  `dwarfui/tooltip.lua`, `dwarfui/widget_extensions.lua`,
+  `dwarfui-minecart-route-markers.lua`,
+  `tests/infrastructure_smoke.spec.lua`,
+  `tests/minecart_route_overlay.spec.lua`,
+  `tests/package_contract.spec.lua`, `tests/pointer.spec.lua`,
+  `tests/tooltip_registration.spec.lua`, `tests/tooltip_service.spec.lua`,
+  `tests/tooltip_target_detector.spec.lua`, `tests/tooltip.spec.lua`, and
+  `tests/widget_extensions.spec.lua`.
+- The accepted color domain is exactly the integer range
+  `COLOR_BLACK..COLOR_WHITE` (`0..15`) from `ColorText.h`. Clone
+  `gui.FRAME_INTERIOR()` per menu and apply the resolved menu fg/bg to every
+  frame pen, the optional native title, and the otherwise-unpainted Window
+  body without mutating shared styles. Paint every entry's complete row with
+  its independently resolved fg/bg.
+- Target identity and placement are separate session fields. Widget targets
+  capture a `SCREEN_POSITION` anchor from the opening pointer; map targets
+  retain a copied world coordinate and use a `MAP_TILE` anchor reprojected
+  every render.
+- The initial public surface is registration-driven only:
+  `register`, `update`, `unregister`, `register_map_tile`,
+  `update_map_tile`, and `unregister_map_tile`. It exposes neither
+  `open_at_*` nor an open-menu replacement operation.
 
 ## Phase 0 - Freeze runtime seams and the API contract
 
-- [ ] Record the active DwarfUI revision, branch, and worktree state before
+- [x] Record the active DwarfUI revision, branch, and worktree state before
       implementation.
-- [ ] Record the active DFHack version and source revision used to audit input,
+- [x] Record the active DFHack version and source revision used to audit input,
       `gui.ZScreen`, overlay, widget, and viewport behavior.
-- [ ] Trace the current tooltip registration, root resolution, target
+- [x] Trace the current tooltip registration, root resolution, target
       detection, weak ownership, reload, and map-target behavior and identify
       the exact contracts to reuse.
-- [ ] Confirm that tooltip pointer polling is not an opening-input seam because
+- [x] Confirm that tooltip pointer polling is not an opening-input seam because
       it runs after input and cannot consume a right-click.
-- [ ] Verify the native input contract from
+- [x] Verify the native input contract from
       `plugins.overlay.feed_viewscreen_widgets()` through the C++ overlay feed
       hook, including the meaning of a truthy Lua return.
-- [ ] Verify the effective `onInput()` seam for Lua `gui.Screen` and
+- [x] Verify the effective `onInput()` seam for Lua `gui.Screen` and
       `gui.ZScreen` instances, including predecessor call and return behavior.
-- [ ] Record which right-click keys the active DFHack build can deliver,
+- [x] Record which right-click keys the active DFHack build can deliver,
       including `_MOUSE_R_DOWN` and `_MOUSE_R`, and whether they can be
       delivered separately or together in one key table.
-- [ ] Verify from active DFHack source and a focused seam characterization that
+- [x] Verify from active DFHack source that
       `_MOUSE_R_DOWN` alone does not perform the native or DwarfUI action that
       the context menu must suppress. If this is false, amend this checklist
       before implementing a latch or suppression mechanism.
-- [ ] Record which left-click keys the active DFHack build and `widgets.List`
+- [x] Record which left-click keys the active DFHack build and `widgets.List`
       consume, and verify that actionable selection and outside-click behavior
       occurs on `_MOUSE_L`, not `_MOUSE_L_DOWN`.
-- [ ] Record DFHack's event-level input ownership contract: a handled
+- [x] Record DFHack's event-level input ownership contract: a handled
       context-menu action consumes its complete key table, including any
       additional fields, while a table with no relevant action is delegated
       unchanged.
-- [ ] Verify that the native overlay seam can either handle the complete input
+- [x] Verify that the native overlay seam can either handle the complete input
       table or delegate it unchanged; do not add partial-batch reinjection,
       `gui.simulateInput()` remainder forwarding, or a reentrancy guard.
-- [ ] Verify `gui.ZScreen` parent render, focus, dismissal, pause, movement,
+- [x] Verify `gui.ZScreen` parent render, focus, dismissal, pause, movement,
       and `sendInputToParent()` behavior.
-- [ ] Verify native `widgets.List` keyboard, mouse, wheel, selection, and
+- [x] Verify native `widgets.List` keyboard, mouse, wheel, selection, and
       submission behavior and identify which row-painting behavior requires a
       context-menu-specific renderer.
-- [ ] Verify that native Window/List dispatch produces at most one transition
+- [x] Verify that native Window/List dispatch produces at most one transition
       when an intact table contains several remaining List-owned keys. If it
       does not, revise the locked remaining-action policy before implementation
       instead of allowing multiple selections or navigation transitions.
-- [ ] Characterize how a non-draggable, non-resizable `widgets.Window` handles
+- [x] Characterize how a non-draggable, non-resizable `widgets.Window` handles
       clicks on its frame and empty body. Preserve its native handling and use
       the screen-owned no-op only for an actionable inside click it leaves
       unhandled, preventing click-through without inventing chrome actions.
-- [ ] Record the DwarfDirect command menu's `widgets.Window` plus
+- [x] Record the DwarfDirect command menu's `widgets.Window` plus
       `widgets.List` composition and reuse its native frame/list interaction
       model, with dragging and resizing disabled to preserve context-menu
       anchors.
-- [ ] Audit the existing minecart world-to-interface projection in text and
+- [x] Audit the existing minecart world-to-interface projection in text and
       Premium graphics modes and decide whether to extract a generic helper or
       consume an existing public helper.
-- [ ] Define immutable numeric `ContextMenuTargetKind` members for
+- [x] Define immutable numeric `ContextMenuTargetKind` members for
       `WIDGET` and `MAP_TILE`.
-- [ ] Define immutable numeric `ContextMenuAnchorKind` members for
+- [x] Define immutable numeric `ContextMenuAnchorKind` members for
       `SCREEN_POSITION` and `MAP_TILE`.
-- [ ] Define immutable numeric `PointerPolicy` members for `TARGET`, `PASS`,
+- [x] Define immutable numeric `PointerPolicy` members for `TARGET`, `PASS`,
       `BLOCK`, and `NONE`, and `PointerResultKind` members for `TARGET`,
       `BLOCKED`, and `MISS` in the shared pointer module.
-- [ ] Inventory every production and test consumer of string
+- [x] Inventory every production and test consumer of string
       `pointer_policy`/pointer-result values so the shared enum migration is
       complete and atomic.
-- [ ] Keep target identity and anchor placement as separate concepts throughout
+- [x] Keep target identity and anchor placement as separate concepts throughout
       the API and internal session model.
-- [ ] Freeze the accepted `dfhack.color` integer domain and the exact
-      menu-frame, title, body, and entry-row color application contract.
-- [ ] Do not publish an explicit programmatic `open_at_*` or replacement API
+- [x] Freeze the accepted `COLOR_BLACK`..`COLOR_WHITE` display-color domain
+      and the exact menu-frame, title, body, and entry-row color application
+      contract.
+- [x] Do not publish an explicit programmatic `open_at_*` or replacement API
       in the initial contract. Reevaluate only when a concrete consumer and
       focused tests require one.
 
 ### Phase 0 completion gate
 
-- [ ] The opening, closing, consumption, rendering, and projection seams are
+- [x] The opening, closing, consumption, rendering, and projection seams are
       supported by the active DFHack source rather than assumptions.
-- [ ] The public registration contract and both anchor modes are written down
+- [x] The public registration contract and both anchor modes are written down
       before production modules are added.
-- [ ] Any deviation from the architecture in this checklist is recorded in
+- [x] Any deviation from the architecture in this checklist is recorded in
       this planning document before implementation proceeds.
 
 ## Phase 1 - Implement definitions, snapshots, and open-session types
@@ -318,8 +472,9 @@ infrastructure rather than a context-menu-owned module.
       `ContextMenuDefinition` and `ContextMenuEntry` annotations.
 - [ ] Support an optional non-empty title after validation.
 - [ ] Support menu-level optional `fg` and `bg` colors.
-- [ ] Validate every supplied `fg` and `bg` as an in-domain integer
-      `dfhack.color`; reject pens and every non-color representation.
+- [ ] Validate every supplied `fg` and `bg` as an integer display color in the
+      inclusive `COLOR_BLACK`..`COLOR_WHITE` range; reject `COLOR_RESET`,
+      pens, and every non-color representation.
 - [ ] Require a non-empty `entries` list.
 - [ ] Require every entry to contain a non-empty string `label`.
 - [ ] Require every entry to contain a Lua function `on_select` for which
@@ -756,11 +911,9 @@ infrastructure rather than a context-menu-owned module.
       longer appear attached to its source tile.
 - [ ] Do not change viewport, cursor, game pause, or native map state merely to
       keep the menu visible.
-- [ ] If a generic projection helper is extracted outside `context_menu/`,
-      migrate the existing minecart projection to it in the same change so the
-      helper has at least two production consumers.
-- [ ] Otherwise keep the projection implementation under `context_menu/`; do
-      not create a nominally generic one-consumer module or silently duplicate
+- [ ] Add shared `dwarfui/map_projection.lua` and migrate the existing
+      minecart projection to it in the same change, giving the helper both
+      minecart and context-menu production consumers without duplicating
       graphics-mode math.
 - [ ] Add unit tests proving a screen-position anchor remains fixed.
 - [ ] Add unit tests proving a map anchor moves after viewport changes and
@@ -804,9 +957,9 @@ infrastructure rather than a context-menu-owned module.
 - [ ] Document the public registration, update, unregister, map-handle,
       definition, color-fallback, selection-context, close, and anchoring
       contracts in the project README or a dedicated guide.
-- [ ] Document accepted `dfhack.color` values, menu frame/title/body color
-      application, update-stable duplicate map precedence, map-handle lifetime,
-      and map-owner root eligibility.
+- [ ] Document accepted `COLOR_BLACK`..`COLOR_WHITE` display colors, menu
+      frame/title/body color application, update-stable duplicate map
+      precedence, map-handle lifetime, and map-owner root eligibility.
 - [ ] Document that the initial public API has no programmatic replacement
       operation and that a right-click while open only closes.
 - [ ] Include examples for a widget screen-position menu and an exact map-tile
@@ -977,8 +1130,9 @@ infrastructure rather than a context-menu-owned module.
 - [ ] Optional title, menu foreground/background defaults, entry labels,
       entry handlers, and independent entry color overrides behave as
       documented.
-- [ ] Every `fg` and `bg` value is a valid integer `dfhack.color`; unsupported
-      values are rejected before registration state changes.
+- [ ] Every `fg` and `bg` value is an integer in the inclusive
+      `COLOR_BLACK..COLOR_WHITE` (`0..15`) domain; `COLOR_RESET` and every
+      other unsupported value are rejected before registration state changes.
 - [ ] Resolved menu colors apply to the native frame, optional title, and body;
       independently resolved entry colors fill their complete rows without
       mutating shared DFHack frame styles.

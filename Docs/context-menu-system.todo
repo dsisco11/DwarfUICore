@@ -1,0 +1,571 @@
+# Context Menu System Implementation Checklist
+
+Status: planned
+
+## Goal
+
+Add a reusable DwarfUI context-menu system whose registration and target
+resolution resemble the existing tooltip system while providing synchronous
+right-click ownership and an interactive menu.
+
+A caller registers a small `ContextMenuDefinition` against either a UI widget
+or an exact map tile. Right-clicking an eligible registered target opens one
+menu and consumes the complete opening gesture. UI-widget menus are anchored
+to the captured screen position. Map-tile menus retain their world position
+and are reprojected before every render so they remain attached while the map
+viewport moves.
+
+## Locked product decisions
+
+- [ ] All context-menu-owned production modules live under
+      `src/scripts_modinstalled/dwarfui/context_menu/`.
+- [ ] All focused unit and DwarfSpec files live under
+      `tests/context_menu/`.
+- [ ] The public facade is loaded with
+      `reqscript('dwarfui/context_menu/api')`; do not add a top-level
+      `dwarfui/context_menu.lua` compatibility facade.
+- [ ] A UI-widget registration opens at the screen position captured from the
+      opening right-click.
+- [ ] A map-tile registration opens from an exact world tile and recomputes
+      its projected screen position before every render.
+- [ ] "Screen position" means the DFHack screen/interface coordinate space
+      used by widget frames, mouse input, and interface painting. It does not
+      mean an operating-system physical display pixel.
+- [ ] Screen-position anchors remain fixed for the open session, apart from
+      menu-frame reclamping after an interface-size change.
+- [ ] Map-tile anchors move with camera panning and zoom and close when the
+      source tile is no longer projectable on the displayed z-level or inside
+      the visible map viewport.
+- [ ] Opening on a registered target consumes every delivered boundary of the
+      right-click gesture so native DF and other UI cannot also react.
+- [ ] `LEAVESCREEN`/Escape closes the open menu and consumes the input.
+- [ ] A second right-click closes the open menu and consumes the complete
+      right-click gesture without reopening another target.
+- [ ] Left-clicking an entry closes the menu, consumes the input, and invokes
+      that entry exactly once.
+- [ ] Left-clicking outside the menu closes it and consumes the complete
+      delivered click gesture.
+- [ ] Selecting an entry by keyboard also closes before invoking its handler
+      and consumes the selection input.
+- [ ] The definition used by an open menu is a validated snapshot. Updating a
+      registration affects its next opening, not the current session.
+- [ ] Entry colors resolve independently in this order: entry override,
+      menu-level default, system default.
+- [ ] The initial system uses `COLOR_WHITE` as the system foreground default
+      and `COLOR_BLACK` as the system background default.
+- [ ] UI-widget targets take precedence over map-tile targets. A blocking UI
+      region suppresses map fallback even when that region has no context
+      menu.
+- [ ] The menu closes before calling `on_select` so handler errors, reloads,
+      or reentrant menu operations cannot leave stale presentation state.
+- [ ] Context-menu presentation may own focus and input while open. It does
+      not inherit the tooltip requirement to remain transparent to focus and
+      input.
+- [ ] No implementation or test may rely on loose discriminator strings or
+      magic numbers. Closed sets use immutable numeric LuaDoc enums and named
+      members.
+- [ ] Every new or modified class and method has LuaDoc documentation.
+- [ ] Local unit evidence, packaged-module evidence, registered live-runtime
+      evidence, and manual visual evidence are recorded separately.
+
+## Intended public contract
+
+```lua
+local context_menu = reqscript('dwarfui/context_menu/api')
+
+context_menu.register(widget, {
+    title='Route stop',
+    fg=COLOR_WHITE,
+    bg=COLOR_BLACK,
+    entries={
+        {
+            label='Move stop',
+            on_select=function(context)
+                -- Update the selected stop.
+            end,
+        },
+        {
+            label='Delete stop',
+            fg=COLOR_LIGHTRED,
+            on_select=function(context)
+                -- Delete the selected stop.
+            end,
+        },
+    },
+})
+
+local handle = context_menu.register_map_tile{
+    owner=overlay,
+    pos=stop.pos,
+    definition=definition,
+}
+```
+
+The implementation may expose explicit `update(widget, definition)`,
+`unregister(widget)`, and atomic
+`update_map_tile(handle, {pos=pos, definition=definition})` operations. It
+should not require callers to mutate a registered definition table by side
+effect.
+
+## Planned module layout
+
+```text
+src/scripts_modinstalled/dwarfui/
+  context_menu/
+    api.lua
+    definition.lua
+    input_hook.lua
+    map_target.lua
+    registration.lua
+    renderer.lua
+    screen.lua
+    service.lua
+    target_detector.lua
+    target.lua
+```
+
+If map projection is extracted as reusable infrastructure, its generic module
+may live outside this directory. The context-menu-owned adapter, session
+logic, and tests must remain inside their dedicated directories.
+
+## Phase 0 - Freeze runtime seams and the API contract
+
+- [ ] Record the active DwarfUI revision, branch, and worktree state before
+      implementation.
+- [ ] Record the active DFHack version and source revision used to audit input,
+      `gui.ZScreen`, overlay, widget, and viewport behavior.
+- [ ] Trace the current tooltip registration, root resolution, target
+      detection, weak ownership, reload, and map-target behavior and identify
+      the exact contracts to reuse.
+- [ ] Confirm that tooltip pointer polling is not an opening-input seam because
+      it runs after input and cannot consume a right-click.
+- [ ] Verify the native input contract from
+      `plugins.overlay.feed_viewscreen_widgets()` through the C++ overlay feed
+      hook, including the meaning of a truthy Lua return.
+- [ ] Verify the effective `onInput()` seam for Lua `gui.Screen` and
+      `gui.ZScreen` instances, including predecessor call and return behavior.
+- [ ] Record which right-click keys the active DFHack build can deliver,
+      including `_MOUSE_R_DOWN` and `_MOUSE_R`.
+- [ ] Record which left-click keys the active DFHack build can deliver so an
+      outside close cannot leak a trailing boundary.
+- [ ] Verify `gui.ZScreen` parent render, focus, dismissal, pause, movement,
+      and `sendInputToParent()` behavior.
+- [ ] Verify native `widgets.List` keyboard, mouse, wheel, selection, and
+      submission behavior and identify which row-painting behavior requires a
+      context-menu-specific renderer.
+- [ ] Audit the existing minecart world-to-interface projection in text and
+      Premium graphics modes and decide whether to extract a generic helper or
+      consume an existing public helper.
+- [ ] Define immutable numeric `ContextMenuTargetKind` members for
+      `WIDGET` and `MAP_TILE`.
+- [ ] Define immutable numeric `ContextMenuAnchorKind` members for
+      `SCREEN_POSITION` and `MAP_TILE`.
+- [ ] Keep target identity and anchor placement as separate concepts throughout
+      the API and internal session model.
+- [ ] Specify whether any explicit programmatic `open_at_*` API is needed by
+      an initial consumer. Do not publish convenience entry points without a
+      concrete use case and tests.
+
+### Phase 0 completion gate
+
+- [ ] The opening, closing, consumption, rendering, and projection seams are
+      supported by the active DFHack source rather than assumptions.
+- [ ] The public registration contract and both anchor modes are written down
+      before production modules are added.
+- [ ] Any deviation from the architecture in this checklist is recorded in
+      this planning document before implementation proceeds.
+
+## Phase 1 - Implement definitions, snapshots, and open-session types
+
+- [ ] Add `context_menu/definition.lua` with documented
+      `ContextMenuDefinition` and `ContextMenuEntry` annotations.
+- [ ] Support an optional non-empty title after validation.
+- [ ] Support menu-level optional `fg` and `bg` colors.
+- [ ] Require a non-empty `entries` list.
+- [ ] Require every entry to contain a non-empty string `label`.
+- [ ] Require every entry to contain a callable `on_select`.
+- [ ] Support independent optional entry-level `fg` and `bg` colors.
+- [ ] Reject unknown shapes and invalid values with errors that identify the
+      offending field and entry index.
+- [ ] Resolve missing colors through entry, menu, and system defaults without
+      mutating the caller's table.
+- [ ] Snapshot title, resolved pens, labels, and handler references when the
+      menu opens.
+- [ ] Add documented target and anchor descriptor types in
+      `context_menu/target.lua`.
+- [ ] Define a documented selection-context object containing target kind,
+      anchor kind, source widget or map owner identity, source root, captured
+      screen position, and copied map position where applicable.
+- [ ] Never retain a native map object pointer when a copied coordinate or
+      stable numeric identity is sufficient.
+- [ ] Add a documented open-session type that owns exactly one definition
+      snapshot, target descriptor, anchor descriptor, and lifecycle state.
+- [ ] Add focused definition tests under `tests/context_menu/` for valid,
+      invalid, empty, and partially colored definitions.
+- [ ] Add focused snapshot tests proving caller mutation after opening does not
+      alter the active menu.
+
+### Phase 1 completion gate
+
+- [ ] Definition validation, color fallback, snapshot immutability, enum use,
+      and selection context are deterministic without a live DF runtime.
+- [ ] Every new class and method has LuaDoc documentation.
+
+## Phase 2 - Implement widget and map-tile registration
+
+- [ ] Add `context_menu/registration.lua` as the owner of public widget
+      registrations and registration lifecycle.
+- [ ] Preserve tooltip-like weak widget ownership so registration does not
+      keep a removed widget alive.
+- [ ] Make repeated registration of the same widget deterministic and
+      idempotent for the same definition.
+- [ ] Implement explicit widget update and unregister behavior.
+- [ ] Resolve the widget's eligible current root dynamically instead of
+      retaining a stale screen or overlay root.
+- [ ] Reject detached, hidden, inactive, disabled-overlay, foreign-root, or
+      otherwise ineligible widget registrations at target-resolution time.
+- [ ] Add `context_menu/map_target.lua` with exact copied x/y/z keys, weak
+      owner semantics, and disposable registration handles.
+- [ ] Define deterministic latest-registration precedence for duplicate map
+      coordinates.
+- [ ] Implement atomic map-handle updates for position and definition.
+- [ ] Ensure a failed update leaves the prior map registration intact.
+- [ ] Automatically remove map registrations when their weak owner or handle
+      is no longer live.
+- [ ] Start any registration-gated input/root discovery only when at least one
+      eligible registration exists.
+- [ ] Stop discovery and release hooks when the final registration disappears
+      and no menu is open.
+- [ ] Add focused registration tests for collection, detach, visibility,
+      root changes, disabled overlays, duplicate map positions, failed updates,
+      explicit unregister, and reload generation changes.
+
+### Phase 2 completion gate
+
+- [ ] Widget and map registrations have weak, reload-safe, explicitly tested
+      ownership.
+- [ ] Registration alone does not open a screen, consume input, or mutate a
+      consumer root.
+
+## Phase 3 - Implement target detection and anchor capture
+
+- [ ] Add `context_menu/target_detector.lua` and reuse the generic
+      `dwarfui/pointer` traversal policies instead of creating a second widget
+      hit tester.
+- [ ] Traverse overlapping UI descendants in reverse render order.
+- [ ] Preserve `target`, `pass`, `block`, and `none` policy semantics.
+- [ ] Allow only a currently eligible registered widget to resolve as a widget
+      context-menu target.
+- [ ] Suppress map fallback when pointer traversal reports a blocking UI
+      region, including native UI occluding the map.
+- [ ] Attempt exact same-z map lookup only after widget resolution reports a
+      true miss rather than a block.
+- [ ] Give a widget target precedence over a map target at the same screen
+      position.
+- [ ] Capture the opening pointer position as a copied
+      `SCREEN_POSITION` anchor for a widget target.
+- [ ] Capture the registered copied world coordinate as a `MAP_TILE` anchor for
+      a map target.
+- [ ] Preserve the source root and stable target identity in the selection
+      context without extending their lifetime unnecessarily.
+- [ ] Do not infer a map target from a projected marker, label, or proximity;
+      resolve the exact world tile under the pointer.
+- [ ] Add focused tests for overlap, clipping, target ownership, blockers,
+      UI-over-map precedence, exact same-z matching, duplicate map entries, and
+      both anchor descriptor types.
+
+### Phase 3 completion gate
+
+- [ ] One pointer sample produces exactly one eligible target, block, or miss.
+- [ ] UI targets produce fixed screen anchors and map targets produce copied
+      world anchors.
+- [ ] Native or DwarfUI-owned UI cannot accidentally expose an underlying map
+      context menu.
+
+## Phase 4 - Own the opening and closing input gestures
+
+- [ ] Add `context_menu/input_hook.lua` with reload-safe hook ownership,
+      predecessor preservation, exact restoration, and foreign-wrapper safety.
+- [ ] Intercept native viewscreen input at
+      `plugins.overlay.feed_viewscreen_widgets()` before delegating to its
+      predecessor.
+- [ ] Intercept Lua-screen input at the owning screen instance's effective
+      `onInput()` before delegating to its predecessor.
+- [ ] Install Lua-screen hooks only on roots that can own an eligible
+      registered target.
+- [ ] On `_MOUSE_R_DOWN`, resolve and latch an eligible target and consume the
+      boundary without opening yet.
+- [ ] On the matching `_MOUSE_R`, consume the boundary and open the latched
+      target.
+- [ ] If the runtime delivers only `_MOUSE_R`, resolve, consume, and open from
+      that event.
+- [ ] Clear a latched opening target if its root, eligibility, pointer
+      position, registration generation, or definition becomes invalid before
+      completion.
+- [ ] Ensure every delivered boundary of an opening gesture is consumed while
+      an unregistered miss preserves predecessor calls and exact return values.
+- [ ] While a menu is open, consume Escape and close it.
+- [ ] While a menu is open, consume the complete second-right-click gesture,
+      close once, and suppress its trailing boundary so it cannot reopen a
+      target.
+- [ ] While a menu is open, consume a left-click outside, close once, and
+      suppress any delivered trailing boundary.
+- [ ] Route a left-click inside an enabled entry to selection; close and
+      consume before invoking its handler.
+- [ ] Route keyboard selection through the same close-before-callback path.
+- [ ] Prevent handler errors from restoring or duplicating a closed session;
+      report the error through the established DFHack error boundary.
+- [ ] Add focused hook tests for native and Lua seams, paired and unpaired
+      mouse events, misses, blockers, predecessor return preservation,
+      reentrancy, reload adoption, exact restoration, and foreign wrappers.
+
+### Phase 4 completion gate
+
+- [ ] Opening, outside-left-click closing, second-right-click closing, Escape,
+      and selection each consume their input exactly once.
+- [ ] A miss is behaviorally transparent to the predecessor.
+- [ ] No half-gesture can leak into native DF, another overlay, or a newly
+      opened menu.
+
+## Phase 5 - Implement the interactive menu screen and renderer
+
+- [ ] Add `context_menu/screen.lua` as a short-lived `gui.ZScreen` host owned
+      by one open session.
+- [ ] Configure the screen so opening a menu does not force or toggle pause.
+- [ ] Render the parent first and the context menu last so the menu is the
+      topmost final paint.
+- [ ] Preserve appropriate parent movement input for an open map-tile menu so
+      camera movement can occur and visibly exercise live reprojection.
+- [ ] Do not forward Escape, right-click, outside left-click, entry selection,
+      or any other context-menu-owned input to the parent.
+- [ ] Add `context_menu/renderer.lua` with an optional title and a selectable,
+      scrollable entry list.
+- [ ] Size width from the longest title or entry label plus frame padding.
+- [ ] Cap height to the available screen space and enable wheel and keyboard
+      scrolling when entries do not fit.
+- [ ] Fill each complete entry row with its resolved background rather than
+      coloring only the label cells.
+- [ ] Paint each entry with its resolved foreground and background.
+- [ ] Define deterministic selected and hovered pens that preserve readable
+      contrast when entries use custom colors.
+- [ ] Keep the title nonselectable and omit any automatic list-count suffix.
+- [ ] Support keyboard navigation and selection, left-click selection, and
+      wheel scrolling.
+- [ ] Clamp the final menu frame to every screen edge without changing the
+      stored source anchor.
+- [ ] Recompute layout after interface dimension changes.
+- [ ] Dismiss the screen exactly once on selection, explicit close, source
+      invalidation, reload, world unload, or owner removal.
+- [ ] Add focused renderer and screen tests for empty title, long labels,
+      custom pens, selection pens, scrolling, every screen edge, small
+      interfaces, resize, and all close paths.
+
+### Phase 5 completion gate
+
+- [ ] The menu is readable, topmost, navigable, and fully interactive with
+      both default and entry-specific colors.
+- [ ] Screen ownership does not pause the game or pass menu-owned input to the
+      parent.
+- [ ] Every dismissal path destroys one open screen and one session.
+
+## Phase 6 - Implement screen-position and map-tile placement
+
+- [ ] Keep a widget menu's captured screen anchor fixed while its source
+      widget moves or rerenders.
+- [ ] Re-clamp a widget menu after screen-size changes without changing its
+      captured anchor.
+- [ ] For map-tile sessions, retain a copied x/y/z world coordinate and
+      re-resolve the current dwarfmode viewport before every render.
+- [ ] Use the active DFHack viewport helper for text-mode world-to-screen
+      projection.
+- [ ] Use the active Premium viewport corner, interface dimensions, and zoom
+      factor for graphics-mode projection.
+- [ ] Keep the projected anchor and menu frame in one interface coordinate
+      space.
+- [ ] Reproject after camera panning, zoom, interface resize, and other
+      viewport changes.
+- [ ] Close and consume no additional input when the tile becomes offscreen,
+      changes away from the displayed z-level, the world unloads, or the
+      owning registration becomes invalid.
+- [ ] Do not pin an offscreen map menu to the nearest screen edge; it would no
+      longer appear attached to its source tile.
+- [ ] Do not change viewport, cursor, game pause, or native map state merely to
+      keep the menu visible.
+- [ ] If a generic projection helper is extracted, migrate the existing
+      minecart projection to it or prove why two implementations are required;
+      do not silently duplicate graphics-mode math.
+- [ ] Add unit tests proving a screen-position anchor remains fixed.
+- [ ] Add unit tests proving a map anchor moves after viewport changes and
+      closes for offscreen, wrong-z, invalid-owner, and world-unload cases.
+- [ ] Add text-mode and Premium projection coverage for map edges, zoom,
+      interface resize, and clamped menu placement.
+
+### Phase 6 completion gate
+
+- [ ] Widget context menus remain at their captured screen positions.
+- [ ] Map context menus visibly track their world tiles every render.
+- [ ] Projection invalidation closes cleanly without stale screens, map
+      mutation, or input side effects.
+
+## Phase 7 - Integrate lifecycle, reload, registry, packaging, and docs
+
+- [ ] Add `context_menu/service.lua` as the single process-wide owner of the
+      active session, opening latch, hook generation, and diagnostics.
+- [ ] Enforce at most one active context menu process-wide.
+- [ ] Opening a new valid target closes any older session before creating the
+      replacement.
+- [ ] Make module reload invalidate stale callbacks, latches, registrations,
+      screens, and render/input ownership from the prior generation.
+- [ ] Restore only hooks owned by this generation and never overwrite a
+      foreign wrapper installed after DwarfUI.
+- [ ] Clear the active menu and registrations on world unload and DwarfUI
+      teardown.
+- [ ] Add every reload-managed module to
+      `dwarfui/module_registry.lua` in dependency order.
+- [ ] Update module-registry tests for load and environment-clear order.
+- [ ] Update package-contract tests for all
+      `dwarfui/context_menu/` production modules.
+- [ ] Update build/package verification so nested production and test
+      directories are discovered correctly.
+- [ ] Document the public registration, update, unregister, map-handle,
+      definition, color-fallback, selection-context, close, and anchoring
+      contracts in the project README or a dedicated guide.
+- [ ] Include examples for a widget screen-position menu and an exact map-tile
+      menu.
+- [ ] Document that selection and outside left-click both close and consume.
+- [ ] Link `Docs/project.todo` to this checklist without marking the project
+      item complete before every definition-of-done gate passes.
+
+### Phase 7 completion gate
+
+- [ ] Reload and teardown leave no stale screen, hook, latch, registration,
+      pointer state, or callback.
+- [ ] Registry order, package contents, public documentation, and both anchor
+      examples match the implemented API.
+
+## Phase 8 - Add native component and interaction coverage
+
+- [ ] Add a DwarfSpec component test for a registered DwarfUI overlay control
+      whose context menu opens at the captured screen position.
+- [ ] Right-click the actual rendered control through the production input
+      boundary.
+- [ ] Prove the backing UI does not receive either boundary of the opening
+      right-click.
+- [ ] Prove an outside left-click closes and does not reach backing UI.
+- [ ] Reopen and prove a second right-click closes and does not reopen or reach
+      backing UI.
+- [ ] Reopen and prove Escape closes and is consumed.
+- [ ] Reopen, select an entry with a real left-click, and prove it closes,
+      consumes, and calls the handler once.
+- [ ] Reopen, select an entry with keyboard input, and prove it closes,
+      consumes, and calls the handler once.
+- [ ] Add a Lua `gui.ZScreen` component case that opens through its instance
+      input seam rather than the native overlay seam.
+- [ ] Add a map-tile component case against a real visible same-z map tile.
+- [ ] Prove opening the map menu suppresses native map right-click behavior.
+- [ ] Move the map camera while the menu remains open and prove the menu moves
+      with the same source tile.
+- [ ] Change z-level or pan the source tile outside the visible viewport and
+      prove the menu closes cleanly.
+- [ ] Exercise custom title, menu colors, per-entry overrides, long lists,
+      scrolling, and selection in the mounted production renderer.
+- [ ] Snapshot and restore pointer, viewport, z-level, pause state, screen
+      stack, overlay state, and any test-owned registrations even when an
+      assertion fails.
+- [ ] Require DwarfSpec `cleanup_confirmed=true` and independently inspect
+      retained screens, hooks, registrations, and pointer state.
+
+### Phase 8 completion gate
+
+- [ ] Production widget and map registrations open through their real input
+      seams and consume opening, closing, and selection input.
+- [ ] The screen-position anchor is fixed and the map-tile anchor tracks camera
+      movement in the mounted production system.
+- [ ] Cleanup is confirmed with no retained UI, hooks, registrations, or
+      changed game state.
+
+## Phase 9 - Complete verification and live acceptance
+
+- [ ] Run the focused definition, registration, detector, hook, renderer,
+      screen, service, and projection unit specs through
+      `./tools/Run-UnitTests.ps1`.
+- [ ] Run the focused context-menu DwarfSpec files through
+      `./tools/Run-AutomationTests.ps1`, which remains a direct
+      `dwarfspec run` pass-through.
+- [ ] Run the complete standalone unit suite.
+- [ ] Run the complete DwarfSpec suite.
+- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
+- [ ] Run the offline build through `./tools/Build.ps1` without claiming live
+      runtime evidence.
+- [ ] Run expanded and archive package verification through the scripts under
+      `./tools/`.
+- [ ] Run `git diff --check`.
+- [ ] Install the built package in the configured live DFHack instance and run
+      `dwarfui reload`.
+- [ ] Confirm the live module registry contains one coherent context-menu
+      generation and no stale hook or screen.
+- [ ] Manually right-click a registered UI control and confirm the menu opens
+      at the click's screen position.
+- [ ] Manually confirm opening, outside left-click closing, second-right-click
+      closing, Escape, mouse selection, and keyboard selection are consumed
+      and do not activate backing UI.
+- [ ] Manually right-click a registered map tile and confirm the menu follows
+      map panning and zoom.
+- [ ] Manually confirm map-tile invalidation on viewport exit and z-level
+      change.
+- [ ] Review DFHack console output and logs after interaction, reload, world
+      unload, and teardown.
+- [ ] Record focused unit, complete unit, focused DwarfSpec, complete
+      DwarfSpec, syntax, build, package, registry, cleanup, and manual visual
+      evidence separately.
+
+### Phase 9 completion gate
+
+- [ ] All automated suites, syntax checks, builds, packages, and whitespace
+      checks pass.
+- [ ] Live DFHack proves both placement modes and all required consumption and
+      closure behavior without Lua errors or stale lifecycle state.
+- [ ] No automated registration or cleanup result is reported as visual live
+      success.
+
+## Definition of done
+
+- [ ] A caller can register a validated `ContextMenuDefinition` against a UI
+      widget or exact map tile.
+- [ ] Optional title, menu foreground/background defaults, entry labels,
+      entry handlers, and independent entry color overrides behave as
+      documented.
+- [ ] Widget menus open at the captured screen position and remain fixed there
+      while open.
+- [ ] Map menus remain attached to their projected world tiles as the camera
+      moves and close when the tile is no longer projectable.
+- [ ] Every opening right-click is fully consumed.
+- [ ] Escape, a second right-click, and an outside left-click close and consume
+      without leaking input.
+- [ ] Mouse or keyboard item selection closes first, consumes, and invokes the
+      selected handler exactly once.
+- [ ] UI targets, blocking regions, and map targets obey deterministic
+      precedence.
+- [ ] Only one menu is open process-wide.
+- [ ] All context-menu-owned source and focused test files live in their
+      dedicated directories.
+- [ ] Reload, world unload, owner removal, and teardown leave no stale screen,
+      hook, latch, registration, callback, or pointer state.
+- [ ] All new and modified classes and methods have LuaDoc comments.
+- [ ] Unit, component, syntax, build, package, live registration, cleanup, and
+      manual visual evidence are complete and reported without conflation.
+
+## Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Pending | Definition, registration, targeting, input, renderer, lifecycle, and projection coverage. |
+| | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Pending | Record structured result and `cleanup_confirmed`. |
+| | Complete unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
+| | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Record cleanup separately from behavior. |
+| | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include nested production, unit, support, and `.ds.lua` files. |
+| | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | Offline packaging evidence only. |
+| | Package verification | `./tools/Publish.ps1` | Pending | Verify expanded and archive contents. |
+| | Diff validation | `git diff --check` | Pending | Record whitespace result. |
+| | Registered runtime | `dwarfui reload` and registry/hook inspection | Pending | Confirm one active generation and no stale screen. |
+| | Live visual behavior | Registered UI control and visible registered map tile | Pending | Verify placement, reprojection, consumption, dismissal, selection, and cleanup. |

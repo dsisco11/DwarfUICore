@@ -236,80 +236,80 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 
 ## Phase 5: Add native integration and complete validation
 
-- [ ] Extend or add a DwarfSpec test whose filename ends only in `.ds.lua`.
-- [ ] Mount the production Minecart Route overlay against the real native
+- [x] Extend or add a DwarfSpec test whose filename ends only in `.ds.lua`.
+- [x] Mount the production Minecart Route overlay against the real native
       Hauling viewscreen and real `plotinfo.hauling` data.
-- [ ] Move the physical test pointer over an actual rendered same-z marker
+- [x] Move the physical test pointer over an actual rendered same-z marker
       before asserting hover behavior.
-- [ ] Assert the sampled map position equals the native stop's exact
+- [x] Assert the sampled map position equals the native stop's exact
       `{x, y, z}` coordinates.
-- [ ] Assert the final rendered tooltip contains the current native stop name,
+- [x] Assert the final rendered tooltip contains the current native stop name,
       not duplicated fixture text.
-- [ ] Move the pointer to the same `x,y` on a different z-level and verify the
+- [x] Move the pointer to the same `x,y` on a different z-level and verify the
       tooltip clears while the off-z marker remains non-interactive.
-- [ ] Move the pointer over native or DwarfUI-owned UI covering the map and
+- [x] Move the pointer over native or DwarfUI-owned UI covering the map and
       verify the map tooltip does not shine through.
-- [ ] Rename or move only a disposable stop when mutation coverage is
+- [x] Rename or move only a disposable stop when mutation coverage is
       required, then verify the registration follows the fresh native data.
-- [ ] Verify selection clear, Hauling-menu close, overlay disable, world
+- [x] Verify selection clear, Hauling-menu close, overlay disable, world
       unload, and `dwarfui reload` remove active map targets and rendered
       intent.
-- [ ] Restore viewport, cursor, pointer position, selected route, overlay
+- [x] Restore viewport, cursor, pointer position, selected route, overlay
       configuration, native route-menu state, and any disposable fixture even
       when an assertion fails.
-- [ ] Require DwarfSpec to report `cleanup_confirmed=true` with no retained
+- [x] Require DwarfSpec to report `cleanup_confirmed=true` with no retained
       screen, subject, pointer patch, tooltip target, or changed game state.
-- [ ] Run focused pointer, tooltip, map-target, minecart model, and minecart
+- [x] Run focused pointer, tooltip, map-target, minecart model, and minecart
       overlay unit tests.
-- [ ] Run the focused DwarfSpec map-tooltip consumer test through
+- [x] Run the focused DwarfSpec map-tooltip consumer test through
       `tools/Run-AutomationTests.ps1`.
-- [ ] Run the complete standalone unit suite.
-- [ ] Run the complete DwarfSpec suite through the same pass-through wrapper.
-- [ ] Run Lua syntax validation for production, unit, support, and `.ds.lua`
+- [x] Run the complete standalone unit suite.
+- [x] Run the complete DwarfSpec suite through the same pass-through wrapper.
+- [x] Run Lua syntax validation for production, unit, support, and `.ds.lua`
       files.
-- [ ] Run the offline build and verify expanded package contents.
-- [ ] Run archive package verification.
-- [ ] Run `git diff --check`.
-- [ ] Install the packaged mod into the configured live DFHack instance and
+- [x] Run the offline build and verify expanded package contents.
+- [x] Run archive package verification.
+- [x] Run `git diff --check`.
+- [x] Install the packaged mod into the configured live DFHack instance and
       run `dwarfui reload`.
 - [ ] Visually verify a same-z marker tooltip, the absence of off-z marker
       tooltips, UI occlusion, route switching, stop rename/move refresh, and
       cleanup.
-- [ ] Review the DFHack console and logs for Lua errors after hover, movement,
+- [x] Review the DFHack console and logs for Lua errors after hover, movement,
       z-level changes, overlay disablement, and reload.
-- [ ] Record focused, complete, syntax, package, cleanup, and live evidence
+- [x] Record focused, complete, syntax, package, cleanup, and live evidence
       separately.
 
 ### Phase 5 completion gate
 
-- [ ] Focused and complete unit and DwarfSpec suites pass with zero failures.
-- [ ] Syntax, offline build, expanded package, archive package, and diff checks
+- [x] Focused and complete unit and DwarfSpec suites pass with zero failures.
+- [x] Syntax, offline build, expanded package, archive package, and diff checks
       pass.
-- [ ] Native automation proves exact tile matching, final tooltip rendering,
+- [x] Native automation proves exact tile matching, final tooltip rendering,
       UI occlusion, same-z-only behavior, and confirmed cleanup.
 - [ ] Live DFHack evidence confirms the packaged implementation without
       overstating unit, component, or offline-build coverage.
 
 ## Definition of done
 
-- [ ] Any eligible DwarfUI owner can register an exact `{x, y, z}` map tile as
+- [x] Any eligible DwarfUI owner can register an exact `{x, y, z}` map tile as
       a tooltip target through the public tooltip module.
-- [ ] The pointer poller samples DFHack-provided map coordinates only while
+- [x] The pointer poller samples DFHack-provided map coordinates only while
       map-tooltip demand exists.
-- [ ] Map-tile hit detection is indexed, deterministic, exact-z, and
+- [x] Map-tile hit detection is indexed, deterministic, exact-z, and
       presentation independent.
-- [ ] Widget targets and UI blockers take precedence over map-tile targets.
-- [ ] Map registrations use their owner only for root eligibility, lifetime,
+- [x] Widget targets and UI blockers take precedence over map-tile targets.
+- [x] Map registrations use their owner only for root eligibility, lifetime,
       and presentation transport.
-- [ ] The existing intent, presenter, and final render seams display map
+- [x] The existing intent, presenter, and final render seams display map
       tooltips without a new screen, overlay, renderer, or input owner.
-- [ ] Same-z Minecart Route stop markers show current stop-name tooltips.
-- [ ] Off-z Minecart Route markers never show or retain map-tile tooltips.
-- [ ] Stop, route, owner, viewscreen, overlay, world, and reload lifecycle
+- [x] Same-z Minecart Route stop markers show current stop-name tooltips.
+- [x] Off-z Minecart Route markers never show or retain map-tile tooltips.
+- [x] Stop, route, owner, viewscreen, overlay, world, and reload lifecycle
       changes leave no stale registration or intent.
-- [ ] Existing widget-tooltip behavior and native Minecart Route input/render
+- [x] Existing widget-tooltip behavior and native Minecart Route input/render
       behavior remain intact.
-- [ ] All new and modified classes and methods have LuaDoc comments.
+- [x] All new and modified classes and methods have LuaDoc comments.
 - [ ] Focused, complete, syntax, package, cleanup, and live verification
       evidence are recorded independently.
 
@@ -330,15 +330,22 @@ widgets or adding minecart-specific behavior to the generic tooltip modules.
 | 2026-07-29 | Phase 3 focused mediation | `.\tools\Run-UnitTests.ps1 tests\tooltip_target.spec.lua tests\tooltip_service.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_presenter.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | Passed: 84 successes, 0 failures, 0 errors, 0 pending | Covers normalized widget and map adapters; widget/map, map/widget, map/map, blocked/map, map/miss, removal, and text-update transitions; combined and separate demand diagnostics; incompatible service-state retirement; package independence; and map intent rendering through the existing owner-selected seam. |
 | 2026-07-29 | Numeric tooltip discriminator correction | `.\tools\Run-UnitTests.ps1 tests\tooltip_target.spec.lua tests\tooltip_service.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_presenter.spec.lua tests\module_registry.spec.lua tests\package_contract.spec.lua` | Passed: 86 successes, 0 failures, 0 errors, 0 pending | Replaces string target-domain and tooltip-observation discriminators with exported numeric `TooltipTargetKind` and `TooltipPointerObservationKind` enums. Pointer dispatcher result strings remain private to generic screen-space traversal. |
 | 2026-07-29 | Minecart same-z consumer | `.\tools\Run-UnitTests.ps1 tests\minecart_route.spec.lua tests\minecart_route_overlay.spec.lua` | Passed: 39 successes, 0 failures, 0 errors, 0 pending | Covers exact same-z registration, numeric marker kinds, current and unnamed stop text, position/name/add/remove/reorder updates, duplicate positions, route and z changes, stale selection, registry reload recovery, menu/world/disable cleanup, explicit off-z exclusion, and unchanged marker/input behavior. |
-| | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 <map-tooltip-file>.ds.lua` | Pending | Move the physical pointer to a real same-z marker and verify final rendering plus cleanup. |
+| 2026-07-29 | Native exact-tile tooltip | `.\tools\Run-AutomationTests.ps1 tests/minecart_route/minecart_route_markers.ds.lua` | Passed: 1 success, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true` | DwarfSpec's `WORLD_TILE` pointer placement sampled the real stop's exact tile. The final screen contained its native name; same-x/y off-z hover cleared; the DwarfUI action rail occluded the map target; selection, menu, overlay, and reload retirement were proven. |
 | 2026-07-29 | Complete unit suite through Phase 3 | `.\tools\Run-UnitTests.ps1` | Passed: 270 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite after unified widget/map mediation. Minecart consumption and native automation remain unimplemented and therefore unproven. |
 | 2026-07-29 | Complete unit suite after numeric enum correction | `.\tools\Run-UnitTests.ps1` | Passed: 272 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite with numeric target-domain and tooltip-observation contracts. |
 | 2026-07-29 | Complete unit suite through Phase 4 | `.\tools\Run-UnitTests.ps1` | Passed: 275 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite after the Minecart Route overlay became a same-z-only consumer of the generic exact-map-tile API. Native hover rendering remains reserved for Phase 5. |
-| | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Pending | Record structured results and `cleanup_confirmed`. |
+| 2026-07-29 | Complete DwarfSpec suite | `.\tools\Run-AutomationTests.ps1` | Passed: 16 successes, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true` | Complete native suite, including the exact-tile Minecart Route consumer and existing tooltip render-seam coverage. |
 | 2026-07-29 | Syntax validation through Phase 3 | `.\tools\Check-LuaSyntax.ps1 -IncludeTests` | Passed: 24 production and 43 test/support files | Covers the normalized adapter, unified mediation, generic map registry, shared class/root helpers, and tests. No later native `.ds.lua` map-tooltip consumer exists yet. |
 | 2026-07-29 | Offline build through Phase 3 | `.\tools\Build.ps1 -LiveReload:$false` | Passed | The default live-reload build was unavailable because no DFHack runner is configured; the offline build passed and is not installed or live evidence. |
 | 2026-07-29 | Expanded package verification through Phase 3 | `.\tools\Publish.ps1` | Passed | The generated `dist\DwarfUI` manifest and content match `src`, including the new normalized target module. |
 | 2026-07-29 | Archive package verification through Phase 3 | `.\tools\Publish.ps1` | Passed | The generated `dist\DwarfUI-0.1.0.zip` manifest and content match `src`. |
 | 2026-07-29 | Diff validation through Phase 3 | `git diff --check` | Passed with no whitespace errors | Git emitted only LF-to-CRLF checkout warnings. |
 | 2026-07-29 | Phase 4 syntax, offline build, package, naming, and diff validation | `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `.\tools\Build.ps1 -LiveReload:$false`; `.\tools\Publish.ps1`; `.\tools\Check-UnitTestNaming.ps1`; `git diff --check` | Passed | Syntax covered 24 production and 43 test/support files; expanded and ZIP package verification passed; naming and whitespace checks passed. This is offline evidence, not native or visual evidence. |
+| 2026-07-29 | Phase 5 focused units | `.\tools\Run-UnitTests.ps1 tests\pointer.spec.lua tests\pointer_poller.spec.lua tests\tooltip.spec.lua tests\tooltip_registration.spec.lua tests\tooltip_map_target.spec.lua tests\tooltip_target_detector.spec.lua tests\tooltip_service.spec.lua tests\tooltip_presenter.spec.lua tests\tooltip_render_hook.spec.lua tests\minecart_route.spec.lua tests\minecart_route_overlay.spec.lua` | Passed: 162 successes, 0 failures, 0 errors, 0 pending | Focused pointer, exact-map-target, mediation, presentation, route-model, and production-overlay coverage. |
+| 2026-07-29 | Phase 5 complete units | `.\tools\Run-UnitTests.ps1` | Passed: 275 successes, 0 failures, 0 errors, 0 pending | Complete standalone suite. |
+| 2026-07-29 | Phase 5 syntax and diff | `.\tools\Check-LuaSyntax.ps1 -IncludeTests`; `git diff --check` | Passed | Syntax covered 24 production and 43 test/support files; diff check reported no whitespace errors. |
+| 2026-07-29 | Phase 5 offline and archive package | `.\tools\Build.ps1 -LiveReload:$false`; `.\tools\Publish.ps1` | Passed | Expanded and ZIP manifests and hashes match `src`. |
+| 2026-07-29 | Phase 5 installed package and reload | `.\tools\VerifyPackage.ps1 -SourceDir src -ZipPath dist\DwarfUI-0.1.0.zip -ExpandedPath <live mods\DwarfUI>`; `<configured dfhack-run.exe> dwarfui reload` | Passed | The configured live mod exactly matches the verified source manifest and archive; `dwarfui reload` completed without a command error. |
+| 2026-07-29 | Phase 5 lifecycle reload regression | `.\tools\Run-UnitTests.ps1 tests\dwarfui_command.spec.lua` | Passed: 2 successes, 0 failures, 0 errors, 0 pending | DwarfUI reload retires its live overlay instances before DFHack discards the overlay registry and leaves unrelated overlays untouched. |
+| 2026-07-29 | Phase 5 DFHack logs | DFHack `stdout.log`, `stderr.log`, `errorlog.txt`, and structured DwarfSpec result | Passed for DwarfUI | Standard output/error logs were empty and the native run reported no Lua error. Existing unrelated reaction/material and occupancy warnings in `errorlog.txt` were not attributed to DwarfUI. |
 | | Live packaged behavior | Prepared fortress Minecart Routes menu | Pending | Verify exact same-z hover, no off-z hover, UI occlusion, refresh, reload, and cleanup. |

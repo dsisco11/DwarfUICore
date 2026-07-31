@@ -93,11 +93,15 @@
     - tests/package_contract.spec.lua
     - tests/README.md
 
-☐ [Phase 6 - Verification and Documentation] Validate implementation and close task.
-    ☐ Run Build task (`Tools/Build.ps1`).
-    ☐ Run Unit Tests task (`Tools/Run-UnitTests.ps1`).
-    ☐ Add README note for bottom-panel hotkey labels feature and behavior constraints.
-    ☐ Mark project todo entry complete after verification.
+✔ [Phase 6 - Verification and Documentation] Validate implementation and close task. @done(26-07-31 13:00)
+    ✔ Run Build task (`Tools/Build.ps1`). @done(26-07-31 13:00)
+    ✔ Run Unit Tests task (`Tools/Run-UnitTests.ps1`). @done(26-07-31 13:00)
+    ✔ Add README note for bottom-panel hotkey labels feature and behavior constraints. @done(26-07-31 13:00)
+    ✔ Mark project todo entry complete after verification. @done(26-07-31 13:00)
+    Verification notes:
+    - Build task executed and passed Lua syntax checks (45 production files, 68 test/support files) before stopping on missing local runner configuration (`dfhack-run.exe` not found).
+    - Unit Tests task passed (403 successes, 0 failures).
+    - Feature documentation added to `README.md` and master todo item completed in `Docs/project.todo`.
     Docs:
     - README.md
     - Docs/project.todo

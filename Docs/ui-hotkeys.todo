@@ -50,10 +50,16 @@
     - src/scripts_modinstalled/dwarfui-mood-popover.lua (fullscreen overlay structure)
     - src/scripts_modinstalled/dwarfui-minecart-route-markers.lua (native-overlay rendering integration)
 
-☐ [Phase 4 - Runtime Integration] Register and reload safely.
-    ☐ Add any new internal model module(s) to `dwarfui/module_registry.lua` in dependency order.
-    ☐ Add the new overlay registration script to overlay reload/retirement flow in `src/scripts_modinstalled/dwarfui.lua`.
-    ☐ Verify `dwarfui reload` reconstructs this feature without stale state.
+✔ [Phase 4 - Runtime Integration] Register and reload safely. @done(26-07-31 12:40)
+    ✔ Add any new internal model module(s) to `dwarfui/module_registry.lua` in dependency order. @done(26-07-31 12:40)
+    ✔ Add the new overlay registration script to overlay reload/retirement flow in `src/scripts_modinstalled/dwarfui.lua`. @done(26-07-31 12:40)
+    ✔ Verify `dwarfui reload` reconstructs this feature without stale state. @done(26-07-31 12:40)
+    Deliverables:
+    - Added `dwarfui/ui_hotkeys` contract registration to `src/scripts_modinstalled/dwarfui/module_registry.lua`.
+    - Added `dwarfui-ui-hotkeys` to overlay retirement/rescan lifecycle in `src/scripts_modinstalled/dwarfui.lua`.
+    - Updated reload/retirement integration expectations in `tests/dwarfui_command.spec.lua`.
+    - Updated module ordering expectations in `tests/module_registry.spec.lua`.
+    - Verified via Unit Tests task: pass (401 successes, 0 failures).
     Docs:
     - src/scripts_modinstalled/dwarfui/module_registry.lua
     - src/scripts_modinstalled/dwarfui.lua

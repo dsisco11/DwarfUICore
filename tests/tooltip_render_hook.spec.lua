@@ -4,9 +4,15 @@ local repo_root = require('support.repo_root')
 local MODULE_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua'
 
+local _, function_chain = module_loader.load(
+    repo_root, 'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
+
 local function load_hook(process, overlay_provider)
     local _, module = module_loader.load(repo_root, MODULE_PATH, {
         globals={dfhack=process},
+        reqscript={
+            ['dwarfui/utils/function_chain']=function_chain,
+        },
         require_modules=setmetatable({}, {
             __index=function(_, name)
                 assert.equals('plugins.overlay', name)

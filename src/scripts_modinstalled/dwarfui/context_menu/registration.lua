@@ -225,6 +225,19 @@ function ContextMenuRegistrationManager:_handle_discovery_failure(message)
     if self._failure_observer then self._failure_observer(message) end
 end
 
+---Disables registration discovery for this generation without dropping data.
+---The service uses this after a contained internal failure so no callback
+---chain survives while input handling is transparent.
+---@param message? string
+---@return boolean changed
+function ContextMenuRegistrationManager:disable(message)
+    local changed = not self._disabled
+    self._disabled = true
+    self._failure = message or self._failure
+    changed = self._root_discovery:stop() or changed
+    return changed
+end
+
 ---Starts or stops discovery after registration demand changes.
 function ContextMenuRegistrationManager:_refresh_discovery()
     self._root_discovery:reconcile()

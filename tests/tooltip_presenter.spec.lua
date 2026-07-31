@@ -83,6 +83,8 @@ local function load_environment()
             globals={dfhack=process},
             reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
         })
+    local _, function_chain = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
     local _, extensions = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
             globals={DEFAULT_NIL=default_nil},
@@ -101,6 +103,9 @@ local function load_environment()
             'src/scripts_modinstalled/dwarfui/tooltip_render_hook.lua', {
                 globals={dfhack=process},
                 require_modules={['plugins.overlay']=overlay},
+                reqscript={
+                    ['dwarfui/utils/function_chain']=function_chain,
+                },
             })
         return result
     end

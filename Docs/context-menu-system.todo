@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 3 complete; input ownership and presentation not started
+Status: Phase 4 complete; interactive presentation not started
 
 ## Goal
 
@@ -759,72 +759,72 @@ production module.
 
 ## Phase 4 - Implement the service and opening hooks
 
-- [ ] Add `context_menu/service.lua` as the single process-wide owner of the
+- [x] Add `context_menu/service.lua` as the single process-wide owner of the
       active session, hook generation, and diagnostics.
-- [ ] Enforce at most one active context menu process-wide.
-- [ ] Expose one documented service transition for opening, closing, and
+- [x] Enforce at most one active context menu process-wide.
+- [x] Expose one documented service transition for opening, closing, and
       selecting; input surfaces must not mutate session state independently.
-- [ ] Define an injected presentation-factory boundary between the service and
+- [x] Define an injected presentation-factory boundary between the service and
       the concrete ZScreen. Use a fake presenter for Phase 4 service/hook tests;
       do not claim production opening integration until Phase 5 supplies and
       wires the real screen/renderer factory.
-- [ ] Add `context_menu/input_hook.lua` with reload-safe hook ownership,
+- [x] Add `context_menu/input_hook.lua` with reload-safe hook ownership,
       predecessor preservation, exact restoration, and foreign-wrapper safety.
-- [ ] Match the tooltip render hook's wrapper contract: restore the exact
+- [x] Match the tooltip render hook's wrapper contract: restore the exact
       predecessor only when DwarfUI's trampoline is still outermost; never
       overwrite a foreign outer wrapper; invalidate and diagnose an inert
       superseded trampoline that remains inside a foreign chain.
-- [ ] Wrap context-menu hook logic in `xpcall(..., debug.traceback)`. Track
+- [x] Wrap context-menu hook logic in `xpcall(..., debug.traceback)`. Track
       `last_error`, `last_failure`, `failure_count`, and
       `disabled_generation`, and report failures through `dfhack.printerr`,
       matching the tooltip hook's diagnostic style.
-- [ ] Wire root discovery's protected failure callback into the same service
+- [x] Wire root discovery's protected failure callback into the same service
       diagnostics and disabled-generation transition. A discovery failure stops
       discovery, closes any active menu, safely releases owned hooks where
       possible, and leaves remaining trampolines transparent until reload.
-- [ ] Intercept native viewscreen input at
+- [x] Intercept native viewscreen input at
       `plugins.overlay.feed_viewscreen_widgets()` before delegating to its
       predecessor.
-- [ ] Intercept Lua-screen input through the explicitly permitted reversible
+- [x] Intercept Lua-screen input through the explicitly permitted reversible
       wrapper around the owning screen instance's effective `onInput()` method.
-- [ ] Install Lua-screen hooks on attached roots that own live registrations;
+- [x] Install Lua-screen hooks on attached roots that own live registrations;
       current target visibility or presentation eligibility must not be
       required to retain discovery of that root.
-- [ ] Restrict opening hooks to actionable opening-target resolution. They do
+- [x] Restrict opening hooks to actionable opening-target resolution. They do
       not process interaction for an already-visible context-menu screen.
-- [ ] Delegate `_MOUSE_R_DOWN`-only input unchanged to the predecessor; do not
+- [x] Delegate `_MOUSE_R_DOWN`-only input unchanged to the predecessor; do not
       sample, resolve, consume, or retain an opening target from that event.
-- [ ] On `_MOUSE_R`, construct the synchronous input sample, resolve and
+- [x] On `_MOUSE_R`, construct the synchronous input sample, resolve and
       validate the current target and anchor, consume the complete input table,
       and open from that same call.
-- [ ] If `_MOUSE_R_DOWN` and `_MOUSE_R` arrive together, resolve, consume, and
+- [x] If `_MOUSE_R_DOWN` and `_MOUSE_R` arrive together, resolve, consume, and
       open exactly once from `_MOUSE_R` in that one input call; the complete
       table is consumed.
-- [ ] If `_MOUSE_R` resolves a miss or blocker without a map target, delegate
+- [x] If `_MOUSE_R` resolves a miss or blocker without a map target, delegate
       the original unmodified key table to the predecessor and preserve its
       exact return values.
-- [ ] For a Lua-screen opening hook, return handled without invoking the
+- [x] For a Lua-screen opening hook, return handled without invoking the
       predecessor when the event opens a menu. Otherwise invoke the predecessor
       exactly once with the original unmodified table.
-- [ ] For a native opening hook, return handled for the complete original input
+- [x] For a native opening hook, return handled for the complete original input
       table when the event opens a menu. Otherwise delegate the original table
       through the normal overlay/native chain.
-- [ ] Do not partition, clone, or reinject a handled input table. Additional
+- [x] Do not partition, clone, or reinject a handled input table. Additional
       keys that share a handled context-menu event are consumed with it.
-- [ ] If sampling or target resolution fails before a registered target is
+- [x] If sampling or target resolution fails before a registered target is
       established, own no keys: delegate the original table unchanged, record
       diagnostics, and disable context-menu handling for the generation.
-- [ ] If presentation fails after a registered target is established,
+- [x] If presentation fails after a registered target is established,
       atomically roll back any partial screen/session, consume the complete
       opening input table, record diagnostics, and disable context-menu handling
       for the generation.
-- [ ] Once disabled, opening hooks become transparent predecessor delegates
+- [x] Once disabled, opening hooks become transparent predecessor delegates
       until reload resets the modules and drops all context-menu state.
-- [ ] Close the session before invoking `on_select`, and prevent handler errors
+- [x] Close the session before invoking `on_select`, and prevent handler errors
       from restoring or duplicating the closed session.
-- [ ] Report handler errors through one documented protected-call boundary
+- [x] Report handler errors through one documented protected-call boundary
       owned by the service.
-- [ ] Add focused service and hook tests for native and Lua seams,
+- [x] Add focused service and hook tests for native and Lua seams,
       `_MOUSE_R_DOWN` transparency, actionable and coalesced `_MOUSE_R`,
       complete-event consumption, unchanged irrelevant-event delegation, misses,
       blockers, predecessor return preservation, internal failure
@@ -832,15 +832,44 @@ production module.
       reset, exact outermost restoration, inert superseded trampolines, and
       foreign wrappers.
 
+### Phase 4 implementation record
+
+- `dwarfui/context_menu/service.lua` owns the sole session and the protected
+  open, close, and select transitions. It constructs a hidden presentation
+  controller through an injected factory and calls `show()` only after the
+  controller is service-owned, allowing failed presentation to close both the
+  controller and session before the generation becomes transparent.
+- The production singleton remains inactive until the concrete presentation
+  factory is installed by the interactive-screen work. This preserves the
+  boundary that Phase 4 can validate opening ownership without enabling a
+  production path that has no renderer.
+- `dwarfui/context_menu/input_hook.lua` wraps native overlay input before its
+  predecessor and attached Lua-screen `onInput()` methods reversibly. It owns
+  complete input tables, preserves exact predecessor returns on delegation,
+  restores only outermost owned methods, and retains only diagnostic metadata
+  for trampolines trapped beneath foreign wrappers.
+- Internal resolution, discovery, hook, presentation, and cleanup failures
+  close all reachable state, stop discovery and owned hooks, record service and
+  hook diagnostics, and leave the generation transparent. Consumer
+  `on_select` failures are reported after close without disabling later menus.
+- Wrapper-chain inspection is shared by the context-menu and tooltip hooks
+  through `dwarfui/utils/function_chain.lua`. A focused target-detector fixture
+  now retains its weak map handle explicitly so garbage collection cannot turn
+  its intended blocker assertion into a nondeterministic miss.
+- Verification on 2026-07-30: focused context-menu tests passed 67/67; the
+  complete unit suite passed 349/349; Lua 5.4.6 syntax passed for 36 production
+  and 54 test/support files; the offline build passed; and `git diff --check`
+  reported no whitespace errors.
+
 ### Phase 4 completion gate
 
-- [ ] The service is the sole authority for session state.
-- [ ] Each actionable opening input table opens at most once and is consumed in
+- [x] The service is the sole authority for session state.
+- [x] Each actionable opening input table opens at most once and is consumed in
       full; an irrelevant table is delegated unchanged exactly once.
-- [ ] A miss is behaviorally transparent to the predecessor.
-- [ ] No mouse-down latch or post-dismissal suppression state exists unless the
+- [x] A miss is behaviorally transparent to the predecessor.
+- [x] No mouse-down latch or post-dismissal suppression state exists unless the
       Phase 0 seam evidence required an explicit checklist revision.
-- [ ] An internal failure cannot leave a partial session, visible screen, active
+- [x] An internal failure cannot leave a partial session, visible screen, active
       handler, or input-trapping generation behind.
 
 ## Phase 5 - Implement the interactive menu screen and renderer
@@ -1301,15 +1330,15 @@ production module.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Pending | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, whole-event input ownership, hooks, renderer, lifecycle, and projection coverage. |
+| 2026-07-30 | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Passed: 67/67 | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, service transitions, and native/Lua opening-hook ownership. Renderer, interactive-screen lifecycle, and projection remain later work. |
 | | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip_target_detector.spec.lua tests/tooltip_registration.spec.lua tests/tooltip.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Pending | Prove the enum migration across the shared pointer API and every affected production consumer. |
 | | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Pending | Record structured result and `cleanup_confirmed`. |
-| | Complete unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
+| 2026-07-30 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 349/349 | Zero failures, errors, or pending tests after Phase 4 implementation. |
 | | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Record cleanup separately from behavior. |
-| | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include nested production, unit, support, and `.ds.lua` files. |
-| | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | Offline packaging evidence only. |
+| 2026-07-30 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6 accepted 36 production and 54 test/support files. |
+| 2026-07-30 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Offline syntax/build gate only; no live reload or runtime claim. |
 | | Package verification | `./tools/Publish.ps1` | Pending | Verify expanded and archive contents. |
-| | Diff validation | `git diff --check` | Pending | Record whitespace result. |
+| 2026-07-30 | Diff validation | `git diff --check` | Passed | No whitespace errors; Git emitted expected CRLF conversion warnings. |
 | | Preliminary Phase 8 package/runtime | Preliminary offline build and package verification, install that exact package, then start a fresh DF/DFHack process | Pending | Required before any Phase 8 live test; verify installed script lookup and module-registry order before accepting results. |
 | | Final registered runtime | Reinstall the final verified package, restart DF/DFHack, then test `dwarfui reload`, explicit consumer re-registration, and registry/hook inspection | Pending | Confirm destructive state reset, one re-registered generation, no stale screen, active hook ownership, or discovery callback, and diagnostics for any inert foreign-wrapped trampoline. |
 | | Live visual behavior | Registered UI control and visible registered map tile | Pending | Verify placement, reprojection, consumption, dismissal, selection, and cleanup. |

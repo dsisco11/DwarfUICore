@@ -7,6 +7,7 @@ local API_VERSION = 1
 local STATE_SLOT = 'tooltip_render_hook'
 local OVERLAY_RENDER_METHOD = 'render_viewscreen_widgets'
 local SCREEN_RENDER_METHOD = 'onRender'
+local function_chain = reqscript('dwarfui/utils/function_chain')
 
 ---@enum dwarfui.TooltipRenderTransport
 TooltipRenderTransport = {
@@ -130,54 +131,6 @@ end
 ---@return ...
 local function unpack_returns(packed)
     return table.unpack(packed, 1, packed.n)
-end
-
----Returns whether an upvalue graph retains the requested predecessor.
----The bounded traversal skips `_ENV` but follows functions and plain table
----records, which covers direct predecessor captures and wrapper records.
----@param value any
----@param predecessor function
----@param visited table<any, boolean>
----@param budget {remaining: integer}
----@return boolean
-local function value_wraps(value, predecessor, visited, budget)
-    if value == predecessor then return true end
-    local value_type = type(value)
-    if value_type ~= 'function' and value_type ~= 'table' then
-        return false
-    end
-    if visited[value] or budget.remaining <= 0 then return false end
-    visited[value] = true
-    budget.remaining = budget.remaining - 1
-    if value_type == 'function' then
-        local index = 1
-        while true do
-            local name, upvalue = debug.getupvalue(value, index)
-            if name == nil then return false end
-            if name ~= '_ENV' and
-                    value_wraps(
-                        upvalue, predecessor, visited, budget) then
-                return true
-            end
-            index = index + 1
-        end
-    end
-    for key, field in next, value do
-        if value_wraps(key, predecessor, visited, budget) or
-                value_wraps(field, predecessor, visited, budget) then
-            return true
-        end
-    end
-    return false
-end
-
----Returns whether a wrapper closure retains the requested predecessor.
----@param wrapper function
----@param predecessor function
----@return boolean
-local function function_wraps(wrapper, predecessor)
-    return value_wraps(
-        wrapper, predecessor, {}, {remaining=256})
 end
 
 ---Invokes the current presenter only for the selected active trampoline.
@@ -325,7 +278,7 @@ function TooltipRenderHookManager:ensure_overlay()
         return false
     end
     if state.overlay_module == overlay and previous and
-            function_wraps(current, previous.active_trampoline) and
+            function_chain.wraps(current, previous.active_trampoline) and
             not state.reorderable_wrappers[current] then
         -- The other extension still owns the exported slot and DwarfUI is
         -- already in its predecessor chain. Replacing that wrapper would
@@ -387,7 +340,7 @@ function TooltipRenderHookManager:ensure_screen(owner)
         previous.generation = state.generation
         return false
     end
-    if previous and function_wraps(
+    if previous and function_chain.wraps(
             current, previous.active_trampoline) and
             not state.reorderable_wrappers[current] then
         -- Preserve another owner's raw instance method while the active
@@ -492,7 +445,7 @@ function TooltipRenderHookManager:get_diagnostics()
             overlay_record.active_trampoline
     local overlay_in_chain = overlay_module_current and
         type(current_overlay[OVERLAY_RENDER_METHOD]) == 'function' and
-        function_wraps(current_overlay[OVERLAY_RENDER_METHOD],
+        function_chain.wraps(current_overlay[OVERLAY_RENDER_METHOD],
             overlay_record.active_trampoline)
     local overlay_module_replacement_pending =
         overlay_record ~= nil and current_overlay ~= nil and
@@ -512,7 +465,7 @@ function TooltipRenderHookManager:get_diagnostics()
         local outermost = current_method ==
             record.active_trampoline
         local in_chain = type(current_method) == 'function' and
-            function_wraps(current_method, record.active_trampoline)
+            function_chain.wraps(current_method, record.active_trampoline)
         local method_replacement_pending = not in_chain or
             (not outermost and
                 state.reorderable_wrappers[current_method] == true)

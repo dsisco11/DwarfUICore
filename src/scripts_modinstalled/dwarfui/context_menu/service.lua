@@ -386,7 +386,7 @@ end
 
 ---Installs one owned world-unload cleanup callback when DFHack exposes the seam.
 function ContextMenuService:_install_state_change_callback()
-    if type(dfhack.onStateChange) ~= 'table' then return end
+    if dfhack.onStateChange == nil then return end
     local callback = function(code)
         if code == SC_WORLD_UNLOADED then self:clear_world_state() end
     end
@@ -396,7 +396,7 @@ end
 
 ---Removes only the state-change callback still owned by this service.
 function ContextMenuService:_remove_state_change_callback()
-    if type(dfhack.onStateChange) == 'table' and
+    if dfhack.onStateChange ~= nil and
             dfhack.onStateChange[STATE_CHANGE_SLOT] ==
                 self._state_change_callback then
         dfhack.onStateChange[STATE_CHANGE_SLOT] = nil

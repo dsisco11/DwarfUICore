@@ -272,15 +272,17 @@ function ContextMenuMapTargetRegistry:contains(handle)
 end
 
 ---Builds one eligible candidate without retaining it in registry state.
+---@param handle any
 ---@param record table
 ---@param owner any
 ---@param root any
 ---@return dwarfui.ContextMenuMapCandidate
-function ContextMenuMapTargetRegistry:_candidate(record, owner, root)
+function ContextMenuMapTargetRegistry:_candidate(
+        handle, record, owner, root)
     return setmetatable({
         identity=record.identity,
         sequence=record.sequence,
-        source=owner,
+        source=handle,
         owner=owner,
         root=root,
         pos={
@@ -303,7 +305,7 @@ function ContextMenuMapTargetRegistry:resolve(handle)
     if not owner then return nil end
     local root = self._root_resolver:resolve(owner, true)
     if not root then return nil end
-    return self:_candidate(record, owner, root)
+    return self:_candidate(handle, record, owner, root)
 end
 
 ---Resolves one numeric registration identity through current eligibility.
@@ -311,11 +313,13 @@ end
 ---@return dwarfui.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve_identity(identity)
     self:_prune()
-    for _, record in pairs(self._registrations) do
+    for handle, record in pairs(self._registrations) do
         if record.identity == identity then
             local owner = record.owner_ref.owner
             local root = owner and self._root_resolver:resolve(owner, true)
-            if root then return self:_candidate(record, owner, root) end
+            if root then
+                return self:_candidate(handle, record, owner, root)
+            end
             return nil
         end
     end
@@ -331,13 +335,13 @@ end
 function ContextMenuMapTargetRegistry:resolve_identity_attached(
         identity, expected_root)
     self:_prune()
-    for _, record in pairs(self._registrations) do
+    for handle, record in pairs(self._registrations) do
         if record.identity == identity then
             local owner = record.owner_ref.owner
             local root = owner and
                 self._root_resolver:find_root(owner, true)
             if root == expected_root then
-                return self:_candidate(record, owner, root)
+                return self:_candidate(handle, record, owner, root)
             end
             return nil
         end
@@ -354,11 +358,11 @@ function ContextMenuMapTargetRegistry:detect(position)
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     if not bucket then return nil end
     local winner
-    for _, record in pairs(bucket) do
+    for handle, record in pairs(bucket) do
         local owner = record.owner_ref.owner
         local root = owner and self._root_resolver:resolve(owner, true)
         if root and (not winner or record.sequence > winner.sequence) then
-            winner = self:_candidate(record, owner, root)
+            winner = self:_candidate(handle, record, owner, root)
         end
     end
     return winner

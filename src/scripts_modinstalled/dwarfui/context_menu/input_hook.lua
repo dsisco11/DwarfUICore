@@ -164,7 +164,7 @@ end
 ---@return function
 local function make_native_trampoline(owner, predecessor)
     local trampoline
-    trampoline = function(keys, ...)
+    trampoline = function(viewscreen_name, viewscreen, keys, ...)
         local state = get_process_state()
         local record = state and state.native_hook
         if record and record.active and
@@ -172,7 +172,8 @@ local function make_native_trampoline(owner, predecessor)
                 dispatch(ContextMenuInputTransport.NATIVE, owner, keys) then
             return true
         end
-        return unpack_returns(table.pack(predecessor(keys, ...)))
+        return unpack_returns(table.pack(
+            predecessor(viewscreen_name, viewscreen, keys, ...)))
     end
     return trampoline
 end

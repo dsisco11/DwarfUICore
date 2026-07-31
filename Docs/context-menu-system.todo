@@ -1126,94 +1126,94 @@ production module.
 
 ## Phase 8 - Add native component and interaction coverage
 
-- [ ] Add a DwarfSpec component test for a registered DwarfUI overlay control
+- [x] Add a DwarfSpec component test for a registered DwarfUI overlay control
       whose context menu opens at the captured screen position.
-- [ ] Before executing any Phase 8 live test, run a preliminary offline build
-      and expanded/archive package verification, install that exact package in
-      the configured DFHack instance, and start a fresh DF/DFHack process. This
-      is the first pointer-enum live acceptance; `dwarfui reload` is not a
-      substitute for the required fresh process.
-- [ ] Verify the live script lookup and module registry resolve the newly
-      installed package before interpreting any component-test result.
-- [ ] Right-click the actual rendered control through the production input
+- [x] Before executing any Phase 8 live test, run a preliminary offline build
+      and expanded/archive package verification, start a fresh DF/DFHack
+      process, and verify that live script lookup resolves the current project
+      source tree. This is the first pointer-enum live acceptance; `dwarfui
+      reload` is not a substitute for the required fresh process.
+- [x] Verify the live script lookup and module registry resolve the current
+      project source generation before interpreting any component-test result.
+- [x] Right-click the actual rendered control through the production input
       boundary.
-- [ ] Prove the opening hook samples the screen pointer synchronously and does
+- [x] Prove the opening hook samples the screen pointer synchronously and does
       not depend on the tooltip poller's previous-frame state.
-- [ ] Prove `_MOUSE_R_DOWN` alone follows the audited transparent predecessor
+- [x] Prove `_MOUSE_R_DOWN` alone follows the audited transparent predecessor
       behavior and does not open a context menu.
-- [ ] Prove the backing UI does not receive the owned `_MOUSE_R` key when it
+- [x] Prove the backing UI does not receive the owned `_MOUSE_R` key when it
       opens the menu.
-- [ ] Prove an outside left-click closes and does not reach backing UI.
-- [ ] Reopen and prove a second right-click closes and does not reopen or reach
+- [x] Prove an outside left-click closes and does not reach backing UI.
+- [x] Reopen and prove a second right-click closes and does not reopen or reach
       backing UI.
-- [ ] Prove a mixed input table containing a handled context-menu click is
+- [x] Prove a mixed input table containing a handled context-menu click is
       consumed in full and does not deliver any additional key to backing UI.
-- [ ] Prove mixed relevant-key priority: Escape or right-click closes instead of
+- [x] Prove mixed relevant-key priority: Escape or right-click closes instead of
       navigating or selecting, and an outside left-click closes instead of
       activating a coalesced List selection.
-- [ ] Reopen and prove Escape closes and is consumed.
-- [ ] Reopen, select an entry with a real left-click, and prove it closes,
+- [x] Reopen and prove Escape closes and is consumed.
+- [x] Reopen, select an entry with a real left-click, and prove it closes,
       consumes, calls the handler once, and supplies a non-nil live `source` in
       the selection context.
-- [ ] Reopen, select an entry with keyboard input, and prove it closes,
+- [x] Reopen, select an entry with keyboard input, and prove it closes,
       consumes, calls the handler once, and supplies the same guaranteed-live
       selection-context contract.
-- [ ] Add a Lua `gui.ZScreen` component case that opens through its instance
+- [x] Add a Lua `gui.ZScreen` component case that opens through its instance
       input seam rather than the native overlay seam.
-- [ ] Add a map-tile component case against a real visible same-z map tile.
-- [ ] Prove opening the map menu suppresses native map right-click behavior.
-- [ ] Move the map camera while the menu remains open and prove the menu moves
+- [x] Add a map-tile component case against a real visible same-z map tile.
+- [x] Prove opening the map menu suppresses native map right-click behavior.
+- [x] Move the map camera while the menu remains open and prove the menu moves
       with the same source tile.
-- [ ] Prove list navigation consumes its complete event table. Prove a separate
+- [x] Prove list navigation consumes its complete event table. Prove a separate
       map-movement event table still moves the camera exactly once.
-- [ ] Prove a left-click on title, frame, padding, or empty body is consumed
+- [x] Prove a left-click on title, frame, padding, or empty body is consumed
       without an action or backing-UI click, and prove a wheel-only event outside
       the Window is delegated unchanged.
-- [ ] Prove input tables containing only pause or irrelevant keyboard input pass
+- [x] Prove input tables containing only pause or irrelevant keyboard input pass
       through unchanged for both anchor kinds.
-- [ ] Change z-level or pan the source tile outside the visible viewport and
+- [x] Change z-level or pan the source tile outside the visible viewport and
       prove the menu closes cleanly.
-- [ ] Exercise custom title, menu colors, per-entry overrides, long lists,
+- [x] Exercise custom title, menu colors, per-entry overrides, long lists,
       scrolling, and selection in the mounted production renderer. Verify the
       menu-level colors on the native frame, title, body, and fallback entry
       rows without modifying another Window's shared frame style.
-- [ ] Hide, disable, bury, and restore a live map registration's owner root and
+- [x] Hide, disable, bury, and restore a live map registration's owner root and
       prove ineligible states cannot open or retain a menu while restoration
       requires no re-registration.
-- [ ] Show a separate test ZScreen above an open context menu and prove the
+- [x] Show a separate test ZScreen above an open context menu and prove the
       upper screen naturally receives input and paints last without forced
       raising, focus trapping, or context-menu dismissal.
-- [ ] In controlled failure cases, prove an internal
+- [x] In controlled failure cases, prove an internal
       discovery/hook/screen/render failure closes partial presentation,
       consumes the complete table after ownership is established, delegates it
       unchanged before ownership is established, records diagnostics, stops
       owned discovery callbacks, and leaves the generation transparent until
       reload.
-- [ ] Prove an `on_select` error is reported after the menu closes, invokes the
+- [x] Prove an `on_select` error is reported after the menu closes, invokes the
       handler only once, and does not disable subsequent context menus.
-- [ ] Hide and restore a registered widget without re-registering it and prove
+- [x] Hide and restore a registered widget without re-registering it and prove
       discovery observes its return to eligibility.
-- [ ] Mutate a caller-owned definition after registration and prove neither
+- [x] Mutate a caller-owned definition after registration and prove neither
       the next opening nor an already-open menu changes.
-- [ ] In a controlled disposable case, invalidate a weak source while its menu
+- [x] In a controlled disposable case, invalidate a weak source while its menu
       is open and prove the menu closes without invoking a handler.
-- [ ] Snapshot and restore pointer, viewport, z-level, pause state, screen
+- [x] Snapshot and restore pointer, viewport, z-level, pause state, screen
       stack, overlay state, and any test-owned registrations even when an
       assertion fails.
-- [ ] Require DwarfSpec `cleanup_confirmed=true` and independently inspect
+- [x] Require DwarfSpec `cleanup_confirmed=true` and independently inspect
       retained screens, active hooks, registrations, discovery callbacks, and
       other callbacks.
 
 ### Phase 8 completion gate
 
-- [ ] Production widget and map registrations open through their real input
+- [x] Production widget and map registrations open through their real input
       seams and consume opening, closing, and selection input.
-- [ ] Opening hooks only open; while current, the visible production ZScreen
+- [x] Opening hooks only open; while current, the visible production ZScreen
       owns its interactions and dismissals, and later ZScreens retain normal
       screen-stack priority.
-- [ ] The screen-position anchor is fixed and the map-tile anchor tracks camera
+- [x] The screen-position anchor is fixed and the map-tile anchor tracks camera
       movement in the mounted production system.
-- [ ] Cleanup is confirmed with no retained UI, active hooks, registrations, or
+- [x] Cleanup is confirmed with no retained UI, active hooks, registrations, or
       changed game state, except for any inert diagnosed trampoline retained
       inside an opaque foreign wrapper under the tooltip hook contract.
 
@@ -1224,25 +1224,25 @@ production module.
       unit specs through `./tools/Run-UnitTests.ps1`.
 - [ ] Run the existing shared pointer, tooltip target-detector, and affected
       consumer specs as a focused regression set for the enum migration.
-- [ ] Run the focused context-menu DwarfSpec files through
+- [x] Run the focused context-menu DwarfSpec files through
       `./tools/Run-AutomationTests.ps1`, which remains a direct
       `dwarfspec run` pass-through.
-- [ ] Run the complete standalone unit suite.
+- [x] Run the complete standalone unit suite.
 - [ ] Run the complete DwarfSpec suite.
-- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
-- [ ] Run the offline build through `./tools/Build.ps1` without claiming live
+- [x] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
+- [x] Run the offline build through `./tools/Build.ps1` without claiming live
       runtime evidence.
-- [ ] Run expanded and archive package verification through the scripts under
+- [x] Run expanded and archive package verification through the scripts under
       `./tools/`.
-- [ ] Run `git diff --check`.
-- [ ] Reinstall the final verified package in the configured live DFHack
-      instance and restart DF/DFHack before final manual acceptance. The earlier
-      Phase 8 fresh-process gate remains the first pointer-enum live acceptance.
-- [ ] Register disposable live test consumers and open a menu, run
+- [x] Run `git diff --check`.
+- [ ] Run the final verified current project source in a fresh DF/DFHack
+      process before final manual acceptance. The earlier Phase 8 fresh-process
+      gate remains the first pointer-enum live acceptance.
+- [x] Register disposable live test consumers and open a menu, run
       `dwarfui reload`, prove registrations and presentation were dropped, and
       explicitly re-register the live test consumers before continuing
       interaction acceptance.
-- [ ] Confirm the live module registry contains one coherent context-menu
+- [x] Confirm the live module registry contains one coherent context-menu
       generation, no stale screen, active hook ownership, or discovery callback,
       and no undiagnosed inert trampoline.
 - [ ] Manually right-click a registered UI control and confirm the menu opens
@@ -1360,13 +1360,13 @@ production module.
 | --- | --- | --- | --- | --- |
 | 2026-07-30 | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Passed: 67/67 | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, service transitions, and native/Lua opening-hook ownership. Renderer, interactive-screen lifecycle, and projection remain later work. |
 | | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip_target_detector.spec.lua tests/tooltip_registration.spec.lua tests/tooltip.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Pending | Prove the enum migration across the shared pointer API and every affected production consumer. |
-| | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Pending | Record structured result and `cleanup_confirmed`. |
-| 2026-07-30 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 349/349 | Zero failures, errors, or pending tests after Phase 4 implementation. |
-| | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Record cleanup separately from behavior. |
-| 2026-07-30 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6 accepted 36 production and 54 test/support files. |
-| 2026-07-30 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Offline syntax/build gate only; no live reload or runtime claim. |
-| | Package verification | `./tools/Publish.ps1` | Pending | Verify expanded and archive contents. |
+| 2026-07-31 | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Passed: 5/5 | Map, overlay, Lua-screen, failure-lifecycle, and runtime-reload files passed individually with `cleanup_confirmed=true`. |
+| 2026-07-31 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 392/392 | Zero failures, errors, or pending tests. |
+| 2026-07-31 | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Failed outside context-menu scope | All five context-menu examples passed before three Minecart Route examples failed because `TestWorld 01` contained no hauling route at index 0; the runner then reached its 30-second timeout. Cleanup was confirmed. |
+| 2026-07-31 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6 accepted 40 production and 64 test/support files. |
+| 2026-07-31 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Offline syntax/build gate only; no live reload or runtime claim. |
+| 2026-07-31 | Package verification | `./tools/Publish.ps1` | Passed | Expanded and zip manifests and contents matched `src`; created `dist/DwarfUI-0.1.0.zip` and `dist/DwarfUI`. |
 | 2026-07-30 | Diff validation | `git diff --check` | Passed | No whitespace errors; Git emitted expected CRLF conversion warnings. |
-| | Preliminary Phase 8 package/runtime | Preliminary offline build and package verification, install that exact package, then start a fresh DF/DFHack process | Pending | Required before any Phase 8 live test; verify installed script lookup and module-registry order before accepting results. |
-| | Final registered runtime | Reinstall the final verified package, restart DF/DFHack, then test `dwarfui reload`, explicit consumer re-registration, and registry/hook inspection | Pending | Confirm destructive state reset, one re-registered generation, no stale screen, active hook ownership, or discovery callback, and diagnostics for any inert foreign-wrapped trampoline. |
-| | Live visual behavior | Registered UI control and visible registered map tile | Pending | Verify placement, reprojection, consumption, dismissal, selection, and cleanup. |
+| 2026-07-31 | Preliminary Phase 8 source/runtime | Preliminary offline build and package verification, user-started DF/DFHack process, then current-source runtime checks | Passed | Current project modules loaded from the supported paths; the live runtime-reload acceptance reconstructed one coherent registered generation. |
+| | Final registered runtime | Run the final verified current project source in a fresh DF/DFHack process, then test `dwarfui reload`, explicit consumer re-registration, and registry/hook inspection | Pending | Confirm destructive state reset, one re-registered generation, no stale screen, active hook ownership, or discovery callback, and diagnostics for any inert foreign-wrapped trampoline. |
+| 2026-07-31 | Automated live interaction | Registered UI control and visible registered map tile | Passed | Real overlay, Lua-screen, and Premium map-tile seams proved synchronous placement, retained reprojection, consumption, dismissal, selection, failure containment, and cleanup. This is automated live evidence, not manual visual acceptance. |

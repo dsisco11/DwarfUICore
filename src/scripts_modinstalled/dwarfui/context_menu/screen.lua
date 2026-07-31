@@ -217,18 +217,24 @@ end
 ---@class dwarfui.ContextMenuScreenController: dwarfui.ContextMenuPresentationController
 ---@field screen dwarfui.ContextMenuScreen
 ---@field _shown boolean
+---@field _closed boolean
 ContextMenuScreenController = {}
 ContextMenuScreenController.__index = ContextMenuScreenController
 
----Shows the prepared menu screen exactly once.
+---Shows the prepared menu synchronously during the handled input dispatch.
 function ContextMenuScreenController:show()
-    assert(not self._shown, 'DwarfUI context-menu screen is already shown.')
+    assert(not self._shown,
+        'DwarfUI context-menu screen is already shown.')
+    assert(not self._closed,
+        'DwarfUI context-menu screen is already closed.')
     self._shown = true
     self.screen:show()
 end
 
 ---Dismisses the prepared or visible menu screen exactly once.
 function ContextMenuScreenController:close()
+    if self._closed then return end
+    self._closed = true
     self.screen:close_presentation()
 end
 
@@ -238,7 +244,11 @@ end
 ---@return dwarfui.ContextMenuScreenController
 function create_presentation(session, actions)
     local screen = ContextMenuScreen{session=session, actions=actions}
-    return setmetatable({screen=screen, _shown=false},
+    return setmetatable({
+        screen=screen,
+        _shown=false,
+        _closed=false,
+    },
         ContextMenuScreenController)
 end
 

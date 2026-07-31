@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 1 complete; registration and presentation not started
+Status: Phase 2 complete; target arbitration and presentation not started
 
 ## Goal
 
@@ -552,71 +552,109 @@ production module.
 
 ## Phase 2 - Implement widget and map-tile registration
 
-- [ ] Add `context_menu/registration.lua` as the owner of public widget
+- [x] Add `context_menu/registration.lua` as the owner of public widget
       registrations and registration lifecycle.
-- [ ] Preserve tooltip-like weak widget ownership so registration does not
+- [x] Preserve tooltip-like weak widget ownership so registration does not
       keep a removed widget alive.
-- [ ] Make repeated registration of the same widget replace its stored
+- [x] Make repeated registration of the same widget replace its stored
       validated definition without creating a duplicate registration,
       sequence entry, discovery loop, or input hook.
-- [ ] Preserve the widget's numeric registration identity across direct
+- [x] Preserve the widget's numeric registration identity across direct
       re-registration and update.
-- [ ] Define registration idempotence in terms of ownership and side effects;
+- [x] Define registration idempotence in terms of ownership and side effects;
       do not require table identity or structural equality comparisons between
       caller definitions.
-- [ ] Implement explicit widget update and unregister behavior.
-- [ ] Validate widget re-registration and update inputs before mutation so a
+- [x] Implement explicit widget update and unregister behavior.
+- [x] Validate widget re-registration and update inputs before mutation so a
       failed definition replacement leaves the prior registration intact.
-- [ ] Resolve the widget's eligible current root dynamically instead of
+- [x] Resolve the widget's eligible current root dynamically instead of
       retaining a stale screen or overlay root.
-- [ ] Separate attachment/root discovery from target eligibility so a hidden
+- [x] Separate attachment/root discovery from target eligibility so a hidden
       or inactive child can still identify the Lua screen whose reversible
       input wrapper must remain installed.
-- [ ] Reject detached, hidden, inactive, disabled-overlay, foreign-root, or
+- [x] Reject detached, hidden, inactive, disabled-overlay, foreign-root, or
       otherwise ineligible widget registrations at target-resolution time.
-- [ ] Add `context_menu/map_target.lua` with exact copied x/y/z keys, weak
-      owner semantics, and disposable registration handles.
-- [ ] Keep a map registration's numeric identity across atomic updates without
+- [x] Add `context_menu/map_target.lua` with exact copied signed-16 x/y/z
+      coordinates, collision-free 48-bit packed integer index keys, weak owner
+      semantics, and disposable registration handles.
+- [x] Keep a map registration's numeric identity across atomic updates without
       retaining its disposable handle strongly in an open session.
-- [ ] For duplicate map coordinates, choose the currently eligible registration
+- [x] For duplicate map coordinates, choose the currently eligible registration
       with the greatest original registration sequence. Atomic update retains
       that sequence even when it moves an older handle onto an occupied tile.
-- [ ] Implement atomic map-handle updates for position and definition.
-- [ ] Ensure a failed update leaves the prior map registration intact.
-- [ ] Automatically remove map registrations when their weak owner or handle
+- [x] Implement atomic map-handle updates for position and definition.
+- [x] Ensure a failed update leaves the prior map registration intact.
+- [x] Automatically remove map registrations when their weak owner or handle
       is no longer live.
-- [ ] Resolve map-owner eligibility through the shared tooltip-style root
+- [x] Resolve map-owner eligibility through the shared tooltip-style root
       resolver for every target sample and open-session validation. A live owner
       in a hidden, inactive, disabled, unpresented, or wrong-screen root is not
       eligible but may become eligible again without re-registration.
-- [ ] Start registration-gated input/root discovery when at least one live
+- [x] Start registration-gated input/root discovery when at least one live
       registration exists, regardless of its current visibility, attachment,
       overlay enablement, or presentation eligibility.
-- [ ] Add `context_menu/root_discovery.lua` with one reload-safe,
+- [x] Add `context_menu/root_discovery.lua` with one reload-safe,
       registration-gated frame callback chain for discovering attachment and
       root changes that cannot be observed from an installed input hook.
-- [ ] Protect every discovery callback with `xpcall(..., debug.traceback)`.
+- [x] Protect every discovery callback with `xpcall(..., debug.traceback)`.
       Record and print the failure, stop the owned callback chain, and expose a
       documented failure callback that the service will use to close active
       presentation and disable the generation.
-- [ ] Ensure root discovery reads only the live registered widget/map owners
+- [x] Ensure root discovery reads only the live registered widget/map owners
       and does not scan unrelated views or world state.
-- [ ] Evaluate target eligibility dynamically for each input sample and render.
-- [ ] Keep enough discovery active to observe a temporarily hidden, detached,
+- [x] Evaluate target eligibility dynamically for each input sample and render.
+- [x] Keep enough discovery active to observe a temporarily hidden, detached,
       disabled, or unpresented registration becoming eligible again.
-- [ ] Stop discovery and release hooks only when the final live registration
+- [x] Stop discovery and release hooks only when the final live registration
       disappears and no menu is open.
-- [ ] Add focused registration tests for collection, detach, visibility,
+- [x] Add focused registration tests for collection, detach, visibility,
       root changes, disabled overlays, duplicate map positions, failed updates,
       update-stable duplicate precedence, map-owner eligibility, discovery
       failure containment, explicit unregister, and reload generation changes.
 
+### Phase 2 implementation record
+
+- `dwarfui/context_menu/registration.lua` owns weak widget registration,
+  idempotent definition replacement, explicit update/unregister operations,
+  shared widget/map numeric identity allocation, attachment-only root
+  discovery, strict dynamic eligibility, and destructive generation reload.
+- `dwarfui/context_menu/map_target.lua` owns copied signed-16 DF coordinates,
+  exact collision-free 48-bit packed integer index keys, weak owners and
+  handles, atomic position-plus-definition updates, stable original duplicate
+  precedence, dynamic shared-root eligibility, and automatic dead-owner/handle
+  pruning.
+- `dwarfui/context_menu/root_discovery.lua` owns one registration-gated
+  next-frame callback chain. Demand, scheduling, discovery, root observers,
+  idle notification, and failure notification run behind traceback boundaries;
+  a failure is printed, recorded, and disables the owning registration
+  generation.
+- Attachment discovery deliberately ignores visibility, activity, overlay
+  enablement, presentation, and layout. Target resolution separately uses the
+  strict shared tooltip root resolver on every request, allowing temporarily
+  ineligible registrations to recover without re-registration.
+- The `dwarfui reload` command shuts down the loaded context-menu registration
+  manager before clearing script environments. The process singleton also
+  shuts down a still-callable prior manager during direct module reload, and
+  stale manager references destructively retire their weak registrations and
+  cannot accept new mutations.
+- The new modules are registered in dependency order and included in the
+  package-contract inventory. Registration has no screen, view attachment, or
+  input-consumption path; its root observer is only the seam through which a
+  later service may install the explicitly permitted reversible input wrapper.
+- Verification on 2026-07-30: focused root-discovery, map-target, and
+  registration tests passed 26/26; focused registration, reload-command,
+  module-registry, and package-contract tests passed 50/50; the complete unit
+  suite passed 320/320; Lua 5.4.6 syntax passed for 31 production and 50
+  test/support files; unit-test naming and `git diff --check` passed. The
+  non-live build passed syntax; live reload was not run because no
+  `dfhack-run.exe` was configured.
+
 ### Phase 2 completion gate
 
-- [ ] Widget and map registrations have weak, reload-safe, explicitly tested
+- [x] Widget and map registrations have weak, reload-safe, explicitly tested
       ownership and cleanup; registration data itself is never preserved across
       reload.
-- [ ] Registration alone does not open a screen, consume input, attach views,
+- [x] Registration alone does not open a screen, consume input, attach views,
       or mutate consumer layout or presentation. It may cause the service to
       install the explicitly permitted reversible input-method wrapper.
 

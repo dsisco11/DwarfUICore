@@ -1,9 +1,17 @@
-☐ [Phase 1 - Discovery and Contracts] Define dynamic bottom-panel targeting and DF binding resolution contracts.
-    ☐ Confirm target focus and overlay lifecycle for fortress mode (`dwarfmode/Default`).
-    ☐ Identify all bottom-panel ui-menu buttons that need labels (citizen, etc.) and define one stable semantic ID per button.
-    ☐ Design a dynamic bounds sampler that re-queries button rectangles from native UI tiles and invalidates cache on size/layout changes.
-    ☐ Design a binding resolver that reads the active keybinding from DF for each semantic button ID.
-    ☐ Define failure behavior: if bounds or binding are unavailable for one button, suppress only that button label.
+✔ [Phase 1 - Discovery and Contracts] Define dynamic bottom-panel targeting and DF binding resolution contracts. @done(26-07-31 12:00)
+    ✔ Confirm target focus and overlay lifecycle for fortress mode (`dwarfmode/Default`). @done(26-07-31 12:00)
+    ✔ Identify all bottom-panel ui-menu buttons that need labels (citizen, etc.) and define one stable semantic ID per button. @done(26-07-31 12:00)
+    ✔ Design a dynamic bounds sampler that re-queries button rectangles from native UI tiles and invalidates cache on size/layout changes. @done(26-07-31 12:00)
+    ✔ Design a binding resolver that reads the active keybinding from DF for each semantic button ID. @done(26-07-31 12:00)
+    ✔ Define failure behavior: if bounds or binding are unavailable for one button, suppress only that button label. @done(26-07-31 12:00)
+    Decisions:
+    - Focus/lifecycle contract: render only while `dwarfmode/Default` is active; clear all cached geometry and labels immediately when focus leaves the screen.
+    - Semantic-ID contract: each label target is keyed by a stable semantic menu ID (for example `citizens`) that is independent of on-screen position and current hotkey text.
+    - Button-catalog contract: the model owns the complete bottom-panel button catalog and maps each semantic ID to one DF action binding key; overlay code consumes snapshots only.
+    - Geometry contract: bounds are dynamically sampled from live native tiles, cached per layout signature, and invalidated on screen-size changes or panel-layout shifts.
+    - Binding contract: hotkey text is resolved from active DF bindings every refresh cycle from the semantic ID's mapped action; no hardcoded label fallback is permitted.
+    - Failure contract: labels are suppressed per button when either bounds or active binding data is unavailable; other button labels remain visible.
+    - Rendering contract: each label anchor is derived from the sampled bounding box (corner + inset), not fixed coordinates.
     Docs:
     - README.md (module, overlay, and reload conventions)
     - Docs/hover-action-rail-proposal.md (target/anchor ownership patterns and dynamic placement ideas)

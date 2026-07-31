@@ -241,6 +241,12 @@ function ContextMenuOpenSession:get_anchor_descriptor()
     return ContextMenuAnchorDescriptor.new(self._anchor)
 end
 
+---Returns the still-live source root without extending its lifetime.
+---@return any|nil
+function ContextMenuOpenSession:get_source_root()
+    return self._weak_sources.source_root
+end
+
 ---Returns whether the session remains open and all required sources are live.
 ---@return boolean
 function ContextMenuOpenSession:is_valid()

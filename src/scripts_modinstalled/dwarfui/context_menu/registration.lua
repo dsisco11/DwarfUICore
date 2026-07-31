@@ -394,6 +394,22 @@ function ContextMenuRegistrationManager:resolve_map_identity(identity)
     return self._map_targets:resolve_identity(identity)
 end
 
+---Resolves an open map session against its original still-attached root.
+---@param identity integer
+---@param expected_root any
+---@return dwarfui.ContextMenuMapCandidate|nil
+function ContextMenuRegistrationManager:resolve_open_map_identity(
+        identity, expected_root)
+    if self._disabled or not self:_module_is_current() then return nil end
+    if rawget(expected_root, '_native') == nil then
+        local candidate = self._map_targets:resolve_identity(identity)
+        return candidate and candidate.root == expected_root and
+            candidate or nil
+    end
+    return self._map_targets:resolve_identity_attached(
+        identity, expected_root)
+end
+
 ---Selects the latest eligible registration at one exact map position.
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfui.ContextMenuMapCandidate|nil

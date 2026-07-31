@@ -121,10 +121,16 @@ function calculate_layout(definition, anchor, screen_width, screen_height)
         #definition.entries + FRAME_CELLS)
     local content_width = math.max(
         MIN_CONTENT_WIDTH, frame_width - FRAME_CELLS)
-    local left = math.max(0,
-        math.min(anchor.x, screen_width - frame_width))
-    local top = math.max(0,
-        math.min(anchor.y, screen_height - frame_height))
+    local left = anchor.x
+    if left + frame_width > screen_width then
+        left = anchor.x - frame_width
+    end
+    left = math.max(0, math.min(left, screen_width - frame_width))
+    local top = anchor.y
+    if top + frame_height > screen_height then
+        top = anchor.y - frame_height
+    end
+    top = math.max(0, math.min(top, screen_height - frame_height))
     local choices = {}
     for index, entry in ipairs(definition.entries) do
         choices[index] = {
@@ -172,6 +178,12 @@ function ContextMenuWindow:init(info)
         end,
     }
     self:addviews{self.menu_list}
+end
+
+---Replaces the current placement anchor with an isolated coordinate copy.
+---@param anchor {x: integer, y: integer}
+function ContextMenuWindow:set_anchor(anchor)
+    self.anchor = {x=anchor.x, y=anchor.y}
 end
 
 ---Recomputes dimensions, truncation, and edge clamping after a resize.

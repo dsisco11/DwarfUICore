@@ -3,8 +3,12 @@
 -- Short-lived interactive ZScreen presentation for one open menu session.
 
 local gui = require('gui')
+local map_projection = reqscript('dwarfui/map_projection')
 local renderers = reqscript('dwarfui/context_menu/renderer')
 local services = reqscript('dwarfui/context_menu/service')
+local targets = reqscript('dwarfui/context_menu/target')
+
+local AnchorKind = targets.ContextMenuAnchorKind
 
 local WHEEL_KEYS = {
     STANDARDSCROLL_UP=true,
@@ -22,6 +26,7 @@ local WHEEL_KEYS = {
 ---@field session dwarfui.ContextMenuOpenSession
 ---@field actions dwarfui.ContextMenuPresentationActions
 ---@field menu_window dwarfui.ContextMenuWindow
+---@field anchor dwarfui.ContextMenuAnchorDescriptor
 ---@field _presentation_closed boolean
 ContextMenuScreen = defclass(ContextMenuScreen, gui.ZScreen)
 ContextMenuScreen.ATTRS{
@@ -51,13 +56,44 @@ function ContextMenuScreen:init(info)
     self.actions = info.actions
     self._presentation_closed = false
     local definition = self.session:get_definition_snapshot()
-    local anchor = self.session:get_anchor_descriptor().screen_position
+    self.anchor = self.session:get_anchor_descriptor()
     self.menu_window = renderers.ContextMenuWindow{
         definition=definition,
-        anchor=anchor,
+        anchor=self.anchor.screen_position,
         on_select=function(index) self.actions.select(index) end,
     }
     self:addviews{self.menu_window}
+end
+
+---Returns whether the opening root remains in this screen's native parent chain.
+---@param root any
+---@return boolean
+function ContextMenuScreen:source_root_is_presented(root)
+    if not root then return false end
+    if not self._native then return true end
+    local root_native = rawget(root, '_native')
+    local current = self._native.parent
+    while current do
+        if current == root_native or current.widgets == root then return true end
+        current = current.parent
+    end
+    return root_native == nil
+end
+
+---Resolves the current placement anchor without mutating native map state.
+---@return {x: integer, y: integer}|nil
+function ContextMenuScreen:resolve_anchor()
+    if self.anchor.kind == AnchorKind.SCREEN_POSITION then
+        return self.anchor.screen_position
+    end
+    local root = self.session:get_source_root()
+    if not self.actions.map_session_is_valid() or
+            not self:source_root_is_presented(root) then
+        return nil
+    end
+    local projected = map_projection.project_visible(
+        self.anchor.map_position)
+    return projected and {x=projected.x, y=projected.y} or nil
 end
 
 ---Returns whether the current pointer lies in the complete Window frame.
@@ -73,7 +109,11 @@ end
 ---Relayouts the Window from the current full interface dimensions.
 function ContextMenuScreen:relayout()
     local body = self.frame_body
+    local anchor = self:resolve_anchor()
+    if not anchor then return false end
+    self.menu_window:set_anchor(anchor)
     self.menu_window:relayout(body.width, body.height)
+    return true
 end
 
 ---Closes through the service when the native screen is dismissed externally.
@@ -165,7 +205,10 @@ function ContextMenuScreen:render(dc)
             self.actions.close()
             return
         end
-        self:relayout()
+        if not self:relayout() then
+            self.actions.close()
+            return
+        end
         ContextMenuScreen.super.render(self, dc)
     end, debug.traceback)
     if not ok then self.actions.fail('screen render', failure) end

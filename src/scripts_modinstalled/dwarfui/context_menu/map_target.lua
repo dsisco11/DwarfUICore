@@ -322,6 +322,29 @@ function ContextMenuMapTargetRegistry:resolve_identity(identity)
     return nil
 end
 
+---Resolves an identity while requiring attachment to one already-presented root.
+---This omits only the global presentation test, which an open ZScreen would
+---otherwise make self-invalidating for Lua-screen roots.
+---@param identity integer
+---@param expected_root any
+---@return dwarfui.ContextMenuMapCandidate|nil
+function ContextMenuMapTargetRegistry:resolve_identity_attached(
+        identity, expected_root)
+    self:_prune()
+    for _, record in pairs(self._registrations) do
+        if record.identity == identity then
+            local owner = record.owner_ref.owner
+            local root = owner and
+                self._root_resolver:find_root(owner, true)
+            if root == expected_root then
+                return self:_candidate(record, owner, root)
+            end
+            return nil
+        end
+    end
+    return nil
+end
+
 ---Selects the latest originally registered eligible handle at one exact tile.
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfui.ContextMenuMapCandidate|nil

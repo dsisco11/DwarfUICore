@@ -1024,56 +1024,56 @@ production module.
 
 ## Phase 6 - Implement screen-position and map-tile placement
 
-- [ ] Place the preferred menu frame with its top-left cell at the source
+  - [x] Place the preferred menu frame with its top-left cell at the source
       anchor.
-- [ ] If the preferred frame overflows right or bottom, try the corresponding
+  - [x] If the preferred frame overflows right or bottom, try the corresponding
       left-of-anchor or above-anchor placement before final clamping.
-- [ ] Apply deterministic horizontal and vertical placement independently so
+  - [x] Apply deterministic horizontal and vertical placement independently so
       corner behavior is testable.
-- [ ] Keep a widget menu's captured screen anchor fixed while its source
+  - [x] Keep a widget menu's captured screen anchor fixed while its source
       widget moves or rerenders.
-- [ ] Re-clamp a widget menu after screen-size changes without changing its
+  - [x] Re-clamp a widget menu after screen-size changes without changing its
       captured anchor.
-- [ ] For map-tile sessions, retain a copied x/y/z world coordinate and
+  - [x] For map-tile sessions, retain a copied x/y/z world coordinate and
       re-resolve the current dwarfmode viewport before every render.
-- [ ] Use the active DFHack viewport helper for text-mode world-to-screen
+  - [x] Use the active DFHack viewport helper for text-mode world-to-screen
       projection.
-- [ ] Use the active Premium viewport corner, interface dimensions, and zoom
+  - [x] Use the active Premium viewport corner, interface dimensions, and zoom
       factor for graphics-mode projection.
-- [ ] Use the projection helper's canonical interface cell for the exact map
+  - [x] Use the projection helper's canonical interface cell for the exact map
       tile as the map menu anchor in both text and Premium modes.
-- [ ] Keep the projected anchor and menu frame in one interface coordinate
+  - [x] Keep the projected anchor and menu frame in one interface coordinate
       space.
-- [ ] Reproject after camera panning, zoom, interface resize, and other
+  - [x] Reproject after camera panning, zoom, interface resize, and other
       viewport changes.
-- [ ] Close and consume no additional input when the tile becomes offscreen,
+  - [x] Close and consume no additional input when the tile becomes offscreen,
       changes away from the displayed z-level, the world unloads, or the
       owning registration becomes invalid.
-- [ ] Close without invoking a handler when the map registration's owner root
+  - [x] Close without invoking a handler when the map registration's owner root
       becomes hidden, inactive, disabled, or absent from the menu's still-live
       presented parent/root chain. Merely placing a later ZScreen above the
       context menu does not invalidate the owner root.
-- [ ] Do not pin an offscreen map menu to the nearest screen edge; it would no
+  - [x] Do not pin an offscreen map menu to the nearest screen edge; it would no
       longer appear attached to its source tile.
-- [ ] Do not change viewport, cursor, game pause, or native map state merely to
+  - [x] Do not change viewport, cursor, game pause, or native map state merely to
       keep the menu visible.
-- [ ] Add shared `dwarfui/map_projection.lua` and migrate the existing
+  - [x] Add shared `dwarfui/map_projection.lua` and migrate the existing
       minecart projection to it in the same change, giving the helper both
       minecart and context-menu production consumers without duplicating
       graphics-mode math.
-- [ ] Add unit tests proving a screen-position anchor remains fixed.
-- [ ] Add unit tests proving a map anchor moves after viewport changes and
+  - [x] Add unit tests proving a screen-position anchor remains fixed.
+  - [x] Add unit tests proving a map anchor moves after viewport changes and
       closes for offscreen, wrong-z, dead-owner, ineligible or unpresented
       owner-root, and world-unload cases.
-- [ ] Add text-mode and Premium projection coverage for map edges, zoom,
+  - [x] Add text-mode and Premium projection coverage for map edges, zoom,
       interface resize, preferred placement, left/above fallback, every
       fallback combination, and final clamping.
 
 ### Phase 6 completion gate
 
-- [ ] Widget context menus remain at their captured screen positions.
-- [ ] Map context menus visibly track their world tiles every render.
-- [ ] Projection invalidation closes cleanly without stale screens, map
+  - [x] Widget context menus remain at their captured screen positions.
+  - [x] Map context menus visibly track their world tiles every render.
+  - [x] Projection invalidation closes cleanly without stale screens, map
       mutation, or input side effects.
 
 ## Phase 7 - Integrate lifecycle, reload, registry, packaging, and docs

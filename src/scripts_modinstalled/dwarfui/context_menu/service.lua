@@ -25,6 +25,7 @@ dfhack.dwarfui = dfhack.dwarfui or {}
 ---@class dwarfui.ContextMenuPresentationActions
 ---@field close fun(): boolean
 ---@field select fun(entry_index: integer): boolean
+---@field map_session_is_valid fun(): boolean
 ---@field fail fun(stage: string, failure: any)
 
 ---Creates a hidden controller; visible side effects begin only in `show()`.
@@ -244,6 +245,20 @@ function ContextMenuService:_open_unprotected(detection)
     local actions = {
         close=function() return self:close() end,
         select=function(entry_index) return self:select(entry_index) end,
+        map_session_is_valid=function()
+            local target = session:get_target_descriptor()
+            if target.kind ~= TargetKind.MAP_TILE then return true end
+            local root = session:get_source_root()
+            local anchor = session:get_anchor_descriptor()
+            local candidate = root and
+                self._registrations:resolve_open_map_identity(
+                    target.registration_identity, root)
+            local pos = candidate and candidate.pos
+            local expected = anchor.map_position
+            return pos ~= nil and expected ~= nil and
+                pos.x == expected.x and pos.y == expected.y and
+                pos.z == expected.z
+        end,
         fail=function(stage, failure)
             self:_disable(stage, failure, true)
         end,

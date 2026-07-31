@@ -162,10 +162,11 @@ end
 ---Destructively retires registrations held by a stale manager reference.
 function ContextMenuRegistrationManager:_retire_stale()
     if self._retired then return end
+    self:clear()
+    self._root_observer = nil
+    self._failure_observer = nil
+    self._menu_open_predicate = function() return false end
     self._retired = true
-    self._widget_registrations = setmetatable({}, {__mode='k'})
-    self._map_targets:clear()
-    self._root_discovery:stop()
 end
 
 ---Returns the count of currently live weak widget registrations.
@@ -461,14 +462,25 @@ function ContextMenuRegistrationManager:set_menu_open_predicate(predicate)
     self:_refresh_discovery()
 end
 
+---Clears registrations and discovery without retiring this manager.
+---@return boolean changed
+function ContextMenuRegistrationManager:clear()
+    local changed = self:registration_count() > 0
+    self._widget_registrations = setmetatable({}, {__mode='k'})
+    self._widget_registration_sequence = 0
+    changed = self._map_targets:clear() or changed
+    changed = self._root_discovery:stop() or changed
+    return changed
+end
+
 ---Destructively clears registrations and owned discovery for this generation.
 ---@return boolean changed
 function ContextMenuRegistrationManager:shutdown()
-    local changed = self:registration_count() > 0
+    local changed = self:clear()
+    self._root_observer = nil
+    self._failure_observer = nil
+    self._menu_open_predicate = function() return false end
     self._retired = true
-    self._widget_registrations = setmetatable({}, {__mode='k'})
-    changed = self._map_targets:clear() or changed
-    changed = self._root_discovery:stop() or changed
     return changed
 end
 

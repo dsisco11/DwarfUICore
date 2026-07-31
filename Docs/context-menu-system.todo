@@ -1078,50 +1078,50 @@ production module.
 
 ## Phase 7 - Integrate lifecycle, reload, registry, packaging, and docs
 
-- [ ] Make module reload invalidate stale callbacks, registrations, screens,
+- [x] Make module reload invalidate stale callbacks, registrations, screens,
       and active render/input ownership from the prior generation.
-- [ ] Treat reload as a complete context-menu reset: close the active screen,
+- [x] Treat reload as a complete context-menu reset: close the active screen,
       remove all hooks owned by the generation when safely restorable, drop all
       widget/map registrations, numeric registration identities, callbacks,
       service diagnostics, and disabled-generation state, and require explicit
       re-registration afterward. Retain only minimal hook-chain metadata when
       the tooltip-style foreign-wrapper contract makes exact removal
       impossible.
-- [ ] Apply the tooltip hook cleanup contract: restore only an outermost hook
+- [x] Apply the tooltip hook cleanup contract: restore only an outermost hook
       owned by this generation, never overwrite a foreign wrapper installed
       after DwarfUI, and make any superseded trampoline retained inside that
       foreign chain inert and visible in diagnostics.
-- [ ] Clear the active menu and registrations on world unload and DwarfUI
+- [x] Clear the active menu and registrations on world unload and DwarfUI
       teardown.
-- [ ] Add every reload-managed module to
+- [x] Add every reload-managed module to
       `dwarfui/module_registry.lua` in dependency order.
-- [ ] Update module-registry tests for load and environment-clear order.
-- [ ] Update package-contract tests for all
+- [x] Update module-registry tests for load and environment-clear order.
+- [x] Update package-contract tests for all
       `dwarfui/context_menu/` production modules.
-- [ ] Update build/package verification so nested production and test
+- [x] Update build/package verification so nested production and test
       directories are discovered correctly.
-- [ ] Document the public registration, update, unregister, map-handle,
+- [x] Document the public registration, update, unregister, map-handle,
       definition, color-fallback, selection-context, close, and anchoring
       contracts in the project README or a dedicated guide.
-- [ ] Document accepted `COLOR_BLACK`..`COLOR_WHITE` display colors, menu
+- [x] Document accepted `COLOR_BLACK`..`COLOR_WHITE` display colors, menu
       frame/title/body color application, update-stable duplicate map
       precedence, map-handle lifetime, and map-owner root eligibility.
-- [ ] Document that the initial public API has no programmatic replacement
+- [x] Document that the initial public API has no programmatic replacement
       operation and that a right-click while open only closes.
-- [ ] Include examples for a widget screen-position menu and an exact map-tile
+- [x] Include examples for a widget screen-position menu and an exact map-tile
       menu.
-- [ ] Document that selection and outside left-click both close and consume.
-- [ ] Link `Docs/project.todo` to this checklist without marking the project
+- [x] Document that selection and outside left-click both close and consume.
+- [x] Link `Docs/project.todo` to this checklist without marking the project
       item complete before every definition-of-done gate passes.
 
 ### Phase 7 completion gate
 
-- [ ] Reload and teardown leave no stale screen, active hook ownership,
+- [x] Reload and teardown leave no stale screen, active hook ownership,
       registration, discovery callback, or other callback. A superseded inert
       trampoline may remain only when an opaque foreign outer wrapper prevents
       exact restoration, matching the tooltip hook contract, and must be
       reported by diagnostics.
-- [ ] Registry order, package contents, public documentation, and both anchor
+- [x] Registry order, package contents, public documentation, and both anchor
       examples match the implemented API.
 
 ## Phase 8 - Add native component and interaction coverage

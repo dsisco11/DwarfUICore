@@ -396,6 +396,7 @@ function ContextMenuMapTargetRegistry:clear()
     local changed = next(self._registrations) ~= nil
     self._registrations = setmetatable({}, {__mode='k'})
     self._coordinate_index = {}
+    self._registration_sequence = 0
     return changed
 end
 

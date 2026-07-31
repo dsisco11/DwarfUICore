@@ -370,11 +370,25 @@ function ContextMenuService:handle_opening_input(keys, transport, owner)
     return opened
 end
 
----Installs one owned world-unload close callback when DFHack exposes the seam.
+---Closes the menu and clears all registrations after a world unload.
+---@return boolean changed
+function ContextMenuService:clear_world_state()
+    local changed = self:close()
+    local ok, cleared = xpcall(function()
+        return self._registrations:clear()
+    end, debug.traceback)
+    if not ok then
+        self:_disable('world unload cleanup', cleared, true)
+        return changed
+    end
+    return cleared or changed
+end
+
+---Installs one owned world-unload cleanup callback when DFHack exposes the seam.
 function ContextMenuService:_install_state_change_callback()
     if type(dfhack.onStateChange) ~= 'table' then return end
     local callback = function(code)
-        if code == SC_WORLD_UNLOADED then self:close() end
+        if code == SC_WORLD_UNLOADED then self:clear_world_state() end
     end
     self._state_change_callback = callback
     dfhack.onStateChange[STATE_CHANGE_SLOT] = callback

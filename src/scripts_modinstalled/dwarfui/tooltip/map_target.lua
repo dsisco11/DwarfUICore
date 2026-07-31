@@ -9,6 +9,9 @@ local ObservationKind = target_types.TooltipPointerObservationKind
 
 API_VERSION = 1
 local REGISTRY_SLOT = 'tooltip_map_target_registry'
+local COORDINATE_MIN = -0x8000
+local COORDINATE_MAX = 0x7fff
+local COORDINATE_MASK = 0xffff
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 
@@ -77,13 +80,24 @@ local function is_integer(value)
     return type(value) == 'number' and value % 1 == 0
 end
 
----Returns a collision-free exact-coordinate key.
+---Returns whether a value fits one signed DF coordinate component.
+---@param value any
+---@return boolean
+local function is_signed_16(value)
+    return is_integer(value) and
+        value >= COORDINATE_MIN and
+        value <= COORDINATE_MAX
+end
+
+---Packs one signed-16-bit DF coordinate into a collision-free 48-bit key.
 ---@param x integer
 ---@param y integer
 ---@param z integer
----@return string
+---@return integer
 local function coordinate_key(x, y, z)
-    return ('%d:%d:%d'):format(x, y, z)
+    return ((x & COORDINATE_MASK) << 32) |
+        ((y & COORDINATE_MASK) << 16) |
+        (z & COORDINATE_MASK)
 end
 
 ---Validates and copies complete mutable registration state.
@@ -100,8 +114,8 @@ local function copy_mutable_state(options, label)
     local pos_type = type(pos)
     assert(pos_type == 'table' or pos_type == 'userdata',
         ('DwarfUI %s requires an exact map position.'):format(label))
-    assert(is_integer(pos.x) and is_integer(pos.y) and is_integer(pos.z),
-        ('DwarfUI %s position requires integer x, y, and z.'):format(label))
+    assert(is_signed_16(pos.x) and is_signed_16(pos.y) and is_signed_16(pos.z),
+        ('DwarfUI %s position requires signed 16-bit integer x, y, and z.'):format(label))
     assert(options.tooltip == nil or type(options.tooltip) == 'string',
         ('DwarfUI %s tooltip must be a string or nil.'):format(label))
     return pos.x, pos.y, pos.z, options.tooltip
@@ -140,7 +154,7 @@ function TooltipMapTargetRegistry.new(options)
 end
 
 ---Returns or creates the weak bucket for one exact coordinate.
----@param key string
+---@param key integer
 ---@return table
 function TooltipMapTargetRegistry:_get_or_create_bucket(key)
     local index = self._state.coordinate_index
@@ -271,9 +285,9 @@ function TooltipMapTargetRegistry:detect(sample)
     assert(type(sample.sequence) == 'number',
         'DwarfUI map target sample sequence must be a number.')
     if sample.x == nil or sample.y == nil or
-            not is_integer(sample.map_x) or
-            not is_integer(sample.map_y) or
-            not is_integer(sample.map_z) then
+            not is_signed_16(sample.map_x) or
+            not is_signed_16(sample.map_y) or
+            not is_signed_16(sample.map_z) then
         return miss(sample)
     end
 

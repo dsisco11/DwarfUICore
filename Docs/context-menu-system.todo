@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 5 complete; screen-position and map-tile placement not started
+Status: Automated verification complete; final manual visual acceptance remains
 
 ## Goal
 
@@ -1219,23 +1219,23 @@ production module.
 
 ## Phase 9 - Complete verification and live acceptance
 
-- [ ] Run the focused definition, registration, root-discovery, input-sample,
+- [x] Run the focused definition, registration, root-discovery, input-sample,
       detector, pointer-enum, hook, renderer, screen, service, and projection
       unit specs through `./tools/Run-UnitTests.ps1`.
-- [ ] Run the existing shared pointer, tooltip target-detector, and affected
+- [x] Run the existing shared pointer, tooltip target-detector, and affected
       consumer specs as a focused regression set for the enum migration.
 - [x] Run the focused context-menu DwarfSpec files through
       `./tools/Run-AutomationTests.ps1`, which remains a direct
       `dwarfspec run` pass-through.
 - [x] Run the complete standalone unit suite.
-- [ ] Run the complete DwarfSpec suite.
+- [x] Run the complete DwarfSpec suite.
 - [x] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
 - [x] Run the offline build through `./tools/Build.ps1` without claiming live
       runtime evidence.
 - [x] Run expanded and archive package verification through the scripts under
       `./tools/`.
 - [x] Run `git diff --check`.
-- [ ] Run the final verified current project source in a fresh DF/DFHack
+- [x] Run the final verified current project source in a fresh DF/DFHack
       process before final manual acceptance. The earlier Phase 8 fresh-process
       gate remains the first pointer-enum live acceptance.
 - [x] Register disposable live test consumers and open a menu, run
@@ -1262,7 +1262,7 @@ production module.
 
 ### Phase 9 completion gate
 
-- [ ] All automated suites, syntax checks, builds, packages, and whitespace
+- [x] All automated suites, syntax checks, builds, packages, and whitespace
       checks pass.
 - [ ] Live DFHack proves both placement modes and all required consumption and
       closure behavior without Lua errors or stale lifecycle state.
@@ -1358,15 +1358,15 @@ production module.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 2026-07-30 | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Passed: 67/67 | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, service transitions, and native/Lua opening-hook ownership. Renderer, interactive-screen lifecycle, and projection remain later work. |
-| | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip/target_detector.spec.lua tests/tooltip/registration.spec.lua tests/tooltip/renderer.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Pending | Prove the enum migration across the shared pointer API and every affected production consumer. |
+| 2026-07-31 | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Passed: 103/103 | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, service, renderer, screen, and projection coverage passed. |
+| 2026-07-31 | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip/target_detector.spec.lua tests/tooltip/registration.spec.lua tests/tooltip/renderer.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Passed: 99/99 | Pointer enum migration and affected tooltip/consumer coverage passed. |
 | 2026-07-31 | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Passed: 5/5 | Map, overlay, Lua-screen, failure-lifecycle, and runtime-reload files passed individually with `cleanup_confirmed=true`. |
-| 2026-07-31 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 392/392 | Zero failures, errors, or pending tests. |
-| 2026-07-31 | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Failed outside context-menu scope | All five context-menu examples passed before three Minecart Route examples failed because `TestWorld 01` contained no hauling route at index 0; the runner then reached its 30-second timeout. Cleanup was confirmed. |
-| 2026-07-31 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6 accepted 40 production and 64 test/support files. |
+| 2026-07-31 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 393/393 | Zero failures, errors, or pending tests. |
+| 2026-07-31 | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1 --timeout 120` | Passed: 21/21 | TestWorld 01 fixtures supplied disposable hauling routes and the real mood-popover scrolling path; cleanup was confirmed. |
+| 2026-07-31 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6 accepted 43 production and 66 test/support files. |
 | 2026-07-31 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Offline syntax/build gate only; no live reload or runtime claim. |
 | 2026-07-31 | Package verification | `./tools/Publish.ps1` | Passed | Expanded and zip manifests and contents matched `src`; created `dist/DwarfUI-0.1.0.zip` and `dist/DwarfUI`. |
-| 2026-07-30 | Diff validation | `git diff --check` | Passed | No whitespace errors; Git emitted expected CRLF conversion warnings. |
+| 2026-07-31 | Diff validation | `git diff --check` | Passed | No whitespace errors; Git emitted expected CRLF conversion warnings. |
 | 2026-07-31 | Preliminary Phase 8 source/runtime | Preliminary offline build and package verification, user-started DF/DFHack process, then current-source runtime checks | Passed | Current project modules loaded from the supported paths; the live runtime-reload acceptance reconstructed one coherent registered generation. |
-| | Final registered runtime | Run the final verified current project source in a fresh DF/DFHack process, then test `dwarfui reload`, explicit consumer re-registration, and registry/hook inspection | Pending | Confirm destructive state reset, one re-registered generation, no stale screen, active hook ownership, or discovery callback, and diagnostics for any inert foreign-wrapped trampoline. |
+| 2026-07-31 | Final registered runtime | User-restarted DF/DFHack process; complete DwarfSpec suite including runtime-reload acceptance | Passed | Current project source exercised the destructive reload and explicit re-registration contract; registry, hook, callback, and cleanup assertions passed. |
 | 2026-07-31 | Automated live interaction | Registered UI control and visible registered map tile | Passed | Real overlay, Lua-screen, and Premium map-tile seams proved synchronous placement, retained reprojection, consumption, dismissal, selection, failure containment, and cleanup. This is automated live evidence, not manual visual acceptance. |

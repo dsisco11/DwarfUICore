@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 0 complete; production implementation not started
+Status: Phase 1 complete; registration and presentation not started
 
 ## Goal
 
@@ -468,64 +468,87 @@ production module.
 
 ## Phase 1 - Implement definitions, snapshots, and open-session types
 
-- [ ] Add `context_menu/definition.lua` with documented
+- [x] Add `context_menu/definition.lua` with documented
       `ContextMenuDefinition` and `ContextMenuEntry` annotations.
-- [ ] Support an optional non-empty title after validation.
-- [ ] Support menu-level optional `fg` and `bg` colors.
-- [ ] Validate every supplied `fg` and `bg` as an integer display color in the
+- [x] Support an optional non-empty title after validation.
+- [x] Support menu-level optional `fg` and `bg` colors.
+- [x] Validate every supplied `fg` and `bg` as an integer display color in the
       inclusive `COLOR_BLACK`..`COLOR_WHITE` range; reject `COLOR_RESET`,
       pens, and every non-color representation.
-- [ ] Require a non-empty `entries` list.
-- [ ] Require every entry to contain a non-empty string `label`.
-- [ ] Require every entry to contain a Lua function `on_select` for which
+- [x] Require a non-empty `entries` list.
+- [x] Require every entry to contain a non-empty string `label`.
+- [x] Require every entry to contain a Lua function `on_select` for which
       `type(on_select) == 'function'`; reject callable tables, userdata, and
       every other value.
-- [ ] Support independent optional entry-level `fg` and `bg` colors.
-- [ ] Reject unknown shapes and invalid values with errors that identify the
+- [x] Support independent optional entry-level `fg` and `bg` colors.
+- [x] Reject unknown shapes and invalid values with errors that identify the
       offending field and entry index.
-- [ ] Resolve missing colors through entry, menu, and system defaults without
+- [x] Resolve missing colors through entry, menu, and system defaults without
       mutating the caller's table.
-- [ ] Make definition validation return a DwarfUI-owned copy containing the
+- [x] Make definition validation return a DwarfUI-owned copy containing the
       title, resolved pens, labels, and handler references.
-- [ ] Store that validated copy at registration and replace it only through
+- [x] Store that validated copy at registration and replace it only through
       re-registration or an explicit update operation.
-- [ ] Copy the stored validated definition into an open-session snapshot when
+- [x] Copy the stored validated definition into an open-session snapshot when
       the menu opens.
-- [ ] Ensure caller mutation after registration affects neither the current
+- [x] Ensure caller mutation after registration affects neither the current
       registration nor an open session.
-- [ ] Add documented target and anchor descriptor types in
+- [x] Add documented target and anchor descriptor types in
       `context_menu/target.lua`.
-- [ ] Define a documented selection-context object containing target kind,
+- [x] Define a documented selection-context object containing target kind,
       anchor kind, numeric registration identity, captured screen position,
       a guaranteed-live resolved source, and copied map position where
       applicable.
-- [ ] Allocate a monotonically increasing numeric registration identity for
+- [x] Allocate a monotonically increasing numeric registration identity for
       each new widget or map registration. Re-registration and explicit update
       retain it; unregister followed by register receives a new identity.
-- [ ] Store source widgets, map owners, and source roots as weak references in
+- [x] Store source widgets, map owners, and source roots as weak references in
       an open session; resolve them only when validating the session or
       constructing the callback context.
-- [ ] Store only the numeric registration identity in a session's stable target
+- [x] Store only the numeric registration identity in a session's stable target
       descriptor; never retain a widget, owner, or map handle strongly as
       identity.
-- [ ] Define callback-context behavior when a weak source has disappeared:
+- [x] Define callback-context behavior when a weak source has disappeared:
       close without constructing a callback context or invoking the handler.
       Whenever `on_select` runs, its context's `source` is non-nil and live.
-- [ ] Never retain a native map object pointer when a copied coordinate or
+- [x] Never retain a native map object pointer when a copied coordinate or
       stable numeric identity is sufficient.
-- [ ] Add a documented open-session type that owns exactly one definition
+- [x] Add a documented open-session type that owns exactly one definition
       snapshot, target descriptor, anchor descriptor, and lifecycle state.
-- [ ] Add focused definition tests under `tests/context_menu/` for valid,
+- [x] Add focused definition tests under `tests/context_menu/` for valid,
       invalid, empty, partially colored definitions, and rejection of callable
       non-function values.
-- [ ] Add focused snapshot tests proving caller mutation after registration or
+- [x] Add focused snapshot tests proving caller mutation after registration or
       opening alters neither the next opening nor the active menu.
+
+### Phase 1 implementation record
+
+- `dwarfui/context_menu/definition.lua` owns strict definition validation,
+  resolved display-color pens, atomic registration-owned definition slots, and
+  structurally isolated opening snapshots. Snapshot, resolved-entry, and
+  resolved-pen constructors also serve as copy constructors.
+- `dwarfui/context_menu/target.lua` owns immutable target, anchor, and session
+  enums; monotonic registration identity allocation; copied stable
+  descriptors whose constructors also serve as copy constructors; weak source
+  ownership; live selection contexts; and close-before-callback session
+  behavior.
+- Reusable numeric classification and immutable numeric enum construction live
+  in `dwarfui/utils/numbers.lua` and
+  `dwarfui/utils/immutable_enum.lua`; context-menu modules do not redefine
+  those helpers locally.
+- The new modules are registered in dependency order and are included in the
+  package-contract inventory. Focused definition/session tests live under
+  `tests/context_menu/`.
+- Verification on 2026-07-30: Lua 5.4.6 syntax passed for 28 production and
+  47 test/support files; focused context-menu and utility tests passed 19/19;
+  module-registry/package-contract tests passed 22/22; and the complete unit
+  suite passed 294/294.
 
 ### Phase 1 completion gate
 
-- [ ] Definition validation, color fallback, snapshot immutability, enum use,
+- [x] Definition validation, color fallback, snapshot immutability, enum use,
       and selection context are deterministic without a live DF runtime.
-- [ ] Every new class and method has LuaDoc documentation.
+- [x] Every new class and method has LuaDoc documentation.
 
 ## Phase 2 - Implement widget and map-tile registration
 

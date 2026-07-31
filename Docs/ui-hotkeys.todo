@@ -1,0 +1,70 @@
+☐ [Phase 1 - Discovery and Contracts] Define dynamic bottom-panel targeting and DF binding resolution contracts.
+    ☐ Confirm target focus and overlay lifecycle for fortress mode (`dwarfmode/Default`).
+    ☐ Identify all bottom-panel ui-menu buttons that need labels (citizen, etc.) and define one stable semantic ID per button.
+    ☐ Design a dynamic bounds sampler that re-queries button rectangles from native UI tiles and invalidates cache on size/layout changes.
+    ☐ Design a binding resolver that reads the active keybinding from DF for each semantic button ID.
+    ☐ Define failure behavior: if bounds or binding are unavailable for one button, suppress only that button label.
+    Docs:
+    - README.md (module, overlay, and reload conventions)
+    - Docs/hover-action-rail-proposal.md (target/anchor ownership patterns and dynamic placement ideas)
+    - https://docs.dfhack.org/en/stable/docs/dev/Lua%20API.html (DFHack Lua API reference)
+
+☐ [Phase 2 - Model Module] Implement dynamic button bounds + active hotkey model.
+    ☐ Add a new `dwarfui/` model module for:
+        - querying current bottom-panel button bounds,
+        - mapping bounds to semantic button IDs,
+        - resolving active DF keybinding labels,
+        - exposing one snapshot API consumed by overlay rendering.
+    ☐ Implement cache + invalidation keyed by screen dimensions and layout signatures.
+    ☐ Normalize returned label text (single visible hotkey token for corner label rendering).
+    ☐ Add LuaDoc comments for all public classes/methods.
+    Docs:
+    - src/scripts_modinstalled/dwarfui/minecart_route.lua (dynamic row/bounds model pattern)
+    - src/scripts_modinstalled/dwarfui/mood_popover.lua (layout discovery and cache invalidation pattern)
+
+☐ [Phase 3 - Overlay] Render corner hotkey labels on live native button bounds.
+    ☐ Add a fullscreen passive overlay script in `src/scripts_modinstalled/` for bottom-panel hotkey labels.
+    ☐ Keep all input pass-through; never consume clicks or keyboard events.
+    ☐ Draw a small label in the chosen corner inset for each currently visible button from the model snapshot.
+    ☐ Re-sample model data on render/update so labels track slight layout changes across window sizes.
+    ☐ Verify citizen button shows `u` when DF active binding is default.
+    Docs:
+    - src/scripts_modinstalled/dwarfui-mood-popover.lua (fullscreen overlay structure)
+    - src/scripts_modinstalled/dwarfui-minecart-route-markers.lua (native-overlay rendering integration)
+
+☐ [Phase 4 - Runtime Integration] Register and reload safely.
+    ☐ Add any new internal model module(s) to `dwarfui/module_registry.lua` in dependency order.
+    ☐ Add the new overlay registration script to overlay reload/retirement flow in `src/scripts_modinstalled/dwarfui.lua`.
+    ☐ Verify `dwarfui reload` reconstructs this feature without stale state.
+    Docs:
+    - src/scripts_modinstalled/dwarfui/module_registry.lua
+    - src/scripts_modinstalled/dwarfui.lua
+    - README.md (Runtime validation and reload)
+
+☐ [Phase 5 - Unit Tests] Add deterministic coverage for geometry, bindings, and pass-through behavior.
+    ☐ Add a model spec covering:
+        - multiple window sizes with slight layout shifts,
+        - dynamic bounds recomputation,
+        - active binding lookup and label normalization,
+        - per-button suppression when data is missing.
+    ☐ Add an overlay spec covering:
+        - default-enabled fullscreen contract,
+        - render placement against model-provided bounds,
+        - no input consumption/regression of native behavior.
+    ☐ Update module registry tests if new module ordering changes.
+    ☐ Update package contract tests for any newly shipped module files.
+    Docs:
+    - tests/mood_popover_overlay.spec.lua
+    - tests/minecart_route_overlay.spec.lua
+    - tests/module_registry.spec.lua
+    - tests/package_contract.spec.lua
+    - tests/README.md
+
+☐ [Phase 6 - Verification and Documentation] Validate implementation and close task.
+    ☐ Run Build task (`Tools/Build.ps1`).
+    ☐ Run Unit Tests task (`Tools/Run-UnitTests.ps1`).
+    ☐ Add README note for bottom-panel hotkey labels feature and behavior constraints.
+    ☐ Mark project todo entry complete after verification.
+    Docs:
+    - README.md
+    - Docs/project.todo

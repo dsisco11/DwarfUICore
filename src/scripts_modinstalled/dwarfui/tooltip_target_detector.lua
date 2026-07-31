@@ -5,6 +5,7 @@
 -- queries a tooltip renderer, screen, or overlay host.
 
 local pointer = reqscript('dwarfui/pointer')
+local PointerResultKind = pointer.PointerResultKind
 local target_types = reqscript('dwarfui/tooltip_target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 local TooltipRootResolver =
@@ -143,7 +144,7 @@ function TooltipTargetDetector:detect(sample)
     local blocked
     for root, root_sequence in pairs(roots) do
         local result = self._resolve(root, sample.x, sample.y)
-        if result.kind == 'target' then
+        if result.kind == PointerResultKind.TARGET then
             local registration = self._registrations[result.target]
             if registration then
                 winner = TooltipTargetDetector.prefer_later_registration(
@@ -158,7 +159,7 @@ function TooltipTargetDetector:detect(sample)
                 blocked = TooltipTargetDetector.prefer_later_registration(
                     blocked, {root=root, sequence=root_sequence})
             end
-        elseif result.kind == 'blocked' then
+        elseif result.kind == PointerResultKind.BLOCKED then
             blocked = TooltipTargetDetector.prefer_later_registration(
                 blocked, {root=root, sequence=root_sequence})
         end

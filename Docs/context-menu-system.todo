@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 2 complete; target arbitration and presentation not started
+Status: Phase 3 complete; input ownership and presentation not started
 
 ## Goal
 
@@ -660,73 +660,101 @@ production module.
 
 ## Phase 3 - Implement target detection and anchor capture
 
-- [ ] Add `context_menu/input_sample.lua` to construct one immutable
+- [x] Add `context_menu/input_sample.lua` to construct one immutable
       synchronous sample for each candidate opening input call.
-- [ ] Read `dfhack.screen.getMousePos()` exactly once for the sample's
+- [x] Read `dfhack.screen.getMousePos()` exactly once for the sample's
       screen/interface coordinate.
-- [ ] When live map registrations exist, read `dfhack.gui.getMousePos()`
+- [x] When live map registrations exist, read `dfhack.gui.getMousePos()`
       exactly once for the sample's exact map coordinate.
-- [ ] Use the same input sample for widget hit testing, DwarfUI blocker
+- [x] Use the same input sample for widget hit testing, DwarfUI blocker
       resolution, exact map lookup, target precedence, and anchor capture.
-- [ ] Do not reuse the asynchronous tooltip pointer-poller state for opening;
+- [x] Do not reuse the asynchronous tooltip pointer-poller state for opening;
       it can be one or more frames older than the input being consumed.
-- [ ] Add `context_menu/target_detector.lua` and reuse the generic
+- [x] Add `context_menu/target_detector.lua` and reuse the generic
       `dwarfui/pointer` traversal policies instead of creating a second widget
       hit tester.
-- [ ] Refactor `dwarfui/pointer.lua` to publish immutable numeric
+- [x] Refactor `dwarfui/pointer.lua` to publish immutable numeric
       `PointerPolicy` and `PointerResultKind` enums and return only named enum
       members.
-- [ ] Migrate existing pointer consumers, widget attributes, tooltip target
+- [x] Migrate existing pointer consumers, widget attributes, tooltip target
       detection, package fixtures, and focused tests to named pointer enum
       members; remove string policy/result comparisons from production and
       tests.
-- [ ] Update module-registry and package-contract expectations for the shared
+- [x] Update module-registry and package-contract expectations for the shared
       pointer module's new enum exports.
-- [ ] Move `dwarfui/pointer` before `dwarfui/widget_extensions` in module
+- [x] Move `dwarfui/pointer` before `dwarfui/widget_extensions` in module
       registry dependency order so pointer attributes can install named enum
       defaults in a fresh DFHack process without literal strings or an implicit
       out-of-order load.
-- [ ] Traverse overlapping UI descendants in reverse render order.
-- [ ] Preserve the existing target, pass, block, and none behavior through the
+- [x] Traverse overlapping UI descendants in reverse render order.
+- [x] Preserve the existing target, pass, block, and none behavior through the
       corresponding named `PointerPolicy` members.
-- [ ] Across distinct eligible DwarfUI roots, choose the registered widget with
+- [x] Across distinct eligible DwarfUI roots, choose the registered widget with
       the latest original registration sequence, matching the tooltip detector.
-- [ ] If at least one registered widget target is found, ignore blockers from
+- [x] If at least one registered widget target is found, ignore blockers from
       other roots. If no registered widget target is found, any blocker
       suppresses map fallback.
-- [ ] Allow only a currently eligible registered widget to resolve as a widget
+- [x] Allow only a currently eligible registered widget to resolve as a widget
       context-menu target.
-- [ ] Suppress map fallback when pointer traversal reports a blocking UI
+- [x] Suppress map fallback when pointer traversal reports a blocking UI
       region in a traversed DwarfUI root.
-- [ ] Attempt exact same-z map lookup only after widget resolution reports a
+- [x] Attempt exact same-z map lookup only after widget resolution reports a
       true miss rather than a block and the synchronous sample contains a
       valid map coordinate.
-- [ ] Filter exact map candidates through their current weak-owner root
+- [x] Filter exact map candidates through their current weak-owner root
       eligibility before applying duplicate-coordinate precedence.
-- [ ] Give a widget target precedence over a map target at the same screen
+- [x] Give a widget target precedence over a map target at the same screen
       position.
-- [ ] Capture the opening pointer position as a copied
+- [x] Capture the opening pointer position as a copied
       `SCREEN_POSITION` anchor for a widget target.
-- [ ] Capture the registered copied world coordinate as a `MAP_TILE` anchor for
+- [x] Capture the registered copied world coordinate as a `MAP_TILE` anchor for
       a map target.
-- [ ] Preserve stable target identity in the selection context and retain
+- [x] Preserve stable target identity in the selection context and retain
       source widgets, map owners, and roots only through the session's defined
       weak-reference mechanism.
-- [ ] Do not infer a map target from a projected marker, label, or proximity;
+- [x] Do not infer a map target from a projected marker, label, or proximity;
       resolve the exact world tile under the pointer.
-- [ ] Add focused tests for within-root overlap, cross-root overlap and
+- [x] Add focused tests for within-root overlap, cross-root overlap and
       registration order, clipping, target ownership, blockers within and
       across roots, DwarfUI-over-map precedence, exact same-z matching,
       duplicate map entries before and after atomic updates, map-owner
       visibility/presentation/current-screen eligibility, both anchor
       descriptor types, and pointer enum migration.
 
+### Phase 3 implementation record
+
+- `dwarfui/context_menu/input_sample.lua` captures the screen/interface
+  pointer exactly once per opening attempt and conditionally captures one exact
+  map coordinate only while map registrations demand it. The resulting scalar
+  snapshot is immutable and independent of the asynchronous tooltip poller.
+- `dwarfui/context_menu/target_detector.lua` applies the shared pointer
+  traversal to every currently eligible registered root, selects the latest
+  originally registered widget across roots, treats unregistered controls and
+  explicit blockers as map-fallback blockers, and consults exact map
+  registration only after a true widget miss.
+- Widget detections carry a stable numeric registration identity and a copied
+  screen-position anchor. Map detections carry the stable map registration
+  identity and a copied registered world-tile anchor; projected markers,
+  labels, and proximity do not participate in detection.
+- `dwarfui/pointer.lua` now publishes immutable numeric `PointerPolicy` and
+  `PointerResultKind` enums. Widget defaults, tooltip detection and rendering,
+  the minecart overlay, package fixtures, and focused tests use named enum
+  members. The module registry loads pointer before widget extensions.
+- The registration manager exposes only currently eligible roots for
+  arbitration, including map-owner roots whose blocking UI must suppress map
+  fallback. Map duplicate precedence and atomic update sequencing remain
+  owned by the exact packed-coordinate registry.
+- Verification on 2026-07-30: focused context-menu tests passed 50/50; the
+  shared pointer and affected-consumer regression set passed 96/96; the
+  complete unit suite passed 330/330; and Lua 5.4.6 syntax passed for 33
+  production and 52 test/support files.
+
 ### Phase 3 completion gate
 
-- [ ] One pointer sample produces exactly one eligible target, block, or miss.
-- [ ] UI targets produce fixed screen anchors and map targets produce copied
+- [x] One pointer sample produces exactly one eligible target, block, or miss.
+- [x] UI targets produce fixed screen anchors and map targets produce copied
       world anchors.
-- [ ] A blocking region in a traversed DwarfUI root cannot accidentally expose
+- [x] A blocking region in a traversed DwarfUI root cannot accidentally expose
       a map context menu behind that DwarfUI region.
 
 ## Phase 4 - Implement the service and opening hooks

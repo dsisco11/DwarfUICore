@@ -54,11 +54,20 @@ describe('Busted test infrastructure', function()
     end)
 
     it('models the tooltip widget primitives', function()
+        local _, immutable_enum = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+        local _, pointer = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfui/pointer.lua', {
+                reqscript={
+                    ['dwarfui/utils/immutable_enum']=immutable_enum,
+                },
+            })
+        local Policy = pointer.PointerPolicy
         local default_nil = widget_harness.default_nil()
         local widgets = widget_harness.widgets(nil, default_nil)
         widgets.Widget.ATTRS{visible=true, active=true, tooltip=default_nil}
-        widgets.Panel.ATTRS{pointer_policy='pass'}
-        widgets.TextButton.ATTRS{pointer_policy='target'}
+        widgets.Panel.ATTRS{pointer_policy=Policy.PASS}
+        widgets.TextButton.ATTRS{pointer_policy=Policy.TARGET}
 
         local button = widgets.TextButton{
             view_id='action',
@@ -77,8 +86,8 @@ describe('Busted test infrastructure', function()
         root:addviews{panel}
         root:updateLayout(widget_harness.rect(0, 0, 12, 8))
 
-        assert.equals('pass', panel.pointer_policy)
-        assert.equals('target', button.pointer_policy)
+        assert.equals(Policy.PASS, panel.pointer_policy)
+        assert.equals(Policy.TARGET, button.pointer_policy)
         assert.is_true(button.visible)
         assert.equals('Action tooltip', button.tooltip)
         assert.is.equal(panel, button.parent_view)

@@ -6,6 +6,7 @@ local extension_path =
     'src/scripts_modinstalled/dwarfui/widget_extensions.lua'
 local text_path = 'src/scripts_modinstalled/dwarfui/text.lua'
 local tooltip_path = 'src/scripts_modinstalled/dwarfui/tooltip.lua'
+local Policy
 
 local function load_tooltip(state)
     state.width = state.width or 80
@@ -40,9 +41,17 @@ local function load_tooltip(state)
         end,
     }
 
+    local _, immutable_enum = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+    local _, pointer = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/pointer.lua', {
+            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+        })
+    Policy = pointer.PointerPolicy
     local _, extensions = module_loader.load(repo_root, extension_path, {
         globals={DEFAULT_NIL=default_nil},
         require_modules={['gui.widgets']=widgets},
+        reqscript={['dwarfui/pointer']=pointer},
     })
     local _, text = module_loader.load(repo_root, text_path)
     local _, class_helpers = module_loader.load(repo_root,
@@ -118,6 +127,7 @@ local function load_tooltip(state)
         },
         reqscript={
             ['dwarfui/class']=class_helpers,
+            ['dwarfui/pointer']=pointer,
             ['dwarfui/widget_extensions']=extensions,
             ['dwarfui/tooltip_registration']=registration,
             ['dwarfui/tooltip_service']={service=service},
@@ -198,8 +208,8 @@ describe('DwarfUI tooltip renderer', function()
 
         assert.is.equal(widgets.Widget, tooltip.TooltipRenderer.super)
         assert.is_false(renderer.visible)
-        assert.equals('none', renderer.pointer_policy)
-        assert.equals('none', renderer.label.pointer_policy)
+        assert.equals(Policy.NONE, renderer.pointer_policy)
+        assert.equals(Policy.NONE, renderer.label.pointer_policy)
         assert.equals('interior', renderer.frame_style)
         assert.equals(1, renderer.frame_inset)
         assert.same({ch=32, fg='black', bg='black'},

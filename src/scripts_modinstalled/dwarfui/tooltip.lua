@@ -2,6 +2,7 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
+local PointerPolicy = reqscript('dwarfui/pointer').PointerPolicy
 reqscript('dwarfui/widget_extensions')
 local class_helpers = reqscript('dwarfui/class')
 local text_helpers = reqscript('dwarfui/text')
@@ -61,7 +62,7 @@ TooltipRenderer.ATTRS{
     frame_inset=1,
     draggable=false,
     no_force_pause_badge=true,
-    pointer_policy='none',
+    pointer_policy=PointerPolicy.NONE,
     visible=false,
 }
 
@@ -76,7 +77,7 @@ function TooltipRenderer:init()
         auto_height=false,
         text_pen=TEXT,
         text='',
-        pointer_policy='none',
+    pointer_policy=PointerPolicy.NONE,
     }
     self:addviews{self.label}
 end

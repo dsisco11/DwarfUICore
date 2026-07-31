@@ -354,6 +354,19 @@ function ContextMenuMapTargetRegistry:get_attachment_roots()
     return roots
 end
 
+---Returns currently eligible owner roots for pointer blocker traversal.
+---@return table<any, boolean>
+function ContextMenuMapTargetRegistry:get_eligible_roots()
+    self:_prune()
+    local roots = setmetatable({}, {__mode='k'})
+    for _, record in pairs(self._registrations) do
+        local owner = record.owner_ref.owner
+        local root = owner and self._root_resolver:resolve(owner, true)
+        if root then roots[root] = true end
+    end
+    return roots
+end
+
 ---Drops every registration for destructive development reload or shutdown.
 ---@return boolean changed
 function ContextMenuMapTargetRegistry:clear()

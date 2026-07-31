@@ -72,18 +72,22 @@ local function load_environment()
         },
     }
 
-    local _, extensions = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
-            globals={DEFAULT_NIL=default_nil},
-            require_modules={['gui.widgets']=widgets},
-        })
     local _, text = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/text.lua')
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/class.lua')
+    local _, immutable_enum = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=process},
+            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
+        })
+    local _, extensions = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
+            globals={DEFAULT_NIL=default_nil},
+            require_modules={['gui.widgets']=widgets},
+            reqscript={['dwarfui/pointer']=pointer},
         })
     local _, service_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/tooltip_service.lua', {

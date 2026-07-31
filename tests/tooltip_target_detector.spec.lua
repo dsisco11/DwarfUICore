@@ -8,6 +8,8 @@ local ROOT_RESOLVER_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_root_resolver.lua'
 local TARGET_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
+local ENUM_PATH =
+    'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
 
 ---Builds a detector harness with real generic pointer resolution.
 ---@param state table|nil
@@ -48,9 +50,11 @@ local function load_environment(state)
             end,
         },
     }
+    local _, immutable_enum = module_loader.load(repo_root, ENUM_PATH)
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
+            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
         })
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/class.lua')
@@ -205,7 +209,7 @@ describe('DwarfUI tooltip target detector', function()
         local detector = env.new_detector(values, {
             resolve=function()
                 resolve_count = resolve_count + 1
-                return {kind='miss'}
+                return {kind=env.pointer.PointerResultKind.MISS}
             end,
         })
 
@@ -348,7 +352,7 @@ describe('DwarfUI tooltip target detector', function()
         local modal = env.widgets.Window{
             frame={l=2, t=2, w=8, h=5},
             frame_inset=1,
-            pointer_policy='block',
+            pointer_policy=env.pointer.PointerPolicy.BLOCK,
         }
         local root = env.widgets.Panel{subviews={registered, modal}}
         layout(root)
@@ -409,7 +413,7 @@ describe('DwarfUI tooltip target detector', function()
             }
             local blocker = env.widgets.Panel{
                 frame={l=1, t=1, w=6, h=3},
-                pointer_policy='block',
+                pointer_policy=env.pointer.PointerPolicy.BLOCK,
             }
             local root = env.widgets.Panel{subviews={target, blocker}}
             layout(root)

@@ -16,6 +16,8 @@ local TARGET_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_target.lua'
 local REGISTRATION_PATH =
     'src/scripts_modinstalled/dwarfui/tooltip_registration.lua'
+local ENUM_PATH =
+    'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua'
 
 ---Builds isolated collaborators for polling-lifecycle integration probes.
 ---@param state? table
@@ -75,9 +77,11 @@ local function load_environment(state)
     }
     state.dwarfui = dfhack.dwarfui
 
+    local _, immutable_enum = module_loader.load(repo_root, ENUM_PATH)
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/pointer.lua', {
             globals={dfhack=dfhack},
+            reqscript={['dwarfui/utils/immutable_enum']=immutable_enum},
         })
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/class.lua')
@@ -146,6 +150,7 @@ local function load_environment(state)
         load_generation=load_generation,
         overlay=overlay,
         OverlayWidget=OverlayWidget,
+        pointer=pointer,
         run_next=run_next,
         state=state,
         widgets=widgets,
@@ -449,7 +454,7 @@ describe('singleton tooltip registration polling', function()
         local registration = env.load_generation()
         local blocker = env.widgets.Panel{
             frame={l=1, t=1, w=6, h=3},
-            pointer_policy='block',
+            pointer_policy=env.pointer.PointerPolicy.BLOCK,
         }
         local root = env.widgets.Panel{subviews={blocker}}
         layout(root, env.state)
@@ -463,11 +468,11 @@ describe('singleton tooltip registration polling', function()
         assert.is_nil(registration.get_diagnostics().target)
         assert.is_nil(registration.get_diagnostics().intent)
 
-        blocker.pointer_policy = 'target'
+        blocker.pointer_policy = env.pointer.PointerPolicy.TARGET
         assert.is_true(env.run_next())
         assert.is_nil(registration.get_diagnostics().target)
 
-        blocker.pointer_policy = 'none'
+        blocker.pointer_policy = env.pointer.PointerPolicy.NONE
         assert.is_true(env.run_next())
         local diagnostics = registration.get_diagnostics()
         assert.is_equal(map, diagnostics.target)

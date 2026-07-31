@@ -1,14 +1,23 @@
 --@ module=true
 
--- Generic pointer targeting deliberately has no tooltip dependency. Tooltip
--- presentation consumes these per-root contexts in Phase 5.
+-- Generic pointer targeting deliberately has no tooltip dependency.
 
-local VALID_POLICIES = {
-    target=true,
-    pass=true,
-    block=true,
-    none=true,
-}
+local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+
+---@enum dwarfui.PointerPolicy
+PointerPolicy = immutable_enum.define({
+    TARGET=1,
+    PASS=2,
+    BLOCK=3,
+    NONE=4,
+}, 'PointerPolicy')
+
+---@enum dwarfui.PointerResultKind
+PointerResultKind = immutable_enum.define({
+    TARGET=1,
+    BLOCKED=2,
+    MISS=3,
+}, 'PointerResultKind')
 
 local function getval(value)
     if type(value) == 'function' then return value() end
@@ -36,45 +45,72 @@ local function frame_contains(view, x, y)
     return body_contains(view, x, y)
 end
 
+---Returns a pointer miss result.
+---@return dwarfui.PointerResult
 local function miss()
-    return {kind='miss'}
+    return {kind=PointerResultKind.MISS}
 end
 
+---Returns a pointer blocker result.
+---@param view gui.View
+---@return dwarfui.PointerResult
 local function blocked(view)
-    return {kind='blocked', blocker=view}
+    return {kind=PointerResultKind.BLOCKED, blocker=view}
 end
 
+---Returns a pointer target result with target-local coordinates.
+---@param view gui.View
+---@param x integer
+---@param y integer
+---@return dwarfui.PointerResult
 local function targeted(view, x, y)
     local local_x, local_y = view.frame_body:localXY(x, y)
-    return {kind='target', target=view, x=local_x, y=local_y}
+    return {
+        kind=PointerResultKind.TARGET,
+        target=view,
+        x=local_x,
+        y=local_y,
+    }
 end
 
+---Resolves one eligible view and its descendants at a screen coordinate.
+---@param view gui.View
+---@param x integer
+---@param y integer
+---@return dwarfui.PointerResult
 local function resolve_view(view, x, y)
     if not is_eligible(view) then return miss() end
     local inside_body = body_contains(view, x, y)
     local inside_frame = frame_contains(view, x, y)
     if not inside_body and not inside_frame then return miss() end
 
-    local policy = view.pointer_policy or 'target'
-    assert(VALID_POLICIES[policy],
+    local policy = view.pointer_policy or PointerPolicy.TARGET
+    assert(policy == PointerPolicy.TARGET or
+            policy == PointerPolicy.PASS or
+            policy == PointerPolicy.BLOCK or
+            policy == PointerPolicy.NONE,
         'DwarfUI invalid pointer_policy ' .. tostring(policy) ..
-        '; expected target, pass, block, or none.')
-    if policy == 'none' then return miss() end
+        '; expected a PointerPolicy member.')
+    if policy == PointerPolicy.NONE then return miss() end
 
     -- Terminal controls own their complete public hit region. Implementation
     -- subviews therefore cannot steal pointer ownership from a TextButton or
     -- another composite target.
-    if policy == 'target' and inside_body then return targeted(view, x, y) end
+    if policy == PointerPolicy.TARGET and inside_body then
+        return targeted(view, x, y)
+    end
 
     if inside_body then
         local subviews = view.subviews or {}
         for index = #subviews, 1, -1 do
             local result = resolve_view(subviews[index], x, y)
-            if result.kind ~= 'miss' then return result end
+            if result.kind ~= PointerResultKind.MISS then return result end
         end
     end
 
-    if policy == 'block' and inside_frame then return blocked(view) end
+    if policy == PointerPolicy.BLOCK and inside_frame then
+        return blocked(view)
+    end
     return miss()
 end
 
@@ -84,6 +120,13 @@ end
 ---@field result table
 PointerContext = {}
 PointerContext.__index = PointerContext
+
+---@class dwarfui.PointerResult
+---@field kind dwarfui.PointerResultKind
+---@field target? gui.View
+---@field blocker? gui.View
+---@field x? integer
+---@field y? integer
 
 ---@param root gui.View
 ---@return table
@@ -105,7 +148,7 @@ function PointerDispatcher.resolve(root, x, y)
     end
     for index = #(root.subviews or {}), 1, -1 do
         local result = resolve_view(root.subviews[index], x, y)
-        if result.kind ~= 'miss' then return result end
+        if result.kind ~= PointerResultKind.MISS then return result end
     end
     return miss()
 end
@@ -128,7 +171,8 @@ function PointerDispatcher.sample(context, ...)
     local result = x and y and
         PointerDispatcher.resolve(context.root, x, y) or miss()
     local previous = context.target
-    local target = result.kind == 'target' and result.target or nil
+    local target = result.kind == PointerResultKind.TARGET and
+        result.target or nil
 
     if previous ~= target then
         if previous and previous.on_pointer_leave then

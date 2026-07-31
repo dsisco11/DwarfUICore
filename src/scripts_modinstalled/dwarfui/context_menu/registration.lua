@@ -183,6 +183,12 @@ function ContextMenuRegistrationManager:registration_count()
         self._map_targets:registration_count()
 end
 
+---Returns the count of currently live weak map registrations.
+---@return integer
+function ContextMenuRegistrationManager:map_registration_count()
+    return self._map_targets:registration_count()
+end
+
 ---Returns whether discovery must remain alive for registrations or a menu.
 ---@return boolean
 function ContextMenuRegistrationManager:_has_discovery_demand()
@@ -381,6 +387,23 @@ end
 function ContextMenuRegistrationManager:detect_map_tile(position)
     if self._disabled or not self:_module_is_current() then return nil end
     return self._map_targets:detect(position)
+end
+
+---Returns eligible roots that must participate in pointer arbitration.
+---Roots owned only by map registrations remain relevant because their
+---blocking UI regions suppress map fallback.
+---@return table<any, boolean>
+function ContextMenuRegistrationManager:get_detection_roots()
+    local roots = setmetatable({}, {__mode='k'})
+    if self._disabled or not self:_module_is_current() then return roots end
+    for widget in pairs(self._widget_registrations) do
+        local root = self._root_resolver:resolve(widget, false)
+        if root then roots[root] = true end
+    end
+    for root in pairs(self._map_targets:get_eligible_roots()) do
+        roots[root] = true
+    end
+    return roots
 end
 
 ---Replaces the later service-owned root observer.

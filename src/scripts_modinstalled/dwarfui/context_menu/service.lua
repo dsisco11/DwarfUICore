@@ -14,6 +14,7 @@ local TargetKind = targets.ContextMenuTargetKind
 
 local API_VERSION = 1
 local SERVICE_SLOT = 'context_menu_service'
+local STATE_CHANGE_SLOT = 'dwarfui_context_menu'
 
 dfhack.dwarfui = dfhack.dwarfui or {}
 
@@ -24,6 +25,7 @@ dfhack.dwarfui = dfhack.dwarfui or {}
 ---@class dwarfui.ContextMenuPresentationActions
 ---@field close fun(): boolean
 ---@field select fun(entry_index: integer): boolean
+---@field fail fun(stage: string, failure: any)
 
 ---Creates a hidden controller; visible side effects begin only in `show()`.
 ---@alias dwarfui.ContextMenuPresentationFactory fun(session: dwarfui.ContextMenuOpenSession, actions: dwarfui.ContextMenuPresentationActions): dwarfui.ContextMenuPresentationController
@@ -61,6 +63,7 @@ dfhack.dwarfui = dfhack.dwarfui or {}
 ---@field _presentation_factory dwarfui.ContextMenuPresentationFactory
 ---@field _printer fun(message: string)
 ---@field _started boolean
+---@field _state_change_callback? function
 ContextMenuService = {}
 ContextMenuService.__index = ContextMenuService
 
@@ -241,6 +244,9 @@ function ContextMenuService:_open_unprotected(detection)
     local actions = {
         close=function() return self:close() end,
         select=function(entry_index) return self:select(entry_index) end,
+        fail=function(stage, failure)
+            self:_disable(stage, failure, true)
+        end,
     }
     local presentation = self._presentation_factory(session, actions)
     assert(type(presentation) == 'table' and
@@ -349,6 +355,26 @@ function ContextMenuService:handle_opening_input(keys, transport, owner)
     return opened
 end
 
+---Installs one owned world-unload close callback when DFHack exposes the seam.
+function ContextMenuService:_install_state_change_callback()
+    if type(dfhack.onStateChange) ~= 'table' then return end
+    local callback = function(code)
+        if code == SC_WORLD_UNLOADED then self:close() end
+    end
+    self._state_change_callback = callback
+    dfhack.onStateChange[STATE_CHANGE_SLOT] = callback
+end
+
+---Removes only the state-change callback still owned by this service.
+function ContextMenuService:_remove_state_change_callback()
+    if type(dfhack.onStateChange) == 'table' and
+            dfhack.onStateChange[STATE_CHANGE_SLOT] ==
+                self._state_change_callback then
+        dfhack.onStateChange[STATE_CHANGE_SLOT] = nil
+    end
+    self._state_change_callback = nil
+end
+
 ---Starts root discovery integration and installs the opening callback.
 ---@return boolean started
 function ContextMenuService:start()
@@ -366,6 +392,7 @@ function ContextMenuService:start()
     self._input_hook:set_handler(function(keys, transport, owner)
         return self:handle_opening_input(keys, transport, owner)
     end)
+    self:_install_state_change_callback()
     -- Installing the root observer can immediately replay a discovered set,
     -- so every failure boundary must already be active before this call.
     self._registrations:set_root_observer(function(roots)
@@ -387,6 +414,7 @@ function ContextMenuService:shutdown()
     self._registrations:set_menu_open_predicate(function() return false end)
     changed = self._registrations:shutdown() or changed
     changed = self._input_hook:shutdown() or changed
+    self:_remove_state_change_callback()
     self._started = false
     return changed
 end

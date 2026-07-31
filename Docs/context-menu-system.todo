@@ -1,6 +1,6 @@
 # Context Menu System Implementation Checklist
 
-Status: Phase 4 complete; interactive presentation not started
+Status: Phase 5 complete; screen-position and map-tile placement not started
 
 ## Goal
 
@@ -874,107 +874,107 @@ production module.
 
 ## Phase 5 - Implement the interactive menu screen and renderer
 
-- [ ] Add `context_menu/screen.lua` as a short-lived `gui.ZScreen` host owned
+- [x] Add `context_menu/screen.lua` as a short-lived `gui.ZScreen` host owned
       by one open session.
-- [ ] Add the concrete screen/renderer presentation factory, wire it into the
+- [x] Add the concrete screen/renderer presentation factory, wire it into the
       service, and only then enable the facade's production opening path.
-- [ ] While its ZScreen is current, make `ContextMenuScreen:onInput()` the
+- [x] While its ZScreen is current, make `ContextMenuScreen:onInput()` the
       context menu's physical input surface for interaction and dismissal; it
       delegates every state transition to the service. A later ZScreen above it
       receives input normally.
-- [ ] Do not call `gui.ZScreen:onInput()` for menu-owned dispatch because it
+- [x] Do not call `gui.ZScreen:onInput()` for menu-owned dispatch because it
       performs its own Escape/right-click dismissal. Classify the complete
       event, route it through the service and native Window/List in the locked
       priority order, and keep every close/select transition service-owned.
-- [ ] Configure `initial_pause=false`, `force_pause=false`,
+- [x] Configure `initial_pause=false`, `force_pause=false`,
       `pass_pause=false`, `pass_movement_keys=false`,
       `pass_mouse_clicks=false`, and `defocusable=false`. The context-menu
       screen explicitly delegates complete irrelevant input tables itself.
-- [ ] Render the parent first and the context menu last so the menu is the
+- [x] Render the parent first and the context menu last so the menu is the
       topmost final paint while its ZScreen is current. If another ZScreen is
       above it, preserve normal screen-stack paint order.
-- [ ] Determine event relevance, pointer-inside-Window state, and ownership
+- [x] Determine event relevance, pointer-inside-Window state, and ownership
       before entering protected Window/List or service dispatch. If dispatch
       then raises, the already-classified relevant table remains consumed.
-- [ ] Before Window/List dispatch, give `LEAVESCREEN` and actionable `_MOUSE_R`
+- [x] Before Window/List dispatch, give `LEAVESCREEN` and actionable `_MOUSE_R`
       first priority and close once. Next, close once for actionable
       `_MOUSE_L` outside the complete Window. These dismissal actions win over
       every List key coalesced into the same table.
-- [ ] After dismissal checks, dispatch the original intact table through the
+- [x] After dismissal checks, dispatch the original intact table through the
       native Window/List. Let the native implementation choose at most one
       transition when several remaining List-owned keys coexist.
-- [ ] If Window/List handles the table, consume it in full. If it does not
+- [x] If Window/List handles the table, consume it in full. If it does not
       handle actionable `_MOUSE_L` inside the complete Window, consume the
       table as a no-op so frame, title, padding, and empty body clicks cannot
       reach backing UI. Otherwise send the original table unchanged to the
       parent exactly once with `sendInputToParent(keys)`.
-- [ ] Treat list navigation, list paging, list selection, wheel input inside
+- [x] Treat list navigation, list paging, list selection, wheel input inside
       the complete Window, Escape, actionable right-click, and actionable
       left-click inside or outside the Window as context-menu-relevant. A table
       containing only pause, map movement, or other irrelevant inputs passes to
       the parent even while the menu is open.
-- [ ] Do not offer wheel-only input outside the complete Window to the List;
+- [x] Do not offer wheel-only input outside the complete Window to the List;
       delegate that original table unchanged. Wheel input inside the Window may
       scroll the List and consumes the complete table when handled.
-- [ ] A table containing any handled Window/List or service action is consumed
+- [x] A table containing any handled Window/List or service action is consumed
       in full even when it also contains pause, movement, or another otherwise
       irrelevant key.
-- [ ] Do not forward a handled table containing Escape, right-click, outside
+- [x] Do not forward a handled table containing Escape, right-click, outside
       left-click, entry selection, or another context-menu action.
-- [ ] On Escape, request one service-owned close and consume the complete input
+- [x] On Escape, request one service-owned close and consume the complete input
       table containing `LEAVESCREEN`.
-- [ ] On a second actionable `_MOUSE_R`, request one service-owned close,
+- [x] On a second actionable `_MOUSE_R`, request one service-owned close,
       consume the complete input table, and never resolve or open an underlying
       target.
-- [ ] On an outside actionable `_MOUSE_L`, request one service-owned close and
+- [x] On an outside actionable `_MOUSE_L`, request one service-owned close and
       consume the complete input table.
-- [ ] On an entry `_MOUSE_L`, consume the complete input table and invoke
+- [x] On an entry `_MOUSE_L`, consume the complete input table and invoke
       selection exactly once through the service's close-before-callback
       transition.
-- [ ] `_MOUSE_L_DOWN` or `_MOUSE_R_DOWN` alone is irrelevant: it neither selects
+- [x] `_MOUSE_L_DOWN` or `_MOUSE_R_DOWN` alone is irrelevant: it neither selects
       nor dismisses and its original input table is delegated unchanged. If a
       down flag and its actionable click are coalesced, act exactly once from
       the actionable click and consume the complete table.
-- [ ] Route keyboard selection through that same service transition.
-- [ ] Add `context_menu/renderer.lua` with a `widgets.Window` using
+- [x] Route keyboard selection through that same service transition.
+- [x] Add `context_menu/renderer.lua` with a `widgets.Window` using
       `gui.FRAME_INTERIOR`, `draggable=false`, `resizable=false`, the optional
       title as its native frame title, and a selectable, scrollable
       `widgets.List` filling its content area.
-- [ ] Create a per-menu copy of the `gui.FRAME_INTERIOR` style whose frame and
+- [x] Create a per-menu copy of the `gui.FRAME_INTERIOR` style whose frame and
       title pens use the resolved menu foreground/background, and set the
       Window body background from the same resolved menu background. Never
       mutate the shared DFHack frame style.
-- [ ] Treat the complete Window frame and body as context-owned pointer space.
+- [x] Treat the complete Window frame and body as context-owned pointer space.
       Rely on native Window/List hit testing and interaction; do not add
       independent title, border, or padding actions.
-- [ ] Size preferred width from the longest title or entry label plus frame
+- [x] Size preferred width from the longest title or entry label plus frame
       padding, but cap final width to the available interface width.
-- [ ] Deterministically right-truncate title and entry text that exceeds the
+- [x] Deterministically right-truncate title and entry text that exceeds the
       capped content width, using an ellipsis when at least four content cells
       are available and direct clipping on narrower interfaces.
-- [ ] Cap height to the available screen space and enable wheel and keyboard
+- [x] Cap height to the available screen space and enable wheel and keyboard
       scrolling when entries do not fit.
-- [ ] Fill each complete entry row with its resolved background rather than
+- [x] Fill each complete entry row with its resolved background rather than
       coloring only the label cells.
-- [ ] Paint each entry with its resolved foreground and background.
-- [ ] Define deterministic selected and hovered pens that preserve readable
+- [x] Paint each entry with its resolved foreground and background.
+- [x] Define deterministic selected and hovered pens that preserve readable
       contrast when entries use custom colors.
-- [ ] Keep the native Window title nonselectable and omit any automatic
+- [x] Keep the native Window title nonselectable and omit any automatic
       list-count suffix.
-- [ ] Support keyboard navigation and selection, left-click selection, and
+- [x] Support keyboard navigation and selection, left-click selection, and
       wheel scrolling.
-- [ ] Clamp the final menu frame to every screen edge without changing the
+- [x] Clamp the final menu frame to every screen edge without changing the
       stored source anchor.
-- [ ] Recompute layout after interface dimension changes.
-- [ ] Dismiss the screen exactly once on selection, explicit close, source
+- [x] Recompute layout after interface dimension changes.
+- [x] Dismiss the screen exactly once on selection, explicit close, source
       invalidation, reload, world unload, or owner removal.
-- [ ] Wrap open-screen routing, layout, projection, and rendering boundaries in
+- [x] Wrap open-screen routing, layout, projection, and rendering boundaries in
       protected calls. On internal failure, report diagnostics, dismiss the
       Window/ZScreen, clear the session, disable context-menu handling for the
       generation, and consume the complete table if a context-menu action had
       already been established. Failures before ownership is established
       delegate the original table unchanged.
-- [ ] Add focused renderer and screen tests for an absent title, long labels,
+- [x] Add focused renderer and screen tests for an absent title, long labels,
       horizontal truncation, custom pens, selection pens, scrolling, every
       screen edge, small interfaces, resize, native Window/List composition,
       whole-event ownership, dismissal-over-List priority for mixed relevant
@@ -983,16 +983,44 @@ production module.
       mouse flags, color-domain and frame-style isolation, internal failure
       containment, and all close paths.
 
+### Phase 5 implementation record
+
+- `dwarfui/context_menu/renderer.lua` owns deterministic measurement,
+  truncation, edge clamping, per-menu `gui.FRAME_INTERIOR` pen isolation,
+  full-row entry painting, readable active pens, and the native non-draggable
+  `widgets.Window` plus selectable `widgets.List` composition.
+- `dwarfui/context_menu/screen.lua` owns one short-lived non-pausing
+  `gui.ZScreen`. It preserves native List single-transition dispatch while
+  enforcing service-owned dismissal priority, whole-table consumption, and
+  exact delegation of irrelevant tables.
+- `dwarfui/context_menu/api.lua` is the registration-only public facade. Its
+  dependency on the screen module installs the concrete presentation factory
+  before starting the opening service, so no production opening can reach the
+  earlier unavailable-presentation seam.
+- Rendering validates weak session ownership and recomputes layout each frame.
+  Reload shuts down the prior service and presentation, and the service's
+  owned state-change callback closes the active presentation on world unload.
+- All screen classification, native dispatch, layout, and render failures are
+  contained. Relevant tables remain consumed after ownership is known;
+  failures before ownership delegate the intact table before disabling the
+  generation.
+- Verification on 2026-07-30: focused context-menu, module-registry, and
+  package-contract tests passed 117/117; the complete unit suite passed
+  374/374; Lua 5.4.6 syntax passed for 39
+  production and 57 test/support files; the offline build and
+  `git diff --check` passed. Live DFHack interaction remains reserved for the
+  native component acceptance work.
+
 ### Phase 5 completion gate
 
-- [ ] While current, the menu is readable, topmost, navigable, and fully
+- [x] While current, the menu is readable, topmost, navigable, and fully
       interactive with both default and entry-specific colors; a later ZScreen
       can naturally appear and receive input above it.
-- [ ] Screen ownership does not pause the game or pass menu-owned input to the
+- [x] Screen ownership does not pause the game or pass menu-owned input to the
       parent.
-- [ ] While current, the visible ZScreen rather than an underlying opening hook
+- [x] While current, the visible ZScreen rather than an underlying opening hook
       owns every context-menu interaction.
-- [ ] Every dismissal path destroys one open screen and one session.
+- [x] Every dismissal path destroys one open screen and one session.
 
 ## Phase 6 - Implement screen-position and map-tile placement
 

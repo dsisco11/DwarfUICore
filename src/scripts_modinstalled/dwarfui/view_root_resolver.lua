@@ -1,19 +1,19 @@
 --@ module=true
 
--- Shared tooltip-owner root discovery and presentation eligibility.
+-- Shared owner-root discovery and presentation eligibility.
 
 local overlay = require('plugins.overlay')
 local class_helpers = reqscript('dwarfui/class')
 
----@alias dwarfui.TooltipRootPresentationPredicate fun(root: gui.View): boolean
+---@alias dwarfui.ViewRootPresentationPredicate fun(root: gui.View): boolean
 
----@class dwarfui.TooltipRootResolverOptions
----@field is_non_overlay_root_presented dwarfui.TooltipRootPresentationPredicate|nil
+---@class dwarfui.ViewRootResolverOptions
+---@field is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate|nil
 
----@class dwarfui.TooltipRootResolver
----@field _is_non_overlay_root_presented dwarfui.TooltipRootPresentationPredicate
-TooltipRootResolver = {}
-TooltipRootResolver.__index = TooltipRootResolver
+---@class dwarfui.ViewRootResolver
+---@field _is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate
+ViewRootResolver = {}
+ViewRootResolver.__index = ViewRootResolver
 
 ---Evaluates a DFHack boolean or boolean callback.
 ---@param value boolean|function|nil
@@ -78,12 +78,12 @@ local function default_non_overlay_root_is_presented(root)
 end
 
 ---Creates a resolver with an injectable non-overlay presentation predicate.
----@param options dwarfui.TooltipRootResolverOptions|nil
----@return dwarfui.TooltipRootResolver
-function TooltipRootResolver.new(options)
+---@param options dwarfui.ViewRootResolverOptions|nil
+---@return dwarfui.ViewRootResolver
+function ViewRootResolver.new(options)
     options = options or {}
     assert(type(options) == 'table',
-        'DwarfUI tooltip root resolver options must be a table.')
+        'DwarfUI view root resolver options must be a table.')
     assert(options.is_non_overlay_root_presented == nil or
         type(options.is_non_overlay_root_presented) == 'function',
         'DwarfUI non-overlay root predicate must be a function.')
@@ -91,7 +91,7 @@ function TooltipRootResolver.new(options)
         _is_non_overlay_root_presented=
             options.is_non_overlay_root_presented or
             default_non_overlay_root_is_presented,
-    }, TooltipRootResolver)
+    }, ViewRootResolver)
 end
 
 ---Finds a visible and active owner root through authoritative parent links.
@@ -99,7 +99,7 @@ end
 ---@param owner gui.View
 ---@param allow_owner_root boolean|nil
 ---@return gui.View|nil
-function TooltipRootResolver:find_root(owner, allow_owner_root)
+function ViewRootResolver:find_root(owner, allow_owner_root)
     if type(owner) ~= 'table' then return nil end
     local current = owner
     local seen = {}
@@ -123,7 +123,7 @@ end
 ---Returns whether a discovered root is laid out and currently presented.
 ---@param root gui.View
 ---@return boolean
-function TooltipRootResolver:is_presented(root)
+function ViewRootResolver:is_presented(root)
     if type(root) ~= 'table' or not root.frame_body then return false end
     if class_helpers.is_instance_of(root, overlay.OverlayWidget) then
         return overlay_root_is_presented(root)
@@ -135,9 +135,9 @@ end
 ---@param owner gui.View
 ---@param allow_owner_root boolean|nil
 ---@return gui.View|nil
-function TooltipRootResolver:resolve(owner, allow_owner_root)
+function ViewRootResolver:resolve(owner, allow_owner_root)
     local root = self:find_root(owner, allow_owner_root)
     return root and self:is_presented(root) and root or nil
 end
 
-resolver = TooltipRootResolver.new()
+resolver = ViewRootResolver.new()

@@ -5,8 +5,8 @@
 local definitions = reqscript('dwarfui/context_menu/definition')
 local targets = reqscript('dwarfui/context_menu/target')
 local numbers = reqscript('dwarfui/utils/numbers')
-local TooltipRootResolver =
-    reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
+local ViewRootResolver =
+    reqscript('dwarfui/view_root_resolver').ViewRootResolver
 
 local COORDINATE_MIN = -0x8000
 local COORDINATE_MAX = 0x7fff
@@ -34,12 +34,12 @@ ContextMenuMapCandidate.__index = ContextMenuMapCandidate
 
 ---@class dwarfui.ContextMenuMapTargetRegistryOptions
 ---@field identity_allocator? dwarfui.ContextMenuRegistrationIdentityAllocator
----@field root_resolver? dwarfui.TooltipRootResolver
+---@field root_resolver? dwarfui.ViewRootResolver
 ---@field find_attachment_root? fun(owner: any, allow_owner_root: boolean): any|nil
 
 ---@class dwarfui.ContextMenuMapTargetRegistry
 ---@field _identity_allocator dwarfui.ContextMenuRegistrationIdentityAllocator
----@field _root_resolver dwarfui.TooltipRootResolver
+---@field _root_resolver dwarfui.ViewRootResolver
 ---@field _find_attachment_root fun(owner: any, allow_owner_root: boolean): any|nil
 ---@field _registrations table<any, table>
 ---@field _coordinate_index table<integer, table<any, table>>
@@ -138,7 +138,7 @@ function ContextMenuMapTargetRegistry.new(options)
     return setmetatable({
         _identity_allocator=options.identity_allocator or
             targets.ContextMenuRegistrationIdentityAllocator.new(),
-        _root_resolver=options.root_resolver or TooltipRootResolver.new(),
+        _root_resolver=options.root_resolver or ViewRootResolver.new(),
         _find_attachment_root=options.find_attachment_root or
             function() return nil end,
         _registrations=setmetatable({}, {__mode='k'}),

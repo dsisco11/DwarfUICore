@@ -6,10 +6,10 @@
 
 local pointer = reqscript('dwarfui/pointer')
 local PointerResultKind = pointer.PointerResultKind
-local target_types = reqscript('dwarfui/tooltip_target')
+local target_types = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
-local TooltipRootResolver =
-    reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
+local ViewRootResolver =
+    reqscript('dwarfui/view_root_resolver').ViewRootResolver
 
 ---@class dwarfui.TooltipPointerObservation
 ---@field sequence integer
@@ -24,8 +24,8 @@ local TooltipRootResolver =
 ---@class dwarfui.TooltipTargetDetectorOptions
 ---@field registrations table<gui.View, table>
 ---@field resolve fun(root: gui.View, x: integer, y: integer): table|nil
----@field is_non_overlay_root_presented dwarfui.TooltipRootPresentationPredicate|nil
----@field root_resolver dwarfui.TooltipRootResolver|nil
+---@field is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate|nil
+---@field root_resolver dwarfui.ViewRootResolver|nil
 ---@field additional_roots fun(): table<gui.View, integer>|nil
 
 ---@class dwarfui.TooltipTargetCandidate
@@ -42,7 +42,7 @@ local TooltipRootResolver =
 ---@class dwarfui.TooltipTargetDetector
 ---@field _registrations table<gui.View, table>
 ---@field _resolve fun(root: gui.View, x: integer, y: integer): table
----@field _root_resolver dwarfui.TooltipRootResolver
+---@field _root_resolver dwarfui.ViewRootResolver
 ---@field _additional_roots fun(): table<gui.View, integer>|nil
 TooltipTargetDetector = {}
 TooltipTargetDetector.__index = TooltipTargetDetector
@@ -100,7 +100,7 @@ function TooltipTargetDetector.new(options)
     return setmetatable({
         _registrations=options.registrations,
         _resolve=options.resolve or pointer.PointerDispatcher.resolve,
-        _root_resolver=options.root_resolver or TooltipRootResolver.new{
+        _root_resolver=options.root_resolver or ViewRootResolver.new{
             is_non_overlay_root_presented=
                 options.is_non_overlay_root_presented,
         },

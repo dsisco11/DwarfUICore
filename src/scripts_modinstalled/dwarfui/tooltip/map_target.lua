@@ -2,9 +2,9 @@
 
 -- Weak exact-coordinate map-tooltip registration and target detection.
 
-local TooltipRootResolver =
-    reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
-local target_types = reqscript('dwarfui/tooltip_target')
+local ViewRootResolver =
+    reqscript('dwarfui/view_root_resolver').ViewRootResolver
+local target_types = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 
 API_VERSION = 1
@@ -62,11 +62,11 @@ process_state.generation = process_state.generation + 1
 
 ---@class dwarfui.TooltipMapTargetRegistryOptions
 ---@field state table
----@field root_resolver dwarfui.TooltipRootResolver
+---@field root_resolver dwarfui.ViewRootResolver
 
 ---@class dwarfui.TooltipMapTargetRegistry
 ---@field _state table
----@field _root_resolver dwarfui.TooltipRootResolver
+---@field _root_resolver dwarfui.ViewRootResolver
 TooltipMapTargetRegistry = {}
 TooltipMapTargetRegistry.__index = TooltipMapTargetRegistry
 
@@ -329,5 +329,5 @@ end
 
 registry = TooltipMapTargetRegistry.new{
     state=process_state,
-    root_resolver=TooltipRootResolver.new(),
+    root_resolver=ViewRootResolver.new(),
 }

@@ -4,7 +4,7 @@
 -- registrations, pointer transitions, and immutable presentation intent, but
 -- has no presentation implementation or UI-host dependency.
 
-local target_adapters = reqscript('dwarfui/tooltip_target')
+local target_adapters = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 2

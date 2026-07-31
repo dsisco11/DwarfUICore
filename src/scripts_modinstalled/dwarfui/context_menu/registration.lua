@@ -6,8 +6,8 @@ local definitions = reqscript('dwarfui/context_menu/definition')
 local map_targets = reqscript('dwarfui/context_menu/map_target')
 local root_discovery = reqscript('dwarfui/context_menu/root_discovery')
 local targets = reqscript('dwarfui/context_menu/target')
-local TooltipRootResolver =
-    reqscript('dwarfui/tooltip_root_resolver').TooltipRootResolver
+local ViewRootResolver =
+    reqscript('dwarfui/view_root_resolver').ViewRootResolver
 
 local MODULE_GENERATION_SLOT = 'context_menu_registration_generation'
 local MANAGER_SLOT = 'context_menu_registration_manager'
@@ -27,7 +27,7 @@ ContextMenuWidgetCandidate = {}
 ContextMenuWidgetCandidate.__index = ContextMenuWidgetCandidate
 
 ---@class dwarfui.ContextMenuRegistrationManagerOptions
----@field root_resolver? dwarfui.TooltipRootResolver
+---@field root_resolver? dwarfui.ViewRootResolver
 ---@field scheduler? fun(callback: function)
 ---@field printer? fun(message: string)
 ---@field on_roots_changed? fun(roots: table<any, boolean>)
@@ -36,7 +36,7 @@ ContextMenuWidgetCandidate.__index = ContextMenuWidgetCandidate
 
 ---@class dwarfui.ContextMenuRegistrationManager
 ---@field _module_generation integer
----@field _root_resolver dwarfui.TooltipRootResolver
+---@field _root_resolver dwarfui.ViewRootResolver
 ---@field _identity_allocator dwarfui.ContextMenuRegistrationIdentityAllocator
 ---@field _widget_registrations table<any, table>
 ---@field _widget_registration_sequence integer
@@ -115,7 +115,7 @@ function ContextMenuRegistrationManager.new(options)
 
     local identity_allocator =
         targets.ContextMenuRegistrationIdentityAllocator.new()
-    local resolver = options.root_resolver or TooltipRootResolver.new()
+    local resolver = options.root_resolver or ViewRootResolver.new()
     local manager = setmetatable({
         _module_generation=module_generation,
         _root_resolver=resolver,

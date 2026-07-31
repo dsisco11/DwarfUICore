@@ -44,9 +44,12 @@ focus, input, logic, dismissal, parent, or screen configuration state.
 ## Stable registration contract
 
 ```lua
-local tooltip = reqscript('dwarfui/tooltip')
+local tooltip = reqscript('dwarfui/tooltip/api')
 tooltip.register(widget)
 ```
+
+`dwarfui/tooltip/api` is the only supported consumer entry point. Modules
+elsewhere under `dwarfui/tooltip/` are internal implementation details.
 
 - `register(widget)` accepts an arbitrary widget, including an unattached one.
 - Duplicate registration is idempotent and returns `false`.

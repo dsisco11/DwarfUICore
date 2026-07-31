@@ -98,7 +98,7 @@ while the map viewport moves.
 - [ ] Registration may install a reversible, generation-owned wrapper around
       an attached owning Lua screen instance's effective `onInput()` method.
       Hook ownership, restoration, reload invalidation, and foreign-wrapper
-      behavior match `dwarfui/tooltip_render_hook.lua`: restore the predecessor
+      behavior match `dwarfui/tooltip/render_hook.lua`: restore the predecessor
       exactly while DwarfUI remains outermost; if a foreign wrapper is
       outermost, preserve it and leave DwarfUI's superseded trampoline inert
       and diagnosable.
@@ -361,14 +361,14 @@ production module.
   shared `PointerResultKind` as `TARGET=1`, `BLOCKED=2`, `MISS=3`. Production
   code must expose immutable tables and compare named members.
 - The pointer-string migration inventory is:
-  `dwarfui/pointer.lua`, `dwarfui/tooltip_target_detector.lua`,
-  `dwarfui/tooltip.lua`, `dwarfui/widget_extensions.lua`,
+  `dwarfui/pointer.lua`, `dwarfui/tooltip/target_detector.lua`,
+  `dwarfui/tooltip/renderer.lua`, `dwarfui/widget_extensions.lua`,
   `dwarfui-minecart-route-markers.lua`,
   `tests/infrastructure_smoke.spec.lua`,
   `tests/minecart_route_overlay.spec.lua`,
   `tests/package_contract.spec.lua`, `tests/pointer.spec.lua`,
-  `tests/tooltip_registration.spec.lua`, `tests/tooltip_service.spec.lua`,
-  `tests/tooltip_target_detector.spec.lua`, `tests/tooltip.spec.lua`, and
+  `tests/tooltip/registration.spec.lua`, `tests/tooltip/service.spec.lua`,
+  `tests/tooltip/target_detector.spec.lua`, `tests/tooltip/renderer.spec.lua`, and
   `tests/widget_extensions.spec.lua`.
 - The accepted color domain is exactly the integer range
   `COLOR_BLACK..COLOR_WHITE` (`0..15`) from `ColorText.h`. Clone
@@ -1359,7 +1359,7 @@ production module.
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-07-30 | Focused unit tests | `./tools/Run-UnitTests.ps1 tests/context_menu` | Passed: 67/67 | Definition, registration, root discovery, synchronous sampling, pointer enums, targeting, service transitions, and native/Lua opening-hook ownership. Renderer, interactive-screen lifecycle, and projection remain later work. |
-| | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip_target_detector.spec.lua tests/tooltip_registration.spec.lua tests/tooltip.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Pending | Prove the enum migration across the shared pointer API and every affected production consumer. |
+| | Shared pointer regression | `./tools/Run-UnitTests.ps1 tests/pointer.spec.lua tests/tooltip/target_detector.spec.lua tests/tooltip/registration.spec.lua tests/tooltip/renderer.spec.lua tests/minecart_route_overlay.spec.lua tests/infrastructure_smoke.spec.lua tests/package_contract.spec.lua tests/widget_extensions.spec.lua` | Pending | Prove the enum migration across the shared pointer API and every affected production consumer. |
 | 2026-07-31 | Focused DwarfSpec tests | `./tools/Run-AutomationTests.ps1 tests/context_menu/<file>.ds.lua` | Passed: 5/5 | Map, overlay, Lua-screen, failure-lifecycle, and runtime-reload files passed individually with `cleanup_confirmed=true`. |
 | 2026-07-31 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed: 392/392 | Zero failures, errors, or pending tests. |
 | 2026-07-31 | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Failed outside context-menu scope | All five context-menu examples passed before three Minecart Route examples failed because `TestWorld 01` contained no hauling route at index 0; the runner then reached its 30-second timeout. Cleanup was confirmed. |

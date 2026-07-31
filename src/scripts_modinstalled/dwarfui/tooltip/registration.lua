@@ -3,14 +3,14 @@
 -- Process-wide tooltip input wiring. Registrations demand pointer polling;
 -- samples flow through target detection into presentation-neutral intent.
 
-local input_service = reqscript('dwarfui/tooltip_service').service
+local input_service = reqscript('dwarfui/tooltip/service').service
 local PointerPoller =
     reqscript('dwarfui/pointer_poller').PointerPoller
 local TooltipTargetDetector =
-    reqscript('dwarfui/tooltip_target_detector').TooltipTargetDetector
+    reqscript('dwarfui/tooltip/target_detector').TooltipTargetDetector
 local map_targets =
-    reqscript('dwarfui/tooltip_map_target').registry
-local target_adapters = reqscript('dwarfui/tooltip_target')
+    reqscript('dwarfui/tooltip/map_target').registry
+local target_adapters = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 1

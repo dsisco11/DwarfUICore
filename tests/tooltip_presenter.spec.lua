@@ -56,7 +56,9 @@ local function load_environment()
         gui={
             getDFViewscreen=function() return state.df_viewscreen end,
             getCurViewscreen=function() return state.cur_viewscreen end,
+            showAnnouncement=function() end,
         },
+        printerr=function() end,
         screen={
             getMousePos=function()
                 state.mouse_samples = state.mouse_samples + 1
@@ -87,7 +89,11 @@ local function load_environment()
         'src/scripts_modinstalled/dwarfui/utils/function_chain.lua')
     local _, extensions = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfui/widget_extensions.lua', {
-            globals={DEFAULT_NIL=default_nil},
+            globals={
+                DEFAULT_NIL=default_nil,
+                COLOR_RED=4,
+                dfhack=process,
+            },
             require_modules={['gui.widgets']=widgets},
             reqscript={['dwarfui/pointer']=pointer},
         })

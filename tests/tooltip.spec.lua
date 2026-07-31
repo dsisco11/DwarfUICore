@@ -16,6 +16,9 @@ local function load_tooltip(state)
     widgets.Widget.ATTRS{visible=true, active=true}
 
     local dfhack = {
+        dwarfui={},
+        gui={showAnnouncement=function() end},
+        printerr=function() end,
         pen={parse=function(value)
             state.parsed_pens = state.parsed_pens or {}
             table.insert(state.parsed_pens, value)
@@ -49,7 +52,11 @@ local function load_tooltip(state)
         })
     Policy = pointer.PointerPolicy
     local _, extensions = module_loader.load(repo_root, extension_path, {
-        globals={DEFAULT_NIL=default_nil},
+        globals={
+            DEFAULT_NIL=default_nil,
+            COLOR_RED=4,
+            dfhack=dfhack,
+        },
         require_modules={['gui.widgets']=widgets},
         reqscript={['dwarfui/pointer']=pointer},
     })

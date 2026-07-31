@@ -65,18 +65,27 @@
     - src/scripts_modinstalled/dwarfui.lua
     - README.md (Runtime validation and reload)
 
-☐ [Phase 5 - Unit Tests] Add deterministic coverage for geometry, bindings, and pass-through behavior.
-    ☐ Add a model spec covering:
+✔ [Phase 5 - Unit Tests] Add deterministic coverage for geometry, bindings, and pass-through behavior. @done(26-07-31 12:50)
+    ✔ Add a model spec covering: @done(26-07-31 12:50)
         - multiple window sizes with slight layout shifts,
         - dynamic bounds recomputation,
         - active binding lookup and label normalization,
         - per-button suppression when data is missing.
-    ☐ Add an overlay spec covering:
+    ✔ Add an overlay spec covering: @done(26-07-31 12:50)
         - default-enabled fullscreen contract,
         - render placement against model-provided bounds,
         - no input consumption/regression of native behavior.
-    ☐ Update module registry tests if new module ordering changes.
-    ☐ Update package contract tests for any newly shipped module files.
+    ✔ Update module registry tests if new module ordering changes. @done(26-07-31 12:50)
+    ✔ Update package contract tests for any newly shipped module files. @done(26-07-31 12:50)
+    Deliverables:
+    - Expanded model coverage in `tests/ui_hotkeys.spec.lua` with explicit multi-window-size layout drift recomputation assertions.
+    - Added overlay coverage in `tests/ui_hotkeys_overlay.spec.lua` for pass-through input and bounds-anchored render placement.
+    - Updated module-order integration assertions in `tests/module_registry.spec.lua`.
+    - Updated package contract coverage in `tests/package_contract.spec.lua` to include:
+        - `dwarfui/ui_hotkeys.lua` as a shipped module,
+        - isolated load support for the model module,
+        - complete payload assertions for `dwarfui-ui-hotkeys.lua` registration and model source.
+    - Verified via Unit Tests task: pass (403 successes, 0 failures).
     Docs:
     - tests/mood_popover_overlay.spec.lua
     - tests/minecart_route_overlay.spec.lua

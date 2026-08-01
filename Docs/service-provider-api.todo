@@ -1,0 +1,498 @@
+# Service Provider API Implementation Checklist
+
+Status: planned; blocked on approval of the version 1 public contract
+
+Source: `Docs/service-provider-api-proposal.md`
+
+## Goal
+
+Implement the proposed namespaced service-provider contract without creating a
+second tooltip or context-menu runtime. DwarfUICore will expose immutable,
+namespace-bound version 1 APIs over its existing process-wide services, enforce
+installation and runtime-generation coherence, and preserve registrations
+across ordinary provider construction.
+
+The work includes the coordinated migration of DwarfUI to namespace `dwarfui`.
+Migration of any other consumer plugin remains explicitly out of scope.
+
+## Proposal analysis
+
+- [ ] Treat this checklist as an implementation extrapolation, not approval of
+      the proposal. Do not begin production changes until the public contract
+      and the unresolved decisions in Phase 0 are approved.
+- [ ] Preserve the current process-wide tooltip and context-menu implementations
+      as the only backends; providers are ownership and compatibility layers,
+      not parallel service implementations.
+- [ ] Introduce lifecycle and acquisition infrastructure before provider
+      facades. Current modules can construct, retire, or replace process state
+      during module load, which conflicts with argument-first validation,
+      atomic publication, and no-automatic-repair requirements.
+- [ ] Refactor registration identity through the full pipeline. Namespaces must
+      survive registration, detection, mediation, presentation, callback
+      dispatch, diagnostics, update, removal, and stale-handle validation.
+- [ ] Treat tooltip collision resolution and context-menu composition as
+      backend changes. They cannot be implemented safely only in the public API
+      wrapper.
+- [ ] Keep package contract, installation resolution, reload behavior, and
+      DwarfUI adoption as separate completion gates. Focused provider tests do
+      not prove packaged or live integration.
+- [ ] Preserve unrelated worktree and index state. Do not stash or commit as
+      part of executing this checklist.
+
+## Locked scope and constraints
+
+- [ ] The public dependency entrypoint is `reqscript('dwarfuicore')`.
+- [ ] The only public provider exports are
+      `dwarfuicore.services.TooltipServiceProvider` and
+      `dwarfuicore.services.ContextMenuServiceProvider`.
+- [ ] Provider construction requires an exact positive integer contract major
+      and a validated stable consumer namespace.
+- [ ] Every `new()` call returns a distinct immutable API object bound to one
+      service, contract major, namespace, and runtime generation.
+- [ ] Closed discriminator sets use immutable numeric LuaDoc enums. Do not
+      publish a consumer-visible service discriminator or string service name.
+- [ ] Production modules start with `--@ module=true`, project modules use
+      `reqscript()`, and reload-managed modules are registered in dependency
+      order.
+- [ ] Every new or modified class and method has complete LuaDoc comments. All
+      public option, update, handle, definition, and diagnostic records have
+      complete versioned LuaDoc definitions.
+- [ ] Provider construction and API methods never reload, tear down, clear
+      script environments, or rescan overlays.
+- [ ] Ordinary construction never replaces a singleton, manager, presenter,
+      hook owner, namespace state, or healthy runtime generation.
+- [ ] Independent consumer-plugin migrations are not authorized by this task.
+
+## Phase 0 - Approve and freeze the version 1 contract
+
+- [ ] Record the starting DwarfUICore branch, revision, worktree state, package
+      version, and current module-registry order.
+- [ ] Run and record the current complete unit, syntax, build, and package
+      baselines before changing production code.
+- [ ] Inventory every `dfhack.dwarfuicore` process slot, module-local generation
+      counter, eager singleton construction, automatic predecessor retirement,
+      hook owner, and reload teardown path.
+- [ ] Inventory the current tooltip and context-menu widget keys, map-handle
+      lifetimes, identity allocators, registration sequences, target precedence,
+      open-session snapshots, diagnostics, and weak-reference behavior.
+- [ ] Approve the namespace grammar, 64-byte limit, byte-for-byte comparison,
+      and exact reserved namespace set. Reserve `dwarfuicore` and any internal
+      test or compatibility namespaces explicitly rather than by prefix guess.
+- [ ] Resolve the proposal's use of "reserved namespace `dwarfui`" against the
+      rule that constructors reject reserved namespaces. Since caller identity
+      cannot be authenticated, define whether `dwarfui` is an assigned
+      documentation convention or a validator-rejected name while still giving
+      DwarfUI a valid acquisition path.
+- [ ] Freeze the complete version 1 LuaDoc schema for both service APIs and all
+      referenced options, updates, handles, definitions, and diagnostics.
+- [ ] Decide whether an abandoned map handle continues to permit weak lifetime
+      cleanup or whether the provider contract requires registrations to remain
+      until explicit removal. Apply one rule consistently to both services.
+- [ ] Freeze how existing widget/root precedence interacts with multiple
+      namespace contributions on the same physical widget or map tile.
+- [ ] Freeze whether an already-open context menu is an immutable snapshot when
+      one contributing namespace updates, unregisters, or clears its state.
+- [ ] Freeze stable error categories and prefixes for constructor errors, stale
+      API objects, foreign handles, mixed installations, unhealthy services,
+      and initialization failures.
+- [ ] Define the installation/build identity source, package-version source,
+      supported-major declarations, and required internal dependency contract
+      versions. Do not derive coherence from method shape alone.
+- [ ] Decide the transition and removal policy for the current
+      `dwarfuicore/tooltip/api` and `dwarfuicore/context_menu/api` facades. Any
+      temporary adapter must delegate to the same new backend.
+- [ ] Approve the DwarfUI adoption boundary and the exact compatibility window;
+      do not include independent plugins in that approval.
+
+### Phase 0 completion gate
+
+- [ ] The proposal text and every decision above are approved or amended in the
+      proposal before implementation begins.
+- [ ] Baseline evidence is recorded without promoting unit or package evidence
+      to live-runtime success.
+- [ ] The current process-state and registration data flows are mapped through
+      presentation and callback dispatch, not only through public facades.
+
+## Phase 1 - Build private namespace, identity, and immutability primitives
+
+- [ ] Add a private namespace validator implementing the approved byte-level
+      grammar and reserved-name checks with focused boundary tests.
+- [ ] Add immutable numeric internal enums for service kind, runtime status,
+      service health, and any other closed state set introduced by this work.
+- [ ] Add a process-wide monotonically increasing identity/sequence allocator
+      that can produce the approved composite identity components without
+      exposing internal records publicly.
+- [ ] Define immutable opaque map-registration handles whose private backing
+      records include runtime generation, service kind, contract major,
+      namespace, and local identity.
+- [ ] Add shared private immutable-proxy support for provider exports, service
+      API objects, and handles. Block assignment, method replacement, field
+      attachment, backing-state inspection, and metatable replacement.
+- [ ] Store API and handle backing records outside consumer-visible tables and
+      expose only documented operations.
+- [ ] Test missing and malformed namespaces, minimum and maximum lengths,
+      invalid ASCII, period rules, reserved names, exact comparison, immutable
+      behavior, and opaque backing storage.
+- [ ] Test composite identity uniqueness across services, namespaces, contract
+      majors, local identities, and runtime generations.
+
+### Phase 1 completion gate
+
+- [ ] Namespace validation and immutable object behavior are deterministic and
+      independent of either service backend.
+- [ ] No public object exposes mutable authoritative runtime, namespace, facade,
+      or identity state.
+
+## Phase 2 - Establish the installation manifest and runtime lifecycle
+
+- [ ] Add one private process-state owner under DwarfUICore-owned keys in
+      `dfhack.dwarfuicore`; correctness must not depend on retention of the root
+      script environment.
+- [ ] Define the private installation manifest with build identity, package
+      version, runtime generation, initialization status, supported contract
+      majors per service, and required internal dependency contracts.
+- [ ] Validate the complete manifest shape and exact coherence of every cached
+      prerequisite, service record, facade, and generation.
+- [ ] Represent initialization, healthy, disabled, retiring, and retired states
+      explicitly and reject acquisition from every disallowed state.
+- [ ] Separate service health from public contract compatibility in state,
+      validation, diagnostics, and error reporting.
+- [ ] Refactor process-owned initializers so each is explicitly idempotent and
+      publishes its state only after local construction succeeds.
+- [ ] Remove module-load behavior that automatically retires or replaces a
+      healthy owner merely because a script environment was loaded again.
+- [ ] Preserve existing hook-chain safety while associating hook managers,
+      registration managers, presenters, pollers, and services with the active
+      manifest generation.
+- [ ] Add focused tests for missing, malformed, partial, mixed-build,
+      mixed-generation, incompatible-dependency, disabled, retiring, and retired
+      state.
+- [ ] Prove validation does not clear environments, invoke teardown, replace
+      state, repair state, or rescan overlays.
+
+### Phase 2 completion gate
+
+- [ ] One coherent manifest governs every process-owned prerequisite and service
+      without relying on similar method names as compatibility evidence.
+- [ ] Re-loading a module cannot silently replace a compatible healthy runtime
+      owner.
+
+## Phase 3 - Implement atomic service acquisition
+
+- [ ] Add one shared private acquisition helper parameterized by immutable
+      service kind and exact public contract major.
+- [ ] Validate both constructor arguments before loading any private service
+      prerequisite.
+- [ ] Reject unsupported majors exactly; never bind a version 1 request to a
+      later major or partially implemented adapter.
+- [ ] Add per-generation, per-service in-progress state and reject reentrant or
+      cyclic initialization with the provider-specific failure prefix.
+- [ ] Validate the installation manifest and already-loaded shared
+      infrastructure before initializing anything missing.
+- [ ] Initialize prerequisites through the idempotent initializers from Phase 2
+      and validate their internal contracts and health.
+- [ ] Construct and validate a complete versioned service facade privately.
+- [ ] Publish the facade cache and healthy service marker only after every check
+      succeeds.
+- [ ] Clear the in-progress marker on every failure while leaving no facade or
+      healthy marker published, so a corrected later retry can succeed.
+- [ ] Reuse a compatible healthy singleton without replacing registrations,
+      active intent/menu state, hooks, diagnostics, or namespace sequences.
+- [ ] Return enough private acquisition metadata to construct a fresh bound API
+      object without exposing the facade to consumers.
+- [ ] Add failure-injection tests at every prerequisite and publication boundary
+      plus corrected-retry, cross-service reuse, and repeated-acquisition tests.
+
+### Phase 3 completion gate
+
+- [ ] Acquisition is atomic at the facade-publication boundary and explicitly
+      makes no unsupported claim about rolling back arbitrary Lua side effects.
+- [ ] All proposal acquisition, partial-state, unhealthy-state, mixed-install,
+      reentrancy, and retry scenarios pass focused tests.
+
+## Phase 4 - Namespace the tooltip backend
+
+- [ ] Change widget registration keys from `widget` to `(namespace, widget)`
+      while retaining weak widget lifetime behavior approved in Phase 0.
+- [ ] Make same-namespace repeat registration idempotent without disturbing the
+      original sequence; allow different namespaces to register the same widget
+      independently.
+- [ ] Allocate map identities and handles through the shared composite identity
+      contract and enforce namespace, service, contract-major, and generation
+      ownership on update and removal.
+- [ ] Carry composite source identity through widget and map candidates, target
+      adaptation, mediation, intent, presenter state, and diagnostics.
+- [ ] Resolve eligible tooltip collisions by greatest process-wide original
+      registration sequence and reveal the next eligible contribution when the
+      winner is removed or becomes ineligible.
+- [ ] Ensure unregister and `clear_namespace()` remove only the bound tooltip
+      namespace and release idle polling/presentation state only when no
+      remaining namespace has demand.
+- [ ] Return copied diagnostics containing only the bound namespace's
+      registrations plus approved shared service-health data.
+- [ ] Preserve ordinary repeated construction, multiple entrypoints using one
+      namespace, different consumers, and cross-service construction without
+      replacing the tooltip backend.
+- [ ] Add unit coverage for same-widget ownership, widget and map collisions,
+      foreign handles, namespace cleanup, weak lifetime, ineligibility fallback,
+      stale generations, diagnostics isolation, and runtime preservation.
+- [ ] Update existing tooltip unit and DwarfSpec fixtures to exercise the
+      namespaced backend without weakening their pointer, render-hook,
+      presentation, or cleanup assertions.
+
+### Phase 4 completion gate
+
+- [ ] Tooltip registration, detection, mediation, presentation, cleanup, and
+      diagnostics retain namespace ownership end to end.
+- [ ] Removing or invalidating one namespace cannot remove or hide the next
+      eligible namespace contribution permanently.
+
+## Phase 5 - Namespace and compose the context-menu backend
+
+- [ ] Change widget registration keys to `(namespace, widget)` and preserve one
+      namespace's original registration sequence across replacement/update.
+- [ ] Convert map registrations to composite identities and enforce all foreign
+      handle rejection dimensions before mutation.
+- [ ] Separate physical target selection from contribution collection so all
+      eligible namespaces for the selected widget or exact map tile can
+      contribute to one menu.
+- [ ] Order namespace contributions by process-wide original registration
+      sequence and preserve entry order within each validated definition.
+- [ ] Retain each rendered entry's composite source identity and dispatch
+      selection to exactly the callback and source context that contributed it.
+- [ ] Apply the Phase 0 open-session decision consistently to update,
+      unregister, `clear_namespace()`, weak-source loss, and callback dispatch.
+- [ ] Ensure removing one namespace leaves every other eligible contribution,
+      root-discovery demand, hook, and active service owner intact.
+- [ ] Add namespace-scoped copied diagnostics plus approved shared health and
+      composition data without leaking another namespace's definitions or
+      callbacks.
+- [ ] Add unit coverage for same-widget and same-tile composition, mixed widget
+      and map contributions, ordering, exact callback dispatch, foreign handles,
+      namespace cleanup, multiple entrypoints, stale generations, and
+      diagnostics isolation.
+- [ ] Extend component/live fixtures to prove real rendered combined menus and
+      selection dispatch without regressing whole-event input ownership,
+      anchoring, screen routing, or cleanup.
+
+### Phase 5 completion gate
+
+- [ ] Every selected menu entry can be traced to one composite registration
+      identity through rendering and callback dispatch.
+- [ ] Unregistering or clearing one namespace cannot remove another namespace's
+      contribution or replace the process-wide backend.
+
+## Phase 6 - Expose providers and immutable version 1 APIs
+
+- [ ] Define lightweight root-bound `TooltipServiceProvider` and
+      `ContextMenuServiceProvider` classes without eagerly loading private
+      service implementations.
+- [ ] Export them through a closed read-only `services` empty proxy with private
+      backing storage; reject replacement and consumer-added provider types.
+- [ ] Implement `new(contractVersion, consumerNamespace)` with both arguments
+      mandatory, provider-specific stable prefixes, exact major negotiation,
+      namespace validation, and shared atomic acquisition.
+- [ ] Return a distinct immutable namespace-bound API object on every successful
+      construction, including repeated construction for the same namespace.
+- [ ] Implement `get_contract_version()` and `get_namespace()` from private
+      backing data and validate the active generation before every method.
+- [ ] Implement every approved tooltip and context-menu version 1 method as a
+      direct namespace-bound delegation with no per-call namespace parameter.
+- [ ] Reject stale API objects and handles after generation retirement with the
+      approved stable error category.
+- [ ] Prove API objects cannot attach fields, replace methods, inspect facades,
+      mutate provider exports, or operate on another namespace.
+- [ ] Prove importing `reqscript('dwarfuicore')` does no service initialization,
+      reload, teardown, environment clearing, or overlay rescan.
+- [ ] Update root, provider, API, module-registry, and package-contract tests for
+      the complete public surface and the absence of a global `get()` or public
+      service discriminator.
+
+### Phase 6 completion gate
+
+- [ ] The canonical proposal examples work against one shared backend and exact
+      version 1 APIs.
+- [ ] The root and API object surfaces contain only approved immutable public
+      contracts.
+
+## Phase 7 - Make explicit development reload generation-safe
+
+- [ ] Mark the active generation retiring and reject new acquisitions before
+      destructive teardown begins.
+- [ ] Retire every core runtime owner, invalidate all namespaces, APIs, handles,
+      callbacks, presentations, hooks, and service facades from the old
+      generation.
+- [ ] Clear only DwarfUICore reload-managed script environments in the registry's
+      safe order and rebuild prerequisites in dependency order.
+- [ ] Publish a new healthy generation only after complete reconstruction and
+      manifest validation succeeds.
+- [ ] On reconstruction failure, leave no retired facade or service marked
+      healthy and keep every old API object stale.
+- [ ] Preserve foreign hook wrappers according to the existing safe-retirement
+      contracts and report any unavoidable inert trampoline in diagnostics.
+- [ ] Prove constructors and API methods cannot reach reload, teardown,
+      environment-clearing, or overlay-rescan operations.
+- [ ] Add command and live lifecycle tests for successful reload, failed reload,
+      stale objects, acquisition during retiring/initializing states, and clean
+      retry after correction.
+- [ ] Prove `dwarfui reload` neither invokes this operation nor changes another
+      namespace or the DwarfUICore generation.
+
+### Phase 7 completion gate
+
+- [ ] Successful reload creates one coherent new generation; failed reload
+      leaves no falsely healthy runtime.
+- [ ] No old API object, opaque handle, callback, hook owner, menu, tooltip
+      intent, or namespace record can act on the new generation.
+
+## Phase 8 - Migrate DwarfUI as the coordinated consumer
+
+- [ ] Perform this phase only in an explicitly authorized DwarfUI checkout and
+      record its revision, branch, worktree state, declared DwarfUICore
+      dependency, and installed package identity.
+- [ ] Acquire tooltip and context-menu APIs with exact contract major 1 and the
+      approved consumer namespace `dwarfui` from DwarfUI-owned entrypoints.
+- [ ] Route all DwarfUI tooltip and context-menu registrations through those
+      bound APIs without creating another runtime or retaining direct access to
+      private DwarfUICore modules.
+- [ ] If temporary DwarfUI-only compatibility adapters are required, make them
+      delegate to the provider APIs, document deprecation, and add removal
+      criteria. Do not present them as the new public contract.
+- [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
+      namespace while preserving all other namespaces and the core generation.
+- [ ] Update DwarfUI focused tests and package/integration setup to install and
+      resolve the intended packaged DwarfUICore before DwarfUI.
+- [ ] Add an independent disposable test consumer namespace to prove DwarfUI
+      reload isolation; do not edit or migrate a real independent plugin.
+- [ ] Verify DwarfUI feature overlays, widgets, minecart integrations, and other
+      existing service consumers retain their behavior through the provider
+      boundary.
+
+### Phase 8 completion gate
+
+- [ ] DwarfUI is a normal namespace-bound consumer of the one DwarfUICore
+      runtime.
+- [ ] Reloading DwarfUI clears and rebuilds only `dwarfui`; the disposable
+      consumer's registrations and the DwarfUICore generation survive.
+
+## Phase 9 - Complete documentation, registry, and package contracts
+
+- [ ] Add every new reload-managed DwarfUICore module to
+      `dwarfuicore/module_registry.lua` in dependency order and update both load
+      and environment-clear order tests.
+- [ ] Update package-contract tests and package verification for the root,
+      provider classes, private implementations, manifest, service modules,
+      documentation, and focused tests required by the proposal.
+- [ ] Update the README from "proposed and unimplemented" only after the public
+      surface exists and its focused tests pass.
+- [ ] Document provider acquisition, namespace selection, exact contract-major
+      semantics, immutable API objects, ownership, collision behavior, opaque
+      handles, cleanup, diagnostics, error transport, health, and reload.
+- [ ] Document that namespaces are ownership boundaries rather than security
+      principals and give stable canonical identifier guidance.
+- [ ] Document compatible and breaking contract changes and keep public contract
+      majors distinct from package and internal dependency versions.
+- [ ] Add canonical tooltip and context-menu examples using
+      `reqscript('dwarfuicore')` and no per-method namespace argument.
+- [ ] Build and inspect the expanded package and final archive; prove all
+      required files exist and no DwarfUI feature module or unrelated consumer
+      code is bundled.
+- [ ] Prove DwarfUI and the disposable independent test consumer resolve the
+      same intended packaged DwarfUICore installation and build identity.
+
+### Phase 9 completion gate
+
+- [ ] Registry order, expanded package, archive, public documentation, and
+      installed resolution match the approved implementation.
+- [ ] The package exposes no accidental internal module path as a public
+      compatibility promise.
+
+## Phase 10 - Verification, live acceptance, and cleanup
+
+- [ ] Run focused namespace, identity, manifest, acquisition, provider, tooltip,
+      context-menu, reload, root, registry, and package-contract unit specs.
+- [ ] Run the complete DwarfUICore unit suite.
+- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
+- [ ] Run the offline build and record it separately from live evidence.
+- [ ] Run `./tools/Publish.ps1` and independently inspect expanded and archived
+      package contents.
+- [ ] Install the exact verified package into the configured DFHack test
+      environment and start a fresh process before live acceptance.
+- [ ] Run focused DwarfSpec provider scenarios for cold construction, repeated
+      construction, multiple entrypoints, multiple consumers, collisions,
+      context-menu composition, namespace cleanup, foreign handles, mixed
+      installation, unhealthy state, initialization failure, and reload.
+- [ ] Run existing focused tooltip and context-menu DwarfSpec regressions.
+- [ ] Run the complete DwarfUICore DwarfSpec suite and record structured results
+      and `cleanup_confirmed` separately.
+- [ ] Run DwarfUI's focused and complete unit/integration suites against the
+      verified DwarfUICore package after Phase 8 is authorized and complete.
+- [ ] Manually verify tooltip winner fallback, combined context-menu ordering
+      and exact callback dispatch, repeated construction preservation, stale
+      object rejection, DwarfUI reload isolation, and explicit core reload.
+- [ ] Inspect hooks, screens, pollers, presenters, active menus/intents,
+      registrations, namespace records, manifest state, and diagnostics after
+      failure, reload, world unload, and final cleanup.
+- [ ] Run `git diff --check` in every touched checkout.
+- [ ] Verify no stale proposal wording, direct private-service consumer imports,
+      temporary test state, generated scratch files, or unauthorized consumer
+      migrations remain.
+- [ ] Record focused unit, complete unit, syntax, build, package, focused live,
+      complete live, DwarfUI integration, manual visual, and cleanup evidence as
+      distinct results.
+
+### Phase 10 completion gate
+
+- [ ] Every acceptance scenario in the proposal has matching automated or
+      explicitly manual evidence and no acceptance row is inferred from a
+      narrower test layer.
+- [ ] Final installed-runtime inspection shows one coherent healthy generation,
+      one backend per service, correct namespace isolation, and no stale owned
+      process state.
+
+## Definition of done
+
+- [ ] `reqscript('dwarfuicore').services` is a closed immutable namespace with
+      exactly the approved provider classes.
+- [ ] Both providers enforce exact major 1 and the approved namespace contract
+      before service initialization.
+- [ ] Every construction returns a distinct immutable API object over one
+      compatible healthy process-wide backend.
+- [ ] Widget and map registrations retain composite identity and namespace
+      ownership through detection, presentation, callback dispatch, diagnostics,
+      update, cleanup, and stale validation.
+- [ ] Tooltip collisions and context-menu composition follow the approved
+      deterministic version 1 rules.
+- [ ] Foreign handles and stale APIs are rejected across namespace, service,
+      contract-major, installation, and generation boundaries.
+- [ ] Ordinary construction preserves singleton owners, registrations, active
+      presentation state, hooks, health, diagnostics, and sequences.
+- [ ] Partial, mixed, disabled, retired, and reentrant states fail clearly and
+      are never automatically repaired or replaced.
+- [ ] Explicit core reload is generation-safe, and DwarfUI reload affects only
+      namespace `dwarfui`.
+- [ ] DwarfUI consumes both services through the approved provider boundary;
+      no independent plugin has been migrated by this task.
+- [ ] Module registry, package contents, installed resolution, documentation,
+      and public LuaDoc match the approved contract.
+- [ ] All new and modified classes and methods have LuaDoc comments.
+- [ ] Focused, complete, syntax, build, package, live, visual, and cleanup gates
+      pass and are reported without conflation.
+
+## Execution evidence
+
+| Date | Scope | Command or entrypoint | Result | Notes |
+| --- | --- | --- | --- | --- |
+| | Baseline unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record before production changes. |
+| | Focused provider unit tests | `./tools/Run-UnitTests.ps1 <focused spec paths>` | Pending | Namespace, identity, manifest, acquisition, APIs, services, reload, registry, and package contract. |
+| | Complete unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
+| | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and DwarfSpec Lua files. |
+| | Offline build | `./tools/Build.ps1` | Pending | Packaging evidence only. |
+| | Package verification | `./tools/Publish.ps1` | Pending | Inspect expanded and archive contents independently. |
+| | Focused DwarfSpec | `./tools/Run-AutomationTests.ps1 <one provider spec>` | Pending | Use one spec per run and record `cleanup_confirmed`. |
+| | Tooltip/context-menu live regressions | `./tools/Run-AutomationTests.ps1 <one existing spec>` | Pending | Preserve existing rendering, input, lifecycle, and cleanup contracts. |
+| | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Do not infer visual success from structured completion. |
+| | DwarfUI integration | DwarfUI unit, package-integration, and DwarfSpec entrypoints against this verified package | Pending | Requires separately authorized DwarfUI checkout changes. |
+| | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one package/build identity and one backend per service. |
+| | Live manual acceptance | Registered tooltip and composed context menu across two namespaces | Pending | Verify collision fallback, ordering, dispatch, isolation, reload, and cleanup. |
+| | Diff validation | `git diff --check` in each touched checkout | Pending | Record whitespace result separately. |

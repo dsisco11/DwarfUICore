@@ -9,7 +9,7 @@ Source: `Docs/service-provider-api-proposal.md`
 Implement the proposed namespaced service-provider contract without creating a
 second tooltip or context-menu runtime. DwarfUICore will expose immutable,
 namespace-bound version 1 APIs over its existing process-wide services, enforce
-installation and runtime-generation coherence, and preserve registrations
+runtime-generation and service-health validation, and preserve registrations
 across ordinary provider construction.
 
 The work includes the coordinated migration of DwarfUI to namespace `dwarfui`.
@@ -104,9 +104,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Preserve the approved provider/API prefixes, stable category tokens,
       non-stable diagnostic detail, handle-validation precedence, and ordinary
       `false` return boundaries from the public error contract.
-- [ ] Define the installation/build identity source, package-version source,
-      supported-major declarations, and required internal dependency contract
-      versions. Do not derive coherence from method shape alone.
+- [ ] Document the supported single-installation runtime model: package updates
+      require a fresh process or complete core reload, while partial replacement
+      and active script-path switching are unsupported and are not diagnosed.
 - [ ] Decide the transition and removal policy for the current
       `dwarfuicore/tooltip/api` and `dwarfuicore/context_menu/api` facades. Any
       temporary adapter must delegate to the same new backend.
@@ -167,16 +167,18 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] No public object exposes mutable authoritative runtime, namespace, facade,
       or identity state.
 
-## Phase 2 - Establish the installation manifest and runtime lifecycle
+## Phase 2 - Establish process runtime state and lifecycle
 
 - [ ] Add one private process-state owner under DwarfUICore-owned keys in
       `dfhack.dwarfuicore`; correctness must not depend on retention of the root
       script environment.
-- [ ] Define the private installation manifest with build identity, package
-      version, runtime generation, initialization status, supported contract
-      majors per service, and required internal dependency contracts.
-- [ ] Validate the complete manifest shape and exact coherence of every cached
-      prerequisite, service record, facade, and generation.
+- [ ] Store only active generation, runtime status, per-service initialization
+      markers, and cached service/facade records in the private process state.
+- [ ] Keep supported public contract majors in their implementing private
+      provider adapters instead of a central runtime descriptor.
+- [ ] Do not add a runtime installation manifest, build identity,
+      package-version comparison, content fingerprint, or per-module dependency
+      version matrix.
 - [ ] Represent initialization, healthy, disabled, retiring, and retired states
       explicitly and reject acquisition from every disallowed state.
 - [ ] Separate service health from public contract compatibility in state,
@@ -187,17 +189,16 @@ Migration of any other consumer plugin remains explicitly out of scope.
       healthy owner merely because a script environment was loaded again.
 - [ ] Preserve existing hook-chain safety while associating hook managers,
       registration managers, presenters, pollers, and services with the active
-      manifest generation.
-- [ ] Add focused tests for missing, malformed, partial, mixed-build,
-      mixed-generation, incompatible-dependency, disabled, retiring, and retired
-      state.
+      runtime generation.
+- [ ] Add focused tests for missing, malformed, partial, wrong-generation,
+      disabled, retiring, and retired runtime/service state.
 - [ ] Prove validation does not clear environments, invoke teardown, replace
       state, repair state, or rescan overlays.
 
 ### Phase 2 completion gate
 
-- [ ] One coherent manifest governs every process-owned prerequisite and service
-      without relying on similar method names as compatibility evidence.
+- [ ] One process-owned runtime record governs generation, status,
+      initialization, services, and facades without carrying package metadata.
 - [ ] Re-loading a module cannot silently replace a compatible healthy runtime
       owner.
 
@@ -209,14 +210,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
       prerequisite.
 - [ ] Render every acquisition failure through the correct provider prefix and
       one of `INVALID_VERSION`, `UNSUPPORTED_VERSION`, `INVALID_NAMESPACE`,
-      `INSTALLATION_INCOHERENT`, `SERVICE_UNHEALTHY`, `INITIALIZATION_BUSY`, or
-      `INITIALIZATION_FAILED`.
+      `SERVICE_UNHEALTHY`, `INITIALIZATION_BUSY`, or `INITIALIZATION_FAILED`.
 - [ ] Reject unsupported majors exactly; never bind a version 1 request to a
       later major or partially implemented adapter.
 - [ ] Add per-generation, per-service in-progress state and reject reentrant or
       cyclic initialization with the provider-specific failure prefix.
-- [ ] Validate the installation manifest and already-loaded shared
-      infrastructure before initializing anything missing.
+- [ ] Validate current runtime status and any existing service record before
+      initializing anything missing.
 - [ ] Initialize prerequisites through the idempotent initializers from Phase 2
       and validate their internal contracts and health.
 - [ ] Construct and validate a complete versioned service facade privately.
@@ -237,8 +237,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 - [ ] Acquisition is atomic at the facade-publication boundary and explicitly
       makes no unsupported claim about rolling back arbitrary Lua side effects.
-- [ ] All proposal acquisition, partial-state, unhealthy-state, mixed-install,
-      reentrancy, and retry scenarios pass focused tests.
+- [ ] All proposal acquisition, partial-state, wrong-generation,
+      unhealthy-state, reentrancy, and retry scenarios pass focused tests.
 
 ## Phase 4 - Namespace the tooltip backend
 
@@ -374,7 +374,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
       direct namespace-bound delegation with no per-call namespace parameter.
 - [ ] Render API failures through the service API prefix and one of `STALE_API`,
       `INVALID_ARGUMENT`, `FOREIGN_HANDLE`, `STALE_HANDLE`,
-      `INSTALLATION_INCOHERENT`, or `SERVICE_UNHEALTHY`.
+      or `SERVICE_UNHEALTHY`.
 - [ ] Validate API generation, handle shape, handle generation, and handle
       domain in the approved order; return `false` only for an absent or removed
       same-domain registration.
@@ -410,7 +410,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Clear only DwarfUICore reload-managed script environments in the registry's
       safe order and rebuild prerequisites in dependency order.
 - [ ] Publish a new healthy generation only after complete reconstruction and
-      manifest validation succeeds.
+      runtime/service validation succeeds.
 - [ ] On reconstruction failure, leave no retired facade or service marked
       healthy and keep every old API object stale.
 - [ ] Preserve foreign hook wrappers according to the existing safe-retirement
@@ -468,7 +468,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
       `dwarfuicore/module_registry.lua` in dependency order and update both load
       and environment-clear order tests.
 - [ ] Update package-contract tests and package verification for the root,
-      provider classes, private implementations, manifest, service modules,
+      provider classes, private implementations, service modules,
       documentation, and focused tests required by the proposal.
 - [ ] Update the README from "proposed and unimplemented" only after the public
       surface exists and its focused tests pass.
@@ -487,14 +487,14 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Document that namespaces are ownership boundaries rather than security
       principals and give stable canonical identifier guidance.
 - [ ] Document compatible and breaking contract changes and keep public contract
-      majors distinct from package and internal dependency versions.
+      majors distinct from package and private implementation versions.
 - [ ] Add canonical tooltip and context-menu examples using
       `reqscript('dwarfuicore')` and no per-method namespace argument.
 - [ ] Build and inspect the expanded package and final archive; prove all
       required files exist and no DwarfUI feature module or unrelated consumer
       code is bundled.
 - [ ] Prove DwarfUI and the disposable independent test consumer resolve the
-      same intended packaged DwarfUICore installation and build identity.
+      same intended packaged DwarfUICore installation.
 
 ### Phase 9 completion gate
 
@@ -505,7 +505,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 10 - Verification, live acceptance, and cleanup
 
-- [ ] Run focused namespace, identity, manifest, acquisition, provider, tooltip,
+- [ ] Run focused namespace, identity, runtime-state, acquisition, provider, tooltip,
       context-menu, reload, root, registry, and package-contract unit specs.
 - [ ] Run the complete DwarfUICore unit suite.
 - [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
@@ -516,8 +516,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       environment and start a fresh process before live acceptance.
 - [ ] Run focused DwarfSpec provider scenarios for cold construction, repeated
       construction, multiple entrypoints, multiple consumers, collisions,
-      context-menu composition, namespace cleanup, foreign handles, mixed
-      installation, unhealthy state, initialization failure, and reload.
+      context-menu composition, namespace cleanup, foreign handles, unhealthy
+      state, initialization failure, and reload.
 - [ ] Run existing focused tooltip and context-menu DwarfSpec regressions.
 - [ ] Run the complete DwarfUICore DwarfSpec suite and record structured results
       and `cleanup_confirmed` separately.
@@ -527,7 +527,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
       and exact callback dispatch, repeated construction preservation, stale
       object rejection, DwarfUI reload isolation, and explicit core reload.
 - [ ] Inspect hooks, screens, pollers, presenters, active menus/intents,
-      registrations, namespace records, manifest state, and diagnostics after
+      registrations, namespace records, runtime state, and diagnostics after
       failure, reload, world unload, and final cleanup.
 - [ ] Run `git diff --check` in every touched checkout.
 - [ ] Verify no stale proposal wording, direct private-service consumer imports,
@@ -570,13 +570,14 @@ Migration of any other consumer plugin remains explicitly out of scope.
       target invalidation closes the immutable current menu, and no invalidated
       callback can execute.
 - [ ] Foreign handles and stale APIs are rejected across namespace, service,
-      contract-major, installation, and generation boundaries.
+      contract-major, and generation boundaries.
 - [ ] Every public failure uses its approved prefix and category, ordinary
       absence returns `false`, and no public operation uses `qerror()` or
       `nil, error` transport.
 - [ ] Ordinary construction preserves singleton owners, registrations, active
       presentation state, hooks, health, diagnostics, and sequences.
-- [ ] Partial, mixed, disabled, retired, and reentrant states fail clearly and
+- [ ] Partial, malformed, wrong-generation, disabled, retired, and reentrant
+      states fail clearly and
       are never automatically repaired or replaced.
 - [ ] Explicit core reload is generation-safe, and DwarfUI reload affects only
       namespace `dwarfui`.
@@ -596,7 +597,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
 | | Baseline unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record before production changes. |
-| | Focused provider unit tests | `./tools/Run-UnitTests.ps1 <focused spec paths>` | Pending | Namespace, identity, manifest, acquisition, APIs, services, reload, registry, and package contract. |
+| | Focused provider unit tests | `./tools/Run-UnitTests.ps1 <focused spec paths>` | Pending | Namespace, identity, runtime state, acquisition, APIs, services, reload, registry, and package contract. |
 | | Complete unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
 | | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and DwarfSpec Lua files. |
 | | Offline build | `./tools/Build.ps1` | Pending | Packaging evidence only. |
@@ -605,6 +606,6 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | | Tooltip/context-menu live regressions | `./tools/Run-AutomationTests.ps1 <one existing spec>` | Pending | Preserve existing rendering, input, lifecycle, and cleanup contracts. |
 | | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Do not infer visual success from structured completion. |
 | | DwarfUI integration | DwarfUI unit, package-integration, and DwarfSpec entrypoints against this verified package | Pending | Requires separately authorized DwarfUI checkout changes. |
-| | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one package/build identity and one backend per service. |
+| | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one packaged DwarfUICore resolution and one backend per service. |
 | | Live manual acceptance | Registered tooltip and composed context menu across two namespaces | Pending | Verify collision fallback, ordering, dispatch, isolation, reload, and cleanup. |
 | | Diff validation | `git diff --check` in each touched checkout | Pending | Record whitespace result separately. |

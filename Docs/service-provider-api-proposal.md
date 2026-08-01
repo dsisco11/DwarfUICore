@@ -62,7 +62,7 @@ addition to its current reusable process-wide infrastructure:
 - context-menu registration, targeting, mediation, presentation, input, and
   hooks;
 - process-wide singleton state and service health;
-- service contract negotiation and installation-coherence validation; and
+- service contract negotiation and runtime lifecycle validation; and
 - the explicit DwarfUICore development reload command.
 
 The extraction must include the transitive dependencies that these systems own.
@@ -232,8 +232,7 @@ Provider constructors use these categories:
 | `INVALID_VERSION` | The version is missing, non-integer, zero, or negative. |
 | `UNSUPPORTED_VERSION` | The requested positive integer major is not implemented completely. |
 | `INVALID_NAMESPACE` | The namespace is missing or fails syntax validation. |
-| `INSTALLATION_INCOHERENT` | The manifest, build identity, runtime generation, cached state, or internal dependency contracts are malformed or mixed. |
-| `SERVICE_UNHEALTHY` | The requested service is disabled, retiring, retired, or otherwise unhealthy. |
+| `SERVICE_UNHEALTHY` | The runtime or requested service is malformed, disabled, retiring, retired, or otherwise unhealthy. |
 | `INITIALIZATION_BUSY` | Acquisition is reentrant or cyclic for the requested generation and service. |
 | `INITIALIZATION_FAILED` | A prerequisite load, initializer, facade construction, or complete contract validation failed. |
 
@@ -245,8 +244,7 @@ Namespace-bound APIs use these categories:
 | `INVALID_ARGUMENT` | A widget, options table, update, definition, or handle is malformed. |
 | `FOREIGN_HANDLE` | A recognized handle belongs to another namespace, service, or contract major. |
 | `STALE_HANDLE` | A recognized handle belongs to another runtime generation. |
-| `INSTALLATION_INCOHERENT` | The active manifest, facade, generation, or internal dependency state is malformed or mixed. |
-| `SERVICE_UNHEALTHY` | The bound service is disabled, retiring, retired, or otherwise unhealthy. |
+| `SERVICE_UNHEALTHY` | The bound runtime, facade, or service is malformed, disabled, retiring, retired, or otherwise unhealthy. |
 
 Every API method validates its bound generation before delegating, so a retired
 object reports `STALE_API`. Handle mutation validates a current API, handle
@@ -257,8 +255,8 @@ namespace, service, or contract major reports `FOREIGN_HANDLE`.
 
 Ordinary absence is not an error. Updating or unregistering an already-removed
 same-domain widget or handle returns `false`. `clear_namespace()` returns
-whether anything changed. Input validation, stale-state, installation,
-service-health, and ownership failures raise before mutating state. No public
+whether anything changed. Input validation, stale-state, service-health, and
+ownership failures raise before mutating state. No public
 constructor or method uses `qerror()` or returns `nil, error`.
 
 ## Namespace-bound service APIs
@@ -572,29 +570,36 @@ Private process state lives under DwarfUICore-owned keys in
 `dfhack.dwarfuicore`. Correctness does not depend only on DFHack retaining the
 root script environment.
 
-## Installation coherence and service health
+## Runtime state and service health
 
-DwarfUICore publishes a private process-wide installation manifest containing:
+DwarfUICore maintains only the private process state required to own its
+runtime:
 
-- an installation/build identity;
-- the DwarfUICore package version;
 - the active runtime generation;
-- initialization status;
-- supported public contract majors per service; and
-- required internal dependency contract versions.
+- the runtime status;
+- per-service initialization markers; and
+- cached service and versioned facade records.
 
-Every prerequisite, service facade, and cached service record must agree with
-the manifest. Method-shape checks alone are insufficient because separately
-cached modules from incompatible installations can expose similar names.
+Supported public contract majors are declared by the private provider adapters
+that implement them. DwarfUICore does not maintain a runtime installation
+manifest, build identity, package-version comparison, file fingerprint, or
+per-module dependency-version matrix.
+
+The supported runtime model expects one DwarfUICore installation to resolve.
+Installing or replacing a package requires a fresh DFHack process or explicit
+complete `dwarfuicore reload`. Partial file replacement and script-path
+switching while a generation is active are unsupported and are not diagnosed
+as runtime installation conflicts. Package identity and contents are verified
+offline by the build, package, and installation-resolution checks.
 
 Service health is distinct from contract compatibility. Acquisition:
 
 - reuses a compatible healthy singleton;
-- rejects a disabled, retired, malformed, or mixed-generation singleton;
+- rejects a disabled, retired, malformed, or wrong-generation singleton;
 - never automatically replaces or repairs an unhealthy singleton;
 - never clears a script environment;
 - never invokes teardown, reload, or overlay rescan; and
-- reports whether reinstall or explicit development reload is appropriate.
+- reports whether restart or explicit development reload is appropriate.
 
 ## Atomic acquisition
 
@@ -602,7 +607,7 @@ The shared private acquisition helper performs atomic facade publication:
 
 - validate constructor arguments before loading service prerequisites;
 - reject acquisition while the runtime generation is initializing or retiring;
-- validate the installation manifest and already loaded shared infrastructure;
+- validate the current runtime status and any existing service record;
 - initialize missing prerequisites with explicitly idempotent initializers;
 - validate the complete service contract and service health;
 - publish a facade cache only after all checks succeed;
@@ -613,7 +618,7 @@ This does not claim that arbitrary Lua module side effects can be rolled back.
 Every core initializer must therefore be idempotent and must publish its own
 process-owned state only after its local construction succeeds. A failed
 acquisition publishes no facade and no healthy service marker; a later retry
-may succeed after the installation is corrected or an explicit reload occurs.
+may succeed after the failure cause is corrected or an explicit reload occurs.
 
 ## Failure contract
 
@@ -622,10 +627,9 @@ Provider construction rejects:
 - invalid or unsupported contract versions;
 - invalid namespaces;
 - a missing private provider implementation, facade, or prerequisite;
-- a missing, malformed, or incompatible installation manifest;
-- mixed installation identities or runtime generations;
+- malformed provider, runtime, or service process state, including a
+  wrong-generation service record;
 - a facade missing required versioned operations;
-- malformed provider or service process state;
 - a disabled, retired, or otherwise unhealthy service;
 - prerequisite load failures; and
 - reentrant or cyclic initialization.
@@ -688,7 +692,7 @@ project work:
 
 1. Approve this exact public contract, including version negotiation, namespace
    rules, identity and collision behavior, and compatibility policy.
-2. Implement the root contract, manifest, namespace system, providers,
+2. Implement the root contract, runtime state, namespace system, providers,
    immutable API objects, and focused contract tests in DwarfUICore.
 3. Migrate DwarfUI to the approved provider APIs through namespace `dwarfui`
    without introducing a second runtime.
@@ -735,13 +739,12 @@ deprecated and are not the new public consumer contract.
 | Cross-service construction | Constructing a second provider reuses shared infrastructure without replacing the first service. |
 | Runtime preservation | Registrations, active intent or menu state, hooks, health, and diagnostics survive ordinary repeated construction. |
 | Partial state | Construction fails clearly without reload, environment clearing, or singleton replacement. |
-| Mixed installation | Conflicting installation identities, generations, and dependency contracts are rejected. |
 | Unhealthy service | A disabled or retired singleton fails clearly and is not repaired or replaced by construction. |
 | Initialization failure | No facade or healthy marker is published; the in-progress marker clears; a later corrected retry can succeed. |
 | Development separation | Constructors and API methods never invoke reload, teardown, environment clearing, or overlay rescan. |
 | Failed core reload | No retired facade remains healthy and every old API object fails as stale. |
 | DwarfUI reload isolation | Reloading DwarfUI preserves every other DwarfUICore namespace and the core singleton generation. |
-| Package contract | The root module, provider classes, private implementations, manifest, service modules, documentation, and tests exist in the DwarfUICore package. |
+| Package contract | The root module, provider classes, private implementations, service modules, documentation, and tests exist in the DwarfUICore package. |
 | Installation resolution | DwarfUI and an independent test consumer resolve the intended packaged DwarfUICore installation. |
 
 ## Recommendation

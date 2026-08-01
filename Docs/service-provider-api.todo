@@ -49,6 +49,11 @@ Migration of any other consumer plugin remains explicitly out of scope.
       and a validated stable consumer namespace.
 - [ ] Every `new()` call returns a distinct immutable API object bound to one
       service, contract major, namespace, and runtime generation.
+- [ ] API objects are non-owning handles, not namespace leases. Do not add lease
+      counting, `close()`, `release()`, or API-garbage-collection cleanup.
+- [ ] Widget keys and opaque map handles retain weak individual lifetimes;
+      namespace-wide cleanup occurs only through explicit consumer operations or
+      DwarfUICore generation retirement.
 - [ ] Closed discriminator sets use immutable numeric LuaDoc enums. Do not
       publish a consumer-visible service discriminator or string service name.
 - [ ] Production modules start with `--@ module=true`, project modules use
@@ -80,9 +85,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
       registration, or global claiming of namespace strings.
 - [ ] Freeze the complete version 1 LuaDoc schema for both service APIs and all
       referenced options, updates, handles, definitions, and diagnostics.
-- [ ] Decide whether an abandoned map handle continues to permit weak lifetime
-      cleanup or whether the provider contract requires registrations to remain
-      until explicit removal. Apply one rule consistently to both services.
+- [ ] Preserve weak lifetime cleanup for abandoned widget keys and opaque map
+      handles in both services, including through every secondary detection
+      index and callback-containing registration value.
+- [ ] Treat consumer reload, disable, teardown, and applicable save/map/world
+      lifecycle handling as explicit `clear_namespace()` call sites. Do not
+      infer generic Lua consumer unload from API reachability, environment
+      clearing, overlay rescanning, map/world unload, or garbage collection.
 - [ ] Freeze how existing widget/root precedence interacts with multiple
       namespace contributions on the same physical widget or map tile.
 - [ ] Freeze whether an already-open context menu is an immutable snapshot when
@@ -120,6 +129,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Define immutable opaque map-registration handles whose private backing
       records include runtime generation, service kind, contract major,
       namespace, and local identity.
+- [ ] Store widget and map-handle registrations in weak ownership structures
+      whose values and secondary indexes cannot keep their own weak keys alive.
 - [ ] Add shared private immutable-proxy support for provider exports, service
       API objects, and handles. Block assignment, method replacement, field
       attachment, backing-state inspection, and metatable replacement.
@@ -130,6 +141,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       opaque backing storage.
 - [ ] Test composite identity uniqueness across services, namespaces, contract
       majors, local identities, and runtime generations.
+- [ ] Test cyclic callback/environment graphs to prove weak widgets and map
+      handles remain collectable while live API objects remain non-owning.
 
 ### Phase 1 completion gate
 
@@ -231,6 +244,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Add unit coverage for same-widget ownership, widget and map collisions,
       foreign handles, namespace cleanup, weak lifetime, ineligibility fallback,
       stale generations, diagnostics isolation, and runtime preservation.
+- [ ] Prove collecting an API object changes no tooltip registration, polling,
+      presentation, namespace, facade, or service-health state.
 - [ ] Update existing tooltip unit and DwarfSpec fixtures to exercise the
       namespaced backend without weakening their pointer, render-hook,
       presentation, or cleanup assertions.
@@ -266,6 +281,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
       and map contributions, ordering, exact callback dispatch, foreign handles,
       namespace cleanup, multiple entrypoints, stale generations, and
       diagnostics isolation.
+- [ ] Prove weak widgets and map handles are collectable even when context-menu
+      definitions contain callbacks that refer into the consumer environment.
+- [ ] Prove collecting an API object changes no context-menu registration,
+      composition, active menu, namespace, facade, or service-health state.
 - [ ] Extend component/live fixtures to prove real rendered combined menus and
       selection dispatch without regressing whole-event input ownership,
       anchoring, screen routing, or cleanup.
@@ -297,6 +316,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       approved stable error category.
 - [ ] Prove API objects cannot attach fields, replace methods, inspect facades,
       mutate provider exports, or operate on another namespace.
+- [ ] Prove the public APIs expose no `close()` or `release()` method and do not
+      register API-object finalizers or namespace lease counts.
 - [ ] Prove importing `reqscript('dwarfuicore')` does no service initialization,
       reload, teardown, environment clearing, or overlay rescan.
 - [ ] Update root, provider, API, module-registry, and package-contract tests for
@@ -355,6 +376,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       criteria. Do not present them as the new public contract.
 - [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
       namespace while preserving all other namespaces and the core generation.
+- [ ] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
+      through explicit namespace cleanup rather than API-object collection.
 - [ ] Update DwarfUI focused tests and package/integration setup to install and
       resolve the intended packaged DwarfUICore before DwarfUI.
 - [ ] Add an independent disposable test consumer namespace to prove DwarfUI
@@ -383,6 +406,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Document provider acquisition, namespace selection, exact contract-major
       semantics, immutable API objects, ownership, collision behavior, opaque
       handles, cleanup, diagnostics, error transport, health, and reload.
+- [ ] Document that API objects are non-owning, individual widget/map
+      registrations are weak, and consumer-controlled lifecycle operations must
+      call `clear_namespace()` explicitly when namespace cleanup is required.
 - [ ] Document that namespaces are ownership boundaries rather than security
       principals and give stable canonical identifier guidance.
 - [ ] Document compatible and breaking contract changes and keep public contract
@@ -453,6 +479,11 @@ Migration of any other consumer plugin remains explicitly out of scope.
       before service initialization.
 - [ ] Every construction returns a distinct immutable API object over one
       compatible healthy process-wide backend.
+- [ ] API object collection never changes registrations; no namespace lease,
+      reference count, `close()`, or `release()` contract exists.
+- [ ] Weak widgets and map handles disappear from all primary and secondary
+      registration indexes when collected, including with cyclic callback
+      graphs.
 - [ ] Widget and map registrations retain composite identity and namespace
       ownership through detection, presentation, callback dispatch, diagnostics,
       update, cleanup, and stale validation.
@@ -466,6 +497,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       are never automatically repaired or replaced.
 - [ ] Explicit core reload is generation-safe, and DwarfUI reload affects only
       namespace `dwarfui`.
+- [ ] Consumer reload, disable, teardown, and applicable lifecycle cleanup use
+      explicit namespace clearing rather than inferred Lua unload or API-object
+      garbage collection.
 - [ ] DwarfUI consumes both services through the approved provider boundary;
       no independent plugin has been migrated by this task.
 - [ ] Module registry, package contents, installed resolution, documentation,

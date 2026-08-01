@@ -225,6 +225,10 @@ Consumers cannot attach fields, replace methods, inspect the private facade, or
 change the bound namespace. This makes future additive methods compatible and
 prevents one consumer from mutating another consumer's API object.
 
+API objects are non-owning namespace handles. They are not namespace leases,
+are not reference counted, and expose no `close()` or `release()` operation.
+Garbage collection of an API object never changes registration state.
+
 ### Tooltip service API version 1
 
 ```lua
@@ -382,10 +386,36 @@ Widget registrations are keyed by `(namespace, widget)`, not by widget alone:
 Map registrations are independently owned opaque handles and follow the same
 namespace rules.
 
+### Registration lifetime and consumer lifecycle
+
+Individual registrations retain the existing weak lifetime model:
+
+- a widget registration is removed when its weak widget key is collected;
+- a map registration is removed when its opaque handle is collected;
+- DwarfUICore must not keep a widget or map handle alive merely because it is
+  registered; and
+- explicit `unregister()` and `unregister_map_tile()` remain available for
+  immediate deterministic removal.
+
+The weak indexes and any secondary detection indexes must preserve this
+contract even when registration values contain plugin callbacks or other
+objects that refer back to the widget, handle, or plugin environment.
+
 Dropping an API object does not remove registrations. This supports multiple
-entrypoints in one plugin and avoids garbage collection changing service
-ownership. Cleanup is explicit through individual unregister operations or
-`clear_namespace()`.
+entrypoints in one plugin and avoids garbage collection changing namespace
+ownership. DwarfUICore does not infer that a Lua consumer has unloaded from API
+object reachability, script-environment clearing, overlay rescanning, map/world
+unload, or garbage collection.
+
+Namespace-wide cleanup is explicit through `clear_namespace()`. A consumer
+that implements reload, disable, teardown, or an applicable save/map/world
+lifecycle handler calls `clear_namespace()` for each service it owns before
+discarding or rebuilding its registrations. Map or world unload is not itself a
+generic consumer-unload event; consumers decide whether their own namespace
+state should survive that boundary.
+
+Explicit `dwarfuicore reload` remains the only operation that retires every
+namespace and registration in the active core generation.
 
 ## Cross-namespace target collisions
 
@@ -574,6 +604,10 @@ deprecated and are not the new public consumer contract.
 | Tooltip collision | The deterministic winning tooltip is presented; removing it reveals the next eligible contribution. |
 | Context-menu composition | Eligible namespace contributions are ordered and combined; each entry dispatches to its original callback. |
 | Namespace cleanup | `clear_namespace()` removes only the bound namespace and service registrations. |
+| API object lifetime | Collecting an API object removes no registration and does not change namespace or service state. |
+| Weak widget lifetime | Collecting a registered widget removes only that widget's namespace-specific registration. |
+| Weak map-handle lifetime | Collecting an opaque map handle removes only its exact registration without retaining the handle through a secondary index. |
+| Explicit consumer cleanup | A consumer-controlled reload, disable, teardown, or applicable lifecycle handler can clear its service namespace without affecting another namespace or the core generation. |
 | Cross-service construction | Constructing a second provider reuses shared infrastructure without replacing the first service. |
 | Runtime preservation | Registrations, active intent or menu state, hooks, health, and diagnostics survive ordinary repeated construction. |
 | Partial state | Construction fails clearly without reload, environment clearing, or singleton replacement. |

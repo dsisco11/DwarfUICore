@@ -201,12 +201,65 @@ cannot provide the complete documented contract.
 Construction raises a Lua error with a stable prefix:
 
 ```text
-DwarfUICore TooltipServiceProvider: <reason>
-DwarfUICore ContextMenuServiceProvider: <reason>
+DwarfUICore TooltipServiceProvider: [CATEGORY] <detail>
+DwarfUICore ContextMenuServiceProvider: [CATEGORY] <detail>
 ```
 
 Consumers that want recoverable dependency handling use `pcall`. Constructors
 do not return `nil, error` and do not call `qerror()`.
+
+## Public error contract
+
+Every public failure raises an ordinary Lua error with one stable surface prefix
+and one stable category token:
+
+```text
+DwarfUICore TooltipServiceProvider: [CATEGORY] <detail>
+DwarfUICore ContextMenuServiceProvider: [CATEGORY] <detail>
+DwarfUICore TooltipServiceApi: [CATEGORY] <detail>
+DwarfUICore ContextMenuServiceApi: [CATEGORY] <detail>
+```
+
+The prefix and category are public versioned contracts. The human-readable
+detail is diagnostic text and is not a byte-stable compatibility contract.
+Implementation code represents the closed category set with an immutable
+numeric internal enum and maps each member to its documented public token.
+
+Provider constructors use these categories:
+
+| Category | Meaning |
+| --- | --- |
+| `INVALID_VERSION` | The version is missing, non-integer, zero, or negative. |
+| `UNSUPPORTED_VERSION` | The requested positive integer major is not implemented completely. |
+| `INVALID_NAMESPACE` | The namespace is missing or fails syntax validation. |
+| `INSTALLATION_INCOHERENT` | The manifest, build identity, runtime generation, cached state, or internal dependency contracts are malformed or mixed. |
+| `SERVICE_UNHEALTHY` | The requested service is disabled, retiring, retired, or otherwise unhealthy. |
+| `INITIALIZATION_BUSY` | Acquisition is reentrant or cyclic for the requested generation and service. |
+| `INITIALIZATION_FAILED` | A prerequisite load, initializer, facade construction, or complete contract validation failed. |
+
+Namespace-bound APIs use these categories:
+
+| Category | Meaning |
+| --- | --- |
+| `STALE_API` | The API object belongs to a retired runtime generation. |
+| `INVALID_ARGUMENT` | A widget, options table, update, definition, or handle is malformed. |
+| `FOREIGN_HANDLE` | A recognized handle belongs to another namespace, service, or contract major. |
+| `STALE_HANDLE` | A recognized handle belongs to another runtime generation. |
+| `INSTALLATION_INCOHERENT` | The active manifest, facade, generation, or internal dependency state is malformed or mixed. |
+| `SERVICE_UNHEALTHY` | The bound service is disabled, retiring, retired, or otherwise unhealthy. |
+
+Every API method validates its bound generation before delegating, so a retired
+object reports `STALE_API`. Handle mutation validates a current API, handle
+shape, handle generation, and handle domain in that order. A malformed value
+reports `INVALID_ARGUMENT`; a recognized old-generation handle reports
+`STALE_HANDLE`; and a recognized current-generation handle from another
+namespace, service, or contract major reports `FOREIGN_HANDLE`.
+
+Ordinary absence is not an error. Updating or unregistering an already-removed
+same-domain widget or handle returns `false`. `clear_namespace()` returns
+whether anything changed. Input validation, stale-state, installation,
+service-health, and ownership failures raise before mutating state. No public
+constructor or method uses `qerror()` or returns `nil, error`.
 
 ## Namespace-bound service APIs
 
@@ -219,7 +272,7 @@ no authoritative runtime or registration state. Private backing storage records:
 - the active DwarfUICore runtime generation.
 
 Every public method validates the generation before delegating. An API object
-from a retired development generation raises a clear stale-handle error.
+from a retired development generation raises `STALE_API`.
 
 Consumers cannot attach fields, replace methods, inspect the private facade, or
 change the bound namespace. This makes future additive methods compatible and
@@ -472,6 +525,35 @@ contributed it. Removing one namespace leaves the other contributions intact.
 Any future priority, grouping, replacement, or suppression mechanism is a
 versioned public contract and must not be inferred from namespace spelling.
 
+## Context-menu open-session mutation contract
+
+Opening a context menu creates an immutable session snapshot containing the
+selected physical target, ordered composite contribution identities, validated
+definition data, entry order, presentation fields, and callback references.
+The visible menu is never dynamically pruned, rebuilt, or patched in place.
+
+Replacing or updating a still-live contribution retains its identity and does
+not change the open snapshot. Its new definition applies to the next opening;
+the current session continues to display and, if selected, invoke the callback
+captured in its snapshot.
+
+Ownership invalidation is different from definition mutation. If any
+contribution included in the open snapshot is explicitly unregistered, removed
+by `clear_namespace()`, or lost through weak widget or map-handle collection,
+the entire menu closes without invoking a callback. Explicit removal operations
+close synchronously. Weak lifetime loss closes at the next prune, render, or
+input validation point and always before selection dispatch.
+
+The entire menu also closes if its selected source widget, map handle, owner,
+root, or physical target becomes invalid or ineligible. Before dispatching any
+selection, the service revalidates the selected physical target and every
+composite contribution identity in the snapshot. A missing or foreign identity
+closes the menu and prevents all callback invocation.
+
+Closing due to one invalid contribution does not remove any other namespace's
+registration. Those surviving contributions appear normally the next time the
+target is opened.
+
 ## Runtime singleton semantics
 
 Provider objects and runtime services have intentionally different lifetimes:
@@ -630,6 +712,9 @@ deprecated and are not the new public consumer contract.
 | Missing constructor arguments | Missing version or namespace fails with the provider-specific prefix before service initialization. |
 | Contract rejection | Non-integer, non-positive, and unsupported versions fail before an API object is returned. |
 | Namespace rejection | Invalid namespaces fail before service initialization. |
+| Stable constructor errors | Constructor failures use the provider prefix and exact approved category while treating diagnostic detail as non-stable text. |
+| Stable API errors | API failures use the service API prefix and exact approved category without returning `nil, error` or calling `qerror()`. |
+| Handle error precedence | A malformed handle is `INVALID_ARGUMENT`, an old-generation recognized handle is `STALE_HANDLE`, a different current domain is `FOREIGN_HANDLE`, and an absent same-domain registration returns `false`. |
 | Repeated construction | Distinct API objects for the same namespace delegate to the same singleton and namespace state without repeated setup. |
 | Multiple entrypoints | Separate entrypoints using one namespace share registrations without replacing the backend. |
 | Multiple consumers | Different namespaces retain independent registrations while sharing one backend service. |
@@ -639,6 +724,9 @@ deprecated and are not the new public consumer contract.
 | Context-menu composition | Eligible namespace contributions are ordered and combined; each entry dispatches to its original callback. |
 | Namespace-neutral targeting | Adding, updating, or removing a namespace contribution on an existing physical widget does not change that widget's target sequence or the service's hit-testing result. |
 | Physical target lifetime | The first contribution creates a stable physical widget target sequence; the last removal deletes it; a later first contribution receives a new sequence. |
+| Open-menu definition update | Replacing or updating a live contribution leaves the immutable open snapshot unchanged and affects the next opening only. |
+| Open-menu ownership loss | Unregistering, clearing, or collecting any snapshotted contribution closes the entire menu before callback dispatch while preserving other namespace registrations. |
+| Selection revalidation | Every snapshotted contribution identity and the physical target are valid immediately before selection; otherwise the menu closes without invoking a callback. |
 | Namespace cleanup | `clear_namespace()` removes only the bound namespace and service registrations. |
 | API object lifetime | Collecting an API object removes no registration and does not change namespace or service state. |
 | Weak widget lifetime | Collecting a registered widget removes only that widget's namespace-specific registration. |

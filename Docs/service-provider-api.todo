@@ -98,11 +98,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Preserve the approved two-stage model: existing namespace-neutral
       widget/root/blocker/map targeting selects one physical target, then the
       service resolves that target's namespace contributions.
-- [ ] Freeze whether an already-open context menu is an immutable snapshot when
-      one contributing namespace updates, unregisters, or clears its state.
-- [ ] Freeze stable error categories and prefixes for constructor errors, stale
-      API objects, foreign handles, mixed installations, unhealthy services,
-      and initialization failures.
+- [ ] Preserve the approved immutable open-menu snapshot: definition updates
+      affect the next opening, while ownership loss closes the entire current
+      menu before any callback can run.
+- [ ] Preserve the approved provider/API prefixes, stable category tokens,
+      non-stable diagnostic detail, handle-validation precedence, and ordinary
+      `false` return boundaries from the public error contract.
 - [ ] Define the installation/build identity source, package-version source,
       supported-major declarations, and required internal dependency contract
       versions. Do not derive coherence from method shape alone.
@@ -127,6 +128,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       grammar with focused boundary tests.
 - [ ] Add immutable numeric internal enums for service kind, runtime status,
       service health, and any other closed state set introduced by this work.
+- [ ] Add an immutable numeric internal public-error category enum and one
+      exhaustive mapping from its members to the approved stable category
+      tokens.
 - [ ] Add a process-wide monotonically increasing identity/sequence allocator
       that can produce the approved composite identity components without
       exposing internal records publicly.
@@ -151,6 +155,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       majors, local identities, and runtime generations.
 - [ ] Test that target and contribution sequences are independent and retain
       their approved idempotent update/removal behavior.
+- [ ] Test that every error enum member has one documented token, no token is
+      duplicated, and unmapped categories cannot be rendered.
 - [ ] Test cyclic callback/environment graphs to prove weak widgets and map
       handles remain collectable while live API objects remain non-owning.
 
@@ -201,6 +207,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
       service kind and exact public contract major.
 - [ ] Validate both constructor arguments before loading any private service
       prerequisite.
+- [ ] Render every acquisition failure through the correct provider prefix and
+      one of `INVALID_VERSION`, `UNSUPPORTED_VERSION`, `INVALID_NAMESPACE`,
+      `INSTALLATION_INCOHERENT`, `SERVICE_UNHEALTHY`, `INITIALIZATION_BUSY`, or
+      `INITIALIZATION_FAILED`.
 - [ ] Reject unsupported majors exactly; never bind a version 1 request to a
       later major or partially implemented adapter.
 - [ ] Add per-generation, per-service in-progress state and reject reentrant or
@@ -220,6 +230,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       object without exposing the facade to consumers.
 - [ ] Add failure-injection tests at every prerequisite and publication boundary
       plus corrected-retry, cross-service reuse, and repeated-acquisition tests.
+- [ ] Assert exact prefixes and category tokens without treating changing
+      diagnostic detail or stack text as byte-stable test output.
 
 ### Phase 3 completion gate
 
@@ -293,8 +305,21 @@ Migration of any other consumer plugin remains explicitly out of scope.
       sequence and preserve entry order within each validated definition.
 - [ ] Retain each rendered entry's composite source identity and dispatch
       selection to exactly the callback and source context that contributed it.
-- [ ] Apply the Phase 0 open-session decision consistently to update,
-      unregister, `clear_namespace()`, weak-source loss, and callback dispatch.
+- [ ] Snapshot the selected physical target, ordered contribution identities,
+      validated definitions, entry order, presentation fields, and callback
+      references when the menu opens.
+- [ ] Keep the open snapshot unchanged when a live contribution is replaced or
+      updated; apply its new definition on the next opening only.
+- [ ] Close the entire menu synchronously when explicit unregister or
+      `clear_namespace()` removes any snapshotted contribution.
+- [ ] Detect weak widget or map-handle loss at pruning, render, and input
+      validation points and close before selection dispatch.
+- [ ] Close the entire menu when its source, owner, root, physical target, or
+      any snapshotted contribution becomes invalid or ineligible; never
+      dynamically prune, rebuild, or patch the visible menu.
+- [ ] Revalidate the physical target and every composite contribution identity
+      immediately before selection and invoke no callback after any validation
+      failure.
 - [ ] Ensure removing one namespace leaves every other eligible contribution,
       root-discovery demand, hook, and active service owner intact.
 - [ ] Add namespace-scoped copied diagnostics plus approved shared health and
@@ -304,6 +329,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
       and map contributions, ordering, exact callback dispatch, foreign handles,
       namespace cleanup, multiple entrypoints, stale generations, and
       diagnostics isolation.
+- [ ] Prove definition replacement/update leaves the open snapshot and captured
+      callback unchanged but affects the next opening.
+- [ ] Prove explicit unregister and namespace clearing close synchronously,
+      weak ownership loss closes at the next safe validation point, and no
+      removed contribution callback can execute.
+- [ ] Prove one invalid snapshotted contribution closes the full menu without
+      deleting other namespaces' registrations, which appear on the next open.
 - [ ] Prove contribution addition, update, removal, collection, and namespace
       clearing cannot reorder a surviving physical widget target or change map
       fallback independently of ordinary target lifetime.
@@ -321,6 +353,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       identity through rendering and callback dispatch.
 - [ ] Unregistering or clearing one namespace cannot remove another namespace's
       contribution or replace the process-wide backend.
+- [ ] Open menus remain immutable across definition updates and close atomically
+      on contribution or target invalidation before callback dispatch.
 
 ## Phase 6 - Expose providers and immutable version 1 APIs
 
@@ -338,6 +372,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
       backing data and validate the active generation before every method.
 - [ ] Implement every approved tooltip and context-menu version 1 method as a
       direct namespace-bound delegation with no per-call namespace parameter.
+- [ ] Render API failures through the service API prefix and one of `STALE_API`,
+      `INVALID_ARGUMENT`, `FOREIGN_HANDLE`, `STALE_HANDLE`,
+      `INSTALLATION_INCOHERENT`, or `SERVICE_UNHEALTHY`.
+- [ ] Validate API generation, handle shape, handle generation, and handle
+      domain in the approved order; return `false` only for an absent or removed
+      same-domain registration.
 - [ ] Reject stale API objects and handles after generation retirement with the
       approved stable error category.
 - [ ] Prove API objects cannot attach fields, replace methods, inspect facades,
@@ -349,6 +389,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Update root, provider, API, module-registry, and package-contract tests for
       the complete public surface and the absence of a global `get()` or public
       service discriminator.
+- [ ] Prove constructors and methods raise ordinary Lua errors, never call
+      `qerror()`, never return `nil, error`, and mutate no state after any
+      validation, ownership, coherence, or health failure.
 
 ### Phase 6 completion gate
 
@@ -432,9 +475,15 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Document provider acquisition, namespace selection, exact contract-major
       semantics, immutable API objects, ownership, collision behavior, opaque
       handles, cleanup, diagnostics, error transport, health, and reload.
+- [ ] Document all stable provider/API prefixes and category tokens, the
+      non-stable status of diagnostic detail, handle-validation precedence, and
+      the distinction between errors and ordinary `false` results.
 - [ ] Document that API objects are non-owning, individual widget/map
       registrations are weak, and consumer-controlled lifecycle operations must
       call `clear_namespace()` explicitly when namespace cleanup is required.
+- [ ] Document immutable context-menu snapshots, next-open update behavior,
+      full-menu closure on ownership loss, and pre-selection identity
+      revalidation.
 - [ ] Document that namespaces are ownership boundaries rather than security
       principals and give stable canonical identifier guidance.
 - [ ] Document compatible and breaking contract changes and keep public contract
@@ -517,8 +566,14 @@ Migration of any other consumer plugin remains explicitly out of scope.
       deterministic version 1 rules.
 - [ ] Namespace-neutral physical targeting uses a stable target sequence that is
       independent from tooltip winner and context-menu contribution ordering.
+- [ ] Context-menu definition updates affect the next opening, ownership or
+      target invalidation closes the immutable current menu, and no invalidated
+      callback can execute.
 - [ ] Foreign handles and stale APIs are rejected across namespace, service,
       contract-major, installation, and generation boundaries.
+- [ ] Every public failure uses its approved prefix and category, ordinary
+      absence returns `false`, and no public operation uses `qerror()` or
+      `nil, error` transport.
 - [ ] Ordinary construction preserves singleton owners, registrations, active
       presentation state, hooks, health, diagnostics, and sequences.
 - [ ] Partial, mixed, disabled, retired, and reentrant states fail clearly and

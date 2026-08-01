@@ -1,9 +1,9 @@
 # Service Provider API Implementation Checklist
 
-Status: Phase 0 complete; Phase 1 reopened after implementation audit. The
-remediation designs and low-level mutation boundary are approved; their
-proposal record, implementation, and regression evidence must be completed
-before Phase 2 begins.
+Status: Phases 0 and 1 complete. The approved contract, including the
+low-level immutable-object mutation boundary, is recorded and frozen; the
+audited namespace, identity, immutability, ordering, and weak-lifetime
+foundations are verified, and runtime-state work may begin with Phase 2.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -162,43 +162,43 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [x] Add an immutable numeric internal public-error category enum and one
       exhaustive mapping from its members to the approved stable category
       tokens.
-- [ ] Add a process-wide monotonically increasing identity/sequence allocator
+- [x] Add a process-wide monotonically increasing identity/sequence allocator
       that can produce the approved composite identity components without
       exposing internal records publicly.
 - [x] Allocate stable physical widget target sequences separately from
       contribution sequences. Retain a target sequence until its last namespace
       contribution is removed; allocate a new one after complete removal and
       later re-registration.
-- [ ] Define immutable opaque map-registration handles whose private backing
+- [x] Define immutable opaque map-registration handles whose private backing
       records include runtime generation, service kind, contract major,
       namespace, and local identity.
-- [ ] Store widget and map-handle registrations in weak ownership structures
+- [x] Store widget and map-handle registrations in weak ownership structures
       whose values and secondary indexes cannot keep their own weak keys alive.
-- [ ] Add shared private immutable-proxy support for provider exports, service
+- [x] Add shared private immutable-proxy support for provider exports, service
       API objects, and handles. Block ordinary assignment, ordinary method
       replacement, field attachment, backing-state inspection, and
       `setmetatable()` replacement. Treat `rawset()` and `debug.*` as explicitly
       unsupported low-level escape hatches while keeping authoritative backing
       state external and isolated from every other proxy.
-- [ ] Store API and handle backing records outside consumer-visible tables and
+- [x] Store API and handle backing records outside consumer-visible tables and
       expose only documented operations.
 - [x] Test missing and malformed namespaces, minimum and maximum lengths,
       invalid ASCII, period rules, exact comparison, immutable behavior, and
       opaque backing storage.
-- [ ] Test composite identity uniqueness across services, namespaces, contract
+- [x] Test composite identity uniqueness across services, namespaces, contract
       majors, local identities, and runtime generations.
-- [ ] Test that target and contribution sequences are independent and retain
+- [x] Test that target and contribution sequences are independent and retain
       their approved idempotent update/removal behavior.
 - [x] Test that every error enum member has one documented token, no token is
       duplicated, and unmapped categories cannot be rendered.
 - [x] Test cyclic callback/environment graphs to prove weak widgets and map
       handles remain collectable while live API objects remain non-owning.
-- [ ] Replace caller-selected allocator ownership with the one dedicated
+- [x] Replace caller-selected allocator ownership with the one dedicated
       reload-stable `dfhack.dwarfuicore.service_provider_identity` process slot.
       Store only a version and plain numeric identity/sequence counters there;
       do not store a module-class instance or add allocator fields to the Phase
       2 runtime record.
-- [ ] Preserve allocator monotonicity across supported module reconstruction
+- [x] Preserve allocator monotonicity across supported module reconstruction
       and complete core-generation reload, resetting only with a fresh DFHack
       process. Validate the slot exactly and reject integer exhaustion before
       incrementing rather than permitting wraparound.
@@ -206,38 +206,38 @@ Migration of any other consumer plugin remains explicitly out of scope.
       `setmetatable()` remain blocked; `rawset()` and `debug.*` are unsupported
       low-level escape hatches; authoritative backing remains external and
       cannot be mutated through a proxy or changes to another proxy.
-- [ ] Amend the proposal to record the approved immutable-object mutation
+- [x] Amend the proposal to record the approved immutable-object mutation
       boundary before using the proxy for public provider or API objects.
-- [ ] Test ordinary assignment, backing inspection, and `setmetatable()` as
+- [x] Test ordinary assignment, backing inspection, and `setmetatable()` as
       enforced failures. Test `rawset()` and applicable `debug.*` operations as
       unsupported self-sabotage that cannot reveal or mutate authoritative
       backing, another proxy, or shared backend state.
-- [ ] Validate every composite identity component before creating a recognized
+- [x] Validate every composite identity component before creating a recognized
       map handle: positive integer generation, known service kind, positive
       integer contract major, validated namespace, and positive allocated local
       identity. Reject missing and unknown fields.
-- [ ] Copy the complete identity into private handle backing and make internal
+- [x] Copy the complete identity into private handle backing and make internal
       inspection return copies or comparisons instead of the authoritative
       record, so retained input and returned tables cannot mutate handle
       identity.
-- [ ] Test malformed and incomplete handle identities plus mutation of the
+- [x] Test malformed and incomplete handle identities plus mutation of the
       original identity input and any identity value returned to internal
       callers.
-- [ ] Make weak primary and secondary index mutation atomic. Reject duplicate
+- [x] Make weak primary and secondary index mutation atomic. Reject duplicate
       live identities, reject changing a live key's identity, permit record
       replacement only for the same key and identity, and clear a secondary
       entry only when it still points to the exact key being removed.
-- [ ] Test same-key reidentification, duplicate-identity insertion, replacement,
+- [x] Test same-key reidentification, duplicate-identity insertion, replacement,
       removal order, collection order, and surviving primary/secondary lookup
       coherence, including cyclic callback graphs.
-- [ ] Add a targeted audit regression suite covering every failure reproduced
+- [x] Add a targeted audit regression suite covering every failure reproduced
       during the Phase 1 completion review before restoring checked status.
 
 ### Phase 1 completion gate
 
-- [ ] Namespace validation and immutable object behavior are deterministic and
+- [x] Namespace validation and immutable object behavior are deterministic and
       independent of either service backend.
-- [ ] No public object exposes mutable authoritative runtime, namespace, facade,
+- [x] No public object exposes mutable authoritative runtime, namespace, facade,
       or identity state.
 
 ## Phase 2 - Establish process runtime state and lifecycle
@@ -759,10 +759,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-08-01 | Baseline unit suite | `./tools/Run-UnitTests.ps1` | Passed | 274 successes, 0 failures, 0 errors, 0 pending. |
-| 2026-08-01 | Focused provider unit tests | `./tools/Run-UnitTests.ps1 tests/service_provider` | Passed | 12 successes covering Phase 1 namespace, contracts, identity, immutability, ordering, and weak lifetime. |
-| 2026-08-01 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed | 286 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-01 | Focused provider unit tests | `./tools/Run-UnitTests.ps1 tests/service_provider` | Passed | 18 successes covering Phase 1 namespace, contracts, reload-stable identity, immutability boundary, handle copying, ordering, weak lifetime, and index coherence. |
+| 2026-08-01 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed | 292 successes, 0 failures, 0 errors, 0 pending. |
 | 2026-08-01 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6; 39 production and 56 test/support files passed. |
-| 2026-08-01 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Phase 1 package source built offline; no installed-runtime claim. |
+| 2026-08-01 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Audited Phase 1 package source built offline; no installed-runtime claim. |
 | 2026-08-01 | Package verification | `./tools/Publish.ps1` | Passed | Expanded and archive verification passed independently with 40 files each. |
 | | Focused DwarfSpec | `./tools/Run-AutomationTests.ps1 <one provider spec>` | Pending | Use one spec per run and record `cleanup_confirmed`. |
 | | Tooltip/context-menu live regressions | `./tools/Run-AutomationTests.ps1 <one existing spec>` | Pending | Preserve existing rendering, input, lifecycle, and cleanup contracts. |
@@ -770,4 +770,4 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | | DwarfUI integration | DwarfUI unit, package-integration, and DwarfSpec entrypoints against this verified package | Pending | Requires separately authorized DwarfUI checkout changes. |
 | | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one packaged DwarfUICore resolution and one backend per service. |
 | | Live manual acceptance | Registered tooltip and composed context menu across two namespaces | Pending | Verify collision fallback, ordering, dispatch, isolation, reload, and cleanup. |
-| 2026-08-01 | Diff validation | `git diff --check` in each touched checkout | Passed | Phase 1 DwarfUICore production, test, registry, package-contract, and planning changes. |
+| 2026-08-01 | Diff validation | `git diff --check` in each touched checkout | Passed | Audited Phase 1 production, test, registry, proposal, and planning changes. |

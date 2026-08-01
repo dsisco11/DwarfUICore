@@ -22,6 +22,12 @@ function WeakRegistrationStore:set(key, identity, record)
     assert(type(key) == 'table' and math.type(identity) == 'integer' and
             type(record) == 'table',
         'DwarfUICore weak registration arguments are invalid.')
+    local existing = self._records[key]
+    assert(not existing or existing.identity == identity,
+        'DwarfUICore weak registration identity cannot change.')
+    local identity_key = self._keys_by_identity[identity]
+    assert(not identity_key or identity_key == key,
+        'DwarfUICore weak registration identity is already live.')
     self._records[key] = {identity=identity, record=record}
     self._keys_by_identity[identity] = key
 end
@@ -49,7 +55,9 @@ function WeakRegistrationStore:remove(key)
     local entry = self._records[key]
     if not entry then return nil end
     self._records[key] = nil
-    self._keys_by_identity[entry.identity] = nil
+    if self._keys_by_identity[entry.identity] == key then
+        self._keys_by_identity[entry.identity] = nil
+    end
     return entry.record
 end
 

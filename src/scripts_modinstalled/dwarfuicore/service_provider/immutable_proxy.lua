@@ -1,12 +1,15 @@
 --@ module=true
 
 ---A private factory for one family of immutable opaque objects.
+---Ordinary mutation is blocked. Raw and debug mutation are unsupported local
+---self-sabotage and cannot reach the external backing map or another proxy.
 ---@class dwarfuicore.ImmutableProxyFactory
 ---@field create fun(self: dwarfuicore.ImmutableProxyFactory, backing: table): table
 ---@field get_backing fun(self: dwarfuicore.ImmutableProxyFactory, value: any): table|nil
 ---@field is_instance fun(self: dwarfuicore.ImmutableProxyFactory, value: any): boolean
 
 ---Creates an isolated immutable-object family with private backing storage.
+---The returned proxies enforce the approved ordinary-Lua mutation boundary.
 ---@param label string
 ---@param methods? table<string, function>
 ---@return dwarfuicore.ImmutableProxyFactory factory

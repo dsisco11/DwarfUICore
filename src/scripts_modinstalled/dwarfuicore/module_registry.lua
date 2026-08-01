@@ -14,7 +14,7 @@ MODULES = {
     {name='dwarfuicore/service_provider/contracts', contract='get_error_token'},
     {name='dwarfuicore/service_provider/namespace', contract='validate'},
     {name='dwarfuicore/service_provider/immutable_proxy', contract='new_factory'},
-    {name='dwarfuicore/service_provider/identity', contract='IdentityAllocator', contract_type='table'},
+    {name='dwarfuicore/service_provider/identity', contract='get_process_allocator'},
     {name='dwarfuicore/service_provider/weak_store', contract='WeakRegistrationStore', contract_type='table'},
     {name='dwarfuicore/class', contract='is_instance_of'},
     {name='dwarfuicore/map_projection', contract='project_visible'},

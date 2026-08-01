@@ -3,11 +3,12 @@
 ## Status
 
 Approved and frozen on 2026-08-01, including its transitive version 1 public
-data schema, but unimplemented. The repository split and implementation Phase 0
-are complete. This document does not implement providers, namespaces, composite
-identities, exact service-contract version negotiation, immutable service APIs,
-or consumer migration. Any further contract amendment before or during
-implementation requires explicit re-approval.
+data schema and immutable-object low-level mutation boundary. The repository
+split and implementation Phases 0 and 1 are complete. Private namespace,
+identity, immutability, ordering, and weak-lifetime primitives now exist, but
+providers, process runtime state, namespaced service backends, service-contract
+version negotiation, public service APIs, and consumer migration remain
+unimplemented. Any further contract amendment requires explicit re-approval.
 
 ## Decision summary
 
@@ -299,6 +300,15 @@ from a retired development generation raises `STALE_API`.
 Consumers cannot attach fields, replace methods, inspect the private facade, or
 change the bound namespace. This makes future additive methods compatible and
 prevents one consumer from mutating another consumer's API object.
+
+This approved immutability boundary applies to the public `services` namespace,
+provider exports, namespace-bound API objects, and opaque handles. It covers
+ordinary Lua indexing, assignment, `pairs()`, and `setmetatable()`. Direct
+`rawset()` and operations from the `debug` library are explicitly unsupported
+low-level escape hatches: they can self-sabotage the consumer's local proxy but
+do not change its external private backing record, another proxy, or shared
+backend state. DwarfUICore exposes no supported operation that returns or
+mutates authoritative backing storage.
 
 API objects are non-owning namespace handles. They are not namespace leases,
 are not reference counted, and expose no `close()` or `release()` operation.

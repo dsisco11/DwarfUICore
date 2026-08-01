@@ -82,7 +82,7 @@ retains:
 
 DwarfUI will become a normal DwarfUICore provider consumer only when this
 proposal is approved and implemented. Its future core service handles would
-use the reserved namespace `dwarfui`.
+use the stable namespace `dwarfui`.
 
 External plugin migration is separate future work. A migrated plugin would
 depend directly on DwarfUICore rather than DwarfUI's internal layout or
@@ -125,7 +125,6 @@ Namespace validation requires:
 - lowercase ASCII letters, digits, hyphens, underscores, and periods only;
 - a leading lowercase ASCII letter;
 - no leading, trailing, or repeated period;
-- no namespace reserved by DwarfUICore; and
 - exact byte-for-byte comparison after validation, with no implicit case or
   punctuation normalization.
 
@@ -137,9 +136,45 @@ prove which script called a Lua function. Two independently authored plugins
 that deliberately claim the same namespace will share that namespace's state.
 Documentation must instruct authors to choose a unique stable identifier.
 
+DwarfUICore does not reserve, allocate, register, or globally claim namespace
+strings. It validates their syntax only. Any consumer can request any valid
+namespace, and no separate namespace-acquisition step exists.
+
 Multiple scripts and entrypoints belonging to the same plugin should reuse the
 same namespace. They receive separate API objects but intentionally share the
 namespace's registrations and identity sequence.
+
+### How namespaces affect runtime behavior
+
+The namespace is bound once when a provider constructs an API object and is
+stored in that object's private backing record. Service methods do not accept a
+namespace argument; they delegate with the bound value automatically.
+
+The namespace partitions ownership inside a shared service rather than creating
+a service instance:
+
+- all namespaces for one service use the same process-wide backend, hooks,
+  presenter, pointer infrastructure, and health state;
+- widget registrations are keyed by `(namespace, widget)`;
+- map registrations receive opaque handles whose private ownership includes the
+  namespace;
+- composite registration identities retain the namespace through detection,
+  presentation, callback dispatch, update, removal, and diagnostics;
+- API objects for the same service and namespace intentionally share
+  registrations, while different namespaces cannot update, remove, or inspect
+  one another's registrations;
+- using the same namespace for tooltip and context-menu APIs does not merge the
+  two services' state; service kind remains part of identity and ownership;
+- `clear_namespace()` clears only the bound service and namespace; and
+- dropping an API object performs no cleanup because ownership belongs to the
+  namespace, not to one handle object.
+
+When different namespaces contribute to the same target, the service's
+versioned collision rule applies: tooltip contributions compete by registration
+sequence, while context-menu contributions compose in registration order.
+Explicit DwarfUICore reload invalidates all namespaces in the retired runtime
+generation. A consumer-specific reload clears and rebuilds only that consumer's
+namespace.
 
 ## Provider construction contract
 
@@ -155,8 +190,8 @@ end
 ```
 
 Both arguments are mandatory. Construction rejects a missing, non-integer,
-zero, negative, or unsupported contract version. It also rejects an invalid or
-reserved consumer namespace.
+zero, negative, or unsupported contract version. It also rejects an invalid
+consumer namespace.
 
 The requested contract version is exact. `new(1, namespace)` never silently
 binds to contract 2. An installed implementation may support multiple majors
@@ -439,7 +474,7 @@ may succeed after the installation is corrected or an explicit reload occurs.
 Provider construction rejects:
 
 - invalid or unsupported contract versions;
-- invalid or reserved namespaces;
+- invalid namespaces;
 - a missing private provider implementation, facade, or prerequisite;
 - a missing, malformed, or incompatible installation manifest;
 - mixed installation identities or runtime generations;
@@ -530,7 +565,7 @@ deprecated and are not the new public consumer contract.
 | Cold context-menu construction | Exact version and namespace are validated; context-menu prerequisites initialize privately; a functional namespace-bound API is returned. |
 | Missing constructor arguments | Missing version or namespace fails with the provider-specific prefix before service initialization. |
 | Contract rejection | Non-integer, non-positive, and unsupported versions fail before an API object is returned. |
-| Namespace rejection | Invalid and reserved namespaces fail before service initialization. |
+| Namespace rejection | Invalid namespaces fail before service initialization. |
 | Repeated construction | Distinct API objects for the same namespace delegate to the same singleton and namespace state without repeated setup. |
 | Multiple entrypoints | Separate entrypoints using one namespace share registrations without replacing the backend. |
 | Multiple consumers | Different namespaces retain independent registrations while sharing one backend service. |

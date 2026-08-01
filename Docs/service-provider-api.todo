@@ -75,14 +75,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Inventory the current tooltip and context-menu widget keys, map-handle
       lifetimes, identity allocators, registration sequences, target precedence,
       open-session snapshots, diagnostics, and weak-reference behavior.
-- [ ] Approve the namespace grammar, 64-byte limit, byte-for-byte comparison,
-      and exact reserved namespace set. Reserve `dwarfuicore` and any internal
-      test or compatibility namespaces explicitly rather than by prefix guess.
-- [ ] Resolve the proposal's use of "reserved namespace `dwarfui`" against the
-      rule that constructors reject reserved namespaces. Since caller identity
-      cannot be authenticated, define whether `dwarfui` is an assigned
-      documentation convention or a validator-rejected name while still giving
-      DwarfUI a valid acquisition path.
+- [ ] Approve the namespace grammar, 64-byte limit, and byte-for-byte
+      comparison. Validate syntax only; do not add reservation, allocation,
+      registration, or global claiming of namespace strings.
 - [ ] Freeze the complete version 1 LuaDoc schema for both service APIs and all
       referenced options, updates, handles, definitions, and diagnostics.
 - [ ] Decide whether an abandoned map handle continues to permit weak lifetime
@@ -116,7 +111,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
 ## Phase 1 - Build private namespace, identity, and immutability primitives
 
 - [ ] Add a private namespace validator implementing the approved byte-level
-      grammar and reserved-name checks with focused boundary tests.
+      grammar with focused boundary tests.
 - [ ] Add immutable numeric internal enums for service kind, runtime status,
       service health, and any other closed state set introduced by this work.
 - [ ] Add a process-wide monotonically increasing identity/sequence allocator
@@ -131,8 +126,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Store API and handle backing records outside consumer-visible tables and
       expose only documented operations.
 - [ ] Test missing and malformed namespaces, minimum and maximum lengths,
-      invalid ASCII, period rules, reserved names, exact comparison, immutable
-      behavior, and opaque backing storage.
+      invalid ASCII, period rules, exact comparison, immutable behavior, and
+      opaque backing storage.
 - [ ] Test composite identity uniqueness across services, namespaces, contract
       majors, local identities, and runtime generations.
 

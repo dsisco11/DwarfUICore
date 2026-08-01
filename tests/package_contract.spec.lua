@@ -49,6 +49,11 @@ describe('DwarfUICore package contract', function()
             'utils/function_chain.lua',
             'utils/immutable_enum.lua',
             'utils/numbers.lua',
+            'service_provider/contracts.lua',
+            'service_provider/namespace.lua',
+            'service_provider/immutable_proxy.lua',
+            'service_provider/identity.lua',
+            'service_provider/weak_store.lua',
         }
 
         for _, relative_path in ipairs(shared_modules) do

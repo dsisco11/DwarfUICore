@@ -1,10 +1,10 @@
 # Service Provider API Implementation Checklist
 
-Status: Phases 0 through 2 complete. The approved contract, including the
+Status: Phases 0 through 3 complete. The approved contract, including the
 low-level immutable-object mutation boundary, is recorded and frozen; the
 audited namespace, identity, immutability, ordering, and weak-lifetime
-foundations and process runtime lifecycle are verified, and atomic service
-acquisition work may begin with Phase 3.
+foundations, process runtime lifecycle, and atomic acquisition boundary are
+verified, and tooltip backend namespacing may begin with Phase 4.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -278,48 +278,60 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 3 - Implement atomic service acquisition
 
-- [ ] Add one shared private acquisition helper parameterized by immutable
+- [x] Add one shared private acquisition helper parameterized by immutable
       service kind and exact public contract major.
-- [ ] Validate both constructor arguments before loading any private service
+- [x] Validate both constructor arguments before loading any private service
       prerequisite.
-- [ ] Render every acquisition failure through the correct provider prefix and
+- [x] Render every acquisition failure through the correct provider prefix and
       one of `INVALID_VERSION`, `UNSUPPORTED_VERSION`, `INVALID_NAMESPACE`,
       `SERVICE_UNHEALTHY`, `INITIALIZATION_BUSY`, or `INITIALIZATION_FAILED`.
-- [ ] Add a table-driven constructor-failure matrix mapping every proposal
+- [x] Distinguish service-validation failure provenance: reject a malformed
+      previously published service as `SERVICE_UNHEALTHY`, while reporting a
+      newly constructed service that fails validation as `INITIALIZATION_FAILED`.
+- [x] Add a table-driven constructor-failure matrix mapping every proposal
       rejection condition to its exact category, including invalid arguments,
       unsupported majors, malformed or disabled runtime/service state,
       reentrant initialization, missing prerequisites or implementations, and
       incomplete facades.
-- [ ] Reject unsupported majors exactly; never bind a version 1 request to a
+- [x] Reject unsupported majors exactly; never bind a version 1 request to a
       later major or partially implemented adapter.
-- [ ] Add per-generation, per-service in-progress state and reject reentrant or
+- [x] Add per-generation, per-service in-progress state and reject reentrant or
       cyclic initialization with the provider-specific failure prefix.
-- [ ] Validate current runtime status and any existing service record before
+- [x] Validate current runtime status and any existing service record before
       initializing anything missing.
-- [ ] Initialize prerequisites through the idempotent initializers from Phase 2
+- [x] Reject an orphaned facade cache for a service kind when no corresponding
+      healthy service exists, regardless of which contract major owns the
+      cached facade; do not preserve, repair, or publish around that partial
+      state.
+- [x] Initialize prerequisites through the idempotent initializers from Phase 2
       and validate their internal contracts and health.
-- [ ] Construct and validate a complete versioned service facade privately.
-- [ ] Publish the facade cache and healthy service marker only after every check
+- [x] Construct and validate a complete versioned service facade privately.
+- [x] Publish the facade cache and healthy service marker only after every check
       succeeds.
-- [ ] Clear the in-progress marker on every failure while leaving no facade or
+- [x] Clear the in-progress marker on every failure while leaving no facade or
       healthy marker published, so a corrected later retry can succeed.
-- [ ] Give unhealthy and initialization failures actionable non-stable detail
+- [x] Give unhealthy and initialization failures actionable non-stable detail
       indicating whether correction, process restart, or explicit development
       reload is appropriate without making the detail byte-stable.
-- [ ] Reuse a compatible healthy singleton without replacing registrations,
+- [x] Reuse a compatible healthy singleton without replacing registrations,
       active intent/menu state, hooks, diagnostics, or namespace sequences.
-- [ ] Return enough private acquisition metadata to construct a fresh bound API
+- [x] Return enough private acquisition metadata to construct a fresh bound API
       object without exposing the facade to consumers.
-- [ ] Add failure-injection tests at every prerequisite and publication boundary
+- [x] Extend partial-state and unhealthy-service tests to cover `MISSING`,
+      `INITIALIZING`, `UNHEALTHY`, and `DISABLED` service health, a malformed
+      healthy-marked cached service, and an orphaned facade under a
+      non-requested contract major. Assert the exact category and that rejection
+      leaves all existing process state unchanged.
+- [x] Add failure-injection tests at every prerequisite and publication boundary
       plus corrected-retry, cross-service reuse, and repeated-acquisition tests.
-- [ ] Assert exact prefixes and category tokens without treating changing
+- [x] Assert exact prefixes and category tokens without treating changing
       diagnostic detail or stack text as byte-stable test output.
 
 ### Phase 3 completion gate
 
-- [ ] Acquisition is atomic at the facade-publication boundary and explicitly
+- [x] Acquisition is atomic at the facade-publication boundary and explicitly
       makes no unsupported claim about rolling back arbitrary Lua side effects.
-- [ ] All proposal acquisition, partial-state, wrong-generation,
+- [x] All proposal acquisition, partial-state, wrong-generation,
       unhealthy-state, reentrancy, and retry scenarios pass focused tests.
 
 ## Phase 4 - Namespace the tooltip backend

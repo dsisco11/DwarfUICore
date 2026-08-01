@@ -4,12 +4,12 @@
 
 Approved and frozen on 2026-08-01, including its transitive version 1 public
 data schema and immutable-object low-level mutation boundary. The repository
-split and implementation Phases 0 through 2 are complete. Private namespace,
+split and implementation Phases 0 through 3 are complete. Private namespace,
 identity, immutability, ordering, weak-lifetime, and process-runtime lifecycle
-infrastructure now exist, but providers, namespaced service backends,
-service-contract version negotiation, public service APIs, and consumer
-migration remain unimplemented. Any further contract amendment requires
-explicit re-approval.
+infrastructure now exist, together with atomic private service acquisition and
+stable provider-error rendering. Providers, namespaced service backends,
+public service APIs, and consumer migration remain unimplemented. Any further
+contract amendment requires explicit re-approval.
 
 ## Decision summary
 
@@ -116,11 +116,12 @@ separately authorized migration to the provider contract.
 
 ## Proposed public root contract
 
-Nothing in this contract exists in the repository today. In particular,
-`dwarfuicore.services`, the provider classes, `new(version, namespace)`,
-namespace-bound service APIs, and their collision and lifecycle rules are all
-unimplemented. The current direct module entrypoints predate this contract and
-are replaced as specified under **Legacy direct API replacement**.
+The public provider surface in this contract does not exist in the repository
+yet. Private namespace, identity, runtime-lifecycle, and atomic-acquisition
+infrastructure now exists, but `dwarfuicore.services`, the provider classes,
+`new(version, namespace)`, namespace-bound service APIs, and their collision
+rules remain unimplemented. The current direct module entrypoints predate this
+contract and are replaced as specified under **Legacy direct API replacement**.
 
 The root module exports a closed, read-only `services` namespace:
 

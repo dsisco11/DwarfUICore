@@ -275,6 +275,98 @@ function initialize_service(service_kind, constructor)
     return service, true
 end
 
+---Begins one facade acquisition transaction over current runtime state.
+---@param service_kind dwarfuicore.ServiceKind
+---@param contract_major integer
+---@return dwarfuicore.ServiceProviderRuntimeState state
+---@return table|nil service
+---@return table|nil facade
+function begin_service_acquisition(service_kind, contract_major)
+    assert(is_service_kind(service_kind),
+        'DwarfUICore service kind is invalid.')
+    assert(math.type(contract_major) == 'integer' and contract_major > 0,
+        'DwarfUICore contract major must be a positive integer.')
+    local state = validate_acquirable()
+    assert(not state.initializing[service_kind],
+        'DwarfUICore service initialization is already active.')
+    local service_record = state.services[service_kind]
+    assert(service_record == nil or
+            service_record.health == contracts.ServiceHealth.HEALTHY,
+        'DwarfUICore service is not healthy.')
+    local service = service_record and service_record.value or nil
+    local facade_cache = state.facades[service_kind]
+    assert(service_record ~= nil or facade_cache == nil,
+        'DwarfUICore facade cache exists without its service.')
+    local facade = facade_cache and facade_cache[contract_major] or nil
+    state.initializing[service_kind] = true
+    return state, service, facade
+end
+
+---Publishes one fully validated service and facade transaction.
+---@param service_kind dwarfuicore.ServiceKind
+---@param contract_major integer
+---@param expected_generation integer
+---@param service table
+---@param facade table
+function publish_service_acquisition(service_kind, contract_major,
+        expected_generation, service, facade)
+    assert(is_service_kind(service_kind),
+        'DwarfUICore service kind is invalid.')
+    assert(math.type(contract_major) == 'integer' and contract_major > 0 and
+            type(service) == 'table' and type(facade) == 'table',
+        'DwarfUICore service acquisition publication is invalid.')
+    local state = validate_acquirable(expected_generation)
+    assert(state.initializing[service_kind] == true,
+        'DwarfUICore service acquisition is not active.')
+    local existing_record = state.services[service_kind]
+    assert(existing_record == nil or existing_record.value == service,
+        'DwarfUICore service acquisition cannot replace a healthy service.')
+    local cache = state.facades[service_kind]
+    local existing_facade = cache and cache[contract_major] or nil
+    assert(existing_facade == nil or existing_facade == facade,
+        'DwarfUICore service acquisition cannot replace a facade.')
+
+    local published_services = {}
+    for kind, record in next, state.services do
+        published_services[kind] = record
+    end
+    published_services[service_kind] = existing_record or {
+        generation=state.generation,
+        health=contracts.ServiceHealth.HEALTHY,
+        value=service,
+    }
+    local published_facades = {}
+    for kind, existing_cache in next, state.facades do
+        published_facades[kind] = existing_cache
+    end
+    local published_cache = {}
+    for major, existing in next, cache or {} do
+        published_cache[major] = existing
+    end
+    published_cache[contract_major] = facade
+    published_facades[service_kind] = published_cache
+
+    state.services = published_services
+    state.facades = published_facades
+    state.initializing[service_kind] = nil
+end
+
+---Clears one failed acquisition marker without touching another generation.
+---@param service_kind dwarfuicore.ServiceKind
+---@param expected_generation integer
+function cancel_service_acquisition(service_kind, expected_generation)
+    if not is_service_kind(service_kind) then return end
+    local state = read_process_state()
+    if type(state) ~= 'table' or
+            rawget(state, 'generation') ~= expected_generation then
+        return
+    end
+    local initializing = rawget(state, 'initializing')
+    if type(initializing) == 'table' then
+        initializing[service_kind] = nil
+    end
+end
+
 ---Returns a private facade cached by an adapter-owned opaque key.
 ---@param service_kind dwarfuicore.ServiceKind
 ---@param cache_key any

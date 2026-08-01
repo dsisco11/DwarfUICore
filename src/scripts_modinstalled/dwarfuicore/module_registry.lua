@@ -16,6 +16,7 @@ MODULES = {
     {name='dwarfuicore/service_provider/immutable_proxy', contract='new_factory'},
     {name='dwarfuicore/service_provider/identity', contract='get_process_allocator'},
     {name='dwarfuicore/service_provider/runtime', contract='validate'},
+    {name='dwarfuicore/service_provider/acquisition', contract='acquire'},
     {name='dwarfuicore/service_provider/weak_store', contract='WeakRegistrationStore', contract_type='table'},
     {name='dwarfuicore/class', contract='is_instance_of'},
     {name='dwarfuicore/map_projection', contract='project_visible'},

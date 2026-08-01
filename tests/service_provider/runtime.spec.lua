@@ -188,4 +188,54 @@ describe('service-provider process runtime', function()
         assert.is_nil(process.teardown_count)
         assert.is_nil(process.overlay_rescan_count)
     end)
+
+    it('publishes service and facade together and cancels failed work', function()
+        local state = healthy_state(3)
+        local process = {dwarfuicore={service_provider_runtime=state}}
+        local runtime = load_runtime(process)
+        local acquired, service, facade =
+            runtime.begin_service_acquisition(
+                contracts.ServiceKind.TOOLTIP, 1)
+        assert.equals(state, acquired)
+        assert.is_nil(service)
+        assert.is_nil(facade)
+        assert.is_true(state.initializing[contracts.ServiceKind.TOOLTIP])
+        local new_service = {}
+        local new_facade = {}
+        runtime.publish_service_acquisition(
+            contracts.ServiceKind.TOOLTIP, 1, 3,
+            new_service, new_facade)
+        assert.equals(new_service,
+            state.services[contracts.ServiceKind.TOOLTIP].value)
+        assert.equals(new_facade,
+            state.facades[contracts.ServiceKind.TOOLTIP][1])
+        assert.is_nil(state.initializing[contracts.ServiceKind.TOOLTIP])
+
+        runtime.begin_service_acquisition(
+            contracts.ServiceKind.CONTEXT_MENU, 1)
+        runtime.cancel_service_acquisition(
+            contracts.ServiceKind.CONTEXT_MENU, 2)
+        assert.is_true(
+            state.initializing[contracts.ServiceKind.CONTEXT_MENU])
+        runtime.cancel_service_acquisition(
+            contracts.ServiceKind.CONTEXT_MENU, 3)
+        assert.is_nil(state.initializing[contracts.ServiceKind.CONTEXT_MENU])
+    end)
+
+    it('rejects every facade cache whose service record is absent', function()
+        for _, cache in ipairs({{}, {[1]={}}, {[2]={}}}) do
+            local state = healthy_state()
+            state.facades[contracts.ServiceKind.TOOLTIP] = cache
+            local process = {dwarfuicore={service_provider_runtime=state}}
+            local runtime = load_runtime(process)
+            assert.has_error(function()
+                runtime.begin_service_acquisition(
+                    contracts.ServiceKind.TOOLTIP, 1)
+            end, 'DwarfUICore facade cache exists without its service.')
+            assert.equals(cache,
+                state.facades[contracts.ServiceKind.TOOLTIP])
+            assert.is_nil(state.services[contracts.ServiceKind.TOOLTIP])
+            assert.is_nil(state.initializing[contracts.ServiceKind.TOOLTIP])
+        end
+    end)
 end)

@@ -1,6 +1,10 @@
+local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local separator = package.config:sub(1, 1)
+
+local _, registry = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/module_registry.lua')
 
 ---Reads one repository source file as binary text.
 ---@param relative_path string
@@ -11,6 +15,17 @@ local function read_source(relative_path)
     local text = file:read('*a')
     file:close()
     return text
+end
+
+---Returns whether one repository source file exists.
+---@param relative_path string
+---@return boolean exists
+local function source_exists(relative_path)
+    local path = repo_root .. separator .. relative_path:gsub('/', separator)
+    local file = io.open(path, 'rb')
+    if not file then return false end
+    file:close()
+    return true
 end
 
 describe('DwarfUICore package contract', function()
@@ -130,6 +145,31 @@ describe('DwarfUICore package contract', function()
             local legacy_file = io.open(legacy_path, 'rb')
             if legacy_file then legacy_file:close() end
             assert.is_nil(legacy_file)
+        end
+    end)
+
+    it('ships every registered Core module and no DwarfUI feature module',
+            function()
+        assert.is_true(source_exists('src/info.txt'))
+        assert.is_true(source_exists(
+            'src/scripts_modinstalled/dwarfuicore.lua'))
+        for _, spec in ipairs(registry.MODULES) do
+            assert.is_true(source_exists(
+                'src/scripts_modinstalled/' .. spec.name .. '.lua'),
+                spec.name .. ' is missing from the DwarfUICore package source')
+        end
+
+        for _, feature in ipairs({
+                'dwarfui-minecart-route-markers.lua',
+                'dwarfui-mood-popover.lua',
+                'dwarfui-ui-hotkeys.lua',
+                'dwarfui-unit-card-task-details.lua',
+                'dwarfui/minecart_route.lua',
+                'dwarfui/mood_popover.lua',
+                'dwarfui/popover.lua',
+                'dwarfui/ui_hotkeys.lua'}) do
+            assert.is_false(source_exists(
+                'src/scripts_modinstalled/' .. feature))
         end
     end)
 end)

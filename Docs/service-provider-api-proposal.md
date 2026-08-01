@@ -88,6 +88,20 @@ External plugin migration is separate future work. A migrated plugin would
 depend directly on DwarfUICore rather than DwarfUI's internal layout or
 initialization.
 
+### Legacy direct API replacement
+
+The existing `dwarfuicore/tooltip/api` and
+`dwarfuicore/context_menu/api` modules are replaced when this contract ships.
+They accept no consumer namespace, so preserving them as adapters would require
+a shared, invented, or inferred namespace and would violate the explicit
+ownership contract.
+
+This is an intentional breaking replacement. DwarfUI and DwarfUICore's tests
+must migrate to the provider APIs before the old modules, their module-registry
+entries, and their packaged files are removed. No compatibility adapter or
+legacy namespace is shipped. Independent plugins that use the old paths require
+separately authorized migration to the provider contract.
+
 ## Proposed public root contract
 
 Nothing in this contract exists in the repository today. In particular,
@@ -698,16 +712,19 @@ project work:
    immutable API objects, and focused contract tests in DwarfUICore.
 3. Migrate DwarfUI to the approved provider APIs through namespace `dwarfui`
    without introducing a second runtime.
-4. Migrate independent consumer plugins as separately approved work.
-5. Publish and verify package contents, installation resolution, and the
+4. Remove the replaced direct API modules after DwarfUI and DwarfUICore tests
+   no longer use them.
+5. Migrate independent consumer plugins as separately approved work.
+6. Publish and verify package contents, installation resolution, and the
    resulting public compatibility contract.
 
 Consumer plugin migration outside DwarfUI is separate work. This proposal does
 not authorize edits to those plugins.
 
-Temporary compatibility adapters, if needed for DwarfUI's own transition, must
-delegate to DwarfUICore and must not create a second runtime. They are explicitly
-deprecated and are not the new public consumer contract.
+The released package contains no temporary compatibility adapter for the old
+direct API paths. Transition work may sequence consumer and test edits before
+deleting the modules inside the coordinated development change, but the final
+package exposes only the provider contract.
 
 ## Acceptance tests
 
@@ -747,6 +764,7 @@ deprecated and are not the new public consumer contract.
 | Development separation | Constructors and API methods never invoke reload, teardown, environment clearing, or overlay rescan. |
 | Failed core reload | No retired facade remains healthy and every old API object fails as stale. |
 | DwarfUI reload isolation | Reloading DwarfUI preserves every other DwarfUICore namespace and the core singleton generation. |
+| Legacy direct API removal | DwarfUI and DwarfUICore tests use the provider APIs; both old direct API modules, their registry entries, and their packaged files are absent; no compatibility namespace or adapter exists. |
 | Package contract | The root module, provider classes, private implementations, service modules, documentation, and tests exist in the DwarfUICore package. |
 | Installation resolution | DwarfUI and an independent test consumer resolve the intended packaged DwarfUICore installation. |
 

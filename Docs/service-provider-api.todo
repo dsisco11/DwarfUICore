@@ -113,11 +113,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Document the supported single-installation runtime model: package updates
       require a fresh process or complete core reload, while partial replacement
       and active script-path switching are unsupported and are not diagnosed.
-- [ ] Decide the transition and removal policy for the current
-      `dwarfuicore/tooltip/api` and `dwarfuicore/context_menu/api` facades. Any
-      temporary adapter must delegate to the same new backend.
-- [ ] Approve the DwarfUI adoption boundary and the exact compatibility window;
-      do not include independent plugins in that approval.
+- [ ] Treat `dwarfuicore/tooltip/api` and
+      `dwarfuicore/context_menu/api` as intentionally replaced public paths.
+      Migrate DwarfUI and DwarfUICore tests, then remove both modules, their
+      registry entries, and packaged files before release.
+- [ ] Ship no compatibility adapter, legacy namespace, inferred namespace, or
+      compatibility window for the old direct APIs. Do not include independent
+      plugin migrations in this work.
 
 ### Phase 0 completion gate
 
@@ -398,6 +400,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Update root, provider, API, module-registry, and package-contract tests for
       the complete public surface and the absence of a global `get()` or public
       service discriminator.
+- [ ] Migrate DwarfUICore tests and fixtures away from both legacy direct API
+      paths so they exercise the namespace-bound provider contract before the
+      legacy modules are deleted.
 - [ ] Prove constructors and methods raise ordinary Lua errors, never call
       `qerror()`, never return `nil, error`, and mutate no state after any
       validation, ownership, coherence, or health failure.
@@ -449,9 +454,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Route all DwarfUI tooltip and context-menu registrations through those
       bound APIs without creating another runtime or retaining direct access to
       private DwarfUICore modules.
-- [ ] If temporary DwarfUI-only compatibility adapters are required, make them
-      delegate to the provider APIs, document deprecation, and add removal
-      criteria. Do not present them as the new public contract.
+- [ ] Remove every DwarfUI dependency on the legacy direct API paths; do not add
+      a temporary adapter or assign a compatibility namespace.
 - [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
       namespace while preserving all other namespaces and the core generation.
 - [ ] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
@@ -476,6 +480,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Add every new reload-managed DwarfUICore module to
       `dwarfuicore/module_registry.lua` in dependency order and update both load
       and environment-clear order tests.
+- [ ] Delete `dwarfuicore/tooltip/api` and
+      `dwarfuicore/context_menu/api`, remove their module-registry entries, and
+      remove their focused legacy facade tests after all coordinated consumers
+      and fixtures use the providers.
 - [ ] Update package-contract tests and package verification for the root,
       provider classes, private implementations, service modules,
       documentation, and focused tests required by the proposal.
@@ -503,6 +511,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Build and inspect the expanded package and final archive; prove all
       required files exist and no DwarfUI feature module or unrelated consumer
       code is bundled.
+- [ ] Prove neither legacy direct API path, compatibility adapter, nor invented
+      compatibility namespace exists in source, registry, documentation, or the
+      final package.
 - [ ] Prove DwarfUI and the disposable independent test consumer resolve the
       same intended packaged DwarfUICore installation.
 
@@ -599,6 +610,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       garbage collection.
 - [ ] DwarfUI consumes both services through the approved provider boundary;
       no independent plugin has been migrated by this task.
+- [ ] Both legacy direct API modules and their registry/package entries are
+      absent, with no compatibility adapter or legacy namespace shipped.
 - [ ] Module registry, package contents, installed resolution, documentation,
       and public LuaDoc match the approved contract.
 - [ ] All new and modified classes and methods have LuaDoc comments.

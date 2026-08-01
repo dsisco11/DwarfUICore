@@ -417,6 +417,40 @@ state should survive that boundary.
 Explicit `dwarfuicore reload` remains the only operation that retires every
 namespace and registration in the active core generation.
 
+## Physical target selection and contribution resolution
+
+Target selection and namespace contribution resolution are separate steps.
+Namespaces partition ownership but never change hit-testing geometry, render
+order, blocking behavior, widget-over-map precedence, or root precedence.
+
+DwarfUICore first selects one physical target using the existing
+namespace-neutral service rules:
+
+- within one eligible UI root, reverse render order determines the widget hit;
+- across eligible roots, the physical widget target with the greatest stable
+  target sequence wins;
+- existing blockers continue to suppress map fallback when no eligible widget
+  target wins; and
+- map fallback uses the exact sampled map coordinate.
+
+A physical widget target receives its target sequence when its first namespace
+contribution is registered. That target sequence remains unchanged while at
+least one namespace contribution for the widget remains. Adding, updating, or
+removing another namespace's contribution does not reorder the physical target.
+Removing the final contribution removes the physical target record; a later
+registration creates a new target sequence.
+
+Each new `(namespace, widget)` contribution and each map registration also has
+its own process-wide service contribution sequence. Idempotent widget
+registration and context-menu definition replacement or update retain the
+existing contribution sequence.
+
+Only after a physical target is selected does the service apply its versioned
+namespace contribution rule. Tooltip selects the eligible contribution with the
+greatest contribution sequence for that target. Context menu combines all
+eligible contributions for that target in ascending contribution sequence,
+preserving entry order within each definition.
+
 ## Cross-namespace target collisions
 
 Namespacing preserves contributions; it does not by itself decide how multiple
@@ -430,7 +464,7 @@ namespaces with the same widget-owned tooltip text still has distinct ownership
 records and a deterministic winning identity.
 
 For context menus, every eligible namespace contributes entries to one menu.
-Contributions are ordered by their process-wide registration sequence, and
+Contributions are ordered by their process-wide contribution sequence, and
 entry order within each definition is preserved. Every rendered entry retains
 its composite source identity so selection invokes exactly the callback that
 contributed it. Removing one namespace leaves the other contributions intact.
@@ -603,6 +637,8 @@ deprecated and are not the new public consumer contract.
 | Foreign handle rejection | A map handle cannot be updated or removed through another namespace, service, contract major, or generation. |
 | Tooltip collision | The deterministic winning tooltip is presented; removing it reveals the next eligible contribution. |
 | Context-menu composition | Eligible namespace contributions are ordered and combined; each entry dispatches to its original callback. |
+| Namespace-neutral targeting | Adding, updating, or removing a namespace contribution on an existing physical widget does not change that widget's target sequence or the service's hit-testing result. |
+| Physical target lifetime | The first contribution creates a stable physical widget target sequence; the last removal deletes it; a later first contribution receives a new sequence. |
 | Namespace cleanup | `clear_namespace()` removes only the bound namespace and service registrations. |
 | API object lifetime | Collecting an API object removes no registration and does not change namespace or service state. |
 | Weak widget lifetime | Collecting a registered widget removes only that widget's namespace-specific registration. |

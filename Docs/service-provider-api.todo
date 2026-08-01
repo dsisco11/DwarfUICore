@@ -54,6 +54,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Widget keys and opaque map handles retain weak individual lifetimes;
       namespace-wide cleanup occurs only through explicit consumer operations or
       DwarfUICore generation retirement.
+- [ ] Physical target selection is namespace-neutral and precedes contribution
+      resolution. Track stable physical target sequence separately from each
+      namespace contribution's sequence.
 - [ ] Closed discriminator sets use immutable numeric LuaDoc enums. Do not
       publish a consumer-visible service discriminator or string service name.
 - [ ] Production modules start with `--@ module=true`, project modules use
@@ -92,8 +95,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       lifecycle handling as explicit `clear_namespace()` call sites. Do not
       infer generic Lua consumer unload from API reachability, environment
       clearing, overlay rescanning, map/world unload, or garbage collection.
-- [ ] Freeze how existing widget/root precedence interacts with multiple
-      namespace contributions on the same physical widget or map tile.
+- [ ] Preserve the approved two-stage model: existing namespace-neutral
+      widget/root/blocker/map targeting selects one physical target, then the
+      service resolves that target's namespace contributions.
 - [ ] Freeze whether an already-open context menu is an immutable snapshot when
       one contributing namespace updates, unregisters, or clears its state.
 - [ ] Freeze stable error categories and prefixes for constructor errors, stale
@@ -126,6 +130,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Add a process-wide monotonically increasing identity/sequence allocator
       that can produce the approved composite identity components without
       exposing internal records publicly.
+- [ ] Allocate stable physical widget target sequences separately from
+      contribution sequences. Retain a target sequence until its last namespace
+      contribution is removed; allocate a new one after complete removal and
+      later re-registration.
 - [ ] Define immutable opaque map-registration handles whose private backing
       records include runtime generation, service kind, contract major,
       namespace, and local identity.
@@ -141,6 +149,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       opaque backing storage.
 - [ ] Test composite identity uniqueness across services, namespaces, contract
       majors, local identities, and runtime generations.
+- [ ] Test that target and contribution sequences are independent and retain
+      their approved idempotent update/removal behavior.
 - [ ] Test cyclic callback/environment graphs to prove weak widgets and map
       handles remain collectable while live API objects remain non-owning.
 
@@ -225,14 +235,18 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Make same-namespace repeat registration idempotent without disturbing the
       original sequence; allow different namespaces to register the same widget
       independently.
+- [ ] Create one namespace-neutral physical widget target record on the first
+      contribution, preserve its target sequence across later namespace changes,
+      and delete it only with the last contribution.
 - [ ] Allocate map identities and handles through the shared composite identity
       contract and enforce namespace, service, contract-major, and generation
       ownership on update and removal.
 - [ ] Carry composite source identity through widget and map candidates, target
       adaptation, mediation, intent, presenter state, and diagnostics.
 - [ ] Resolve eligible tooltip collisions by greatest process-wide original
-      registration sequence and reveal the next eligible contribution when the
-      winner is removed or becomes ineligible.
+      contribution sequence only after namespace-neutral physical target
+      selection, and reveal the next eligible contribution when the winner is
+      removed or becomes ineligible.
 - [ ] Ensure unregister and `clear_namespace()` remove only the bound tooltip
       namespace and release idle polling/presentation state only when no
       remaining namespace has demand.
@@ -244,6 +258,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Add unit coverage for same-widget ownership, widget and map collisions,
       foreign handles, namespace cleanup, weak lifetime, ineligibility fallback,
       stale generations, diagnostics isolation, and runtime preservation.
+- [ ] Prove adding, updating, unregistering, clearing, or collecting one
+      namespace contribution does not reorder a still-registered physical
+      widget against another root or change widget/blocker/map hit-testing.
 - [ ] Prove collecting an API object changes no tooltip registration, polling,
       presentation, namespace, facade, or service-health state.
 - [ ] Update existing tooltip unit and DwarfSpec fixtures to exercise the
@@ -260,13 +277,19 @@ Migration of any other consumer plugin remains explicitly out of scope.
 ## Phase 5 - Namespace and compose the context-menu backend
 
 - [ ] Change widget registration keys to `(namespace, widget)` and preserve one
-      namespace's original registration sequence across replacement/update.
+      namespace's original contribution sequence across replacement/update.
+- [ ] Share one namespace-neutral physical widget target record across its
+      contributions and preserve its target sequence until the last namespace
+      contribution is removed.
 - [ ] Convert map registrations to composite identities and enforce all foreign
       handle rejection dimensions before mutation.
 - [ ] Separate physical target selection from contribution collection so all
       eligible namespaces for the selected widget or exact map tile can
       contribute to one menu.
-- [ ] Order namespace contributions by process-wide original registration
+- [ ] Preserve existing reverse-render, root, blocker, and widget-over-map target
+      precedence without consulting namespace spelling, namespace count, or a
+      later contribution sequence.
+- [ ] Order namespace contributions by process-wide original contribution
       sequence and preserve entry order within each validated definition.
 - [ ] Retain each rendered entry's composite source identity and dispatch
       selection to exactly the callback and source context that contributed it.
@@ -281,6 +304,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       and map contributions, ordering, exact callback dispatch, foreign handles,
       namespace cleanup, multiple entrypoints, stale generations, and
       diagnostics isolation.
+- [ ] Prove contribution addition, update, removal, collection, and namespace
+      clearing cannot reorder a surviving physical widget target or change map
+      fallback independently of ordinary target lifetime.
 - [ ] Prove weak widgets and map handles are collectable even when context-menu
       definitions contain callbacks that refer into the consumer environment.
 - [ ] Prove collecting an API object changes no context-menu registration,
@@ -489,6 +515,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       update, cleanup, and stale validation.
 - [ ] Tooltip collisions and context-menu composition follow the approved
       deterministic version 1 rules.
+- [ ] Namespace-neutral physical targeting uses a stable target sequence that is
+      independent from tooltip winner and context-menu contribution ordering.
 - [ ] Foreign handles and stale APIs are rejected across namespace, service,
       contract-major, installation, and generation boundaries.
 - [ ] Ordinary construction preserves singleton owners, registrations, active

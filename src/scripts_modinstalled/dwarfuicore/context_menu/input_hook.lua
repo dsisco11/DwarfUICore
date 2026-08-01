@@ -10,16 +10,16 @@ local STATE_SLOT = 'context_menu_input_hook'
 local NATIVE_METHOD = 'feed_viewscreen_widgets'
 local SCREEN_METHOD = 'onInput'
 
----@enum dwarfui.ContextMenuInputTransport
+---@enum dwarfuicore.ContextMenuInputTransport
 ContextMenuInputTransport = immutable_enum.define({
     NATIVE=1,
     SCREEN=2,
 }, 'ContextMenuInputTransport')
 
-dfhack.dwarfui = dfhack.dwarfui or {}
-local process_state = dfhack.dwarfui[STATE_SLOT]
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+local process_state = dfhack.dwarfuicore[STATE_SLOT]
 if process_state and process_state.api_version ~= API_VERSION then
-    error(('Conflicting DwarfUI context-menu input-hook versions: ' ..
+    error(('Conflicting DwarfUICore context-menu input-hook versions: ' ..
         'process has %s, requested %s.'):format(
             tostring(process_state.api_version), tostring(API_VERSION)))
 end
@@ -51,10 +51,10 @@ process_state = {
     last_failure=nil,
     disabled_generation=nil,
 }
-dfhack.dwarfui[STATE_SLOT] = process_state
+dfhack.dwarfuicore[STATE_SLOT] = process_state
 
----@class dwarfui.ContextMenuInputHookRecord
----@field transport dwarfui.ContextMenuInputTransport
+---@class dwarfuicore.ContextMenuInputHookRecord
+---@field transport dwarfuicore.ContextMenuInputTransport
 ---@field owner table|nil
 ---@field owner_ref table|nil
 ---@field active_trampoline function
@@ -65,15 +65,15 @@ dfhack.dwarfui[STATE_SLOT] = process_state
 ---@field active boolean
 ---@field foreign_outer_wrapper boolean
 
----@class dwarfui.ContextMenuInputHookState
+---@class dwarfuicore.ContextMenuInputHookState
 ---@field api_version integer
 ---@field generation integer
 ---@field handler function|nil
 ---@field failure_handler function|nil
 ---@field native_module table|nil
----@field native_hook dwarfui.ContextMenuInputHookRecord|nil
----@field screen_hooks table<table, dwarfui.ContextMenuInputHookRecord>
----@field retired_hooks dwarfui.ContextMenuInputHookRecord[]
+---@field native_hook dwarfuicore.ContextMenuInputHookRecord|nil
+---@field screen_hooks table<table, dwarfuicore.ContextMenuInputHookRecord>
+---@field retired_hooks dwarfuicore.ContextMenuInputHookRecord[]
 ---@field dispatch_count integer
 ---@field handled_count integer
 ---@field delegated_count integer
@@ -81,17 +81,17 @@ dfhack.dwarfui[STATE_SLOT] = process_state
 ---@field last_error string|nil
 ---@field last_failure table|nil
 ---@field disabled_generation integer|nil
----@field manager? dwarfui.ContextMenuInputHookManager
+---@field manager? dwarfuicore.ContextMenuInputHookManager
 
----@class dwarfui.ContextMenuInputHookManager
----@field _state dwarfui.ContextMenuInputHookState
+---@class dwarfuicore.ContextMenuInputHookManager
+---@field _state dwarfuicore.ContextMenuInputHookState
 ContextMenuInputHookManager = {}
 ContextMenuInputHookManager.__index = ContextMenuInputHookManager
 
 ---Returns the authoritative process state for trampoline adoption.
----@return dwarfui.ContextMenuInputHookState|nil
+---@return dwarfuicore.ContextMenuInputHookState|nil
 local function get_process_state()
-    return dfhack.dwarfui and dfhack.dwarfui[STATE_SLOT] or nil
+    return dfhack.dwarfuicore and dfhack.dwarfuicore[STATE_SLOT] or nil
 end
 
 ---Preserves every predecessor return, including trailing nil values.
@@ -102,8 +102,8 @@ local function unpack_returns(packed)
 end
 
 ---Records one unexpected trampoline failure before delegating unchanged.
----@param state dwarfui.ContextMenuInputHookState
----@param transport dwarfui.ContextMenuInputTransport
+---@param state dwarfuicore.ContextMenuInputHookState
+---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
 ---@param failure any
 local function fail_dispatch(state, transport, owner, failure)
@@ -123,7 +123,7 @@ local function fail_dispatch(state, transport, owner, failure)
     state.handler = nil
     if dfhack.printerr then
         pcall(dfhack.printerr,
-            'DwarfUI context-menu input hook failed:\n' .. rendered)
+            'DwarfUICore context-menu input hook failed:\n' .. rendered)
     end
     if callback then
         pcall(callback, rendered)
@@ -131,7 +131,7 @@ local function fail_dispatch(state, transport, owner, failure)
 end
 
 ---Runs the current opening handler behind the hook's traceback boundary.
----@param transport dwarfui.ContextMenuInputTransport
+---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
 ---@param keys table
 ---@return boolean handled
@@ -199,11 +199,11 @@ local function make_screen_trampoline(owner_ref, predecessor)
 end
 
 ---Creates a manager facade over the process-owned input-hook state.
----@param state dwarfui.ContextMenuInputHookState
----@return dwarfui.ContextMenuInputHookManager
+---@param state dwarfuicore.ContextMenuInputHookState
+---@return dwarfuicore.ContextMenuInputHookManager
 function ContextMenuInputHookManager.new(state)
     assert(type(state) == 'table' and state.api_version == API_VERSION,
-        'DwarfUI context-menu input-hook state has an incompatible version.')
+        'DwarfUICore context-menu input-hook state has an incompatible version.')
     return setmetatable({_state=state}, ContextMenuInputHookManager)
 end
 
@@ -211,7 +211,7 @@ end
 ---@param handler function|nil
 function ContextMenuInputHookManager:set_handler(handler)
     assert(handler == nil or type(handler) == 'function',
-        'DwarfUI context-menu input handler must be a function.')
+        'DwarfUICore context-menu input handler must be a function.')
     self._state.handler = handler
 end
 
@@ -219,7 +219,7 @@ end
 ---@param handler fun(message: string)|nil
 function ContextMenuInputHookManager:set_failure_handler(handler)
     assert(handler == nil or type(handler) == 'function',
-        'DwarfUI context-menu hook failure handler must be a function.')
+        'DwarfUICore context-menu hook failure handler must be a function.')
     self._state.failure_handler = handler
 end
 
@@ -268,10 +268,10 @@ end
 ---@return boolean changed
 function ContextMenuInputHookManager:ensure_screen(owner)
     assert(type(owner) == 'table',
-        'DwarfUI context-menu screen-hook owner must be a table.')
+        'DwarfUICore context-menu screen-hook owner must be a table.')
     local current = owner[SCREEN_METHOD]
     assert(type(current) == 'function',
-        'DwarfUI context-menu screen owner onInput must be a function.')
+        'DwarfUICore context-menu screen owner onInput must be a function.')
     local state = self._state
     local previous = state.screen_hooks[owner]
     if previous and current == previous.active_trampoline then
@@ -309,7 +309,7 @@ end
 
 ---Retires one screen hook and restores only an outermost owned method.
 ---@param owner table
----@param record dwarfui.ContextMenuInputHookRecord
+---@param record dwarfuicore.ContextMenuInputHookRecord
 ---@return boolean restored
 function ContextMenuInputHookManager:_retire_screen(owner, record)
     record.active = false
@@ -339,7 +339,7 @@ end
 ---@return boolean changed
 function ContextMenuInputHookManager:reconcile_roots(roots)
     assert(type(roots) == 'table',
-        'DwarfUI context-menu hook reconciliation requires a root set.')
+        'DwarfUICore context-menu hook reconciliation requires a root set.')
     local state = self._state
     local screen_roots = setmetatable({}, {__mode='k'})
     local needs_native = false

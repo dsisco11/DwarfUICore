@@ -4,19 +4,19 @@
 
 local numbers = reqscript('dwarfuicore/utils/numbers')
 
----@class dwarfui.ContextMenuInputSamplerOptions
+---@class dwarfuicore.ContextMenuInputSamplerOptions
 ---@field sample_screen_pointer? fun(): integer|nil, integer|nil
 ---@field sample_map_pointer? fun(): {x: integer, y: integer, z: integer}|nil
 ---@field has_map_demand? fun(): boolean
 
----@class dwarfui.ContextMenuInputSample
+---@class dwarfuicore.ContextMenuInputSample
 ---@field x integer|nil
 ---@field y integer|nil
 ---@field map_x integer|nil
 ---@field map_y integer|nil
 ---@field map_z integer|nil
 
----@class dwarfui.ContextMenuInputSampler
+---@class dwarfuicore.ContextMenuInputSampler
 ---@field _sample_screen_pointer fun(): integer|nil, integer|nil
 ---@field _sample_map_pointer fun(): {x: integer, y: integer, z: integer}|nil
 ---@field _has_map_demand fun(): boolean
@@ -46,7 +46,7 @@ end
 ---@param x integer|nil
 ---@param y integer|nil
 ---@param map_position {x: integer, y: integer, z: integer}|nil
----@return dwarfui.ContextMenuInputSample
+---@return dwarfuicore.ContextMenuInputSample
 local function immutable_sample(x, y, map_position)
     if not numbers.is_integer(x) or not numbers.is_integer(y) then
         x, y = nil, nil
@@ -69,7 +69,7 @@ local function immutable_sample(x, y, map_position)
     return setmetatable({}, {
         __index=values,
         __newindex=function()
-            error('DwarfUI context-menu input samples are immutable.', 2)
+            error('DwarfUICore context-menu input samples are immutable.', 2)
         end,
         __pairs=function()
             return next, values, nil
@@ -79,21 +79,21 @@ local function immutable_sample(x, y, map_position)
 end
 
 ---Creates a synchronous context-menu input sampler.
----@param options? dwarfui.ContextMenuInputSamplerOptions
----@return dwarfui.ContextMenuInputSampler
+---@param options? dwarfuicore.ContextMenuInputSamplerOptions
+---@return dwarfuicore.ContextMenuInputSampler
 function ContextMenuInputSampler.new(options)
     options = options or {}
     assert(type(options) == 'table',
-        'DwarfUI context-menu input sampler options must be a table.')
+        'DwarfUICore context-menu input sampler options must be a table.')
     assert(options.sample_screen_pointer == nil or
             type(options.sample_screen_pointer) == 'function',
-        'DwarfUI screen pointer sampler must be a function.')
+        'DwarfUICore screen pointer sampler must be a function.')
     assert(options.sample_map_pointer == nil or
             type(options.sample_map_pointer) == 'function',
-        'DwarfUI map pointer sampler must be a function.')
+        'DwarfUICore map pointer sampler must be a function.')
     assert(options.has_map_demand == nil or
             type(options.has_map_demand) == 'function',
-        'DwarfUI map sampling demand predicate must be a function.')
+        'DwarfUICore map sampling demand predicate must be a function.')
     return setmetatable({
         _sample_screen_pointer=options.sample_screen_pointer or
             default_screen_sampler,
@@ -103,7 +103,7 @@ function ContextMenuInputSampler.new(options)
 end
 
 ---Captures one coherent screen/map sample for an opening input call.
----@return dwarfui.ContextMenuInputSample
+---@return dwarfuicore.ContextMenuInputSample
 function ContextMenuInputSampler:capture()
     local x, y = self._sample_screen_pointer()
     local map_position

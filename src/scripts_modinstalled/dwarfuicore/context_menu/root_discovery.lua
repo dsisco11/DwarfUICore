@@ -4,12 +4,12 @@
 
 local MODULE_GENERATION_SLOT = 'context_menu_root_discovery_generation'
 
-dfhack.dwarfui = dfhack.dwarfui or {}
-dfhack.dwarfui[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfui[MODULE_GENERATION_SLOT] or 0) + 1
-local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
+    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 
----@class dwarfui.ContextMenuRootDiscoveryOptions
+---@class dwarfuicore.ContextMenuRootDiscoveryOptions
 ---@field has_demand fun(): boolean
 ---@field discover fun(): table<any, boolean>
 ---@field on_roots_changed? fun(roots: table<any, boolean>)
@@ -18,7 +18,7 @@ local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
 ---@field scheduler? fun(callback: function)
 ---@field printer? fun(message: string)
 
----@class dwarfui.ContextMenuRootDiscovery
+---@class dwarfuicore.ContextMenuRootDiscovery
 ---@field _has_demand fun(): boolean
 ---@field _discover fun(): table<any, boolean>
 ---@field _on_roots_changed fun(roots: table<any, boolean>)|nil
@@ -78,27 +78,27 @@ local function same_roots(first, second)
 end
 
 ---Creates one guarded root-discovery callback chain.
----@param options dwarfui.ContextMenuRootDiscoveryOptions
----@return dwarfui.ContextMenuRootDiscovery
+---@param options dwarfuicore.ContextMenuRootDiscoveryOptions
+---@return dwarfuicore.ContextMenuRootDiscovery
 function ContextMenuRootDiscovery.new(options)
     assert(type(options) == 'table',
-        'DwarfUI context-menu root discovery requires options.')
+        'DwarfUICore context-menu root discovery requires options.')
     assert(type(options.has_demand) == 'function',
-        'DwarfUI context-menu root discovery requires a demand predicate.')
+        'DwarfUICore context-menu root discovery requires a demand predicate.')
     assert(type(options.discover) == 'function',
-        'DwarfUI context-menu root discovery requires a discovery callback.')
+        'DwarfUICore context-menu root discovery requires a discovery callback.')
     assert(options.on_roots_changed == nil or
             type(options.on_roots_changed) == 'function',
-        'DwarfUI context-menu root observer must be a function.')
+        'DwarfUICore context-menu root observer must be a function.')
     assert(options.on_idle == nil or type(options.on_idle) == 'function',
-        'DwarfUI context-menu idle callback must be a function.')
+        'DwarfUICore context-menu idle callback must be a function.')
     assert(options.on_failure == nil or
             type(options.on_failure) == 'function',
-        'DwarfUI context-menu failure callback must be a function.')
+        'DwarfUICore context-menu failure callback must be a function.')
     assert(options.scheduler == nil or type(options.scheduler) == 'function',
-        'DwarfUI context-menu discovery scheduler must be a function.')
+        'DwarfUICore context-menu discovery scheduler must be a function.')
     assert(options.printer == nil or type(options.printer) == 'function',
-        'DwarfUI context-menu discovery printer must be a function.')
+        'DwarfUICore context-menu discovery printer must be a function.')
     return setmetatable({
         _has_demand=options.has_demand,
         _discover=options.discover,
@@ -121,7 +121,7 @@ end
 ---@return boolean
 function ContextMenuRootDiscovery:_module_is_current()
     return self._module_generation ==
-        dfhack.dwarfui[MODULE_GENERATION_SLOT]
+        dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 end
 
 ---Invokes one discovery collaborator under a traceback boundary.
@@ -135,7 +135,7 @@ function ContextMenuRootDiscovery:_call(label, callback)
         packed = table.pack(callback())
     end, debug.traceback)
     if ok then return true, table.unpack(packed, 1, packed.n) end
-    self:_fail(('DwarfUI context-menu %s failed:\n%s'):format(
+    self:_fail(('DwarfUICore context-menu %s failed:\n%s'):format(
         label, tostring(failure)))
     return false
 end
@@ -156,7 +156,7 @@ function ContextMenuRootDiscovery:_fail(message)
         end, debug.traceback)
         if not ok then
             self._printer(
-                'DwarfUI context-menu failure callback failed:\n' ..
+                'DwarfUICore context-menu failure callback failed:\n' ..
                 tostring(failure))
         end
     end
@@ -202,7 +202,7 @@ end
 function ContextMenuRootDiscovery:_tick(
         expected_generation, expected_module_generation)
     if expected_module_generation ~=
-            dfhack.dwarfui[MODULE_GENERATION_SLOT] then
+            dfhack.dwarfuicore[MODULE_GENERATION_SLOT] then
         self._running = false
         self._scheduled = false
         return
@@ -227,7 +227,7 @@ function ContextMenuRootDiscovery:_tick(
     if not discover_ok then return end
     if type(roots) ~= 'table' then
         self:_fail(
-            'DwarfUI context-menu root discovery must return a root set.')
+            'DwarfUICore context-menu root discovery must return a root set.')
         return
     end
     if not self:_publish_roots(roots) then return end

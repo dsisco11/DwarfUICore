@@ -9,21 +9,21 @@ local FRAME_CELLS = 2
 local TITLE_DECORATION_CELLS = 6
 local MIN_CONTENT_WIDTH = 1
 
----@class dwarfui.ContextMenuLayout
+---@class dwarfuicore.ContextMenuLayout
 ---@field frame {l: integer, t: integer, w: integer, h: integer}
 ---@field content_width integer
 ---@field title? string
 ---@field choices table[]
 
----@class dwarfui.ContextMenuList: widgets.List
+---@class dwarfuicore.ContextMenuList: widgets.List
 ---@field super widgets.List
 ContextMenuList = defclass(ContextMenuList, widgets.List)
 
----@class dwarfui.ContextMenuWindow: widgets.Window
+---@class dwarfuicore.ContextMenuWindow: widgets.Window
 ---@field super widgets.Window
----@field definition dwarfui.ContextMenuDefinitionSnapshot
+---@field definition dwarfuicore.ContextMenuDefinitionSnapshot
 ---@field anchor {x: integer, y: integer}
----@field menu_list dwarfui.ContextMenuList
+---@field menu_list dwarfuicore.ContextMenuList
 ContextMenuWindow = defclass(ContextMenuWindow, widgets.Window)
 
 ---Returns text clipped to a deterministic interface-cell width.
@@ -67,14 +67,14 @@ function create_frame_style(foreground, background)
 end
 
 ---Creates the normal pen for one resolved entry.
----@param entry dwarfui.ContextMenuResolvedEntry
+---@param entry dwarfuicore.ContextMenuResolvedEntry
 ---@return any
 local function normal_pen(entry)
     return dfhack.pen.parse{ch=' ', fg=entry.fg, bg=entry.bg}
 end
 
 ---Creates a readable selected or hovered pen for one resolved entry.
----@param entry dwarfui.ContextMenuResolvedEntry
+---@param entry dwarfuicore.ContextMenuResolvedEntry
 ---@return any
 local function active_pen(entry)
     if entry.fg ~= entry.bg then
@@ -101,14 +101,14 @@ function ContextMenuList:onRenderBody(dc)
 end
 
 ---Measures and clamps the menu against the current interface rectangle.
----@param definition dwarfui.ContextMenuDefinitionSnapshot
+---@param definition dwarfuicore.ContextMenuDefinitionSnapshot
 ---@param anchor {x: integer, y: integer}
 ---@param screen_width integer
 ---@param screen_height integer
----@return dwarfui.ContextMenuLayout
+---@return dwarfuicore.ContextMenuLayout
 function calculate_layout(definition, anchor, screen_width, screen_height)
     assert(screen_width >= 1 and screen_height >= 1,
-        'DwarfUI context-menu layout requires a non-empty interface.')
+        'DwarfUICore context-menu layout requires a non-empty interface.')
     local preferred_width = definition.title and
         #definition.title + TITLE_DECORATION_CELLS or 0
     for _, entry in ipairs(definition.entries) do
@@ -150,13 +150,13 @@ function calculate_layout(definition, anchor, screen_width, screen_height)
     }
 end
 
----@class dwarfui.ContextMenuWindowOptions
----@field definition dwarfui.ContextMenuDefinitionSnapshot
+---@class dwarfuicore.ContextMenuWindowOptions
+---@field definition dwarfuicore.ContextMenuDefinitionSnapshot
 ---@field anchor {x: integer, y: integer}
 ---@field on_select fun(entry_index: integer)
 
 ---Constructs a native non-draggable Window containing one selectable List.
----@param info dwarfui.ContextMenuWindowOptions
+---@param info dwarfuicore.ContextMenuWindowOptions
 function ContextMenuWindow:init(info)
     self.definition = info.definition
     self.anchor = {x=info.anchor.x, y=info.anchor.y}

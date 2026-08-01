@@ -4,9 +4,9 @@
 
 local gui = require('gui')
 local map_projection = reqscript('dwarfuicore/map_projection')
-local renderers = reqscript('dwarfui/context_menu/renderer')
-local services = reqscript('dwarfui/context_menu/service')
-local targets = reqscript('dwarfui/context_menu/target')
+local renderers = reqscript('dwarfuicore/context_menu/renderer')
+local services = reqscript('dwarfuicore/context_menu/service')
+local targets = reqscript('dwarfuicore/context_menu/target')
 
 local AnchorKind = targets.ContextMenuAnchorKind
 
@@ -21,12 +21,12 @@ local WHEEL_KEYS = {
     CONTEXT_SCROLL_PAGEDOWN=true,
 }
 
----@class dwarfui.ContextMenuScreen: gui.ZScreen
+---@class dwarfuicore.ContextMenuScreen: gui.ZScreen
 ---@field super gui.ZScreen
----@field session dwarfui.ContextMenuOpenSession
----@field actions dwarfui.ContextMenuPresentationActions
----@field menu_window dwarfui.ContextMenuWindow
----@field anchor dwarfui.ContextMenuAnchorDescriptor
+---@field session dwarfuicore.ContextMenuOpenSession
+---@field actions dwarfuicore.ContextMenuPresentationActions
+---@field menu_window dwarfuicore.ContextMenuWindow
+---@field anchor dwarfuicore.ContextMenuAnchorDescriptor
 ---@field _presentation_closed boolean
 ContextMenuScreen = defclass(ContextMenuScreen, gui.ZScreen)
 ContextMenuScreen.ATTRS{
@@ -50,7 +50,7 @@ local function has_wheel_input(keys)
 end
 
 ---Constructs one menu screen without showing it.
----@param info {session: dwarfui.ContextMenuOpenSession, actions: dwarfui.ContextMenuPresentationActions}
+---@param info {session: dwarfuicore.ContextMenuOpenSession, actions: dwarfuicore.ContextMenuPresentationActions}
 function ContextMenuScreen:init(info)
     self.session = info.session
     self.actions = info.actions
@@ -214,8 +214,8 @@ function ContextMenuScreen:render(dc)
     if not ok then self.actions.fail('screen render', failure) end
 end
 
----@class dwarfui.ContextMenuScreenController: dwarfui.ContextMenuPresentationController
----@field screen dwarfui.ContextMenuScreen
+---@class dwarfuicore.ContextMenuScreenController: dwarfuicore.ContextMenuPresentationController
+---@field screen dwarfuicore.ContextMenuScreen
 ---@field _shown boolean
 ---@field _closed boolean
 ContextMenuScreenController = {}
@@ -224,9 +224,9 @@ ContextMenuScreenController.__index = ContextMenuScreenController
 ---Shows the prepared menu synchronously during the handled input dispatch.
 function ContextMenuScreenController:show()
     assert(not self._shown,
-        'DwarfUI context-menu screen is already shown.')
+        'DwarfUICore context-menu screen is already shown.')
     assert(not self._closed,
-        'DwarfUI context-menu screen is already closed.')
+        'DwarfUICore context-menu screen is already closed.')
     self._shown = true
     self.screen:show()
 end
@@ -239,9 +239,9 @@ function ContextMenuScreenController:close()
 end
 
 ---Creates a hidden screen controller for one authoritative session.
----@param session dwarfui.ContextMenuOpenSession
----@param actions dwarfui.ContextMenuPresentationActions
----@return dwarfui.ContextMenuScreenController
+---@param session dwarfuicore.ContextMenuOpenSession
+---@param actions dwarfuicore.ContextMenuPresentationActions
+---@return dwarfuicore.ContextMenuScreenController
 function create_presentation(session, actions)
     local screen = ContextMenuScreen{session=session, actions=actions}
     return setmetatable({

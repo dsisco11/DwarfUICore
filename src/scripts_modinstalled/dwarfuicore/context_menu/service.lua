@@ -2,11 +2,11 @@
 
 -- Process-wide context-menu session authority and opening-input mediation.
 
-local input_hooks = reqscript('dwarfui/context_menu/input_hook')
-local input_samples = reqscript('dwarfui/context_menu/input_sample')
-local registrations = reqscript('dwarfui/context_menu/registration')
-local target_detectors = reqscript('dwarfui/context_menu/target_detector')
-local targets = reqscript('dwarfui/context_menu/target')
+local input_hooks = reqscript('dwarfuicore/context_menu/input_hook')
+local input_samples = reqscript('dwarfuicore/context_menu/input_sample')
+local registrations = reqscript('dwarfuicore/context_menu/registration')
+local target_detectors = reqscript('dwarfuicore/context_menu/target_detector')
+local targets = reqscript('dwarfuicore/context_menu/target')
 local numbers = reqscript('dwarfuicore/utils/numbers')
 
 local DetectionKind = target_detectors.ContextMenuDetectionKind
@@ -14,36 +14,36 @@ local TargetKind = targets.ContextMenuTargetKind
 
 local API_VERSION = 1
 local SERVICE_SLOT = 'context_menu_service'
-local STATE_CHANGE_SLOT = 'dwarfui_context_menu'
+local STATE_CHANGE_SLOT = 'dwarfuicore_context_menu'
 
-dfhack.dwarfui = dfhack.dwarfui or {}
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 
----@class dwarfui.ContextMenuPresentationController
----@field show fun(self: dwarfui.ContextMenuPresentationController)
----@field close fun(self: dwarfui.ContextMenuPresentationController)
+---@class dwarfuicore.ContextMenuPresentationController
+---@field show fun(self: dwarfuicore.ContextMenuPresentationController)
+---@field close fun(self: dwarfuicore.ContextMenuPresentationController)
 
----@class dwarfui.ContextMenuPresentationActions
+---@class dwarfuicore.ContextMenuPresentationActions
 ---@field close fun(): boolean
 ---@field select fun(entry_index: integer): boolean
 ---@field map_session_is_valid fun(): boolean
 ---@field fail fun(stage: string, failure: any)
 
 ---Creates a hidden controller; visible side effects begin only in `show()`.
----@alias dwarfui.ContextMenuPresentationFactory fun(session: dwarfui.ContextMenuOpenSession, actions: dwarfui.ContextMenuPresentationActions): dwarfui.ContextMenuPresentationController
+---@alias dwarfuicore.ContextMenuPresentationFactory fun(session: dwarfuicore.ContextMenuOpenSession, actions: dwarfuicore.ContextMenuPresentationActions): dwarfuicore.ContextMenuPresentationController
 
----@class dwarfui.ContextMenuServiceOptions
----@field registrations dwarfui.ContextMenuRegistrationManager
----@field detector dwarfui.ContextMenuTargetDetector
----@field sampler dwarfui.ContextMenuInputSampler
----@field input_hook dwarfui.ContextMenuInputHookManager
----@field presentation_factory dwarfui.ContextMenuPresentationFactory
+---@class dwarfuicore.ContextMenuServiceOptions
+---@field registrations dwarfuicore.ContextMenuRegistrationManager
+---@field detector dwarfuicore.ContextMenuTargetDetector
+---@field sampler dwarfuicore.ContextMenuInputSampler
+---@field input_hook dwarfuicore.ContextMenuInputHookManager
+---@field presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field printer? fun(message: string)
 
----@class dwarfui.ContextMenuServiceState
+---@class dwarfuicore.ContextMenuServiceState
 ---@field api_version integer
 ---@field generation integer
----@field session dwarfui.ContextMenuOpenSession|nil
----@field presentation dwarfui.ContextMenuPresentationController|nil
+---@field session dwarfuicore.ContextMenuOpenSession|nil
+---@field presentation dwarfuicore.ContextMenuPresentationController|nil
 ---@field disabled_generation integer|nil
 ---@field last_error string|nil
 ---@field last_failure table|nil
@@ -53,15 +53,15 @@ dfhack.dwarfui = dfhack.dwarfui or {}
 ---@field open_count integer
 ---@field close_count integer
 ---@field selection_count integer
----@field service? dwarfui.ContextMenuService
+---@field service? dwarfuicore.ContextMenuService
 
----@class dwarfui.ContextMenuService
----@field _state dwarfui.ContextMenuServiceState
----@field _registrations dwarfui.ContextMenuRegistrationManager
----@field _detector dwarfui.ContextMenuTargetDetector
----@field _sampler dwarfui.ContextMenuInputSampler
----@field _input_hook dwarfui.ContextMenuInputHookManager
----@field _presentation_factory dwarfui.ContextMenuPresentationFactory
+---@class dwarfuicore.ContextMenuService
+---@field _state dwarfuicore.ContextMenuServiceState
+---@field _registrations dwarfuicore.ContextMenuRegistrationManager
+---@field _detector dwarfuicore.ContextMenuTargetDetector
+---@field _sampler dwarfuicore.ContextMenuInputSampler
+---@field _input_hook dwarfuicore.ContextMenuInputHookManager
+---@field _presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field _printer fun(message: string)
 ---@field _started boolean
 ---@field _state_change_callback? function
@@ -80,7 +80,7 @@ end
 
 ---Creates a fresh destructively reloadable service state.
 ---@param generation integer
----@return dwarfui.ContextMenuServiceState
+---@return dwarfuicore.ContextMenuServiceState
 local function new_state(generation)
     return {
         api_version=API_VERSION,
@@ -100,25 +100,25 @@ local function new_state(generation)
 end
 
 ---Creates one process-wide session authority from explicit collaborators.
----@param state dwarfui.ContextMenuServiceState
----@param options dwarfui.ContextMenuServiceOptions
----@return dwarfui.ContextMenuService
+---@param state dwarfuicore.ContextMenuServiceState
+---@param options dwarfuicore.ContextMenuServiceOptions
+---@return dwarfuicore.ContextMenuService
 function ContextMenuService.new(state, options)
     assert(type(state) == 'table',
-        'DwarfUI context-menu service requires process state.')
+        'DwarfUICore context-menu service requires process state.')
     assert(type(options) == 'table',
-        'DwarfUI context-menu service requires options.')
+        'DwarfUICore context-menu service requires options.')
     for _, name in ipairs{
             'registrations', 'detector', 'sampler', 'input_hook',
             'presentation_factory',
         } do
         assert(options[name] ~= nil,
-            'DwarfUI context-menu service requires ' .. name .. '.')
+            'DwarfUICore context-menu service requires ' .. name .. '.')
     end
     assert(type(options.presentation_factory) == 'function',
-        'DwarfUI context-menu presentation factory must be a function.')
+        'DwarfUICore context-menu presentation factory must be a function.')
     assert(options.printer == nil or type(options.printer) == 'function',
-        'DwarfUI context-menu service printer must be a function.')
+        'DwarfUICore context-menu service printer must be a function.')
     return setmetatable({
         _state=state,
         _registrations=options.registrations,
@@ -144,12 +144,12 @@ function ContextMenuService:is_disabled()
 end
 
 ---Installs the concrete factory before production opening is started.
----@param factory dwarfui.ContextMenuPresentationFactory
+---@param factory dwarfuicore.ContextMenuPresentationFactory
 function ContextMenuService:set_presentation_factory(factory)
     assert(type(factory) == 'function',
-        'DwarfUI context-menu presentation factory must be a function.')
+        'DwarfUICore context-menu presentation factory must be a function.')
     assert(not self._started and not self:is_open(),
-        'DwarfUI context-menu presentation cannot change while active.')
+        'DwarfUICore context-menu presentation cannot change while active.')
     self._presentation_factory = factory
 end
 
@@ -220,13 +220,13 @@ function ContextMenuService:_disable(stage, failure, report)
     state.last_error = message
     state.last_failure.error = message
     if report then
-        self._printer(('DwarfUI context-menu %s failed:\n%s'):format(
+        self._printer(('DwarfUICore context-menu %s failed:\n%s'):format(
             stage, message))
     end
 end
 
 ---Builds and presents one session after its target was validated.
----@param detection dwarfui.ContextMenuTargetDetection
+---@param detection dwarfuicore.ContextMenuTargetDetection
 ---@return boolean opened
 function ContextMenuService:_open_unprotected(detection)
     local state = self._state
@@ -267,7 +267,7 @@ function ContextMenuService:_open_unprotected(detection)
     assert(type(presentation) == 'table' and
             type(presentation.show) == 'function' and
             type(presentation.close) == 'function',
-        'DwarfUI context-menu presentation must provide show() and close().')
+        'DwarfUICore context-menu presentation must provide show() and close().')
     state.presentation = presentation
     presentation:show()
     state.open_count = state.open_count + 1
@@ -275,14 +275,14 @@ function ContextMenuService:_open_unprotected(detection)
 end
 
 ---Opens one target atomically through the sole service transition.
----@param detection dwarfui.ContextMenuTargetDetection
+---@param detection dwarfuicore.ContextMenuTargetDetection
 ---@return boolean opened
 function ContextMenuService:open(detection)
     assert(type(detection) == 'table' and
             detection.kind == DetectionKind.TARGET and
             detection.candidate ~= nil and detection.target ~= nil and
             detection.anchor ~= nil and detection.root ~= nil,
-        'DwarfUI context-menu opening requires a target detection.')
+        'DwarfUICore context-menu opening requires a target detection.')
     local ok, opened = xpcall(function()
         return self:_open_unprotected(detection)
     end, debug.traceback)
@@ -317,7 +317,7 @@ function ContextMenuService:select(entry_index)
     local definition = session:get_definition_snapshot()
     assert(numbers.is_integer(entry_index) and
             definition.entries[entry_index] ~= nil,
-        'DwarfUI context-menu selection requires a valid entry index.')
+        'DwarfUICore context-menu selection requires a valid entry index.')
     local context = session:create_selection_context()
     if not context then
         self:close()
@@ -332,7 +332,7 @@ function ContextMenuService:select(entry_index)
     if not ok then
         state.handler_failure_count = state.handler_failure_count + 1
         state.last_handler_error = tostring(failure)
-        self._printer('DwarfUI context-menu on_select failed:\n' ..
+        self._printer('DwarfUICore context-menu on_select failed:\n' ..
             tostring(failure))
     end
     return true
@@ -340,7 +340,7 @@ end
 
 ---Processes only actionable opening input from an installed trampoline.
 ---@param keys table
----@param transport dwarfui.ContextMenuInputTransport
+---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
 ---@return boolean handled
 function ContextMenuService:handle_opening_input(keys, transport, owner)
@@ -357,7 +357,7 @@ function ContextMenuService:handle_opening_input(keys, transport, owner)
                 (detection.kind == DetectionKind.TARGET or
                     detection.kind == DetectionKind.BLOCKED or
                     detection.kind == DetectionKind.MISS),
-            'DwarfUI context-menu detector returned an invalid result.')
+            'DwarfUICore context-menu detector returned an invalid result.')
     end, debug.traceback)
     if not resolved then
         self:_disable('opening resolution', failure, true)
@@ -472,7 +472,7 @@ function ContextMenuService:get_diagnostics()
     }
 end
 
-local previous = dfhack.dwarfui[SERVICE_SLOT]
+local previous = dfhack.dwarfuicore[SERVICE_SLOT]
 local generation = previous and previous.generation + 1 or 1
 if previous and previous.service and
         type(previous.service.shutdown) == 'function' then
@@ -480,7 +480,7 @@ if previous and previous.service and
 end
 
 local state = new_state(generation)
-dfhack.dwarfui[SERVICE_SLOT] = state
+dfhack.dwarfuicore[SERVICE_SLOT] = state
 
 local registration_manager = registrations.manager
 local input_hook_manager = input_hooks.manager
@@ -494,9 +494,9 @@ local detector = target_detectors.ContextMenuTargetDetector.new{
 }
 
 ---Fails explicitly if invoked before the concrete screen factory is installed.
----@return dwarfui.ContextMenuPresentationController
+---@return dwarfuicore.ContextMenuPresentationController
 local function unavailable_presentation_factory()
-    error('DwarfUI context-menu presentation is not installed.')
+    error('DwarfUICore context-menu presentation is not installed.')
 end
 
 service = ContextMenuService.new(state, {

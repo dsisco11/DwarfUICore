@@ -28,6 +28,18 @@ MODULES = {
     {name='dwarfuicore/tooltip/presenter', contract='TooltipPresenter', contract_type='table'},
     {name='dwarfuicore/tooltip/runtime', contract='presenter', contract_type='table'},
     {name='dwarfuicore/tooltip/api', contract='register'},
+    {name='dwarfuicore/context_menu/definition', contract='ContextMenuDefinitionSnapshot', contract_type='table'},
+    {name='dwarfuicore/context_menu/target', contract='ContextMenuOpenSession', contract_type='table'},
+    {name='dwarfuicore/context_menu/input_sample', contract='ContextMenuInputSampler', contract_type='table'},
+    {name='dwarfuicore/context_menu/root_discovery', contract='ContextMenuRootDiscovery', contract_type='table'},
+    {name='dwarfuicore/context_menu/map_target', contract='ContextMenuMapTargetRegistry', contract_type='table'},
+    {name='dwarfuicore/context_menu/registration', contract='manager', contract_type='table'},
+    {name='dwarfuicore/context_menu/target_detector', contract='ContextMenuTargetDetector', contract_type='table'},
+    {name='dwarfuicore/context_menu/input_hook', contract='manager', contract_type='table'},
+    {name='dwarfuicore/context_menu/renderer', contract='ContextMenuWindow', contract_type='table'},
+    {name='dwarfuicore/context_menu/service', contract='service', contract_type='table'},
+    {name='dwarfuicore/context_menu/screen', contract='ContextMenuScreen', contract_type='table'},
+    {name='dwarfuicore/context_menu/api', contract='register'},
 }
 
 local REGISTRY_SCRIPT = 'dwarfuicore/module_registry'

@@ -2,8 +2,8 @@
 
 -- Weak exact-coordinate map-tile context-menu registrations.
 
-local definitions = reqscript('dwarfui/context_menu/definition')
-local targets = reqscript('dwarfui/context_menu/target')
+local definitions = reqscript('dwarfuicore/context_menu/definition')
+local targets = reqscript('dwarfuicore/context_menu/target')
 local numbers = reqscript('dwarfuicore/utils/numbers')
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
@@ -12,34 +12,34 @@ local COORDINATE_MIN = -0x8000
 local COORDINATE_MAX = 0x7fff
 local COORDINATE_MASK = 0xffff
 
----@class dwarfui.ContextMenuMapRegistrationOptions
+---@class dwarfuicore.ContextMenuMapRegistrationOptions
 ---@field owner any
 ---@field pos {x: integer, y: integer, z: integer}
----@field definition dwarfui.ContextMenuDefinition
+---@field definition dwarfuicore.ContextMenuDefinition
 
----@class dwarfui.ContextMenuMapRegistrationUpdate
+---@class dwarfuicore.ContextMenuMapRegistrationUpdate
 ---@field pos {x: integer, y: integer, z: integer}
----@field definition dwarfui.ContextMenuDefinition
+---@field definition dwarfuicore.ContextMenuDefinition
 
----@class dwarfui.ContextMenuMapCandidate
+---@class dwarfuicore.ContextMenuMapCandidate
 ---@field identity integer
 ---@field sequence integer
 ---@field source any
 ---@field owner any
 ---@field root any
 ---@field pos {x: integer, y: integer, z: integer}
----@field _definition dwarfui.ContextMenuDefinitionSlot
+---@field _definition dwarfuicore.ContextMenuDefinitionSlot
 ContextMenuMapCandidate = {}
 ContextMenuMapCandidate.__index = ContextMenuMapCandidate
 
----@class dwarfui.ContextMenuMapTargetRegistryOptions
----@field identity_allocator? dwarfui.ContextMenuRegistrationIdentityAllocator
----@field root_resolver? dwarfui.ViewRootResolver
+---@class dwarfuicore.ContextMenuMapTargetRegistryOptions
+---@field identity_allocator? dwarfuicore.ContextMenuRegistrationIdentityAllocator
+---@field root_resolver? dwarfuicore.ViewRootResolver
 ---@field find_attachment_root? fun(owner: any, allow_owner_root: boolean): any|nil
 
----@class dwarfui.ContextMenuMapTargetRegistry
----@field _identity_allocator dwarfui.ContextMenuRegistrationIdentityAllocator
----@field _root_resolver dwarfui.ViewRootResolver
+---@class dwarfuicore.ContextMenuMapTargetRegistry
+---@field _identity_allocator dwarfuicore.ContextMenuRegistrationIdentityAllocator
+---@field _root_resolver dwarfuicore.ViewRootResolver
 ---@field _find_attachment_root fun(owner: any, allow_owner_root: boolean): any|nil
 ---@field _registrations table<any, table>
 ---@field _coordinate_index table<integer, table<any, table>>
@@ -64,7 +64,7 @@ local UPDATE_FIELDS = {
 local function validate_fields(value, fields, label)
     for field in pairs(value) do
         assert(type(field) == 'string' and fields[field],
-            ('DwarfUI %s contains unsupported field %s.'):format(
+            ('DwarfUICore %s contains unsupported field %s.'):format(
                 label, tostring(field)))
     end
 end
@@ -76,7 +76,7 @@ end
 local function copy_position(position, label)
     local position_type = type(position)
     assert(position_type == 'table' or position_type == 'userdata',
-        ('DwarfUI %s requires an exact map position.'):format(label))
+        ('DwarfUICore %s requires an exact map position.'):format(label))
     assert(numbers.is_integer(position.x) and
             position.x >= COORDINATE_MIN and
             position.x <= COORDINATE_MAX and
@@ -86,7 +86,7 @@ local function copy_position(position, label)
             numbers.is_integer(position.z) and
             position.z >= COORDINATE_MIN and
             position.z <= COORDINATE_MAX,
-        ('DwarfUI %s requires signed 16-bit integer x, y, and z.'):format(
+        ('DwarfUICore %s requires signed 16-bit integer x, y, and z.'):format(
             label))
     return {x=position.x, y=position.y, z=position.z}
 end
@@ -114,27 +114,27 @@ local function weak_bucket()
 end
 
 ---Returns an isolated opening definition for this candidate.
----@return dwarfui.ContextMenuDefinitionSnapshot
+---@return dwarfuicore.ContextMenuDefinitionSnapshot
 function ContextMenuMapCandidate:get_definition_snapshot()
     return self._definition:snapshot()
 end
 
 ---Creates a weak exact-coordinate registry.
----@param options? dwarfui.ContextMenuMapTargetRegistryOptions
----@return dwarfui.ContextMenuMapTargetRegistry
+---@param options? dwarfuicore.ContextMenuMapTargetRegistryOptions
+---@return dwarfuicore.ContextMenuMapTargetRegistry
 function ContextMenuMapTargetRegistry.new(options)
     options = options or {}
     assert(type(options) == 'table',
-        'DwarfUI map-target registry options must be a table.')
+        'DwarfUICore map-target registry options must be a table.')
     assert(options.identity_allocator == nil or
             type(options.identity_allocator.allocate) == 'function',
-        'DwarfUI map-target identity allocator must allocate identities.')
+        'DwarfUICore map-target identity allocator must allocate identities.')
     assert(options.root_resolver == nil or
             type(options.root_resolver.resolve) == 'function',
-        'DwarfUI map-target root resolver must resolve owners.')
+        'DwarfUICore map-target root resolver must resolve owners.')
     assert(options.find_attachment_root == nil or
             type(options.find_attachment_root) == 'function',
-        'DwarfUI map-target attachment resolver must be a function.')
+        'DwarfUICore map-target attachment resolver must be a function.')
     return setmetatable({
         _identity_allocator=options.identity_allocator or
             targets.ContextMenuRegistrationIdentityAllocator.new(),
@@ -184,14 +184,14 @@ function ContextMenuMapTargetRegistry:_prune()
 end
 
 ---Registers one weak-owner exact map tile and returns its disposable handle.
----@param options dwarfui.ContextMenuMapRegistrationOptions
+---@param options dwarfuicore.ContextMenuMapRegistrationOptions
 ---@return any handle
 function ContextMenuMapTargetRegistry:register(options)
     assert(type(options) == 'table',
-        'DwarfUI map-tile registration options must be a table.')
+        'DwarfUICore map-tile registration options must be a table.')
     validate_fields(options, REGISTRATION_FIELDS, 'map-tile registration')
     assert(type(options.owner) == 'table',
-        'DwarfUI map-tile registration requires an owner.')
+        'DwarfUICore map-tile registration requires an owner.')
     local position = copy_position(options.pos, 'map-tile registration')
     local definition = definitions.ContextMenuDefinitionSlot.new(
         options.definition)
@@ -214,7 +214,7 @@ end
 
 ---Atomically replaces one handle's copied position and definition.
 ---@param handle any
----@param update dwarfui.ContextMenuMapRegistrationUpdate
+---@param update dwarfuicore.ContextMenuMapRegistrationUpdate
 ---@return boolean updated
 function ContextMenuMapTargetRegistry:update(handle, update)
     local record = self._registrations[handle]
@@ -226,7 +226,7 @@ function ContextMenuMapTargetRegistry:update(handle, update)
         return false
     end
     assert(type(update) == 'table',
-        'DwarfUI map-tile update must be a table.')
+        'DwarfUICore map-tile update must be a table.')
     validate_fields(update, UPDATE_FIELDS, 'map-tile update')
     local position = copy_position(update.pos, 'map-tile update')
     local definition = definitions.ContextMenuDefinitionSlot.new(
@@ -276,7 +276,7 @@ end
 ---@param record table
 ---@param owner any
 ---@param root any
----@return dwarfui.ContextMenuMapCandidate
+---@return dwarfuicore.ContextMenuMapCandidate
 function ContextMenuMapTargetRegistry:_candidate(
         handle, record, owner, root)
     return setmetatable({
@@ -296,7 +296,7 @@ end
 
 ---Resolves one handle through current strict root eligibility.
 ---@param handle any
----@return dwarfui.ContextMenuMapCandidate|nil
+---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve(handle)
     self:_prune()
     local record = self._registrations[handle]
@@ -310,7 +310,7 @@ end
 
 ---Resolves one numeric registration identity through current eligibility.
 ---@param identity integer
----@return dwarfui.ContextMenuMapCandidate|nil
+---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve_identity(identity)
     self:_prune()
     for handle, record in pairs(self._registrations) do
@@ -331,7 +331,7 @@ end
 ---otherwise make self-invalidating for Lua-screen roots.
 ---@param identity integer
 ---@param expected_root any
----@return dwarfui.ContextMenuMapCandidate|nil
+---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve_identity_attached(
         identity, expected_root)
     self:_prune()
@@ -351,7 +351,7 @@ end
 
 ---Selects the latest originally registered eligible handle at one exact tile.
 ---@param position {x: integer, y: integer, z: integer}
----@return dwarfui.ContextMenuMapCandidate|nil
+---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:detect(position)
     local copied = copy_position(position, 'map-tile target sample')
     self:_prune()

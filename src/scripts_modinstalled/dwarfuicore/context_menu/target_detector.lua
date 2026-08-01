@@ -4,40 +4,40 @@
 
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 local pointer = reqscript('dwarfuicore/pointer')
-local targets = reqscript('dwarfui/context_menu/target')
+local targets = reqscript('dwarfuicore/context_menu/target')
 local PointerResultKind = pointer.PointerResultKind
 local TargetKind = targets.ContextMenuTargetKind
 
----@enum dwarfui.ContextMenuDetectionKind
+---@enum dwarfuicore.ContextMenuDetectionKind
 ContextMenuDetectionKind = immutable_enum.define({
     TARGET=1,
     BLOCKED=2,
     MISS=3,
 }, 'ContextMenuDetectionKind')
 
----@class dwarfui.ContextMenuTargetDetection
----@field kind dwarfui.ContextMenuDetectionKind
----@field candidate? dwarfui.ContextMenuWidgetCandidate|dwarfui.ContextMenuMapCandidate
----@field target? dwarfui.ContextMenuTargetDescriptor
----@field anchor? dwarfui.ContextMenuAnchorDescriptor
+---@class dwarfuicore.ContextMenuTargetDetection
+---@field kind dwarfuicore.ContextMenuDetectionKind
+---@field candidate? dwarfuicore.ContextMenuWidgetCandidate|dwarfuicore.ContextMenuMapCandidate
+---@field target? dwarfuicore.ContextMenuTargetDescriptor
+---@field anchor? dwarfuicore.ContextMenuAnchorDescriptor
 ---@field root? any
 ---@field local_x? integer
 ---@field local_y? integer
 
----@class dwarfui.ContextMenuTargetDetectorOptions
----@field registrations dwarfui.ContextMenuRegistrationManager
----@field resolve? fun(root: any, x: integer, y: integer): dwarfui.PointerResult
+---@class dwarfuicore.ContextMenuTargetDetectorOptions
+---@field registrations dwarfuicore.ContextMenuRegistrationManager
+---@field resolve? fun(root: any, x: integer, y: integer): dwarfuicore.PointerResult
 
----@class dwarfui.ContextMenuTargetDetector
----@field _registrations dwarfui.ContextMenuRegistrationManager
----@field _resolve fun(root: any, x: integer, y: integer): dwarfui.PointerResult
+---@class dwarfuicore.ContextMenuTargetDetector
+---@field _registrations dwarfuicore.ContextMenuRegistrationManager
+---@field _resolve fun(root: any, x: integer, y: integer): dwarfuicore.PointerResult
 ContextMenuTargetDetector = {}
 ContextMenuTargetDetector.__index = ContextMenuTargetDetector
 
 ---Creates one target detection result.
----@param kind dwarfui.ContextMenuDetectionKind
+---@param kind dwarfuicore.ContextMenuDetectionKind
 ---@param values? table
----@return dwarfui.ContextMenuTargetDetection
+---@return dwarfuicore.ContextMenuTargetDetection
 local function detection(kind, values)
     values = values or {}
     values.kind = kind
@@ -57,18 +57,18 @@ local function prefer_later(current, candidate)
 end
 
 ---Creates a detector over the context-menu registration manager.
----@param options dwarfui.ContextMenuTargetDetectorOptions
----@return dwarfui.ContextMenuTargetDetector
+---@param options dwarfuicore.ContextMenuTargetDetectorOptions
+---@return dwarfuicore.ContextMenuTargetDetector
 function ContextMenuTargetDetector.new(options)
     assert(type(options) == 'table',
-        'DwarfUI context-menu target detector requires options.')
+        'DwarfUICore context-menu target detector requires options.')
     assert(type(options.registrations) == 'table' and
             type(options.registrations.get_detection_roots) == 'function' and
             type(options.registrations.resolve_widget) == 'function' and
             type(options.registrations.detect_map_tile) == 'function',
-        'DwarfUI context-menu target detector requires registrations.')
+        'DwarfUICore context-menu target detector requires registrations.')
     assert(options.resolve == nil or type(options.resolve) == 'function',
-        'DwarfUI context-menu pointer resolver must be a function.')
+        'DwarfUICore context-menu pointer resolver must be a function.')
     return setmetatable({
         _registrations=options.registrations,
         _resolve=options.resolve or pointer.PointerDispatcher.resolve,
@@ -76,11 +76,11 @@ function ContextMenuTargetDetector.new(options)
 end
 
 ---Detects exactly one eligible target, blocker, or miss from one sample.
----@param sample dwarfui.ContextMenuInputSample
----@return dwarfui.ContextMenuTargetDetection
+---@param sample dwarfuicore.ContextMenuInputSample
+---@return dwarfuicore.ContextMenuTargetDetection
 function ContextMenuTargetDetector:detect(sample)
     assert(type(sample) == 'table',
-        'DwarfUI context-menu target detector requires an input sample.')
+        'DwarfUICore context-menu target detector requires an input sample.')
     if sample.x == nil or sample.y == nil then
         return detection(ContextMenuDetectionKind.MISS)
     end

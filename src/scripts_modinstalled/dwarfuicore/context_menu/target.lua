@@ -2,50 +2,50 @@
 
 -- Stable target identity, copied anchors, and weak open-session ownership.
 
-local definitions = reqscript('dwarfui/context_menu/definition')
+local definitions = reqscript('dwarfuicore/context_menu/definition')
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 local numbers = reqscript('dwarfuicore/utils/numbers')
 
----@enum dwarfui.ContextMenuTargetKind
+---@enum dwarfuicore.ContextMenuTargetKind
 ContextMenuTargetKind = immutable_enum.define({
     WIDGET=1,
     MAP_TILE=2,
 }, 'ContextMenuTargetKind')
 
----@enum dwarfui.ContextMenuAnchorKind
+---@enum dwarfuicore.ContextMenuAnchorKind
 ContextMenuAnchorKind = immutable_enum.define({
     SCREEN_POSITION=1,
     MAP_TILE=2,
 }, 'ContextMenuAnchorKind')
 
----@enum dwarfui.ContextMenuSessionState
+---@enum dwarfuicore.ContextMenuSessionState
 ContextMenuSessionState = immutable_enum.define({
     OPEN=1,
     CLOSED=2,
 }, 'ContextMenuSessionState')
 
----@class dwarfui.ContextMenuRegistrationIdentityAllocator
+---@class dwarfuicore.ContextMenuRegistrationIdentityAllocator
 ---@field _next integer
 ContextMenuRegistrationIdentityAllocator = {}
 ContextMenuRegistrationIdentityAllocator.__index =
     ContextMenuRegistrationIdentityAllocator
 
----@class dwarfui.ContextMenuTargetDescriptor
----@field kind dwarfui.ContextMenuTargetKind
+---@class dwarfuicore.ContextMenuTargetDescriptor
+---@field kind dwarfuicore.ContextMenuTargetKind
 ---@field registration_identity integer
 ContextMenuTargetDescriptor = {}
 ContextMenuTargetDescriptor.__index = ContextMenuTargetDescriptor
 
----@class dwarfui.ContextMenuAnchorDescriptor
----@field kind dwarfui.ContextMenuAnchorKind
+---@class dwarfuicore.ContextMenuAnchorDescriptor
+---@field kind dwarfuicore.ContextMenuAnchorKind
 ---@field screen_position {x: integer, y: integer}
 ---@field map_position? {x: integer, y: integer, z: integer}
 ContextMenuAnchorDescriptor = {}
 ContextMenuAnchorDescriptor.__index = ContextMenuAnchorDescriptor
 
----@class dwarfui.ContextMenuSelectionContext
----@field target_kind dwarfui.ContextMenuTargetKind
----@field anchor_kind dwarfui.ContextMenuAnchorKind
+---@class dwarfuicore.ContextMenuSelectionContext
+---@field target_kind dwarfuicore.ContextMenuTargetKind
+---@field anchor_kind dwarfuicore.ContextMenuAnchorKind
 ---@field registration_identity integer
 ---@field screen_position {x: integer, y: integer}
 ---@field map_position? {x: integer, y: integer, z: integer}
@@ -53,19 +53,19 @@ ContextMenuAnchorDescriptor.__index = ContextMenuAnchorDescriptor
 ---@field source_root any
 ---@field owner? any
 
----@class dwarfui.ContextMenuOpenSessionOptions
----@field definition dwarfui.ContextMenuDefinitionSnapshot
----@field target dwarfui.ContextMenuTargetDescriptor
----@field anchor dwarfui.ContextMenuAnchorDescriptor
+---@class dwarfuicore.ContextMenuOpenSessionOptions
+---@field definition dwarfuicore.ContextMenuDefinitionSnapshot
+---@field target dwarfuicore.ContextMenuTargetDescriptor
+---@field anchor dwarfuicore.ContextMenuAnchorDescriptor
 ---@field source any
 ---@field source_root any
 ---@field owner? any
 
----@class dwarfui.ContextMenuOpenSession
----@field _definition dwarfui.ContextMenuDefinitionSnapshot
----@field _target dwarfui.ContextMenuTargetDescriptor
----@field _anchor dwarfui.ContextMenuAnchorDescriptor
----@field _state dwarfui.ContextMenuSessionState
+---@class dwarfuicore.ContextMenuOpenSession
+---@field _definition dwarfuicore.ContextMenuDefinitionSnapshot
+---@field _target dwarfuicore.ContextMenuTargetDescriptor
+---@field _anchor dwarfuicore.ContextMenuAnchorDescriptor
+---@field _state dwarfuicore.ContextMenuSessionState
 ---@field _weak_sources table
 ---@field _requires_owner boolean
 ContextMenuOpenSession = {}
@@ -77,7 +77,7 @@ ContextMenuOpenSession.__index = ContextMenuOpenSession
 ---@param label string
 local function validate_screen_position(x, y, label)
     assert(numbers.is_integer(x) and numbers.is_integer(y),
-        ('DwarfUI %s requires integer x and y.'):format(label))
+        ('DwarfUICore %s requires integer x and y.'):format(label))
 end
 
 ---Validates one exact map coordinate.
@@ -86,15 +86,15 @@ end
 local function validate_map_position(position, label)
     local position_type = type(position)
     assert(position_type == 'table' or position_type == 'userdata',
-        ('DwarfUI %s requires an exact map position.'):format(label))
+        ('DwarfUICore %s requires an exact map position.'):format(label))
     assert(numbers.is_integer(position.x) and
             numbers.is_integer(position.y) and
             numbers.is_integer(position.z),
-        ('DwarfUI %s requires integer x, y, and z.'):format(label))
+        ('DwarfUICore %s requires integer x, y, and z.'):format(label))
 end
 
 ---Creates a fresh monotonically increasing identity allocator.
----@return dwarfui.ContextMenuRegistrationIdentityAllocator
+---@return dwarfuicore.ContextMenuRegistrationIdentityAllocator
 function ContextMenuRegistrationIdentityAllocator.new()
     return setmetatable({_next=0},
         ContextMenuRegistrationIdentityAllocator)
@@ -108,22 +108,22 @@ function ContextMenuRegistrationIdentityAllocator:allocate()
 end
 
 ---Creates a target descriptor or copies an existing descriptor instance.
----@param kind dwarfui.ContextMenuTargetKind|dwarfui.ContextMenuTargetDescriptor
+---@param kind dwarfuicore.ContextMenuTargetKind|dwarfuicore.ContextMenuTargetDescriptor
 ---@param registration_identity? integer
----@return dwarfui.ContextMenuTargetDescriptor
+---@return dwarfuicore.ContextMenuTargetDescriptor
 function ContextMenuTargetDescriptor.new(kind, registration_identity)
     if getmetatable(kind) == ContextMenuTargetDescriptor then
         assert(registration_identity == nil,
-            'DwarfUI target-descriptor copies do not accept an identity.')
+            'DwarfUICore target-descriptor copies do not accept an identity.')
         registration_identity = kind.registration_identity
         kind = kind.kind
     end
     assert(kind == ContextMenuTargetKind.WIDGET or
             kind == ContextMenuTargetKind.MAP_TILE,
-        'DwarfUI context-menu target kind must be a ContextMenuTargetKind.')
+        'DwarfUICore context-menu target kind must be a ContextMenuTargetKind.')
     assert(numbers.is_integer(registration_identity) and
             registration_identity > 0,
-        'DwarfUI context-menu registration identity must be a positive integer.')
+        'DwarfUICore context-menu registration identity must be a positive integer.')
     return setmetatable({
         kind=kind,
         registration_identity=registration_identity,
@@ -131,22 +131,22 @@ function ContextMenuTargetDescriptor.new(kind, registration_identity)
 end
 
 ---Creates an anchor descriptor or copies an existing descriptor instance.
----@param kind dwarfui.ContextMenuAnchorKind|dwarfui.ContextMenuAnchorDescriptor
+---@param kind dwarfuicore.ContextMenuAnchorKind|dwarfuicore.ContextMenuAnchorDescriptor
 ---@param options? {screen_position: {x: integer, y: integer}, map_position?: {x: integer, y: integer, z: integer}}
----@return dwarfui.ContextMenuAnchorDescriptor
+---@return dwarfuicore.ContextMenuAnchorDescriptor
 function ContextMenuAnchorDescriptor.new(kind, options)
     if getmetatable(kind) == ContextMenuAnchorDescriptor then
         assert(options == nil,
-            'DwarfUI anchor-descriptor copies do not accept options.')
+            'DwarfUICore anchor-descriptor copies do not accept options.')
         options = kind
         kind = kind.kind
     end
     assert(kind == ContextMenuAnchorKind.SCREEN_POSITION or
             kind == ContextMenuAnchorKind.MAP_TILE,
-        'DwarfUI context-menu anchor kind must be a ContextMenuAnchorKind.')
+        'DwarfUICore context-menu anchor kind must be a ContextMenuAnchorKind.')
     assert(type(options) == 'table' and
             type(options.screen_position) == 'table',
-        'DwarfUI context-menu anchor requires a screen position.')
+        'DwarfUICore context-menu anchor requires a screen position.')
     local screen_position = options.screen_position
     validate_screen_position(
         screen_position.x, screen_position.y, 'context-menu anchor')
@@ -163,7 +163,7 @@ function ContextMenuAnchorDescriptor.new(kind, options)
         }
     else
         assert(options.map_position == nil,
-            'DwarfUI screen-position anchors cannot contain a map position.')
+            'DwarfUICore screen-position anchors cannot contain a map position.')
     end
     return setmetatable(descriptor, ContextMenuAnchorDescriptor)
 end
@@ -171,7 +171,7 @@ end
 ---Creates a fixed screen-position anchor.
 ---@param x integer
 ---@param y integer
----@return dwarfui.ContextMenuAnchorDescriptor
+---@return dwarfuicore.ContextMenuAnchorDescriptor
 function ContextMenuAnchorDescriptor.screen_position(x, y)
     return ContextMenuAnchorDescriptor.new(
         ContextMenuAnchorKind.SCREEN_POSITION, {
@@ -183,7 +183,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@param screen_x integer
 ---@param screen_y integer
----@return dwarfui.ContextMenuAnchorDescriptor
+---@return dwarfuicore.ContextMenuAnchorDescriptor
 function ContextMenuAnchorDescriptor.map_tile(position, screen_x, screen_y)
     return ContextMenuAnchorDescriptor.new(
         ContextMenuAnchorKind.MAP_TILE, {
@@ -193,15 +193,15 @@ function ContextMenuAnchorDescriptor.map_tile(position, screen_x, screen_y)
 end
 
 ---Creates one open session with copied stable state and weak live sources.
----@param options dwarfui.ContextMenuOpenSessionOptions
----@return dwarfui.ContextMenuOpenSession
+---@param options dwarfuicore.ContextMenuOpenSessionOptions
+---@return dwarfuicore.ContextMenuOpenSession
 function ContextMenuOpenSession.new(options)
     assert(type(options) == 'table',
-        'DwarfUI context-menu open session requires options.')
+        'DwarfUICore context-menu open session requires options.')
     assert(options.source ~= nil,
-        'DwarfUI context-menu open session requires a source.')
+        'DwarfUICore context-menu open session requires a source.')
     assert(options.source_root ~= nil,
-        'DwarfUI context-menu open session requires a source root.')
+        'DwarfUICore context-menu open session requires a source root.')
     return setmetatable({
         _definition=definitions.ContextMenuDefinitionSnapshot.new(
             options.definition),
@@ -218,25 +218,25 @@ function ContextMenuOpenSession.new(options)
 end
 
 ---Returns the current lifecycle state.
----@return dwarfui.ContextMenuSessionState
+---@return dwarfuicore.ContextMenuSessionState
 function ContextMenuOpenSession:get_state()
     return self._state
 end
 
 ---Returns an isolated copy of the session's definition snapshot.
----@return dwarfui.ContextMenuDefinitionSnapshot
+---@return dwarfuicore.ContextMenuDefinitionSnapshot
 function ContextMenuOpenSession:get_definition_snapshot()
     return definitions.ContextMenuDefinitionSnapshot.new(self._definition)
 end
 
 ---Returns an isolated copy of the stable target descriptor.
----@return dwarfui.ContextMenuTargetDescriptor
+---@return dwarfuicore.ContextMenuTargetDescriptor
 function ContextMenuOpenSession:get_target_descriptor()
     return ContextMenuTargetDescriptor.new(self._target)
 end
 
 ---Returns an isolated copy of the anchor descriptor.
----@return dwarfui.ContextMenuAnchorDescriptor
+---@return dwarfuicore.ContextMenuAnchorDescriptor
 function ContextMenuOpenSession:get_anchor_descriptor()
     return ContextMenuAnchorDescriptor.new(self._anchor)
 end
@@ -269,7 +269,7 @@ function ContextMenuOpenSession:close()
 end
 
 ---Builds a callback context only while every required weak source is live.
----@return dwarfui.ContextMenuSelectionContext|nil
+---@return dwarfuicore.ContextMenuSelectionContext|nil
 function ContextMenuOpenSession:create_selection_context()
     if not self:is_valid() then return nil end
     local anchor = self._anchor
@@ -302,7 +302,7 @@ end
 function ContextMenuOpenSession:select(entry_index)
     assert(numbers.is_integer(entry_index) and
             self._definition.entries[entry_index] ~= nil,
-        'DwarfUI context-menu selection requires a valid entry index.')
+        'DwarfUICore context-menu selection requires a valid entry index.')
     local context = self:create_selection_context()
     if not context then return false end
     local handler = self._definition.entries[entry_index].on_select

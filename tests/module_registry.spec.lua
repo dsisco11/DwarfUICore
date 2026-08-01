@@ -27,6 +27,18 @@ describe('dwarfuicore module registry', function()
             'dwarfuicore/tooltip/presenter',
             'dwarfuicore/tooltip/runtime',
             'dwarfuicore/tooltip/api',
+            'dwarfuicore/context_menu/definition',
+            'dwarfuicore/context_menu/target',
+            'dwarfuicore/context_menu/input_sample',
+            'dwarfuicore/context_menu/root_discovery',
+            'dwarfuicore/context_menu/map_target',
+            'dwarfuicore/context_menu/registration',
+            'dwarfuicore/context_menu/target_detector',
+            'dwarfuicore/context_menu/input_hook',
+            'dwarfuicore/context_menu/renderer',
+            'dwarfuicore/context_menu/service',
+            'dwarfuicore/context_menu/screen',
+            'dwarfuicore/context_menu/api',
         }, (function()
             local names = {}
             for _, spec in ipairs(registry.MODULES) do
@@ -36,6 +48,18 @@ describe('dwarfuicore module registry', function()
         end)())
         assert.same({
             'dwarfuicore/module_registry',
+            'dwarfuicore/context_menu/api',
+            'dwarfuicore/context_menu/screen',
+            'dwarfuicore/context_menu/service',
+            'dwarfuicore/context_menu/renderer',
+            'dwarfuicore/context_menu/input_hook',
+            'dwarfuicore/context_menu/target_detector',
+            'dwarfuicore/context_menu/registration',
+            'dwarfuicore/context_menu/map_target',
+            'dwarfuicore/context_menu/root_discovery',
+            'dwarfuicore/context_menu/input_sample',
+            'dwarfuicore/context_menu/target',
+            'dwarfuicore/context_menu/definition',
             'dwarfuicore/tooltip/api',
             'dwarfuicore/tooltip/runtime',
             'dwarfuicore/tooltip/presenter',

@@ -1,6 +1,7 @@
 # Service Provider API Implementation Checklist
 
-Status: planned; blocked on approval of the version 1 public contract
+Status: version 1 contract approved and frozen; ready for baseline and inventory
+work
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -86,44 +87,48 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Inventory the current tooltip and context-menu widget keys, map-handle
       lifetimes, identity allocators, registration sequences, target precedence,
       open-session snapshots, diagnostics, and weak-reference behavior.
-- [ ] Approve the namespace grammar, 64-byte limit, and byte-for-byte
+- [x] Approve the namespace grammar, 64-byte limit, and byte-for-byte
       comparison. Validate syntax only; do not add reservation, allocation,
       registration, or global claiming of namespace strings.
-- [ ] Freeze the complete version 1 LuaDoc schema for both service APIs and all
+- [x] Freeze the complete version 1 LuaDoc schema for both service APIs and all
       referenced options, updates, handles, and definitions.
-- [ ] Freeze the diagnostic boundary: public service health is observable
+- [x] Freeze the diagnostic boundary: public service health is observable
       through documented errors, while private diagnostic shapes are unversioned
       and may not leak definitions or callback references across namespaces.
-- [ ] Preserve weak lifetime cleanup for abandoned widget keys and opaque map
+- [x] Preserve weak lifetime cleanup for abandoned widget keys and opaque map
       handles in both services, including through every secondary detection
       index and callback-containing registration value.
-- [ ] Treat consumer reload, disable, teardown, and applicable save/map/world
+- [x] Treat consumer reload, disable, teardown, and applicable save/map/world
       lifecycle handling as explicit `clear_namespace()` call sites. Do not
       infer generic Lua consumer unload from API reachability, environment
       clearing, overlay rescanning, map/world unload, or garbage collection.
-- [ ] Preserve the approved two-stage model: existing namespace-neutral
+- [x] Preserve the approved two-stage model: existing namespace-neutral
       widget/root/blocker/map targeting selects one physical target, then the
       service resolves that target's namespace contributions.
-- [ ] Preserve the approved immutable open-menu snapshot: definition updates
+- [x] Preserve the approved immutable open-menu snapshot: definition updates
       affect the next opening, while ownership loss closes the entire current
       menu before any callback can run.
-- [ ] Preserve the approved provider/API prefixes, stable category tokens,
+- [x] Preserve the approved provider/API prefixes, stable category tokens,
       non-stable diagnostic detail, handle-validation precedence, and ordinary
       `false` return boundaries from the public error contract.
-- [ ] Document the supported single-installation runtime model: package updates
+- [x] Document the supported single-installation runtime model: package updates
       require a fresh process or complete core reload, while partial replacement
       and active script-path switching are unsupported and are not diagnosed.
-- [ ] Treat `dwarfuicore/tooltip/api` and
+- [x] Treat `dwarfuicore/tooltip/api` and
       `dwarfuicore/context_menu/api` as intentionally replaced public paths.
       Migrate DwarfUI and DwarfUICore tests, then remove both modules, their
       registry entries, and packaged files before release.
-- [ ] Ship no compatibility adapter, legacy namespace, inferred namespace, or
+- [x] Ship no compatibility adapter, legacy namespace, inferred namespace, or
       compatibility window for the old direct APIs. Do not include independent
       plugin migrations in this work.
+- [x] Require the coordinated DwarfUI migration before releasing the
+      provider-bearing DwarfUICore package. Pair it with a DwarfUI minimum
+      dependency on the assigned provider-bearing package version and claim no
+      support for either mismatched old/new package combination.
 
 ### Phase 0 completion gate
 
-- [ ] The proposal text and every decision above are approved or amended in the
+- [x] The proposal text and every decision above are approved or amended in the
       proposal before implementation begins.
 - [ ] Baseline evidence is recorded without promoting unit or package evidence
       to live-runtime success.
@@ -456,6 +461,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
       private DwarfUICore modules.
 - [ ] Remove every DwarfUI dependency on the legacy direct API paths; do not add
       a temporary adapter or assign a compatibility namespace.
+- [ ] Update DwarfUI production code, focused and integration tests, mocks,
+      documentation, `.luarc.json`, and package/integration tooling together so
+      none retains a legacy direct API reference.
+- [ ] Raise DwarfUI's minimum DwarfUICore dependency to the package version that
+      first ships the provider contract; do not publish either coordinated
+      package until the matching package is ready.
 - [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
       namespace while preserving all other namespaces and the core generation.
 - [ ] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
@@ -472,6 +483,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 - [ ] DwarfUI is a normal namespace-bound consumer of the one DwarfUICore
       runtime.
+- [ ] DwarfUI's production, test, mock, documentation, Lua configuration, and
+      integration surfaces all use exact contract major 1 and namespace
+      `dwarfui`, and its package dependency requires the provider-bearing core.
 - [ ] Reloading DwarfUI clears and rebuilds only `dwarfui`; the disposable
       consumer's registrations and the DwarfUICore generation survive.
 
@@ -516,6 +530,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       final package.
 - [ ] Prove DwarfUI and the disposable independent test consumer resolve the
       same intended packaged DwarfUICore installation.
+- [ ] Verify the release artifacts and documentation claim no compatibility for
+      old DwarfUI with provider-bearing DwarfUICore or provider-consuming
+      DwarfUI with an older DwarfUICore package.
 
 ### Phase 9 completion gate
 
@@ -610,6 +627,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       garbage collection.
 - [ ] DwarfUI consumes both services through the approved provider boundary;
       no independent plugin has been migrated by this task.
+- [ ] The coordinated DwarfUI release updates every legacy reference and
+      requires the provider-bearing DwarfUICore package version; neither
+      mismatched old/new pairing is presented as supported.
 - [ ] Both legacy direct API modules and their registry/package entries are
       absent, with no compatibility adapter or legacy namespace shipped.
 - [ ] Module registry, package contents, installed resolution, documentation,

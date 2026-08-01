@@ -2,10 +2,12 @@
 
 ## Status
 
-Proposed and unimplemented. The repository split is complete, but this document
-defines a future public service-provider contract only. It does not implement
-providers, namespaces, composite identities, exact service-contract version
-negotiation, immutable service APIs, or migration of consumer plugins.
+Approved and frozen on 2026-08-01, but unimplemented. The repository split is
+complete, and this document is the accepted version 1 public service-provider
+contract. It does not implement providers, namespaces, composite identities,
+exact service-contract version negotiation, immutable service APIs, or consumer
+migration. Any contract amendment before implementation requires explicit
+re-approval.
 
 ## Decision summary
 
@@ -80,9 +82,17 @@ retains:
 - minecart, mood, and unit-card integrations; and
 - other feature-specific behavior that consumes core services.
 
-DwarfUI will become a normal DwarfUICore provider consumer only when this
-proposal is approved and implemented. Its future core service handles would
-use the stable namespace `dwarfui`.
+DwarfUI is the required coordinated consumer for this breaking replacement.
+Before the provider-bearing DwarfUICore package is released, DwarfUI must
+acquire exact contract major 1 tooltip and context-menu APIs through the stable
+namespace `dwarfui` and remove every use of the legacy direct API paths.
+
+The coordinated DwarfUI release must raise its minimum DwarfUICore dependency
+to the provider-bearing package version assigned for that release. The old
+DwarfUI package is not supported against the new DwarfUICore package, and the
+new DwarfUI package is not supported against an older DwarfUICore package.
+Production code, tests, mocks, documentation, Lua tooling configuration, and
+package/integration tooling all cross the boundary together.
 
 External plugin migration is separate future work. A migrated plugin would
 depend directly on DwarfUICore rather than DwarfUI's internal layout or
@@ -711,7 +721,8 @@ project work:
 2. Implement the root contract, runtime state, namespace system, providers,
    immutable API objects, and focused contract tests in DwarfUICore.
 3. Migrate DwarfUI to the approved provider APIs through namespace `dwarfui`
-   without introducing a second runtime.
+   without introducing a second runtime, and raise its minimum dependency to
+   the provider-bearing DwarfUICore package version.
 4. Remove the replaced direct API modules after DwarfUI and DwarfUICore tests
    no longer use them.
 5. Migrate independent consumer plugins as separately approved work.
@@ -724,7 +735,9 @@ not authorize edits to those plugins.
 The released package contains no temporary compatibility adapter for the old
 direct API paths. Transition work may sequence consumer and test edits before
 deleting the modules inside the coordinated development change, but the final
-package exposes only the provider contract.
+package exposes only the provider contract. The matching DwarfUI package must
+be ready before that DwarfUICore package is released; there is no supported
+old-DwarfUI/new-core or new-DwarfUI/old-core compatibility interval.
 
 ## Acceptance tests
 
@@ -764,6 +777,8 @@ package exposes only the provider contract.
 | Development separation | Constructors and API methods never invoke reload, teardown, environment clearing, or overlay rescan. |
 | Failed core reload | No retired facade remains healthy and every old API object fails as stale. |
 | DwarfUI reload isolation | Reloading DwarfUI preserves every other DwarfUICore namespace and the core singleton generation. |
+| Coordinated DwarfUI release | DwarfUI production code, tests, mocks, documentation, Lua configuration, and integration tooling use contract major 1 with namespace `dwarfui`; its minimum dependency names the provider-bearing DwarfUICore package version. |
+| Cross-version rejection | The release and package contracts do not claim support for old DwarfUI with provider-bearing DwarfUICore or provider-consuming DwarfUI with older DwarfUICore. |
 | Legacy direct API removal | DwarfUI and DwarfUICore tests use the provider APIs; both old direct API modules, their registry entries, and their packaged files are absent; no compatibility namespace or adapter exists. |
 | Package contract | The root module, provider classes, private implementations, service modules, documentation, and tests exist in the DwarfUICore package. |
 | Installation resolution | DwarfUI and an independent test consumer resolve the intended packaged DwarfUICore installation. |

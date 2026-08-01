@@ -183,6 +183,7 @@ describe('DwarfUICore context-menu screen', function()
         local screen = fixture.screen
 
         assert.equals(1, fixture.service.start_count)
+        assert.equals('dwarfuicore/context-menu', screen.focus_path)
         assert.is_false(screen.initial_pause)
         assert.is_false(screen.force_pause)
         assert.is_false(screen.pass_pause)

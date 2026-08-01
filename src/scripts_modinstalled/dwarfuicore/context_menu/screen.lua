@@ -30,7 +30,7 @@ local WHEEL_KEYS = {
 ---@field _presentation_closed boolean
 ContextMenuScreen = defclass(ContextMenuScreen, gui.ZScreen)
 ContextMenuScreen.ATTRS{
-    focus_path='dwarfui/context-menu',
+    focus_path='dwarfuicore/context-menu',
     initial_pause=false,
     force_pause=false,
     pass_pause=false,

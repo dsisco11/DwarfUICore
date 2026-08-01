@@ -2,14 +2,12 @@
 
 ## Status
 
-Approved and frozen on 2026-08-01 for its architecture and behavioral
-decisions, but unimplemented. The repository split is complete. Before
-production implementation, the transitive public data schemas named by this
-document must still be enumerated here and explicitly approved. This document
-does not implement providers, namespaces, composite identities, exact
-service-contract version negotiation, immutable service APIs, or consumer
-migration. Any other contract amendment before implementation requires explicit
-re-approval.
+Approved and frozen on 2026-08-01, including its transitive version 1 public
+data schema, but unimplemented. The repository split and implementation Phase 0
+are complete. This document does not implement providers, namespaces, composite
+identities, exact service-contract version negotiation, immutable service APIs,
+or consumer migration. Any further contract amendment before or during
+implementation requires explicit re-approval.
 
 ## Decision summary
 
@@ -420,16 +418,126 @@ function ContextMenuServiceApi:clear_namespace()
 end
 ```
 
-All referenced option, update, handle, definition, entry, callback-context, and
-public discriminator types are public versioned data contracts and must receive
-complete LuaDoc definitions in the implementation. Registration handles are
-opaque immutable values.
+All referenced option, update, handle, definition, entry, and callback-context
+types are public versioned data contracts and must receive complete LuaDoc
+definitions in the implementation. Registration handles are opaque immutable
+values.
 
-This document does not yet enumerate the complete transitive field schemas for
-those records, their callback contexts, or their referenced public
-discriminators. Those schemas, including optionality, defaults, validation,
-copying, and identity semantics, must be appended here and explicitly approved
-before production implementation begins.
+### Version 1 public data schema amendment
+
+Status: explicitly approved on 2026-08-01.
+
+Version 1 uses these exact transitive public types:
+
+```lua
+---An exact fortress-map coordinate copied at an API boundary.
+---@class dwarfuicore.MapTilePosition
+---@field x integer
+---@field y integer
+---@field z integer
+
+---A captured interface-cell coordinate copied for callback dispatch.
+---@class dwarfuicore.ScreenPosition
+---@field x integer
+---@field y integer
+
+---A presentation owner that can resolve to a currently presented root.
+---@alias dwarfuicore.PresentationOwner gui.View|gui.ZScreen
+
+---Options for one exact map-tile tooltip registration.
+---@class dwarfuicore.MapTileTooltipRegistrationOptions
+---@field owner dwarfuicore.PresentationOwner
+---@field pos dwarfuicore.MapTilePosition
+---@field tooltip? string
+
+---Complete mutable replacement state for a map-tile tooltip registration.
+---@class dwarfuicore.MapTileTooltipUpdate
+---@field pos dwarfuicore.MapTilePosition
+---@field tooltip? string
+
+---Opaque identity and lifetime handle for one map-tile tooltip registration.
+---@class dwarfuicore.MapTileTooltipRegistration
+
+---One selectable context-menu entry.
+---@class dwarfuicore.ContextMenuEntry
+---@field label string
+---@field on_select fun(context: dwarfuicore.ContextMenuSelectionContext)
+---@field fg? integer
+---@field bg? integer
+
+---One validated context-menu contribution.
+---@class dwarfuicore.ContextMenuDefinition
+---@field title? string
+---@field fg? integer
+---@field bg? integer
+---@field entries dwarfuicore.ContextMenuEntry[]
+
+---Options for one exact map-tile context-menu contribution.
+---@class dwarfuicore.ContextMenuMapRegistrationOptions
+---@field owner dwarfuicore.PresentationOwner
+---@field pos dwarfuicore.MapTilePosition
+---@field definition dwarfuicore.ContextMenuDefinition
+
+---Complete mutable replacement state for a map-tile menu contribution.
+---@class dwarfuicore.ContextMenuMapRegistrationUpdate
+---@field pos dwarfuicore.MapTilePosition
+---@field definition dwarfuicore.ContextMenuDefinition
+
+---Opaque identity and lifetime handle for one map-tile menu contribution.
+---@class dwarfuicore.ContextMenuMapRegistration
+
+---Copied source context passed to exactly one contributing entry callback.
+---@class dwarfuicore.ContextMenuSelectionContext
+---@field screen_position dwarfuicore.ScreenPosition
+---@field map_position? dwarfuicore.MapTilePosition
+---@field source gui.View|dwarfuicore.ContextMenuMapRegistration
+---@field source_root dwarfuicore.PresentationOwner
+---@field owner? dwarfuicore.PresentationOwner
+```
+
+The validation and ownership rules for those types are:
+
+- map coordinates are exact signed 16-bit integers from `-32768` through
+  `32767`; screen coordinates are exact integers;
+- a position may be a Lua table or DFHack userdata with readable `x`, `y`, and
+  `z` fields; DwarfUICore copies those fields and retains no position object;
+- every options, update, definition, and entry value is a Lua table containing
+  only its documented fields;
+- every widget argument is a `gui.View`, and every map `owner` is a `gui.View`
+  or `gui.ZScreen`; widget registration before attachment is valid, but every
+  registration is ineligible until its source or owner resolves to a currently
+  presented root;
+- omitted `tooltip` is equivalent to `nil` and clears stored map-tooltip text;
+- context-menu `title` and every entry `label` are non-empty strings;
+- `entries` is a non-empty dense array, and every `on_select` is a Lua function;
+- `fg` and `bg` are integers from `COLOR_BLACK` (`0`) through `COLOR_WHITE`
+  (`15`); definition defaults are white-on-black, and omitted entry colors
+  inherit the resolved definition colors;
+- registration and update validate and copy complete position, tooltip, and
+  definition state before mutation; caller mutation after return changes no
+  registration or open-session snapshot;
+- definition snapshots copy strings, colors, positions, and entry arrays while
+  retaining the registered callback functions;
+- each successful map registration returns a distinct opaque immutable handle,
+  including repeated registration of the same coordinate; handles expose no
+  fields, local identity, namespace, service kind, contract major, or generation;
+- map update preserves the handle, composite identity, original contribution
+  sequence, and immutable owner while atomically replacing its mutable state;
+- `ContextMenuSelectionContext` is freshly copied immediately before dispatch
+  from the still-valid snapshotted contribution; mutating it changes no service
+  or registration state;
+- for a widget contribution, `source` is the registered widget, `owner` is
+  absent, and `map_position` is absent;
+- for a map contribution, `source` is its opaque registration handle, `owner`
+  is its registered owner, and `map_position` is the exact registered tile; and
+- the callback context exposes no raw local/composite registration identity,
+  namespace, service discriminator, target discriminator, or anchor
+  discriminator. The presence of `map_position` identifies map contributions
+  without adding another closed public discriminator.
+
+Any malformed public value raises the service API's `INVALID_ARGUMENT` error
+before mutation. The exact schemas and rules above are part of contract major 1
+once explicitly approved.
 
 ### Diagnostic boundary
 

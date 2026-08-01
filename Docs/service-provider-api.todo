@@ -1,9 +1,8 @@
 # Service Provider API Implementation Checklist
 
-Status: architecture and behavioral contract approved; production
-implementation blocked until the transitive public data schema is recorded in
-the proposal and explicitly approved. Read-only baseline and inventory work may
-proceed.
+Status: Phase 0 complete. The architecture, behavioral contract, and transitive
+version 1 public data schema are approved and frozen; production implementation
+may begin with Phase 1.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -85,26 +84,28 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 0 - Approve and freeze the version 1 contract
 
-- [ ] Record the starting DwarfUICore branch, revision, worktree state, package
+- [x] Record the starting DwarfUICore branch, revision, worktree state, package
       version, and current module-registry order.
-- [ ] Run and record the current complete unit, syntax, build, and package
+- [x] Run and record the current complete unit, syntax, build, and package
       baselines before changing production code.
-- [ ] Inventory every `dfhack.dwarfuicore` process slot, module-local generation
+- [x] Inventory every `dfhack.dwarfuicore` process slot, module-local generation
       counter, eager singleton construction, automatic predecessor retirement,
       hook owner, and reload teardown path.
-- [ ] Inventory the current tooltip and context-menu widget keys, map-handle
+- [x] Inventory the current tooltip and context-menu widget keys, map-handle
       lifetimes, identity allocators, registration sequences, target precedence,
       open-session snapshots, diagnostics, and weak-reference behavior.
 - [x] Approve the namespace grammar, 64-byte limit, and byte-for-byte
       comparison. Validate syntax only; do not add reservation, allocation,
       registration, or global claiming of namespace strings.
-- [ ] Amend the proposal with and explicitly approve the complete transitive
+- [x] Amend the proposal with the complete transitive
       version 1 LuaDoc schema for both services. Cover map positions, options,
       updates, opaque handles, context-menu definitions and entries, callback
       selection context, referenced public discriminator enums, field
       optionality/defaults, validation, copying, canonical type names, and
       identity semantics. Reconcile the current callback context's raw
       registration identity with the proposal's opaque composite-identity rule.
+- [x] Explicitly approve the version 1 public data schema amendment before
+      production implementation begins.
 - [x] Freeze the diagnostic boundary: public service health is observable
       through documented errors, while private diagnostic shapes are unversioned
       and may not leak definitions or callback references across namespaces.
@@ -143,12 +144,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 - [x] The proposal text and every decision above are approved or amended in the
       proposal before implementation begins.
-- [ ] Every DwarfUICore-owned transitive public type reachable through an API
+- [x] Every DwarfUICore-owned transitive public type reachable through an API
       parameter, return, field, or callback is defined in the proposal and
       explicitly approved.
-- [ ] Baseline evidence is recorded without promoting unit or package evidence
+- [x] Baseline evidence is recorded without promoting unit or package evidence
       to live-runtime success.
-- [ ] The current process-state and registration data flows are mapped through
+- [x] The current process-state and registration data flows are mapped through
       presentation and callback dispatch, not only through public facades.
 
 ## Phase 1 - Build private namespace, identity, and immutability primitives
@@ -714,16 +715,16 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 | Date | Scope | Command or entrypoint | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Baseline unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record before production changes. |
+| 2026-08-01 | Baseline unit suite | `./tools/Run-UnitTests.ps1` | Passed | 274 successes, 0 failures, 0 errors, 0 pending. |
 | | Focused provider unit tests | `./tools/Run-UnitTests.ps1 <focused spec paths>` | Pending | Namespace, identity, runtime state, acquisition, APIs, services, reload, registry, and package contract. |
 | | Complete unit suite | `./tools/Run-UnitTests.ps1` | Pending | Record successes, failures, errors, and pending tests. |
-| | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Include production, unit, support, and DwarfSpec Lua files. |
-| | Offline build | `./tools/Build.ps1` | Pending | Packaging evidence only. |
-| | Package verification | `./tools/Publish.ps1` | Pending | Inspect expanded and archive contents independently. |
+| 2026-08-01 | Syntax validation | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Passed | Lua 5.4.6; 34 production and 52 test/support files passed. |
+| 2026-08-01 | Offline build | `./tools/Build.ps1 -LiveReload:$false` | Passed | Offline evidence only; no installed-runtime claim. |
+| 2026-08-01 | Package verification | `./tools/Publish.ps1` | Passed | Expanded and archive verification passed independently: 35 files each; archive size 68,591 bytes. |
 | | Focused DwarfSpec | `./tools/Run-AutomationTests.ps1 <one provider spec>` | Pending | Use one spec per run and record `cleanup_confirmed`. |
 | | Tooltip/context-menu live regressions | `./tools/Run-AutomationTests.ps1 <one existing spec>` | Pending | Preserve existing rendering, input, lifecycle, and cleanup contracts. |
 | | Complete DwarfSpec suite | `./tools/Run-AutomationTests.ps1` | Pending | Do not infer visual success from structured completion. |
 | | DwarfUI integration | DwarfUI unit, package-integration, and DwarfSpec entrypoints against this verified package | Pending | Requires separately authorized DwarfUI checkout changes. |
 | | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one packaged DwarfUICore resolution and one backend per service. |
 | | Live manual acceptance | Registered tooltip and composed context menu across two namespaces | Pending | Verify collision fallback, ordering, dispatch, isolation, reload, and cleanup. |
-| | Diff validation | `git diff --check` in each touched checkout | Pending | Record whitespace result separately. |
+| 2026-08-01 | Diff validation | `git diff --check` in each touched checkout | Passed | DwarfUICore planning-document changes only. |

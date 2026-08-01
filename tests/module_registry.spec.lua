@@ -82,4 +82,17 @@ describe('dwarfuicore module registry', function()
             'dwarfuicore/utils/immutable_enum',
         }, registry.get_script_names())
     end)
+
+    it('reports the module and missing contract during validation', function()
+        local _, registry = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/module_registry.lua')
+
+        local ok, failure = pcall(function()
+            registry.load_all(function() return {} end)
+        end)
+        assert.is_false(ok)
+        assert.is_truthy(tostring(failure):find(
+            'DwarfUICore module dwarfuicore/utils/immutable_enum is ' ..
+                'missing define', 1, true))
+    end)
 end)

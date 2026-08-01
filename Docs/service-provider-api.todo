@@ -63,8 +63,11 @@ Migration of any other consumer plugin remains explicitly out of scope.
       `reqscript()`, and reload-managed modules are registered in dependency
       order.
 - [ ] Every new or modified class and method has complete LuaDoc comments. All
-      public option, update, handle, definition, and diagnostic records have
-      complete versioned LuaDoc definitions.
+      public option, update, handle, and definition records have complete
+      versioned LuaDoc definitions.
+- [ ] Provider APIs expose no `get_diagnostics()` method or public diagnostic
+      record type. Retain private diagnostics for focused tests, reload
+      validation, hook inspection, and development troubleshooting only.
 - [ ] Provider construction and API methods never reload, tear down, clear
       script environments, or rescan overlays.
 - [ ] Ordinary construction never replaces a singleton, manager, presenter,
@@ -87,7 +90,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
       comparison. Validate syntax only; do not add reservation, allocation,
       registration, or global claiming of namespace strings.
 - [ ] Freeze the complete version 1 LuaDoc schema for both service APIs and all
-      referenced options, updates, handles, definitions, and diagnostics.
+      referenced options, updates, handles, and definitions.
+- [ ] Freeze the diagnostic boundary: public service health is observable
+      through documented errors, while private diagnostic shapes are unversioned
+      and may not leak definitions or callback references across namespaces.
 - [ ] Preserve weak lifetime cleanup for abandoned widget keys and opaque map
       handles in both services, including through every secondary detection
       index and callback-containing registration value.
@@ -254,7 +260,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
       contract and enforce namespace, service, contract-major, and generation
       ownership on update and removal.
 - [ ] Carry composite source identity through widget and map candidates, target
-      adaptation, mediation, intent, presenter state, and diagnostics.
+      adaptation, mediation, intent, presenter state, and private diagnostics.
 - [ ] Resolve eligible tooltip collisions by greatest process-wide original
       contribution sequence only after namespace-neutral physical target
       selection, and reveal the next eligible contribution when the winner is
@@ -262,14 +268,16 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Ensure unregister and `clear_namespace()` remove only the bound tooltip
       namespace and release idle polling/presentation state only when no
       remaining namespace has demand.
-- [ ] Return copied diagnostics containing only the bound namespace's
-      registrations plus approved shared service-health data.
+- [ ] Retain private tooltip diagnostics for tests and development tooling,
+      namespace their registration data, and expose none of them through the
+      provider API.
 - [ ] Preserve ordinary repeated construction, multiple entrypoints using one
       namespace, different consumers, and cross-service construction without
       replacing the tooltip backend.
 - [ ] Add unit coverage for same-widget ownership, widget and map collisions,
       foreign handles, namespace cleanup, weak lifetime, ineligibility fallback,
-      stale generations, diagnostics isolation, and runtime preservation.
+      stale generations, private diagnostic isolation, absence of a public
+      diagnostic surface, and runtime preservation.
 - [ ] Prove adding, updating, unregistering, clearing, or collecting one
       namespace contribution does not reorder a still-registered physical
       widget against another root or change widget/blocker/map hit-testing.
@@ -282,7 +290,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
 ### Phase 4 completion gate
 
 - [ ] Tooltip registration, detection, mediation, presentation, cleanup, and
-      diagnostics retain namespace ownership end to end.
+      private diagnostics retain namespace ownership end to end.
 - [ ] Removing or invalidating one namespace cannot remove or hide the next
       eligible namespace contribution permanently.
 
@@ -322,13 +330,14 @@ Migration of any other consumer plugin remains explicitly out of scope.
       failure.
 - [ ] Ensure removing one namespace leaves every other eligible contribution,
       root-discovery demand, hook, and active service owner intact.
-- [ ] Add namespace-scoped copied diagnostics plus approved shared health and
-      composition data without leaking another namespace's definitions or
-      callbacks.
+- [ ] Retain private context-menu diagnostics for tests and development tooling,
+      namespace their registration and composition data, expose none through
+      the provider API, and never retain definitions or callbacks in diagnostic
+      output.
 - [ ] Add unit coverage for same-widget and same-tile composition, mixed widget
       and map contributions, ordering, exact callback dispatch, foreign handles,
       namespace cleanup, multiple entrypoints, stale generations, and
-      diagnostics isolation.
+      private diagnostic isolation and absence of a public diagnostic surface.
 - [ ] Prove definition replacement/update leaves the open snapshot and captured
       callback unchanged but affects the next opening.
 - [ ] Prove explicit unregister and namespace clearing close synchronously,
@@ -474,7 +483,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       surface exists and its focused tests pass.
 - [ ] Document provider acquisition, namespace selection, exact contract-major
       semantics, immutable API objects, ownership, collision behavior, opaque
-      handles, cleanup, diagnostics, error transport, health, and reload.
+      handles, cleanup, error transport, health, reload, and the absence of a
+      public diagnostic API.
 - [ ] Document all stable provider/API prefixes and category tokens, the
       non-stable status of diagnostic detail, handle-validation precedence, and
       the distinction between errors and ordinary `false` results.
@@ -560,8 +570,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       registration indexes when collected, including with cyclic callback
       graphs.
 - [ ] Widget and map registrations retain composite identity and namespace
-      ownership through detection, presentation, callback dispatch, diagnostics,
-      update, cleanup, and stale validation.
+      ownership through detection, presentation, callback dispatch, private
+      diagnostics, update, cleanup, and stale validation.
 - [ ] Tooltip collisions and context-menu composition follow the approved
       deterministic version 1 rules.
 - [ ] Namespace-neutral physical targeting uses a stable target sequence that is
@@ -574,6 +584,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Every public failure uses its approved prefix and category, ordinary
       absence returns `false`, and no public operation uses `qerror()` or
       `nil, error` transport.
+- [ ] Provider APIs expose no diagnostic method or record type; private
+      diagnostic state remains usable by focused tests and development tooling
+      without leaking definitions or callback references.
 - [ ] Ordinary construction preserves singleton owners, registrations, active
       presentation state, hooks, health, diagnostics, and sequences.
 - [ ] Partial, malformed, wrong-generation, disabled, retired, and reentrant

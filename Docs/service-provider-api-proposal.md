@@ -331,11 +331,6 @@ end
 ---@return boolean changed
 function TooltipServiceApi:clear_namespace()
 end
-
----Returns copied diagnostics restricted to this namespace and shared health.
----@return dwarfuicore.TooltipNamespaceDiagnostics
-function TooltipServiceApi:get_diagnostics()
-end
 ```
 
 ### Context-menu service API version 1
@@ -397,16 +392,22 @@ end
 ---@return boolean changed
 function ContextMenuServiceApi:clear_namespace()
 end
-
----Returns copied diagnostics restricted to this namespace and shared health.
----@return dwarfuicore.ContextMenuNamespaceDiagnostics
-function ContextMenuServiceApi:get_diagnostics()
-end
 ```
 
-All referenced option, update, handle, definition, and diagnostic types are
-public versioned data contracts and must receive complete LuaDoc definitions in
-the implementation. Registration handles are opaque immutable values.
+All referenced option, update, handle, and definition types are public versioned
+data contracts and must receive complete LuaDoc definitions in the
+implementation. Registration handles are opaque immutable values.
+
+### Diagnostic boundary
+
+Provider API version 1 deliberately exposes no `get_diagnostics()` method and
+defines no public diagnostic record types. Consumers observe service health
+through the documented constructor and API error contracts.
+
+Private runtime diagnostics remain available for focused tests, reload
+validation, hook inspection, and development troubleshooting. Their shape is
+not a public or versioned contract, may change without a contract-major change,
+and must not expose another namespace's definitions or callback references.
 
 ## Composite identity and ownership
 
@@ -420,9 +421,10 @@ runtime generation + service kind + consumer namespace + local identity
 The composite identity remains internal unless represented by an opaque public
 handle. A consumer never supplies its own local identity.
 
-All lookup, update, removal, diagnostics, presentation callbacks, and stale
-checks retain the namespace component. A service API rejects a handle issued to
-a different namespace, service kind, contract major, or runtime generation.
+All lookup, update, removal, private diagnostics, presentation callbacks, and
+stale checks retain the namespace component. A service API rejects a handle
+issued to a different namespace, service kind, contract major, or runtime
+generation.
 
 Widget registrations are keyed by `(namespace, widget)`, not by widget alone:
 
@@ -650,8 +652,8 @@ Compatible changes within one contract major include:
 
 - adding a new API method;
 - adding an optional input field with a defined default; and
-- adding a diagnostic field that consumers are documented to ignore when
-  unknown.
+- changing private diagnostic data that is not exposed through the provider
+  API.
 
 The following require a new contract major:
 
@@ -718,6 +720,7 @@ deprecated and are not the new public consumer contract.
 | Namespace rejection | Invalid namespaces fail before service initialization. |
 | Stable constructor errors | Constructor failures use the provider prefix and exact approved category while treating diagnostic detail as non-stable text. |
 | Stable API errors | API failures use the service API prefix and exact approved category without returning `nil, error` or calling `qerror()`. |
+| Public diagnostic boundary | Provider APIs expose no `get_diagnostics()` method or public diagnostic record type; private diagnostics remain available to tests and development tooling only. |
 | Handle error precedence | A malformed handle is `INVALID_ARGUMENT`, an old-generation recognized handle is `STALE_HANDLE`, a different current domain is `FOREIGN_HANDLE`, and an absent same-domain registration returns `false`. |
 | Repeated construction | Distinct API objects for the same namespace delegate to the same singleton and namespace state without repeated setup. |
 | Multiple entrypoints | Separate entrypoints using one namespace share registrations without replacing the backend. |

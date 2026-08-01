@@ -89,7 +89,7 @@ function Get-ModInfo {
 function Resolve-DFHackRunner {
     param(
         [string]$RunnerPath,
-        [string]$DwarfFortressRoot
+        [string]$DFHackRoot
     )
 
     if ($RunnerPath) {
@@ -99,12 +99,12 @@ function Resolve-DFHackRunner {
         return (Resolve-Path -LiteralPath $RunnerPath).Path
     }
 
-    if ($DwarfFortressRoot) {
-        $candidate = Join-Path $DwarfFortressRoot 'hack\dfhack-run.exe'
+    if ($DFHackRoot) {
+        $candidate = Join-Path $DFHackRoot 'dfhack-run.exe'
         if (Test-Path -LiteralPath $candidate -PathType Leaf) {
             return (Resolve-Path -LiteralPath $candidate).Path
         }
-        throw "Could not find DFHack's command runner under: $DwarfFortressRoot"
+        throw "Could not find DFHack's command runner under: $DFHackRoot"
     }
 
     $command = Get-Command 'dfhack-run.exe' -ErrorAction SilentlyContinue |
@@ -113,5 +113,5 @@ function Resolve-DFHackRunner {
         return $command.Source
     }
 
-    throw 'Could not find dfhack-run.exe. Set MOD_COMMAND_RUNNER, pass -DFHackRunner, or pass -DwarfFortressRoot.'
+    throw 'Could not find dfhack-run.exe. Set MOD_COMMAND_RUNNER, set DFHACK_ROOT, pass -DFHackRunner, or pass -DFHackRoot.'
 }

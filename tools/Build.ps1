@@ -4,7 +4,7 @@ param(
     [bool] $LiveReload = $true,
     [string] $SourceDir = 'src',
     [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
-    [string] $DwarfFortressRoot = $env:GAME_ROOT,
+    [string] $DFHackRoot = $env:DFHACK_ROOT,
     [string] $ReloadOutputPath,
     [string] $EnvFile = '.env.local'
 )
@@ -29,7 +29,7 @@ Import-EnvironmentFile -Path $resolvedEnvFile -AllowMissing
 
 $processLuaCompiler = [Environment]::GetEnvironmentVariable('LUA_COMPILER', 'Process')
 $processDFHackRunner = [Environment]::GetEnvironmentVariable('MOD_COMMAND_RUNNER', 'Process')
-$processDwarfFortressRoot = [Environment]::GetEnvironmentVariable('GAME_ROOT', 'Process')
+$processDFHackRoot = [Environment]::GetEnvironmentVariable('DFHACK_ROOT', 'Process')
 
 if (-not $LuaCompiler) {
     $LuaCompiler = if ($processLuaCompiler) {
@@ -41,8 +41,8 @@ if (-not $LuaCompiler) {
 if (-not $DFHackRunner) {
     $DFHackRunner = $processDFHackRunner
 }
-if (-not $DwarfFortressRoot) {
-    $DwarfFortressRoot = $processDwarfFortressRoot
+if (-not $DFHackRoot) {
+    $DFHackRoot = $processDFHackRoot
 }
 
 if (-not (Test-Path -LiteralPath $syntaxCheck -PathType Leaf)) {
@@ -68,7 +68,7 @@ if ($LiveReload) {
     }
 
     $runner = Resolve-DFHackRunner -RunnerPath $DFHackRunner `
-        -DwarfFortressRoot $DwarfFortressRoot
+        -DFHackRoot $DFHackRoot
     Write-Host "Running DFHack command: $($modInfo.Id) reload"
     $reloadOutput = @(& $runner $modInfo.Id reload 2>&1) |
         ForEach-Object { $_.ToString() }

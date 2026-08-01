@@ -3,7 +3,7 @@
 -- Short-lived interactive ZScreen presentation for one open menu session.
 
 local gui = require('gui')
-local map_projection = reqscript('dwarfui/map_projection')
+local map_projection = reqscript('dwarfuicore/map_projection')
 local renderers = reqscript('dwarfui/context_menu/renderer')
 local services = reqscript('dwarfui/context_menu/service')
 local targets = reqscript('dwarfui/context_menu/target')

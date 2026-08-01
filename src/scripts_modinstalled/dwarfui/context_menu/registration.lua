@@ -7,7 +7,7 @@ local map_targets = reqscript('dwarfui/context_menu/map_target')
 local root_discovery = reqscript('dwarfui/context_menu/root_discovery')
 local targets = reqscript('dwarfui/context_menu/target')
 local ViewRootResolver =
-    reqscript('dwarfui/view_root_resolver').ViewRootResolver
+    reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
 local MODULE_GENERATION_SLOT = 'context_menu_registration_generation'
 local MANAGER_SLOT = 'context_menu_registration_manager'

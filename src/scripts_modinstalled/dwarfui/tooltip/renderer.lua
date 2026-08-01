@@ -2,9 +2,9 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local PointerPolicy = reqscript('dwarfui/pointer').PointerPolicy
-reqscript('dwarfui/widget_extensions')
-local text_helpers = reqscript('dwarfui/text')
+local PointerPolicy = reqscript('dwarfuicore/pointer').PointerPolicy
+reqscript('dwarfuicore/widget_extensions')
+local text_helpers = reqscript('dwarfuicore/text')
 
 local BACKGROUND = dfhack.pen.parse{
     ch=32,

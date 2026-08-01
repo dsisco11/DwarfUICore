@@ -4,9 +4,9 @@
 
 local definitions = reqscript('dwarfui/context_menu/definition')
 local targets = reqscript('dwarfui/context_menu/target')
-local numbers = reqscript('dwarfui/utils/numbers')
+local numbers = reqscript('dwarfuicore/utils/numbers')
 local ViewRootResolver =
-    reqscript('dwarfui/view_root_resolver').ViewRootResolver
+    reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
 local COORDINATE_MIN = -0x8000
 local COORDINATE_MAX = 0x7fff

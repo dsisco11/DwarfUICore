@@ -2,7 +2,7 @@
 
 -- Synchronous, immutable pointer sampling for actionable opening input.
 
-local numbers = reqscript('dwarfui/utils/numbers')
+local numbers = reqscript('dwarfuicore/utils/numbers')
 
 ---@class dwarfui.ContextMenuInputSamplerOptions
 ---@field sample_screen_pointer? fun(): integer|nil, integer|nil

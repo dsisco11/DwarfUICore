@@ -7,7 +7,18 @@
 ---@field contract_type string|nil
 
 ---@type dwarfuicore.ModuleSpec[]
-MODULES = {}
+MODULES = {
+    {name='dwarfuicore/utils/immutable_enum', contract='define'},
+    {name='dwarfuicore/utils/function_chain', contract='wraps'},
+    {name='dwarfuicore/utils/numbers', contract='is_integer'},
+    {name='dwarfuicore/class', contract='is_instance_of'},
+    {name='dwarfuicore/map_projection', contract='project_visible'},
+    {name='dwarfuicore/pointer_poller', contract='PointerPoller', contract_type='table'},
+    {name='dwarfuicore/pointer', contract='PointerContext', contract_type='table'},
+    {name='dwarfuicore/text', contract='wrap_text'},
+    {name='dwarfuicore/view_root_resolver', contract='ViewRootResolver', contract_type='table'},
+    {name='dwarfuicore/widget_extensions', contract='install_all'},
+}
 
 local REGISTRY_SCRIPT = 'dwarfuicore/module_registry'
 

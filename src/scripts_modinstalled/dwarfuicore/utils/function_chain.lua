@@ -46,9 +46,9 @@ end
 ---@return boolean
 function wraps(wrapper, predecessor, budget)
     assert(type(wrapper) == 'function',
-        'DwarfUI function-chain wrapper must be a function.')
+        'DwarfUICore function-chain wrapper must be a function.')
     assert(type(predecessor) == 'function',
-        'DwarfUI function-chain predecessor must be a function.')
+        'DwarfUICore function-chain predecessor must be a function.')
     return value_wraps(
         wrapper, predecessor, {}, {remaining=budget or 256})
 end

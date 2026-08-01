@@ -3,8 +3,8 @@
 -- Stable target identity, copied anchors, and weak open-session ownership.
 
 local definitions = reqscript('dwarfui/context_menu/definition')
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
-local numbers = reqscript('dwarfui/utils/numbers')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
+local numbers = reqscript('dwarfuicore/utils/numbers')
 
 ---@enum dwarfui.ContextMenuTargetKind
 ContextMenuTargetKind = immutable_enum.define({

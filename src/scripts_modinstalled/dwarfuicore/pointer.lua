@@ -2,9 +2,9 @@
 
 -- Generic pointer targeting deliberately has no tooltip dependency.
 
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
----@enum dwarfui.PointerPolicy
+---@enum dwarfuicore.PointerPolicy
 PointerPolicy = immutable_enum.define({
     TARGET=1,
     PASS=2,
@@ -12,7 +12,7 @@ PointerPolicy = immutable_enum.define({
     NONE=4,
 }, 'PointerPolicy')
 
----@enum dwarfui.PointerResultKind
+---@enum dwarfuicore.PointerResultKind
 PointerResultKind = immutable_enum.define({
     TARGET=1,
     BLOCKED=2,
@@ -46,14 +46,14 @@ local function frame_contains(view, x, y)
 end
 
 ---Returns a pointer miss result.
----@return dwarfui.PointerResult
+---@return dwarfuicore.PointerResult
 local function miss()
     return {kind=PointerResultKind.MISS}
 end
 
 ---Returns a pointer blocker result.
 ---@param view gui.View
----@return dwarfui.PointerResult
+---@return dwarfuicore.PointerResult
 local function blocked(view)
     return {kind=PointerResultKind.BLOCKED, blocker=view}
 end
@@ -62,7 +62,7 @@ end
 ---@param view gui.View
 ---@param x integer
 ---@param y integer
----@return dwarfui.PointerResult
+---@return dwarfuicore.PointerResult
 local function targeted(view, x, y)
     local local_x, local_y = view.frame_body:localXY(x, y)
     return {
@@ -77,7 +77,7 @@ end
 ---@param view gui.View
 ---@param x integer
 ---@param y integer
----@return dwarfui.PointerResult
+---@return dwarfuicore.PointerResult
 local function resolve_view(view, x, y)
     if not is_eligible(view) then return miss() end
     local inside_body = body_contains(view, x, y)
@@ -89,7 +89,7 @@ local function resolve_view(view, x, y)
             policy == PointerPolicy.PASS or
             policy == PointerPolicy.BLOCK or
             policy == PointerPolicy.NONE,
-        'DwarfUI invalid pointer_policy ' .. tostring(policy) ..
+        'DwarfUICore invalid pointer_policy ' .. tostring(policy) ..
         '; expected a PointerPolicy member.')
     if policy == PointerPolicy.NONE then return miss() end
 
@@ -114,15 +114,15 @@ local function resolve_view(view, x, y)
     return miss()
 end
 
----@class dwarfui.PointerContext
+---@class dwarfuicore.PointerContext
 ---@field root gui.View
 ---@field target gui.View|nil
 ---@field result table
 PointerContext = {}
 PointerContext.__index = PointerContext
 
----@class dwarfui.PointerResult
----@field kind dwarfui.PointerResultKind
+---@class dwarfuicore.PointerResult
+---@field kind dwarfuicore.PointerResultKind
 ---@field target? gui.View
 ---@field blocker? gui.View
 ---@field x? integer
@@ -131,11 +131,11 @@ PointerContext.__index = PointerContext
 ---@param root gui.View
 ---@return table
 function PointerContext.new(root)
-    assert(root, 'DwarfUI PointerContext requires a root view.')
+    assert(root, 'DwarfUICore PointerContext requires a root view.')
     return setmetatable({root=root, target=nil, result=miss()}, PointerContext)
 end
 
----@class dwarfui.PointerDispatcher
+---@class dwarfuicore.PointerDispatcher
 PointerDispatcher = {}
 
 ---@param root gui.View
@@ -158,7 +158,7 @@ end
 ---@return table
 function PointerDispatcher.sample(context, ...)
     assert(context and context.root,
-        'DwarfUI PointerDispatcher.sample requires a PointerContext.')
+        'DwarfUICore PointerDispatcher.sample requires a PointerContext.')
     local coordinate_count = select('#', ...)
     local x, y = ...
     if coordinate_count == 0 then

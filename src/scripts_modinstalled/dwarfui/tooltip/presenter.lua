@@ -1,6 +1,6 @@
 --@ module=true
 
-local class_helpers = reqscript('dwarfui/class')
+local class_helpers = reqscript('dwarfuicore/class')
 
 ---@class dwarfui.TooltipPresenterOptions
 ---@field service dwarfui.TooltipService

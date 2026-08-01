@@ -1,29 +1,29 @@
 --@ module=true
 
 local widgets = require('gui.widgets')
-local pointer = reqscript('dwarfui/pointer')
+local pointer = reqscript('dwarfuicore/pointer')
 local PointerPolicy = pointer.PointerPolicy
 
 local STATE_KEY = 'widget_extensions'
 
----@class dwarfui.SharedAttributeReplacement
+---@class dwarfuicore.SharedAttributeReplacement
 ---@field class_name string
 ---@field attribute_name string
 ---@field prior_value any
 ---@field prior_value_present boolean
 ---@field canonical_value any
 
----@class dwarfui.SharedAttributeOwnershipState
+---@class dwarfuicore.SharedAttributeOwnershipState
 ---@field generation integer
 ---@field replacement_count integer
----@field replacements dwarfui.SharedAttributeReplacement[]
+---@field replacements dwarfuicore.SharedAttributeReplacement[]
 ---@field report_attempted boolean
 ---@field announcement_error string|nil
 ---@field console_error string|nil
 
-if type(dfhack.dwarfui) ~= 'table' then dfhack.dwarfui = {} end
-local previous_state = dfhack.dwarfui[STATE_KEY]
----@type dwarfui.SharedAttributeOwnershipState
+if type(dfhack.dwarfuicore) ~= 'table' then dfhack.dwarfuicore = {} end
+local previous_state = dfhack.dwarfuicore[STATE_KEY]
+---@type dwarfuicore.SharedAttributeOwnershipState
 local process_state = type(previous_state) == 'table' and previous_state or {
     generation=0,
     replacement_count=0,
@@ -39,7 +39,7 @@ end
 process_state.generation = process_state.generation + 1
 process_state.replacement_count = #process_state.replacements
 process_state.report_attempted = process_state.report_attempted == true
-dfhack.dwarfui[STATE_KEY] = process_state
+dfhack.dwarfuicore[STATE_KEY] = process_state
 
 ---Converts a diagnostic value to text without trusting its metamethods.
 ---@param value any
@@ -75,7 +75,7 @@ end
 ---@return boolean changed
 local function install_attribute(class, name, default, description)
     local attrs = assert(class and class.ATTRS,
-        'DwarfUI requires ' .. description .. '.ATTRS.')
+        'DwarfUICore requires ' .. description .. '.ATTRS.')
     local existing = rawget(attrs, name)
     if existing == default then return false end
 
@@ -90,7 +90,7 @@ end
 ---@return boolean changed
 function install_tooltip_attribute()
     local widget = assert(widgets.Widget,
-        'DwarfUI requires gui.widgets.Widget for tooltip attributes.')
+        'DwarfUICore requires gui.widgets.Widget for tooltip attributes.')
     return install_attribute(widget, 'tooltip', DEFAULT_NIL,
         'gui.widgets.Widget')
 end
@@ -100,13 +100,13 @@ end
 function install_pointer_attributes()
     local changed = false
     local widget = assert(widgets.Widget,
-        'DwarfUI requires gui.widgets.Widget for pointer attributes.')
+        'DwarfUICore requires gui.widgets.Widget for pointer attributes.')
     local panel = assert(widgets.Panel,
-        'DwarfUI requires gui.widgets.Panel for pointer attributes.')
+        'DwarfUICore requires gui.widgets.Panel for pointer attributes.')
     local window = assert(widgets.Window,
-        'DwarfUI requires gui.widgets.Window for pointer attributes.')
+        'DwarfUICore requires gui.widgets.Window for pointer attributes.')
     local text_button = assert(widgets.TextButton,
-        'DwarfUI requires gui.widgets.TextButton for pointer attributes.')
+        'DwarfUICore requires gui.widgets.TextButton for pointer attributes.')
 
     changed = install_attribute(widget, 'pointer_policy', PointerPolicy.TARGET,
         'gui.widgets.Widget') or changed
@@ -129,11 +129,11 @@ function install_pointer_attributes()
 end
 
 ---Builds the detailed ownership-replacement report.
----@param replacements dwarfui.SharedAttributeReplacement[]
+---@param replacements dwarfuicore.SharedAttributeReplacement[]
 ---@return string
 local function build_report(replacements)
     local lines = {
-        ('DwarfUI replaced %d shared gui.widgets attribute contract(s):')
+        ('DwarfUICore replaced %d shared gui.widgets attribute contract(s):')
             :format(#replacements),
     }
     for _, replacement in ipairs(replacements) do
@@ -147,7 +147,7 @@ local function build_report(replacements)
 end
 
 ---Reports the first replacement batch once per DFHack process.
----@param replacements dwarfui.SharedAttributeReplacement[]
+---@param replacements dwarfuicore.SharedAttributeReplacement[]
 local function report_replacements(replacements)
     if #replacements == 0 or process_state.report_attempted then return end
     process_state.report_attempted = true
@@ -155,7 +155,7 @@ local function report_replacements(replacements)
     local message = build_report(replacements)
     local announcement_ok, announcement_error = pcall(function()
         dfhack.gui.showAnnouncement(
-            'DwarfUI corrected conflicting shared UI attributes. See DFHack console.',
+            'DwarfUICore corrected conflicting shared UI attributes. See DFHack console.',
             COLOR_RED,
             true)
     end)
@@ -171,7 +171,7 @@ local function report_replacements(replacements)
     end
 end
 
----Installs every DwarfUI-owned shared widget attribute contract.
+---Installs every DwarfUICore-owned shared widget attribute contract.
 ---@return integer replacement_count
 function install_all()
     local first_replacement = #process_state.replacements + 1
@@ -187,7 +187,7 @@ function install_all()
 end
 
 ---Returns reload-safe shared-attribute ownership diagnostics.
----@return dwarfui.SharedAttributeOwnershipState diagnostics
+---@return dwarfuicore.SharedAttributeOwnershipState diagnostics
 function get_diagnostics()
     return process_state
 end

@@ -4,12 +4,12 @@
 
 local MODULE_GENERATION_SLOT = 'pointer_poller_module_generation'
 
-dfhack.dwarfui = dfhack.dwarfui or {}
-dfhack.dwarfui[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfui[MODULE_GENERATION_SLOT] or 0) + 1
-local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
+    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 
----@class dwarfui.PointerSample
+---@class dwarfuicore.PointerSample
 ---@field sequence integer
 ---@field x integer|nil
 ---@field y integer|nil
@@ -19,35 +19,35 @@ local module_generation = dfhack.dwarfui[MODULE_GENERATION_SLOT]
 ---@field coordinate_space '"screen-cells"'
 
 ---Queues one callback for later execution without invoking it synchronously.
----@alias dwarfui.PointerPollerScheduler fun(callback: function)
+---@alias dwarfuicore.PointerPollerScheduler fun(callback: function)
 
 ---Returns one pointer position in screen-cell coordinates.
----@alias dwarfui.PointerPollerSampler fun(): integer|nil, integer|nil
+---@alias dwarfuicore.PointerPollerSampler fun(): integer|nil, integer|nil
 
 ---Returns the exact map tile under the pointer, or nil outside the map.
----@alias dwarfui.PointerPollerMapSampler fun(): {x: integer, y: integer, z: integer}|nil
+---@alias dwarfuicore.PointerPollerMapSampler fun(): {x: integer, y: integer, z: integer}|nil
 
 ---Accepts one immutable sample and must not retain mutable poller state.
----@alias dwarfui.PointerPollerObserver fun(sample: dwarfui.PointerSample)
+---@alias dwarfuicore.PointerPollerObserver fun(sample: dwarfuicore.PointerSample)
 
 ---Returns whether another pointer sample is currently required.
----@alias dwarfui.PointerPollerDemand fun(): boolean
+---@alias dwarfuicore.PointerPollerDemand fun(): boolean
 
----@class dwarfui.PointerPollerOptions
----@field scheduler dwarfui.PointerPollerScheduler|nil
----@field sample_pointer dwarfui.PointerPollerSampler|nil
----@field sample_map_pointer dwarfui.PointerPollerMapSampler|nil
----@field observer dwarfui.PointerPollerObserver
----@field has_demand dwarfui.PointerPollerDemand
----@field has_map_demand dwarfui.PointerPollerDemand|nil
+---@class dwarfuicore.PointerPollerOptions
+---@field scheduler dwarfuicore.PointerPollerScheduler|nil
+---@field sample_pointer dwarfuicore.PointerPollerSampler|nil
+---@field sample_map_pointer dwarfuicore.PointerPollerMapSampler|nil
+---@field observer dwarfuicore.PointerPollerObserver
+---@field has_demand dwarfuicore.PointerPollerDemand
+---@field has_map_demand dwarfuicore.PointerPollerDemand|nil
 
----@class dwarfui.PointerPoller
----@field _scheduler dwarfui.PointerPollerScheduler
----@field _sample_pointer dwarfui.PointerPollerSampler
----@field _sample_map_pointer dwarfui.PointerPollerMapSampler
----@field _observer dwarfui.PointerPollerObserver
----@field _has_demand dwarfui.PointerPollerDemand
----@field _has_map_demand dwarfui.PointerPollerDemand
+---@class dwarfuicore.PointerPoller
+---@field _scheduler dwarfuicore.PointerPollerScheduler
+---@field _sample_pointer dwarfuicore.PointerPollerSampler
+---@field _sample_map_pointer dwarfuicore.PointerPollerMapSampler
+---@field _observer dwarfuicore.PointerPollerObserver
+---@field _has_demand dwarfuicore.PointerPollerDemand
+---@field _has_map_demand dwarfuicore.PointerPollerDemand
 ---@field _module_generation integer
 ---@field _generation integer
 ---@field _sequence integer
@@ -88,7 +88,7 @@ end
 ---@param map_x integer|nil
 ---@param map_y integer|nil
 ---@param map_z integer|nil
----@return dwarfui.PointerSample
+---@return dwarfuicore.PointerSample
 local function make_sample(sequence, x, y, map_x, map_y, map_z)
     local values = {
         sequence=sequence,
@@ -102,7 +102,7 @@ local function make_sample(sequence, x, y, map_x, map_y, map_z)
     return setmetatable({}, {
         __index=values,
         __newindex=function()
-            error('DwarfUI pointer samples are immutable.', 2)
+            error('DwarfUICore pointer samples are immutable.', 2)
         end,
         __pairs=function()
             return next, values, nil
@@ -112,26 +112,26 @@ local function make_sample(sequence, x, y, map_x, map_y, map_z)
 end
 
 ---Creates a pointer poller with explicit observation and demand boundaries.
----@param options dwarfui.PointerPollerOptions
----@return dwarfui.PointerPoller
+---@param options dwarfuicore.PointerPollerOptions
+---@return dwarfuicore.PointerPoller
 function PointerPoller.new(options)
     assert(type(options) == 'table',
-        'DwarfUI pointer poller requires dependency options.')
+        'DwarfUICore pointer poller requires dependency options.')
     assert(options.scheduler == nil or type(options.scheduler) == 'function',
-        'DwarfUI pointer poller scheduler must be a function.')
+        'DwarfUICore pointer poller scheduler must be a function.')
     assert(options.sample_pointer == nil or
         type(options.sample_pointer) == 'function',
-        'DwarfUI pointer poller sampler must be a function.')
+        'DwarfUICore pointer poller sampler must be a function.')
     assert(options.sample_map_pointer == nil or
         type(options.sample_map_pointer) == 'function',
-        'DwarfUI map pointer sampler must be a function.')
+        'DwarfUICore map pointer sampler must be a function.')
     assert(type(options.observer) == 'function',
-        'DwarfUI pointer poller observer must be a function.')
+        'DwarfUICore pointer poller observer must be a function.')
     assert(type(options.has_demand) == 'function',
-        'DwarfUI pointer poller demand predicate must be a function.')
+        'DwarfUICore pointer poller demand predicate must be a function.')
     assert(options.has_map_demand == nil or
         type(options.has_map_demand) == 'function',
-        'DwarfUI map pointer demand predicate must be a function.')
+        'DwarfUICore map pointer demand predicate must be a function.')
     return setmetatable({
         _scheduler=options.scheduler or default_scheduler,
         _sample_pointer=options.sample_pointer or default_sampler,
@@ -151,7 +151,7 @@ end
 ---@return boolean
 function PointerPoller:_module_is_current()
     return self._module_generation ==
-        dfhack.dwarfui[MODULE_GENERATION_SLOT]
+        dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 end
 
 ---Stops logical ownership of the current callback chain.
@@ -171,7 +171,7 @@ function PointerPoller:_call(label, callback)
     local results = table.pack(xpcall(callback, debug.traceback))
     if not results[1] then
         self:_halt()
-        error(('DwarfUI pointer poller %s failed: %s'):format(
+        error(('DwarfUICore pointer poller %s failed: %s'):format(
             label, tostring(results[2])), 0)
     end
     return true, table.unpack(results, 2, results.n)
@@ -210,7 +210,7 @@ end
 function PointerPoller:_tick(expected_generation,
         expected_module_generation)
     if expected_module_generation ~=
-            dfhack.dwarfui[MODULE_GENERATION_SLOT] then
+            dfhack.dwarfuicore[MODULE_GENERATION_SLOT] then
         self._running = false
         self._scheduled = false
         return
@@ -250,7 +250,7 @@ function PointerPoller:_tick(expected_generation,
 
     if expected_generation ~= self._generation or
             expected_module_generation ~=
-                dfhack.dwarfui[MODULE_GENERATION_SLOT] or
+                dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or
             not self._running then
         return
     end

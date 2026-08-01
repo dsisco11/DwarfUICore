@@ -4,12 +4,12 @@
 -- consumes pointer samples and weak registrations, but never creates or
 -- queries a tooltip renderer, screen, or overlay host.
 
-local pointer = reqscript('dwarfui/pointer')
+local pointer = reqscript('dwarfuicore/pointer')
 local PointerResultKind = pointer.PointerResultKind
 local target_types = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 local ViewRootResolver =
-    reqscript('dwarfui/view_root_resolver').ViewRootResolver
+    reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
 ---@class dwarfui.TooltipPointerObservation
 ---@field sequence integer

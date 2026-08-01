@@ -3,7 +3,7 @@
 -- Weak exact-coordinate map-tooltip registration and target detection.
 
 local ViewRootResolver =
-    reqscript('dwarfui/view_root_resolver').ViewRootResolver
+    reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 local target_types = reqscript('dwarfui/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 

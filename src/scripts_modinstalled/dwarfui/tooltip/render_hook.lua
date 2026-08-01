@@ -7,7 +7,7 @@ local API_VERSION = 1
 local STATE_SLOT = 'tooltip_render_hook'
 local OVERLAY_RENDER_METHOD = 'render_viewscreen_widgets'
 local SCREEN_RENDER_METHOD = 'onRender'
-local function_chain = reqscript('dwarfui/utils/function_chain')
+local function_chain = reqscript('dwarfuicore/utils/function_chain')
 
 ---@enum dwarfui.TooltipRenderTransport
 TooltipRenderTransport = {

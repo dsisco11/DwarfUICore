@@ -2,7 +2,7 @@
 
 -- Validation and snapshot ownership for context-menu definitions.
 
-local numbers = reqscript('dwarfui/utils/numbers')
+local numbers = reqscript('dwarfuicore/utils/numbers')
 
 local SYSTEM_FOREGROUND = 15
 local SYSTEM_BACKGROUND = 0

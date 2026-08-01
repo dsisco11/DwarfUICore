@@ -7,7 +7,7 @@ local input_samples = reqscript('dwarfui/context_menu/input_sample')
 local registrations = reqscript('dwarfui/context_menu/registration')
 local target_detectors = reqscript('dwarfui/context_menu/target_detector')
 local targets = reqscript('dwarfui/context_menu/target')
-local numbers = reqscript('dwarfui/utils/numbers')
+local numbers = reqscript('dwarfuicore/utils/numbers')
 
 local DetectionKind = target_detectors.ContextMenuDetectionKind
 local TargetKind = targets.ContextMenuTargetKind

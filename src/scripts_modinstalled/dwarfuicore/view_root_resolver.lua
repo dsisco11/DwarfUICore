@@ -3,15 +3,15 @@
 -- Shared owner-root discovery and presentation eligibility.
 
 local overlay = require('plugins.overlay')
-local class_helpers = reqscript('dwarfui/class')
+local class_helpers = reqscript('dwarfuicore/class')
 
----@alias dwarfui.ViewRootPresentationPredicate fun(root: gui.View): boolean
+---@alias dwarfuicore.ViewRootPresentationPredicate fun(root: gui.View): boolean
 
----@class dwarfui.ViewRootResolverOptions
----@field is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate|nil
+---@class dwarfuicore.ViewRootResolverOptions
+---@field is_non_overlay_root_presented dwarfuicore.ViewRootPresentationPredicate|nil
 
----@class dwarfui.ViewRootResolver
----@field _is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate
+---@class dwarfuicore.ViewRootResolver
+---@field _is_non_overlay_root_presented dwarfuicore.ViewRootPresentationPredicate
 ViewRootResolver = {}
 ViewRootResolver.__index = ViewRootResolver
 
@@ -78,15 +78,15 @@ local function default_non_overlay_root_is_presented(root)
 end
 
 ---Creates a resolver with an injectable non-overlay presentation predicate.
----@param options dwarfui.ViewRootResolverOptions|nil
----@return dwarfui.ViewRootResolver
+---@param options dwarfuicore.ViewRootResolverOptions|nil
+---@return dwarfuicore.ViewRootResolver
 function ViewRootResolver.new(options)
     options = options or {}
     assert(type(options) == 'table',
-        'DwarfUI view root resolver options must be a table.')
+        'DwarfUICore view root resolver options must be a table.')
     assert(options.is_non_overlay_root_presented == nil or
         type(options.is_non_overlay_root_presented) == 'function',
-        'DwarfUI non-overlay root predicate must be a function.')
+        'DwarfUICore non-overlay root predicate must be a function.')
     return setmetatable({
         _is_non_overlay_root_presented=
             options.is_non_overlay_root_presented or

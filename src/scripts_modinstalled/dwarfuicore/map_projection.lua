@@ -4,7 +4,7 @@
 
 local guidm = require('gui.dwarfmode')
 
----@class dwarfui.MapProjectionResult
+---@class dwarfuicore.MapProjectionResult
 ---@field x integer
 ---@field y integer
 ---@field z integer
@@ -32,7 +32,7 @@ end
 ---The caller owns visibility and z-level policy.
 ---@param pos {x: integer, y: integer, z: integer}
 ---@param viewport gui.dwarfmode.Viewport
----@return dwarfui.MapProjectionResult|nil
+---@return dwarfuicore.MapProjectionResult|nil
 function world_to_interface(pos, viewport)
     if not pos or not viewport then return nil end
     if not dfhack.screen.inGraphicsMode() then
@@ -64,7 +64,7 @@ end
 ---Projects an exact tile only when it is visible on the displayed z-level.
 ---@param pos {x: integer, y: integer, z: integer}
 ---@param viewport? gui.dwarfmode.Viewport
----@return dwarfui.MapProjectionResult|nil
+---@return dwarfuicore.MapProjectionResult|nil
 function project_visible(pos, viewport)
     local origin = {x=0, y=0}
     if not viewport then viewport, origin = get_active_viewport() end

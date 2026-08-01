@@ -55,11 +55,11 @@ describe('Busted test infrastructure', function()
 
     it('models the tooltip widget primitives', function()
         local _, immutable_enum = module_loader.load(repo_root,
-            'src/scripts_modinstalled/dwarfui/utils/immutable_enum.lua')
+            'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
         local _, pointer = module_loader.load(repo_root,
-            'src/scripts_modinstalled/dwarfui/pointer.lua', {
+            'src/scripts_modinstalled/dwarfuicore/pointer.lua', {
                 reqscript={
-                    ['dwarfui/utils/immutable_enum']=immutable_enum,
+                    ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 },
             })
         local Policy = pointer.PointerPolicy

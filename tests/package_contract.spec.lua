@@ -21,4 +21,51 @@ describe('DwarfUICore package contract', function()
         assert.is_truthy(info:find('[ID:dwarfuicore]', 1, true))
         assert.is_truthy(root:find('--@ module=true', 1, true))
     end)
+
+    it('owns shared infrastructure under the dwarfuicore namespace', function()
+        local shared_modules = {
+            'class.lua',
+            'map_projection.lua',
+            'pointer_poller.lua',
+            'pointer.lua',
+            'text.lua',
+            'view_root_resolver.lua',
+            'widget_extensions.lua',
+            'utils/function_chain.lua',
+            'utils/immutable_enum.lua',
+            'utils/numbers.lua',
+        }
+
+        for _, relative_path in ipairs(shared_modules) do
+            local source = read_source(
+                'src/scripts_modinstalled/dwarfuicore/' .. relative_path)
+            assert.is_truthy(source:find('--@ module=true', 1, true))
+            assert.is_nil(source:find("reqscript('dwarfui/", 1, true))
+        end
+    end)
+
+    it('does not retain shared infrastructure under the dwarfui namespace',
+            function()
+        local legacy_modules = {
+            'class.lua',
+            'map_projection.lua',
+            'pointer_poller.lua',
+            'pointer.lua',
+            'text.lua',
+            'view_root_resolver.lua',
+            'widget_extensions.lua',
+            'utils/function_chain.lua',
+            'utils/immutable_enum.lua',
+            'utils/numbers.lua',
+        }
+
+        for _, relative_path in ipairs(legacy_modules) do
+            local path = repo_root .. separator ..
+                ('src/scripts_modinstalled/dwarfui/' .. relative_path):gsub(
+                    '/', separator)
+            local file = io.open(path, 'rb')
+            if file then file:close() end
+            assert.is_nil(file)
+        end
+    end)
 end)

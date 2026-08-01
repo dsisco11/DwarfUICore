@@ -2,8 +2,8 @@
 
 -- Reload-safe pre-delegation input trampolines for native and Lua screens.
 
-local function_chain = reqscript('dwarfui/utils/function_chain')
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
+local function_chain = reqscript('dwarfuicore/utils/function_chain')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
 local API_VERSION = 1
 local STATE_SLOT = 'context_menu_input_hook'

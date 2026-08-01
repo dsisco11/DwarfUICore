@@ -2,8 +2,8 @@
 
 -- Deterministic widget/blocker/map arbitration over one synchronous sample.
 
-local immutable_enum = reqscript('dwarfui/utils/immutable_enum')
-local pointer = reqscript('dwarfui/pointer')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
+local pointer = reqscript('dwarfuicore/pointer')
 local targets = reqscript('dwarfui/context_menu/target')
 local PointerResultKind = pointer.PointerResultKind
 local TargetKind = targets.ContextMenuTargetKind

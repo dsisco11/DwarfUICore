@@ -5,7 +5,7 @@
 
 local input_service = reqscript('dwarfui/tooltip/service').service
 local PointerPoller =
-    reqscript('dwarfui/pointer_poller').PointerPoller
+    reqscript('dwarfuicore/pointer_poller').PointerPoller
 local TooltipTargetDetector =
     reqscript('dwarfui/tooltip/target_detector').TooltipTargetDetector
 local map_targets =

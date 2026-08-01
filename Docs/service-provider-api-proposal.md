@@ -2,11 +2,13 @@
 
 ## Status
 
-Approved and frozen on 2026-08-01, but unimplemented. The repository split is
-complete, and this document is the accepted version 1 public service-provider
-contract. It does not implement providers, namespaces, composite identities,
-exact service-contract version negotiation, immutable service APIs, or consumer
-migration. Any contract amendment before implementation requires explicit
+Approved and frozen on 2026-08-01 for its architecture and behavioral
+decisions, but unimplemented. The repository split is complete. Before
+production implementation, the transitive public data schemas named by this
+document must still be enumerated here and explicitly approved. This document
+does not implement providers, namespaces, composite identities, exact
+service-contract version negotiation, immutable service APIs, or consumer
+migration. Any other contract amendment before implementation requires explicit
 re-approval.
 
 ## Decision summary
@@ -117,8 +119,8 @@ separately authorized migration to the provider contract.
 Nothing in this contract exists in the repository today. In particular,
 `dwarfuicore.services`, the provider classes, `new(version, namespace)`,
 namespace-bound service APIs, and their collision and lifecycle rules are all
-unimplemented. The current module entrypoints are documented in the repository
-README and remain separate from this proposal.
+unimplemented. The current direct module entrypoints predate this contract and
+are replaced as specified under **Legacy direct API replacement**.
 
 The root module exports a closed, read-only `services` namespace:
 
@@ -418,9 +420,16 @@ function ContextMenuServiceApi:clear_namespace()
 end
 ```
 
-All referenced option, update, handle, and definition types are public versioned
-data contracts and must receive complete LuaDoc definitions in the
-implementation. Registration handles are opaque immutable values.
+All referenced option, update, handle, definition, entry, callback-context, and
+public discriminator types are public versioned data contracts and must receive
+complete LuaDoc definitions in the implementation. Registration handles are
+opaque immutable values.
+
+This document does not yet enumerate the complete transitive field schemas for
+those records, their callback contexts, or their referenced public
+discriminators. Those schemas, including optionality, defaults, validation,
+copying, and identity semantics, must be appended here and explicitly approved
+before production implementation begins.
 
 ### Diagnostic boundary
 

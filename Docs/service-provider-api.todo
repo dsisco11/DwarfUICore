@@ -1,7 +1,9 @@
 # Service Provider API Implementation Checklist
 
-Status: version 1 contract approved and frozen; ready for baseline and inventory
-work
+Status: architecture and behavioral contract approved; production
+implementation blocked until the transitive public data schema is recorded in
+the proposal and explicitly approved. Read-only baseline and inventory work may
+proceed.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -31,6 +33,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Refactor registration identity through the full pipeline. Namespaces must
       survive registration, detection, mediation, presentation, callback
       dispatch, diagnostics, update, removal, and stale-handle validation.
+- [ ] Close the proposal's public-schema gap before production work. The
+      proposal names versioned option, update, handle, definition, entry,
+      callback-context, and discriminator types but does not define their
+      complete fields, optionality, defaults, or validation semantics.
 - [ ] Treat tooltip collision resolution and context-menu composition as
       backend changes. They cannot be implemented safely only in the public API
       wrapper.
@@ -64,8 +70,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       `reqscript()`, and reload-managed modules are registered in dependency
       order.
 - [ ] Every new or modified class and method has complete LuaDoc comments. All
-      public option, update, handle, and definition records have complete
-      versioned LuaDoc definitions.
+      public option, update, handle, definition, entry, callback-context, and
+      discriminator records have complete versioned LuaDoc definitions.
 - [ ] Provider APIs expose no `get_diagnostics()` method or public diagnostic
       record type. Retain private diagnostics for focused tests, reload
       validation, hook inspection, and development troubleshooting only.
@@ -90,8 +96,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [x] Approve the namespace grammar, 64-byte limit, and byte-for-byte
       comparison. Validate syntax only; do not add reservation, allocation,
       registration, or global claiming of namespace strings.
-- [x] Freeze the complete version 1 LuaDoc schema for both service APIs and all
-      referenced options, updates, handles, and definitions.
+- [ ] Amend the proposal with and explicitly approve the complete transitive
+      version 1 LuaDoc schema for both services. Cover map positions, options,
+      updates, opaque handles, context-menu definitions and entries, callback
+      selection context, referenced public discriminator enums, field
+      optionality/defaults, validation, copying, canonical type names, and
+      identity semantics. Reconcile the current callback context's raw
+      registration identity with the proposal's opaque composite-identity rule.
 - [x] Freeze the diagnostic boundary: public service health is observable
       through documented errors, while private diagnostic shapes are unversioned
       and may not leak definitions or callback references across namespaces.
@@ -130,6 +141,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 - [x] The proposal text and every decision above are approved or amended in the
       proposal before implementation begins.
+- [ ] Every DwarfUICore-owned transitive public type reachable through an API
+      parameter, return, field, or callback is defined in the proposal and
+      explicitly approved.
 - [ ] Baseline evidence is recorded without promoting unit or package evidence
       to live-runtime success.
 - [ ] The current process-state and registration data flows are mapped through
@@ -237,6 +251,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       succeeds.
 - [ ] Clear the in-progress marker on every failure while leaving no facade or
       healthy marker published, so a corrected later retry can succeed.
+- [ ] Give unhealthy and initialization failures actionable non-stable detail
+      indicating whether correction, process restart, or explicit development
+      reload is appropriate without making the detail byte-stable.
 - [ ] Reuse a compatible healthy singleton without replacing registrations,
       active intent/menu state, hooks, diagnostics, or namespace sequences.
 - [ ] Return enough private acquisition metadata to construct a fresh bound API
@@ -266,6 +283,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Allocate map identities and handles through the shared composite identity
       contract and enforce namespace, service, contract-major, and generation
       ownership on update and removal.
+- [ ] Make tooltip map updates atomic while preserving the opaque handle,
+      composite identity, and original contribution sequence.
 - [ ] Carry composite source identity through widget and map candidates, target
       adaptation, mediation, intent, presenter state, and private diagnostics.
 - [ ] Resolve eligible tooltip collisions by greatest process-wide original
@@ -310,6 +329,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       contribution is removed.
 - [ ] Convert map registrations to composite identities and enforce all foreign
       handle rejection dimensions before mutation.
+- [ ] Make context-menu map updates atomic while preserving the opaque handle,
+      composite identity, and original contribution sequence.
 - [ ] Separate physical target selection from contribution collection so all
       eligible namespaces for the selected widget or exact map tile can
       contribute to one menu.
@@ -388,6 +409,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       backing data and validate the active generation before every method.
 - [ ] Implement every approved tooltip and context-menu version 1 method as a
       direct namespace-bound delegation with no per-call namespace parameter.
+- [ ] Implement the exact approved transitive public LuaDoc schemas and reject
+      malformed required fields, unknown closed discriminator values, and
+      invalid callback shapes before mutation.
 - [ ] Render API failures through the service API prefix and one of `STALE_API`,
       `INVALID_ARGUMENT`, `FOREIGN_HANDLE`, `STALE_HANDLE`,
       or `SERVICE_UNHEALTHY`.
@@ -405,12 +429,19 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Update root, provider, API, module-registry, and package-contract tests for
       the complete public surface and the absence of a global `get()` or public
       service discriminator.
+- [ ] Assert the exact method set and return semantics for both APIs, including
+      first-registration versus repeat/replacement `created`, absent
+      same-domain `updated`/`removed`, and namespace-wide `changed` booleans;
+      prove no public diagnostic method or unapproved method is exposed.
 - [ ] Migrate DwarfUICore tests and fixtures away from both legacy direct API
       paths so they exercise the namespace-bound provider contract before the
       legacy modules are deleted.
 - [ ] Prove constructors and methods raise ordinary Lua errors, never call
       `qerror()`, never return `nil, error`, and mutate no state after any
-      validation, ownership, coherence, or health failure.
+      validation, ownership, contract, runtime-state, or health failure.
+- [ ] Prove a resolvable root with a missing private implementation reports the
+      provider-specific `INITIALIZATION_FAILED` contract, while a missing root
+      script remains DFHack's ordinary missing-script error.
 
 ### Phase 6 completion gate
 
@@ -468,7 +499,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       first ships the provider contract; do not publish either coordinated
       package until the matching package is ready.
 - [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
-      namespace while preserving all other namespaces and the core generation.
+      namespace through both acquired service APIs while preserving all other
+      namespaces and the core generation.
 - [ ] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
       through explicit namespace cleanup rather than API-object collection.
 - [ ] Update DwarfUI focused tests and package/integration setup to install and
@@ -520,6 +552,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       principals and give stable canonical identifier guidance.
 - [ ] Document compatible and breaking contract changes and keep public contract
       majors distinct from package and private implementation versions.
+- [ ] Publish the complete approved transitive LuaDoc schema, including callback
+      context and public discriminator semantics, without exposing composite
+      identities or private diagnostic records.
 - [ ] Add canonical tooltip and context-menu examples using
       `reqscript('dwarfuicore')` and no per-method namespace argument.
 - [ ] Build and inspect the expanded package and final archive; prove all
@@ -543,6 +578,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 10 - Verification, live acceptance, and cleanup
 
+- [ ] Build an acceptance-evidence matrix mapping every proposal acceptance row
+      to its exact focused unit, complete unit, package, live, manual, or cleanup
+      evidence before running the final verification sequence.
 - [ ] Run focused namespace, identity, runtime-state, acquisition, provider, tooltip,
       context-menu, reload, root, registry, and package-contract unit specs.
 - [ ] Run the complete DwarfUICore unit suite.
@@ -562,8 +600,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Run DwarfUI's focused and complete unit/integration suites against the
       verified DwarfUICore package after Phase 8 is authorized and complete.
 - [ ] Manually verify tooltip winner fallback, combined context-menu ordering
-      and exact callback dispatch, repeated construction preservation, stale
-      object rejection, DwarfUI reload isolation, and explicit core reload.
+      and exact callback dispatch, immutable open-menu update behavior,
+      full-menu closure on contribution loss, repeated construction
+      preservation, stale object rejection, DwarfUI reload isolation, and
+      explicit core reload.
 - [ ] Inspect hooks, screens, pollers, presenters, active menus/intents,
       registrations, namespace records, runtime state, and diagnostics after
       failure, reload, world unload, and final cleanup.
@@ -590,6 +630,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       exactly the approved provider classes.
 - [ ] Both providers enforce exact major 1 and the approved namespace contract
       before service initialization.
+- [ ] Namespace handling is syntax-only: no reserved names, allocation,
+      registration, claiming, normalization, or namespace-acquisition API
+      exists.
 - [ ] Every construction returns a distinct immutable API object over one
       compatible healthy process-wide backend.
 - [ ] API object collection never changes registrations; no namespace lease,
@@ -615,6 +658,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Provider APIs expose no diagnostic method or record type; private
       diagnostic state remains usable by focused tests and development tooling
       without leaking definitions or callback references.
+- [ ] Both APIs expose exactly the approved methods and boolean/handle return
+      semantics, and every transitively reachable DwarfUICore-owned public data
+      type matches the explicitly approved LuaDoc schema.
 - [ ] Ordinary construction preserves singleton owners, registrations, active
       presentation state, hooks, health, diagnostics, and sequences.
 - [ ] Partial, malformed, wrong-generation, disabled, retired, and reentrant

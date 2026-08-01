@@ -68,4 +68,34 @@ describe('DwarfUICore package contract', function()
             assert.is_nil(file)
         end
     end)
+
+    it('owns the current tooltip implementation under dwarfuicore', function()
+        local tooltip_modules = {
+            'api.lua',
+            'map_target.lua',
+            'presenter.lua',
+            'registration.lua',
+            'render_hook.lua',
+            'renderer.lua',
+            'runtime.lua',
+            'service.lua',
+            'target_detector.lua',
+            'target.lua',
+        }
+
+        for _, relative_path in ipairs(tooltip_modules) do
+            local source = read_source(
+                'src/scripts_modinstalled/dwarfuicore/tooltip/' ..
+                    relative_path)
+            assert.is_truthy(source:find('--@ module=true', 1, true))
+            assert.is_nil(source:find("reqscript('dwarfui/tooltip/", 1, true))
+
+            local legacy_path = repo_root .. separator ..
+                ('src/scripts_modinstalled/dwarfui/tooltip/' ..
+                    relative_path):gsub('/', separator)
+            local legacy_file = io.open(legacy_path, 'rb')
+            if legacy_file then legacy_file:close() end
+            assert.is_nil(legacy_file)
+        end
+    end)
 end)

@@ -9,17 +9,17 @@ local OVERLAY_RENDER_METHOD = 'render_viewscreen_widgets'
 local SCREEN_RENDER_METHOD = 'onRender'
 local function_chain = reqscript('dwarfuicore/utils/function_chain')
 
----@enum dwarfui.TooltipRenderTransport
+---@enum dwarfuicore.TooltipRenderTransport
 TooltipRenderTransport = {
     OVERLAY=1,
     SCREEN=2,
 }
 
-dfhack.dwarfui = dfhack.dwarfui or {}
-local process_state = dfhack.dwarfui[STATE_SLOT]
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+local process_state = dfhack.dwarfuicore[STATE_SLOT]
 
 if process_state and process_state.api_version ~= API_VERSION then
-    error(('Conflicting DwarfUI tooltip render-hook versions: ' ..
+    error(('Conflicting DwarfUICore tooltip render-hook versions: ' ..
         'process has %s, requested %s.'):format(
             tostring(process_state.api_version), tostring(API_VERSION)))
 end
@@ -45,7 +45,7 @@ if not process_state then
         selected_transport=nil,
         selected_owner=nil,
     }
-    dfhack.dwarfui[STATE_SLOT] = process_state
+    dfhack.dwarfuicore[STATE_SLOT] = process_state
 end
 process_state.failure_count = process_state.failure_count or 0
 process_state.overlay_module_replacement_count =
@@ -56,8 +56,8 @@ process_state.reorderable_wrappers =
     process_state.reorderable_wrappers or
         setmetatable({}, {__mode='k'})
 
----@class dwarfui.TooltipRenderHookRecord
----@field transport dwarfui.TooltipRenderTransport
+---@class dwarfuicore.TooltipRenderHookRecord
+---@field transport dwarfuicore.TooltipRenderTransport
 ---@field owner table|nil
 ---@field owner_ref table|nil weak-value reference for a screen owner
 ---@field active_trampoline function
@@ -73,16 +73,16 @@ process_state.reorderable_wrappers =
 ---@field method_replaced boolean
 ---@field method_replacement_count integer
 
----@class dwarfui.TooltipRenderHookState
+---@class dwarfuicore.TooltipRenderHookState
 ---@field api_version integer
 ---@field overlay_module table|nil
----@field overlay_hook dwarfui.TooltipRenderHookRecord|nil
----@field screen_hooks table<table, dwarfui.TooltipRenderHookRecord>
+---@field overlay_hook dwarfuicore.TooltipRenderHookRecord|nil
+---@field screen_hooks table<table, dwarfuicore.TooltipRenderHookRecord>
 ---@field presenter function|nil
 ---@field generation integer
 ---@field render_count integer
 ---@field last_rendered_revision integer|nil
----@field last_transport dwarfui.TooltipRenderTransport|nil
+---@field last_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field last_error string|nil
 ---@field disabled_generation integer|nil
 ---@field current_intent_revision integer|nil
@@ -91,10 +91,10 @@ process_state.reorderable_wrappers =
 ---@field overlay_module_replacement_count integer
 ---@field overlay_method_replacement_count integer
 ---@field reorderable_wrappers table<function, boolean>
----@field selected_transport dwarfui.TooltipRenderTransport|nil
+---@field selected_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 
----@class dwarfui.TooltipRenderHookDiagnostics
+---@class dwarfuicore.TooltipRenderHookDiagnostics
 ---@field api_version integer
 ---@field generation integer
 ---@field presenter_installed boolean
@@ -104,26 +104,26 @@ process_state.reorderable_wrappers =
 ---@field failure_count integer
 ---@field last_failure table|nil
 ---@field inactive_intent boolean
----@field selected_transport dwarfui.TooltipRenderTransport|nil
+---@field selected_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 ---@field render_count integer
 ---@field last_rendered_revision integer|nil
----@field last_transport dwarfui.TooltipRenderTransport|nil
+---@field last_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field last_error string|nil
 ---@field overlay table
 ---@field screens table[]
 ---@field selected_screen table|nil
 ---@field screen_hook_count integer
 
----@class dwarfui.TooltipRenderHookManager
----@field _state dwarfui.TooltipRenderHookState
+---@class dwarfuicore.TooltipRenderHookManager
+---@field _state dwarfuicore.TooltipRenderHookState
 TooltipRenderHookManager = {}
 TooltipRenderHookManager.__index = TooltipRenderHookManager
 
 ---Returns the authoritative process slot instead of module-generation state.
----@return dwarfui.TooltipRenderHookState|nil
+---@return dwarfuicore.TooltipRenderHookState|nil
 local function get_process_state()
-    return dfhack.dwarfui and dfhack.dwarfui[STATE_SLOT] or nil
+    return dfhack.dwarfuicore and dfhack.dwarfuicore[STATE_SLOT] or nil
 end
 
 ---Preserves every return value, including embedded and trailing nil values.
@@ -134,8 +134,8 @@ local function unpack_returns(packed)
 end
 
 ---Invokes the current presenter only for the selected active trampoline.
----@param state dwarfui.TooltipRenderHookState
----@param transport dwarfui.TooltipRenderTransport
+---@param state dwarfuicore.TooltipRenderHookState
+---@param transport dwarfuicore.TooltipRenderTransport
 ---@param owner table
 local function present(state, transport, owner)
     if state.selected_transport ~= transport or
@@ -164,7 +164,7 @@ local function present(state, transport, owner)
         }
         if dfhack.printerr then
             pcall(dfhack.printerr,
-                'DwarfUI tooltip presenter failed:\n' ..
+                'DwarfUICore tooltip presenter failed:\n' ..
                     tostring(rendered_revision))
         end
         return
@@ -178,7 +178,7 @@ end
 ---Builds a trampoline that always calls its predecessor before presentation.
 ---The callback re-reads process state and runs only while this exact function
 ---is the designated active trampoline for its transport owner.
----@param transport dwarfui.TooltipRenderTransport
+---@param transport dwarfuicore.TooltipRenderTransport
 ---@param owner_or_ref table overlay owner or weak screen-owner reference
 ---@param predecessor function
 ---@return function
@@ -208,11 +208,11 @@ local function make_trampoline(transport, owner_or_ref, predecessor)
 end
 
 ---Creates a manager facade over the process-owned hook state.
----@param state dwarfui.TooltipRenderHookState
----@return dwarfui.TooltipRenderHookManager
+---@param state dwarfuicore.TooltipRenderHookState
+---@return dwarfuicore.TooltipRenderHookManager
 function TooltipRenderHookManager.new(state)
     assert(type(state) == 'table',
-        'DwarfUI TooltipRenderHookManager requires process-owned state.')
+        'DwarfUICore TooltipRenderHookManager requires process-owned state.')
     return setmetatable({_state=state}, TooltipRenderHookManager)
 end
 
@@ -220,7 +220,7 @@ end
 ---@param presenter function|nil
 function TooltipRenderHookManager:set_presenter(presenter)
     assert(presenter == nil or type(presenter) == 'function',
-        'DwarfUI tooltip presenter must be a function or nil.')
+        'DwarfUICore tooltip presenter must be a function or nil.')
     local state = self._state
     if presenter ~= nil and
             (state.disabled_generation == state.generation or
@@ -242,18 +242,18 @@ end
 ---@param revision integer|nil
 function TooltipRenderHookManager:set_current_intent_revision(revision)
     assert(revision == nil or type(revision) == 'number',
-        'DwarfUI tooltip intent revision must be a number or nil.')
+        'DwarfUICore tooltip intent revision must be a number or nil.')
     self._state.current_intent_revision = revision
 end
 
----Allows one outer wrapper to be placed beneath a later DwarfUI trampoline.
+---Allows one outer wrapper to be placed beneath a later DwarfUICore trampoline.
 ---Wrapper owners must opt in because reordering changes the function identity
 ---in the exported slot and can invalidate exact-identity cleanup contracts.
 ---@param wrapper function
 ---@return boolean changed
 function TooltipRenderHookManager:mark_wrapper_reorderable(wrapper)
     assert(type(wrapper) == 'function',
-        'DwarfUI reorderable render wrapper must be a function.')
+        'DwarfUICore reorderable render wrapper must be a function.')
     local wrappers = self._state.reorderable_wrappers
     if wrappers[wrapper] then return false end
     wrappers[wrapper] = true
@@ -280,7 +280,7 @@ function TooltipRenderHookManager:ensure_overlay()
     if state.overlay_module == overlay and previous and
             function_chain.wraps(current, previous.active_trampoline) and
             not state.reorderable_wrappers[current] then
-        -- The other extension still owns the exported slot and DwarfUI is
+        -- The other extension still owns the exported slot and DwarfUICore is
         -- already in its predecessor chain. Replacing that wrapper would
         -- invalidate exact-identity cleanup contracts.
         previous.generation = state.generation
@@ -327,10 +327,10 @@ end
 ---@return boolean changed
 function TooltipRenderHookManager:ensure_screen(owner)
     assert(type(owner) == 'table',
-        'DwarfUI tooltip screen-hook owner must be a table.')
+        'DwarfUICore tooltip screen-hook owner must be a table.')
     local current = owner[SCREEN_RENDER_METHOD]
     assert(type(current) == 'function',
-        'DwarfUI tooltip screen owner onRender must be a function.')
+        'DwarfUICore tooltip screen owner onRender must be a function.')
 
     local state = self._state
     state.selected_transport = TooltipRenderTransport.SCREEN
@@ -344,7 +344,7 @@ function TooltipRenderHookManager:ensure_screen(owner)
             current, previous.active_trampoline) and
             not state.reorderable_wrappers[current] then
         -- Preserve another owner's raw instance method while the active
-        -- DwarfUI trampoline remains reachable through its wrapper.
+        -- DwarfUICore trampoline remains reachable through its wrapper.
         previous.generation = state.generation
         return false
     end
@@ -431,7 +431,7 @@ function TooltipRenderHookManager:shutdown()
 end
 
 ---Returns a read-only snapshot of hook installation and chain diagnostics.
----@return dwarfui.TooltipRenderHookDiagnostics
+---@return dwarfuicore.TooltipRenderHookDiagnostics
 function TooltipRenderHookManager:get_diagnostics()
     local state = self._state
     local overlay_record = state.overlay_hook

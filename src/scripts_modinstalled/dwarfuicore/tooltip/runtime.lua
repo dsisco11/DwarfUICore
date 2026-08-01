@@ -3,12 +3,12 @@
 -- Process-wide tooltip presentation assembly and startup.
 
 local gui = require('gui')
-local presenter_module = reqscript('dwarfui/tooltip/presenter')
-local renderer_module = reqscript('dwarfui/tooltip/renderer')
-local service_module = reqscript('dwarfui/tooltip/service')
-local render_hook_module = reqscript('dwarfui/tooltip/render_hook')
+local presenter_module = reqscript('dwarfuicore/tooltip/presenter')
+local renderer_module = reqscript('dwarfuicore/tooltip/renderer')
+local service_module = reqscript('dwarfuicore/tooltip/service')
+local render_hook_module = reqscript('dwarfuicore/tooltip/render_hook')
 
----@type dwarfui.TooltipPresenter
+---@type dwarfuicore.TooltipPresenter
 presenter = presenter_module.TooltipPresenter.new{
     service=service_module.service,
     hook_manager=render_hook_module.manager,

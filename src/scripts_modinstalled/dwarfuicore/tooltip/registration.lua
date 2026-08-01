@@ -3,14 +3,14 @@
 -- Process-wide tooltip input wiring. Registrations demand pointer polling;
 -- samples flow through target detection into presentation-neutral intent.
 
-local input_service = reqscript('dwarfui/tooltip/service').service
+local input_service = reqscript('dwarfuicore/tooltip/service').service
 local PointerPoller =
     reqscript('dwarfuicore/pointer_poller').PointerPoller
 local TooltipTargetDetector =
-    reqscript('dwarfui/tooltip/target_detector').TooltipTargetDetector
+    reqscript('dwarfuicore/tooltip/target_detector').TooltipTargetDetector
 local map_targets =
-    reqscript('dwarfui/tooltip/map_target').registry
-local target_adapters = reqscript('dwarfui/tooltip/target')
+    reqscript('dwarfuicore/tooltip/map_target').registry
+local target_adapters = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 1
@@ -56,7 +56,7 @@ local function has_map_sampling_demand()
 end
 
 ---Detects and mediates one presentation-independent pointer sample.
----@param sample dwarfui.PointerSample
+---@param sample dwarfuicore.PointerSample
 local function observe_pointer(sample)
     local screen_observation = detector:detect(sample)
     if screen_observation.kind == ObservationKind.TARGET then
@@ -109,8 +109,8 @@ function unregister(widget)
 end
 
 ---Registers one exact map tile with an independent owner and opaque handle.
----@param options dwarfui.MapTileTooltipRegistrationOptions
----@return dwarfui.MapTileTooltipRegistration
+---@param options dwarfuicore.MapTileTooltipRegistrationOptions
+---@return dwarfuicore.MapTileTooltipRegistration
 function register_map_tile(options)
     local handle = map_targets:register(options)
     poller:start()
@@ -118,15 +118,15 @@ function register_map_tile(options)
 end
 
 ---Atomically replaces one map registration's exact position and text.
----@param handle dwarfui.MapTileTooltipRegistration
----@param update dwarfui.MapTileTooltipUpdate
+---@param handle dwarfuicore.MapTileTooltipRegistration
+---@param update dwarfuicore.MapTileTooltipUpdate
 ---@return boolean updated
 function update_map_tile(handle, update)
     return map_targets:update(handle, update)
 end
 
 ---Explicitly removes one map registration and releases idle polling.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean removed
 function unregister_map_tile(handle)
     local removed = map_targets:unregister(handle)

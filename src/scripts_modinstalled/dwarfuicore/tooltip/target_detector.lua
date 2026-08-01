@@ -6,14 +6,14 @@
 
 local pointer = reqscript('dwarfuicore/pointer')
 local PointerResultKind = pointer.PointerResultKind
-local target_types = reqscript('dwarfui/tooltip/target')
+local target_types = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
----@class dwarfui.TooltipPointerObservation
+---@class dwarfuicore.TooltipPointerObservation
 ---@field sequence integer
----@field kind dwarfui.TooltipPointerObservationKind
+---@field kind dwarfuicore.TooltipPointerObservationKind
 ---@field pointer_x integer|nil
 ---@field pointer_y integer|nil
 ---@field target gui.View|nil
@@ -21,37 +21,37 @@ local ViewRootResolver =
 ---@field local_y integer|nil
 ---@field root gui.View|nil
 
----@class dwarfui.TooltipTargetDetectorOptions
+---@class dwarfuicore.TooltipTargetDetectorOptions
 ---@field registrations table<gui.View, table>
 ---@field resolve fun(root: gui.View, x: integer, y: integer): table|nil
----@field is_non_overlay_root_presented dwarfui.ViewRootPresentationPredicate|nil
----@field root_resolver dwarfui.ViewRootResolver|nil
+---@field is_non_overlay_root_presented dwarfuicore.ViewRootPresentationPredicate|nil
+---@field root_resolver dwarfuicore.ViewRootResolver|nil
 ---@field additional_roots fun(): table<gui.View, integer>|nil
 
----@class dwarfui.TooltipTargetCandidate
+---@class dwarfuicore.TooltipTargetCandidate
 ---@field target gui.View
 ---@field root gui.View
 ---@field local_x integer
 ---@field local_y integer
 ---@field sequence integer
 
----@class dwarfui.TooltipBlockedCandidate
+---@class dwarfuicore.TooltipBlockedCandidate
 ---@field root gui.View
 ---@field sequence integer
 
----@class dwarfui.TooltipTargetDetector
+---@class dwarfuicore.TooltipTargetDetector
 ---@field _registrations table<gui.View, table>
 ---@field _resolve fun(root: gui.View, x: integer, y: integer): table
----@field _root_resolver dwarfui.ViewRootResolver
+---@field _root_resolver dwarfuicore.ViewRootResolver
 ---@field _additional_roots fun(): table<gui.View, integer>|nil
 TooltipTargetDetector = {}
 TooltipTargetDetector.__index = TooltipTargetDetector
 
 ---Builds a presentation-neutral observation.
----@param sample dwarfui.PointerSample
----@param kind dwarfui.TooltipPointerObservationKind
----@param candidate dwarfui.TooltipTargetCandidate|dwarfui.TooltipBlockedCandidate|nil
----@return dwarfui.TooltipPointerObservation
+---@param sample dwarfuicore.PointerSample
+---@param kind dwarfuicore.TooltipPointerObservationKind
+---@param candidate dwarfuicore.TooltipTargetCandidate|dwarfuicore.TooltipBlockedCandidate|nil
+---@return dwarfuicore.TooltipPointerObservation
 local function observation(sample, kind, candidate)
     candidate = candidate or {}
     return {
@@ -67,7 +67,7 @@ local function observation(sample, kind, candidate)
 end
 
 ---Selects the later registered candidate for deterministic cross-root order.
----@generic T: dwarfui.TooltipTargetCandidate|dwarfui.TooltipBlockedCandidate
+---@generic T: dwarfuicore.TooltipTargetCandidate|dwarfuicore.TooltipBlockedCandidate
 ---@param current T|nil
 ---@param candidate T
 ---@return T
@@ -79,24 +79,24 @@ function TooltipTargetDetector.prefer_later_registration(current, candidate)
 end
 
 ---Creates a detector over a caller-owned weak registration table.
----@param options dwarfui.TooltipTargetDetectorOptions
----@return dwarfui.TooltipTargetDetector
+---@param options dwarfuicore.TooltipTargetDetectorOptions
+---@return dwarfuicore.TooltipTargetDetector
 function TooltipTargetDetector.new(options)
     assert(type(options) == 'table',
-        'DwarfUI tooltip target detector requires dependency options.')
+        'DwarfUICore tooltip target detector requires dependency options.')
     assert(type(options.registrations) == 'table',
-        'DwarfUI tooltip target detector requires registrations.')
+        'DwarfUICore tooltip target detector requires registrations.')
     assert(options.resolve == nil or type(options.resolve) == 'function',
-        'DwarfUI tooltip target detector resolver must be a function.')
+        'DwarfUICore tooltip target detector resolver must be a function.')
     assert(options.is_non_overlay_root_presented == nil or
             type(options.is_non_overlay_root_presented) == 'function',
-        'DwarfUI non-overlay root predicate must be a function.')
+        'DwarfUICore non-overlay root predicate must be a function.')
     assert(options.root_resolver == nil or
             type(options.root_resolver) == 'table',
-        'DwarfUI tooltip root resolver must be a table.')
+        'DwarfUICore tooltip root resolver must be a table.')
     assert(options.additional_roots == nil or
             type(options.additional_roots) == 'function',
-        'DwarfUI additional tooltip roots must be provided by a function.')
+        'DwarfUICore additional tooltip roots must be provided by a function.')
     return setmetatable({
         _registrations=options.registrations,
         _resolve=options.resolve or pointer.PointerDispatcher.resolve,
@@ -109,13 +109,13 @@ function TooltipTargetDetector.new(options)
 end
 
 ---Detects exactly one target, blocked region, or miss for one pointer sample.
----@param sample dwarfui.PointerSample
----@return dwarfui.TooltipPointerObservation
+---@param sample dwarfuicore.PointerSample
+---@return dwarfuicore.TooltipPointerObservation
 function TooltipTargetDetector:detect(sample)
     assert(type(sample) == 'table',
-        'DwarfUI tooltip target detector requires a pointer sample.')
+        'DwarfUICore tooltip target detector requires a pointer sample.')
     assert(type(sample.sequence) == 'number',
-        'DwarfUI pointer sample sequence must be a number.')
+        'DwarfUICore pointer sample sequence must be a number.')
     if sample.x == nil or sample.y == nil then
         return observation(sample, ObservationKind.MISS)
     end

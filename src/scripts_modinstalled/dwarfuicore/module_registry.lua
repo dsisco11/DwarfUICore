@@ -18,6 +18,16 @@ MODULES = {
     {name='dwarfuicore/text', contract='wrap_text'},
     {name='dwarfuicore/view_root_resolver', contract='ViewRootResolver', contract_type='table'},
     {name='dwarfuicore/widget_extensions', contract='install_all'},
+    {name='dwarfuicore/tooltip/target', contract='TooltipTargetAdapter', contract_type='table'},
+    {name='dwarfuicore/tooltip/map_target', contract='registry', contract_type='table'},
+    {name='dwarfuicore/tooltip/service', contract='service', contract_type='table'},
+    {name='dwarfuicore/tooltip/target_detector', contract='TooltipTargetDetector', contract_type='table'},
+    {name='dwarfuicore/tooltip/registration', contract='register'},
+    {name='dwarfuicore/tooltip/renderer', contract='TooltipRenderer', contract_type='table'},
+    {name='dwarfuicore/tooltip/render_hook', contract='manager', contract_type='table'},
+    {name='dwarfuicore/tooltip/presenter', contract='TooltipPresenter', contract_type='table'},
+    {name='dwarfuicore/tooltip/runtime', contract='presenter', contract_type='table'},
+    {name='dwarfuicore/tooltip/api', contract='register'},
 }
 
 local REGISTRY_SCRIPT = 'dwarfuicore/module_registry'

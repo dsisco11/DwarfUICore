@@ -4,14 +4,14 @@
 -- registrations, pointer transitions, and immutable presentation intent, but
 -- has no presentation implementation or UI-host dependency.
 
-local target_adapters = reqscript('dwarfui/tooltip/target')
+local target_adapters = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 2
 local SERVICE_SLOT = 'tooltip_service'
 
-dfhack.dwarfui = dfhack.dwarfui or {}
-local process_state = dfhack.dwarfui[SERVICE_SLOT]
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+local process_state = dfhack.dwarfuicore[SERVICE_SLOT]
 
 if not process_state or process_state.api_version ~= API_VERSION then
     process_state = {
@@ -26,10 +26,10 @@ if not process_state or process_state.api_version ~= API_VERSION then
         intent_observer=nil,
         generation=0,
     }
-    dfhack.dwarfui[SERVICE_SLOT] = process_state
+    dfhack.dwarfuicore[SERVICE_SLOT] = process_state
 end
 
----@class dwarfui.TooltipIntent
+---@class dwarfuicore.TooltipIntent
 ---@field revision integer
 ---@field source_sequence integer
 ---@field text string
@@ -39,52 +39,52 @@ end
 ---@field source_root gui.View
 
 ---Receives each changed immutable intent, or nil when intent is cleared.
----@alias dwarfui.TooltipIntentObserver fun(intent: dwarfui.TooltipIntent|nil, revision: integer)
+---@alias dwarfuicore.TooltipIntentObserver fun(intent: dwarfuicore.TooltipIntent|nil, revision: integer)
 
----@class dwarfui.TooltipServiceState
+---@class dwarfuicore.TooltipServiceState
 ---@field api_version integer
 ---@field registrations table<gui.View, table>
 ---@field registration_sequence integer
 ---@field target any|nil
----@field target_adapter dwarfui.TooltipTargetAdapter|nil
----@field intent dwarfui.TooltipIntent|nil
+---@field target_adapter dwarfuicore.TooltipTargetAdapter|nil
+---@field intent dwarfuicore.TooltipIntent|nil
 ---@field revision integer
 ---@field last_sequence integer
----@field intent_observer dwarfui.TooltipIntentObserver|nil
+---@field intent_observer dwarfuicore.TooltipIntentObserver|nil
 ---@field generation integer
 
----@class dwarfui.TooltipService
----@field _state dwarfui.TooltipServiceState
+---@class dwarfuicore.TooltipService
+---@field _state dwarfuicore.TooltipServiceState
 TooltipService = {}
 TooltipService.__index = TooltipService
 
 ---Creates a service object over process-owned reload-safe state.
----@param state dwarfui.TooltipServiceState
----@return dwarfui.TooltipService
+---@param state dwarfuicore.TooltipServiceState
+---@return dwarfuicore.TooltipService
 function TooltipService.new(state)
     assert(type(state) == 'table',
-        'DwarfUI TooltipService requires process-owned state.')
+        'DwarfUICore TooltipService requires process-owned state.')
     return setmetatable({_state=state}, TooltipService)
 end
 
 ---Returns validated tooltip text after pointer callbacks have run.
----@param target dwarfui.TooltipTargetAdapter|nil
+---@param target dwarfuicore.TooltipTargetAdapter|nil
 ---@return string|nil
 local function get_tooltip(target)
     if not target then return nil end
     local value = target:get_tooltip()
     if value == nil or value == '' then return nil end
     assert(type(value) == 'string',
-        'DwarfUI tooltip must be a string, nil, or an empty string; got ' ..
+        'DwarfUICore tooltip must be a string, nil, or an empty string; got ' ..
         type(value) .. '.')
     return value
 end
 
 ---Creates one immutable tooltip-intent snapshot.
----@param observation dwarfui.TooltipPointerObservation
+---@param observation dwarfuicore.TooltipPointerObservation
 ---@param text string
 ---@param revision integer
----@return dwarfui.TooltipIntent
+---@return dwarfuicore.TooltipIntent
 local function make_intent(observation, text, revision)
     local values = {
         revision=revision,
@@ -98,7 +98,7 @@ local function make_intent(observation, text, revision)
     return setmetatable({}, {
         __index=values,
         __newindex=function()
-            error('DwarfUI tooltip intents are immutable.', 2)
+            error('DwarfUICore tooltip intents are immutable.', 2)
         end,
         __pairs=function()
             return next, values, nil
@@ -108,7 +108,7 @@ local function make_intent(observation, text, revision)
 end
 
 ---Notifies this service's optional presentation-neutral intent observer.
----@param intent dwarfui.TooltipIntent|nil
+---@param intent dwarfuicore.TooltipIntent|nil
 function TooltipService:_notify_intent_observer(intent)
     local state = self._state
     if state.intent_observer then
@@ -128,7 +128,7 @@ function TooltipService:_clear_intent()
 end
 
 ---Publishes one immutable intent snapshot from this service.
----@param observation dwarfui.TooltipPointerObservation
+---@param observation dwarfuicore.TooltipPointerObservation
 ---@param text string
 function TooltipService:_publish_intent(observation, text)
     local state = self._state
@@ -164,7 +164,7 @@ function TooltipService:get_registrations()
 end
 
 ---Returns the authoritative immutable presentation intent, if any.
----@return dwarfui.TooltipIntent|nil
+---@return dwarfuicore.TooltipIntent|nil
 function TooltipService:get_intent()
     return self._state.intent
 end
@@ -174,7 +174,7 @@ end
 ---@return boolean created
 function TooltipService:register(widget)
     assert(type(widget) == 'table',
-        'DwarfUI tooltip registration requires a widget table.')
+        'DwarfUICore tooltip registration requires a widget table.')
     local state = self._state
     if state.registrations[widget] then return false end
     state.registration_sequence = state.registration_sequence + 1
@@ -205,25 +205,25 @@ end
 
 ---Replaces or removes this service's presentation-neutral intent observer.
 ---Replacement never replays intent or synthesizes pointer callbacks.
----@param observer dwarfui.TooltipIntentObserver|nil
+---@param observer dwarfuicore.TooltipIntentObserver|nil
 function TooltipService:set_intent_observer(observer)
     assert(observer == nil or type(observer) == 'function',
-        'DwarfUI tooltip intent observer must be a function or nil.')
+        'DwarfUICore tooltip intent observer must be a function or nil.')
     self._state.intent_observer = observer
 end
 
 ---Accepts one ordered detector observation and mediates tooltip semantics.
----@param observation dwarfui.TooltipPointerObservation
+---@param observation dwarfuicore.TooltipPointerObservation
 ---@return boolean accepted
 function TooltipService:accept_pointer_observation(observation)
     assert(type(observation) == 'table',
-        'DwarfUI tooltip service requires a pointer observation.')
+        'DwarfUICore tooltip service requires a pointer observation.')
     assert(type(observation.sequence) == 'number',
-        'DwarfUI tooltip observation sequence must be a number.')
+        'DwarfUICore tooltip observation sequence must be a number.')
     assert(observation.kind == ObservationKind.TARGET or
         observation.kind == ObservationKind.BLOCKED or
         observation.kind == ObservationKind.MISS,
-        'DwarfUI tooltip observation kind must be target, blocked, or miss.')
+        'DwarfUICore tooltip observation kind must be target, blocked, or miss.')
     local state = self._state
     if observation.sequence <= state.last_sequence then return false end
     state.last_sequence = observation.sequence

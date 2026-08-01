@@ -2,10 +2,10 @@
 
 local class_helpers = reqscript('dwarfuicore/class')
 
----@class dwarfui.TooltipPresenterOptions
----@field service dwarfui.TooltipService
----@field hook_manager dwarfui.TooltipRenderHookManager
----@field renderer dwarfui.TooltipRenderer
+---@class dwarfuicore.TooltipPresenterOptions
+---@field service dwarfuicore.TooltipService
+---@field hook_manager dwarfuicore.TooltipRenderHookManager
+---@field renderer dwarfuicore.TooltipRenderer
 ---@field transport table
 ---@field screen_class table
 ---@field get_overlay_module fun(): table
@@ -15,12 +15,12 @@ local class_helpers = reqscript('dwarfuicore/class')
 ---@field new_painter fun(width: integer, height: integer): gui.Painter
 ---@field invalidate fun()
 
----@class dwarfui.TooltipPresenterDiagnostics
+---@class dwarfuicore.TooltipPresenterDiagnostics
 ---@field generation integer
 ---@field active boolean
 ---@field current_intent_revision integer|nil
 ---@field service_revision integer
----@field selected_transport dwarfui.TooltipRenderTransport|nil
+---@field selected_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
 ---@field supported_surface boolean
 ---@field surface_reason string
@@ -30,10 +30,10 @@ local class_helpers = reqscript('dwarfuicore/class')
 ---@field render_count integer
 ---@field redraw_count integer
 
----@class dwarfui.TooltipPresenter
----@field _service dwarfui.TooltipService
----@field _hook_manager dwarfui.TooltipRenderHookManager
----@field _renderer dwarfui.TooltipRenderer
+---@class dwarfuicore.TooltipPresenter
+---@field _service dwarfuicore.TooltipService
+---@field _hook_manager dwarfuicore.TooltipRenderHookManager
+---@field _renderer dwarfuicore.TooltipRenderer
 ---@field _transport table
 ---@field _screen_class table
 ---@field _get_overlay_module fun(): table
@@ -57,11 +57,11 @@ TooltipPresenter = {}
 TooltipPresenter.__index = TooltipPresenter
 
 ---Creates an intent-driven presentation adapter with explicit dependencies.
----@param options dwarfui.TooltipPresenterOptions
----@return dwarfui.TooltipPresenter
+---@param options dwarfuicore.TooltipPresenterOptions
+---@return dwarfuicore.TooltipPresenter
 function TooltipPresenter.new(options)
     assert(type(options) == 'table',
-        'DwarfUI TooltipPresenter requires dependency options.')
+        'DwarfUICore TooltipPresenter requires dependency options.')
     for _, name in ipairs({
             'service', 'hook_manager', 'renderer', 'transport',
             'screen_class', 'get_overlay_module',
@@ -69,7 +69,7 @@ function TooltipPresenter.new(options)
             'new_painter', 'invalidate',
         }) do
         assert(options[name] ~= nil,
-            'DwarfUI TooltipPresenter requires ' .. name .. '.')
+            'DwarfUICore TooltipPresenter requires ' .. name .. '.')
     end
     return setmetatable({
         _service=options.service,
@@ -99,7 +99,7 @@ end
 
 ---Classifies one opaque source root without consulting the input system.
 ---@param root table
----@return dwarfui.TooltipRenderTransport|nil
+---@return dwarfuicore.TooltipRenderTransport|nil
 ---@return table|nil owner
 ---@return string reason
 function TooltipPresenter:_classify_root(root)
@@ -183,7 +183,7 @@ function TooltipPresenter:start()
 end
 
 ---Presents the current intent through the selected completed render seam.
----@param transport dwarfui.TooltipRenderTransport
+---@param transport dwarfuicore.TooltipRenderTransport
 ---@param owner table
 ---@return integer|nil rendered_revision
 function TooltipPresenter:present(transport, owner)
@@ -240,7 +240,7 @@ function TooltipPresenter:shutdown()
 end
 
 ---Returns presentation, selection, layout, redraw, and render diagnostics.
----@return dwarfui.TooltipPresenterDiagnostics
+---@return dwarfuicore.TooltipPresenterDiagnostics
 function TooltipPresenter:get_diagnostics()
     local intent = self._service:get_intent()
     local service_diagnostics = self._service:get_diagnostics()

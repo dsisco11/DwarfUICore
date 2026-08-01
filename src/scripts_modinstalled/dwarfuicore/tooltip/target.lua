@@ -3,22 +3,22 @@
 -- Normalized tooltip targets bridge heterogeneous hit domains into the
 -- process-wide tooltip service without making map registrations imitate views.
 
----@enum dwarfui.TooltipTargetKind
+---@enum dwarfuicore.TooltipTargetKind
 TooltipTargetKind = {
     WIDGET=1,
     MAP_TILE=2,
 }
 
----@enum dwarfui.TooltipPointerObservationKind
+---@enum dwarfuicore.TooltipPointerObservationKind
 TooltipPointerObservationKind = {
     TARGET=1,
     BLOCKED=2,
     MISS=3,
 }
 
----@class dwarfui.TooltipTargetAdapterOptions
+---@class dwarfuicore.TooltipTargetAdapterOptions
 ---@field identity any
----@field kind dwarfui.TooltipTargetKind
+---@field kind dwarfuicore.TooltipTargetKind
 ---@field source_root gui.View
 ---@field is_current fun(): boolean
 ---@field get_tooltip fun(): any
@@ -26,9 +26,9 @@ TooltipPointerObservationKind = {
 ---@field on_pointer_update fun(x: integer|nil, y: integer|nil)|nil
 ---@field on_pointer_leave fun()|nil
 
----@class dwarfui.TooltipTargetAdapter
+---@class dwarfuicore.TooltipTargetAdapter
 ---@field _identity any
----@field _kind dwarfui.TooltipTargetKind
+---@field _kind dwarfuicore.TooltipTargetKind
 ---@field _source_root gui.View
 ---@field _is_current fun(): boolean
 ---@field _get_tooltip fun(): any
@@ -39,22 +39,22 @@ TooltipTargetAdapter = {}
 TooltipTargetAdapter.__index = TooltipTargetAdapter
 
 ---Creates one normalized tooltip target over caller-owned accessors.
----@param options dwarfui.TooltipTargetAdapterOptions
----@return dwarfui.TooltipTargetAdapter
+---@param options dwarfuicore.TooltipTargetAdapterOptions
+---@return dwarfuicore.TooltipTargetAdapter
 function TooltipTargetAdapter.new(options)
     assert(type(options) == 'table',
-        'DwarfUI tooltip target adapter requires options.')
+        'DwarfUICore tooltip target adapter requires options.')
     assert(options.identity ~= nil,
-        'DwarfUI tooltip target adapter requires stable identity.')
+        'DwarfUICore tooltip target adapter requires stable identity.')
     assert(options.kind == TooltipTargetKind.WIDGET or
             options.kind == TooltipTargetKind.MAP_TILE,
-        'DwarfUI tooltip target adapter kind must be a TooltipTargetKind.')
+        'DwarfUICore tooltip target adapter kind must be a TooltipTargetKind.')
     assert(type(options.source_root) == 'table',
-        'DwarfUI tooltip target adapter requires a source root.')
+        'DwarfUICore tooltip target adapter requires a source root.')
     assert(type(options.is_current) == 'function',
-        'DwarfUI tooltip target adapter requires a current-state accessor.')
+        'DwarfUICore tooltip target adapter requires a current-state accessor.')
     assert(type(options.get_tooltip) == 'function',
-        'DwarfUI tooltip target adapter requires a tooltip accessor.')
+        'DwarfUICore tooltip target adapter requires a tooltip accessor.')
     return setmetatable({
         _identity=options.identity,
         _kind=options.kind,
@@ -74,7 +74,7 @@ function TooltipTargetAdapter:get_identity()
 end
 
 ---Returns this adapter's hit-domain kind.
----@return dwarfui.TooltipTargetKind
+---@return dwarfuicore.TooltipTargetKind
 function TooltipTargetAdapter:get_kind()
     return self._kind
 end
@@ -127,12 +127,12 @@ end
 ---@param widget gui.View
 ---@param source_root gui.View
 ---@param registrations table<gui.View, table>
----@return dwarfui.TooltipTargetAdapter
+---@return dwarfuicore.TooltipTargetAdapter
 function adapt_widget(widget, source_root, registrations)
     assert(type(widget) == 'table',
-        'DwarfUI widget tooltip adapter requires a widget.')
+        'DwarfUICore widget tooltip adapter requires a widget.')
     assert(type(registrations) == 'table',
-        'DwarfUI widget tooltip adapter requires registrations.')
+        'DwarfUICore widget tooltip adapter requires registrations.')
     return TooltipTargetAdapter.new{
         identity=widget,
         kind=TooltipTargetKind.WIDGET,
@@ -156,15 +156,15 @@ function adapt_widget(widget, source_root, registrations)
 end
 
 ---Adapts an exact map candidate without adding view behavior to its handle.
----@param candidate dwarfui.MapTileTargetObservation
----@param registry dwarfui.TooltipMapTargetRegistry
----@return dwarfui.TooltipTargetAdapter
+---@param candidate dwarfuicore.MapTileTargetObservation
+---@param registry dwarfuicore.TooltipMapTargetRegistry
+---@return dwarfuicore.TooltipTargetAdapter
 function adapt_map_tile(candidate, registry)
     assert(type(candidate) == 'table' and
             candidate.kind == TooltipPointerObservationKind.TARGET,
-        'DwarfUI map tooltip adapter requires a target candidate.')
+        'DwarfUICore map tooltip adapter requires a target candidate.')
     assert(type(registry) == 'table',
-        'DwarfUI map tooltip adapter requires a registry.')
+        'DwarfUICore map tooltip adapter requires a registry.')
     local handle = candidate.identity
     return TooltipTargetAdapter.new{
         identity=handle,

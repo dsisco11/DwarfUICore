@@ -2,11 +2,11 @@
 
 -- Public registration-driven tooltip facade.
 
-local registration = reqscript('dwarfui/tooltip/registration')
-local runtime = reqscript('dwarfui/tooltip/runtime')
+local registration = reqscript('dwarfuicore/tooltip/registration')
+local runtime = reqscript('dwarfuicore/tooltip/runtime')
 
 ---An exact fortress-map tile used only for map-target hit detection.
----@class dwarfui.MapTilePosition
+---@class dwarfuicore.MapTilePosition
 ---@field x integer
 ---@field y integer
 ---@field z integer
@@ -16,16 +16,16 @@ local runtime = reqscript('dwarfui/tooltip/runtime')
 ---transport and lifecycle eligibility independently from exact tile matching.
 ---Registration is valid before attachment, but cannot become eligible until
 ---the owner resolves to a currently presented root.
----@class dwarfui.MapTileTooltipRegistrationOptions
+---@class dwarfuicore.MapTileTooltipRegistrationOptions
 ---@field owner gui.View
----@field pos dwarfui.MapTilePosition
+---@field pos dwarfuicore.MapTilePosition
 ---@field tooltip string|nil
 
 ---Complete replacement state for an existing map-tile registration.
 ---The owner and handle identity are immutable. Position and text change
 ---atomically so detection cannot observe values from different updates.
----@class dwarfui.MapTileTooltipUpdate
----@field pos dwarfui.MapTilePosition
+---@class dwarfuicore.MapTileTooltipUpdate
+---@field pos dwarfuicore.MapTilePosition
 ---@field tooltip string|nil
 
 ---Opaque stable identity for one map-tile tooltip registration.
@@ -37,7 +37,7 @@ local runtime = reqscript('dwarfui/tooltip/runtime')
 ---handle immediately, returns true exactly once, and returns false thereafter.
 ---The process registry must not keep an otherwise abandoned handle alive;
 ---explicit unregistration remains available for immediate removal.
----@class dwarfui.MapTileTooltipRegistration
+---@class dwarfuicore.MapTileTooltipRegistration
 
 ---Registers a widget with the process-wide singleton tooltip service.
 ---@param widget table
@@ -54,22 +54,22 @@ function unregister(widget)
 end
 
 ---Registers one exact map tile with owner-scoped tooltip eligibility.
----@param options dwarfui.MapTileTooltipRegistrationOptions
----@return dwarfui.MapTileTooltipRegistration
+---@param options dwarfuicore.MapTileTooltipRegistrationOptions
+---@return dwarfuicore.MapTileTooltipRegistration
 function register_map_tile(options)
     return registration.register_map_tile(options)
 end
 
 ---Atomically replaces one map registration's exact position and tooltip.
----@param handle dwarfui.MapTileTooltipRegistration
----@param update dwarfui.MapTileTooltipUpdate
+---@param handle dwarfuicore.MapTileTooltipRegistration
+---@param update dwarfuicore.MapTileTooltipUpdate
 ---@return boolean updated
 function update_map_tile(handle, update)
     return registration.update_map_tile(handle, update)
 end
 
 ---Explicitly removes one exact map-tile registration.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean removed
 function unregister_map_tile(handle)
     return registration.unregister_map_tile(handle)

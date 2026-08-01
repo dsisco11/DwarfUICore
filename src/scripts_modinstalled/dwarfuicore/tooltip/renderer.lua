@@ -16,7 +16,7 @@ local TEXT = dfhack.pen.parse{fg=COLOR_WHITE, bg=COLOR_BLACK}
 -- A moving tooltip is presentation layered over a host, not a Panel or Window.
 -- Keeping it a plain Widget avoids their global layout/redraw lifecycle inside
 -- the host's render pass.
----@class dwarfui.TooltipRenderer: gui.widgets.Widget
+---@class dwarfuicore.TooltipRenderer: gui.widgets.Widget
 TooltipRenderer = defclass(nil, widgets.Widget)
 TooltipRenderer.ATTRS{
     frame={l=0, t=0, w=1, h=3},

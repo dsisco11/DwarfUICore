@@ -4,7 +4,7 @@
 
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
-local target_types = reqscript('dwarfui/tooltip/target')
+local target_types = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 
 API_VERSION = 1
@@ -13,7 +13,7 @@ local COORDINATE_MIN = -0x8000
 local COORDINATE_MAX = 0x7fff
 local COORDINATE_MASK = 0xffff
 
-dfhack.dwarfui = dfhack.dwarfui or {}
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 
 ---Creates a weak-key table.
 ---@return table
@@ -39,37 +39,37 @@ local function new_process_state()
     }
 end
 
-local process_state = dfhack.dwarfui[REGISTRY_SLOT]
+local process_state = dfhack.dwarfuicore[REGISTRY_SLOT]
 if type(process_state) ~= 'table' or
         process_state.api_version ~= API_VERSION then
     process_state = new_process_state()
-    dfhack.dwarfui[REGISTRY_SLOT] = process_state
+    dfhack.dwarfuicore[REGISTRY_SLOT] = process_state
 end
 process_state.generation = process_state.generation + 1
 
----@class dwarfui.MapTileTargetObservation
+---@class dwarfuicore.MapTileTargetObservation
 ---@field sequence integer
----@field kind dwarfui.TooltipPointerObservationKind
+---@field kind dwarfuicore.TooltipPointerObservationKind
 ---@field pointer_x integer|nil
 ---@field pointer_y integer|nil
 ---@field map_x integer|nil
 ---@field map_y integer|nil
 ---@field map_z integer|nil
----@field target dwarfui.MapTileTooltipRegistration|nil
----@field identity dwarfui.MapTileTooltipRegistration|nil
----@field target_kind dwarfui.TooltipTargetKind|nil
+---@field target dwarfuicore.MapTileTooltipRegistration|nil
+---@field identity dwarfuicore.MapTileTooltipRegistration|nil
+---@field target_kind dwarfuicore.TooltipTargetKind|nil
 ---@field root gui.View|nil
 ---@field source_root gui.View|nil
 ---@field registration_sequence integer|nil
 ---@field tooltip string|nil
 
----@class dwarfui.TooltipMapTargetRegistryOptions
+---@class dwarfuicore.TooltipMapTargetRegistryOptions
 ---@field state table
----@field root_resolver dwarfui.ViewRootResolver
+---@field root_resolver dwarfuicore.ViewRootResolver
 
----@class dwarfui.TooltipMapTargetRegistry
+---@class dwarfuicore.TooltipMapTargetRegistry
 ---@field _state table
----@field _root_resolver dwarfui.ViewRootResolver
+---@field _root_resolver dwarfuicore.ViewRootResolver
 TooltipMapTargetRegistry = {}
 TooltipMapTargetRegistry.__index = TooltipMapTargetRegistry
 
@@ -109,21 +109,21 @@ end
 ---@return string|nil tooltip
 local function copy_mutable_state(options, label)
     assert(type(options) == 'table',
-        ('DwarfUI %s must be a table.'):format(label))
+        ('DwarfUICore %s must be a table.'):format(label))
     local pos = options.pos
     local pos_type = type(pos)
     assert(pos_type == 'table' or pos_type == 'userdata',
-        ('DwarfUI %s requires an exact map position.'):format(label))
+        ('DwarfUICore %s requires an exact map position.'):format(label))
     assert(is_signed_16(pos.x) and is_signed_16(pos.y) and is_signed_16(pos.z),
-        ('DwarfUI %s position requires signed 16-bit integer x, y, and z.'):format(label))
+        ('DwarfUICore %s position requires signed 16-bit integer x, y, and z.'):format(label))
     assert(options.tooltip == nil or type(options.tooltip) == 'string',
-        ('DwarfUI %s tooltip must be a string or nil.'):format(label))
+        ('DwarfUICore %s tooltip must be a string or nil.'):format(label))
     return pos.x, pos.y, pos.z, options.tooltip
 end
 
 ---Builds one presentation-neutral miss observation.
----@param sample dwarfui.PointerSample
----@return dwarfui.MapTileTargetObservation
+---@param sample dwarfuicore.PointerSample
+---@return dwarfuicore.MapTileTargetObservation
 local function miss(sample)
     return {
         sequence=sample.sequence,
@@ -137,16 +137,16 @@ local function miss(sample)
 end
 
 ---Creates a registry over reload-safe state and shared root eligibility.
----@param options dwarfui.TooltipMapTargetRegistryOptions
----@return dwarfui.TooltipMapTargetRegistry
+---@param options dwarfuicore.TooltipMapTargetRegistryOptions
+---@return dwarfuicore.TooltipMapTargetRegistry
 function TooltipMapTargetRegistry.new(options)
     assert(type(options) == 'table',
-        'DwarfUI map target registry requires options.')
+        'DwarfUICore map target registry requires options.')
     assert(type(options.state) == 'table',
-        'DwarfUI map target registry requires process state.')
+        'DwarfUICore map target registry requires process state.')
     assert(type(options.root_resolver) == 'table' and
             type(options.root_resolver.resolve) == 'function',
-        'DwarfUI map target registry requires a root resolver.')
+        'DwarfUICore map target registry requires a root resolver.')
     return setmetatable({
         _state=options.state,
         _root_resolver=options.root_resolver,
@@ -166,7 +166,7 @@ function TooltipMapTargetRegistry:_get_or_create_bucket(key)
 end
 
 ---Removes one handle from its current bucket and drops an empty bucket.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@param record table
 function TooltipMapTargetRegistry:_remove_from_bucket(handle, record)
     local bucket = record.bucket
@@ -177,13 +177,13 @@ function TooltipMapTargetRegistry:_remove_from_bucket(handle, record)
 end
 
 ---Registers one caller-owned exact map-tile tooltip handle.
----@param options dwarfui.MapTileTooltipRegistrationOptions
----@return dwarfui.MapTileTooltipRegistration
+---@param options dwarfuicore.MapTileTooltipRegistrationOptions
+---@return dwarfuicore.MapTileTooltipRegistration
 function TooltipMapTargetRegistry:register(options)
     assert(type(options) == 'table',
-        'DwarfUI map-tile registration options must be a table.')
+        'DwarfUICore map-tile registration options must be a table.')
     assert(type(options.owner) == 'table',
-        'DwarfUI map-tile registration requires an owner view.')
+        'DwarfUICore map-tile registration requires an owner view.')
     local x, y, z, tooltip =
         copy_mutable_state(options, 'map-tile registration')
     local state = self._state
@@ -207,8 +207,8 @@ function TooltipMapTargetRegistry:register(options)
 end
 
 ---Atomically replaces one handle's exact position and tooltip text.
----@param handle dwarfui.MapTileTooltipRegistration
----@param update dwarfui.MapTileTooltipUpdate
+---@param handle dwarfuicore.MapTileTooltipRegistration
+---@param update dwarfuicore.MapTileTooltipUpdate
 ---@return boolean updated
 function TooltipMapTargetRegistry:update(handle, update)
     local record = self._state.registrations[handle]
@@ -229,7 +229,7 @@ function TooltipMapTargetRegistry:update(handle, update)
 end
 
 ---Explicitly removes one handle and its empty exact-coordinate bucket.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean removed
 function TooltipMapTargetRegistry:unregister(handle)
     local record = self._state.registrations[handle]
@@ -248,14 +248,14 @@ function TooltipMapTargetRegistry:registration_count()
 end
 
 ---Returns whether one opaque handle remains registered.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean
 function TooltipMapTargetRegistry:contains(handle)
     return self._state.registrations[handle] ~= nil
 end
 
 ---Returns one handle's current tooltip value without exposing its record.
----@param handle dwarfui.MapTileTooltipRegistration
+---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return string|nil
 function TooltipMapTargetRegistry:get_tooltip(handle)
     local record = self._state.registrations[handle]
@@ -277,13 +277,13 @@ function TooltipMapTargetRegistry:get_owner_roots()
 end
 
 ---Detects one deterministic eligible target at the sampled exact map tile.
----@param sample dwarfui.PointerSample
----@return dwarfui.MapTileTargetObservation
+---@param sample dwarfuicore.PointerSample
+---@return dwarfuicore.MapTileTargetObservation
 function TooltipMapTargetRegistry:detect(sample)
     assert(type(sample) == 'table',
-        'DwarfUI map target detector requires a pointer sample.')
+        'DwarfUICore map target detector requires a pointer sample.')
     assert(type(sample.sequence) == 'number',
-        'DwarfUI map target sample sequence must be a number.')
+        'DwarfUICore map target sample sequence must be a number.')
     if sample.x == nil or sample.y == nil or
             not is_signed_16(sample.map_x) or
             not is_signed_16(sample.map_y) or

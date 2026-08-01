@@ -54,6 +54,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       `dwarfuicore.services.ContextMenuServiceProvider`.
 - [ ] Provider construction requires an exact positive integer contract major
       and a validated stable consumer namespace.
+- [ ] DwarfUICore allocates every local registration identity. Consumers never
+      supply, select, or mutate local or composite identities.
 - [ ] Every `new()` call returns a distinct immutable API object bound to one
       service, contract major, namespace, and runtime generation.
 - [ ] API objects are non-owning handles, not namespace leases. Do not add lease
@@ -238,6 +240,11 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Render every acquisition failure through the correct provider prefix and
       one of `INVALID_VERSION`, `UNSUPPORTED_VERSION`, `INVALID_NAMESPACE`,
       `SERVICE_UNHEALTHY`, `INITIALIZATION_BUSY`, or `INITIALIZATION_FAILED`.
+- [ ] Add a table-driven constructor-failure matrix mapping every proposal
+      rejection condition to its exact category, including invalid arguments,
+      unsupported majors, malformed or disabled runtime/service state,
+      reentrant initialization, missing prerequisites or implementations, and
+      incomplete facades.
 - [ ] Reject unsupported majors exactly; never bind a version 1 request to a
       later major or partially implemented adapter.
 - [ ] Add per-generation, per-service in-progress state and reject reentrant or
@@ -415,6 +422,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Render API failures through the service API prefix and one of `STALE_API`,
       `INVALID_ARGUMENT`, `FOREIGN_HANDLE`, `STALE_HANDLE`,
       or `SERVICE_UNHEALTHY`.
+- [ ] Add a table-driven API-failure matrix covering every category and the
+      proposal's validation precedence, with state unchanged after each raised
+      error and `false` reserved for absent same-domain registrations.
 - [ ] Validate API generation, handle shape, handle generation, and handle
       domain in the approved order; return `false` only for an absent or removed
       same-domain registration.
@@ -422,6 +432,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       approved stable error category.
 - [ ] Prove API objects cannot attach fields, replace methods, inspect facades,
       mutate provider exports, or operate on another namespace.
+- [ ] Prove tooltip and context-menu APIs using the same namespace share no
+      registration state because service kind remains part of identity.
 - [ ] Prove the public APIs expose no `close()` or `release()` method and do not
       register API-object finalizers or namespace lease counts.
 - [ ] Prove importing `reqscript('dwarfuicore')` does no service initialization,
@@ -459,6 +471,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
       generation.
 - [ ] Clear only DwarfUICore reload-managed script environments in the registry's
       safe order and rebuild prerequisites in dependency order.
+- [ ] Rescan core presentation integrations only as part of explicit
+      `dwarfuicore reload` reconstruction, never from provider construction or a
+      service API method.
 - [ ] Publish a new healthy generation only after complete reconstruction and
       runtime/service validation succeeds.
 - [ ] On reconstruction failure, leave no retired facade or service marked
@@ -479,6 +494,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       leaves no falsely healthy runtime.
 - [ ] No old API object, opaque handle, callback, hook owner, menu, tooltip
       intent, or namespace record can act on the new generation.
+- [ ] Explicit `dwarfuicore reload` is the only operation permitted to globally
+      retire every namespace or rescan core presentation integrations.
 
 ## Phase 8 - Migrate DwarfUI as the coordinated consumer
 
@@ -542,6 +559,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Document all stable provider/API prefixes and category tokens, the
       non-stable status of diagnostic detail, handle-validation precedence, and
       the distinction between errors and ordinary `false` results.
+- [ ] Document `pcall` as the recovery boundary for consumers that choose to
+      handle constructor or API errors.
 - [ ] Document that API objects are non-owning, individual widget/map
       registrations are weak, and consumer-controlled lifecycle operations must
       call `clear_namespace()` explicitly when namespace cleanup is required.
@@ -549,9 +568,13 @@ Migration of any other consumer plugin remains explicitly out of scope.
       full-menu closure on ownership loss, and pre-selection identity
       revalidation.
 - [ ] Document that namespaces are ownership boundaries rather than security
-      principals and give stable canonical identifier guidance.
+      principals, explain that deliberate reuse shares state, and require one
+      canonical identifier across entrypoints, saves, and releases.
 - [ ] Document compatible and breaking contract changes and keep public contract
       majors distinct from package and private implementation versions.
+- [ ] Document the supported single-installation model, offline package
+      verification, fresh-process or explicit-core-reload update boundary, and
+      unsupported partial replacement or active script-path switching.
 - [ ] Publish the complete approved transitive LuaDoc schema, including callback
       context and public discriminator semantics, without exposing composite
       identities or private diagnostic records.
@@ -643,6 +666,9 @@ Migration of any other consumer plugin remains explicitly out of scope.
 - [ ] Widget and map registrations retain composite identity and namespace
       ownership through detection, presentation, callback dispatch, private
       diagnostics, update, cleanup, and stale validation.
+- [ ] Local identities are allocated only by DwarfUICore, and using one
+      namespace across tooltip and context-menu APIs does not merge service
+      state.
 - [ ] Tooltip collisions and context-menu composition follow the approved
       deterministic version 1 rules.
 - [ ] Namespace-neutral physical targeting uses a stable target sequence that is

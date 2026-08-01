@@ -53,6 +53,7 @@ describe('DwarfUICore package contract', function()
             'service_provider/namespace.lua',
             'service_provider/immutable_proxy.lua',
             'service_provider/identity.lua',
+            'service_provider/runtime.lua',
             'service_provider/weak_store.lua',
         }
 

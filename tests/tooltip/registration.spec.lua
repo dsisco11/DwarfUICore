@@ -615,7 +615,7 @@ describe('singleton tooltip registration polling', function()
         assert.equals(0, env.state.mouse_reads or 0)
     end)
 
-    it('retires old callbacks and starts one new chain on repeated reload',
+    it('preserves one active polling chain across repeated module loads',
             function()
         local env = load_environment{mouse_x=2, mouse_y=2}
         local first = env.load_generation()
@@ -625,27 +625,22 @@ describe('singleton tooltip registration polling', function()
         layout(root, env.state)
         first.register(child)
         local first_generation =
-            first.get_diagnostics().poller_module_generation
+            first.get_diagnostics().poller_runtime_generation
 
         local second = env.load_generation()
         local second_generation =
-            second.get_diagnostics().poller_module_generation
-        assert.equals(first_generation + 1, second_generation)
-        assert.equals(2, #env.state.callbacks)
-
-        assert.is_true(env.run_next())
-        assert.equals(0, env.state.mouse_reads or 0)
+            second.get_diagnostics().poller_runtime_generation
+        assert.equals(first_generation, second_generation)
         assert.equals(1, #env.state.callbacks)
+
         assert.is_true(env.run_next())
         assert.equals(1, env.state.mouse_reads)
         assert.equals(1, #env.state.callbacks)
 
         local third = env.load_generation()
-        assert.equals(second_generation + 1,
-            third.get_diagnostics().poller_module_generation)
-        assert.equals(2, #env.state.callbacks)
-        assert.is_true(env.run_next())
-        assert.equals(1, env.state.mouse_reads)
+        assert.equals(second_generation,
+            third.get_diagnostics().poller_runtime_generation)
+        assert.equals(1, #env.state.callbacks)
         assert.is_true(env.run_next())
         assert.equals(2, env.state.mouse_reads)
         assert.equals(1, #env.state.callbacks)

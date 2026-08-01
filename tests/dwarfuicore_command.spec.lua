@@ -3,6 +3,38 @@ local repo_root = require('support.repo_root')
 
 local ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore.lua'
 local REGISTRY_NAME = 'dwarfuicore/module_registry'
+local RUNTIME_NAME = 'dwarfuicore/service_provider/runtime'
+
+---Creates a deterministic private runtime lifecycle seam.
+---@return table runtime
+local function runtime_stub()
+    local state
+    return {
+        begin_initialization=function()
+            if state then return state, false end
+            state={generation=1, status='initializing'}
+            return state, true
+        end,
+        complete_initialization=function(generation)
+            assert.equals(state.generation, generation)
+            state.status='healthy'
+        end,
+        fail_initialization=function(generation)
+            assert.equals(state.generation, generation)
+            state.status='disabled'
+        end,
+        begin_reload=function()
+            if not state then state={generation=1, status='healthy'} end
+            assert.equals('healthy', state.status)
+            state.status='retiring'
+            return state
+        end,
+        begin_reconstruction=function()
+            state={generation=state.generation + 1, status='initializing'}
+            return state
+        end,
+    }
+end
 
 ---Creates a controlled DFHack command surface and call log.
 ---@param loaded? table<string, boolean>
@@ -36,6 +68,7 @@ end
 ---@param dfhack table
 ---@return table root
 local function load_root(registry, dfhack)
+    local runtime = runtime_stub()
     local _, root = module_loader.load(repo_root, ROOT_PATH, {
         globals={
             dfhack=dfhack,
@@ -44,6 +77,7 @@ local function load_root(registry, dfhack)
         },
         reqscript={
             [REGISTRY_NAME]=registry,
+            [RUNTIME_NAME]=runtime,
             ['dwarfuicore/tooltip/runtime']={},
             ['dwarfuicore/tooltip/render_hook']={},
             ['dwarfuicore/context_menu/service']={},
@@ -143,6 +177,7 @@ describe('dwarfuicore command lifecycle', function()
         local events = {}
         local root = load_root(registry, dfhack)
         local environments = {
+            [RUNTIME_NAME]=runtime_stub(),
             ['dwarfuicore/tooltip/runtime']={
                 presenter={shutdown=function()
                     table.insert(events, 'tooltip')
@@ -197,6 +232,7 @@ describe('dwarfuicore command lifecycle', function()
             },
             reqscript={
                 [REGISTRY_NAME]=registry,
+                [RUNTIME_NAME]=runtime_stub(),
                 ['dwarfuicore/tooltip/runtime']={},
                 ['dwarfuicore/tooltip/render_hook']={
                     manager={shutdown=function()

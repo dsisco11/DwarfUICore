@@ -498,7 +498,7 @@ describe('context-menu registration', function()
         assert.is_nil(manager:resolve_widget(widget))
     end)
 
-    it('destructively invalidates registrations across module generations',
+    it('preserves compatible registrations across ordinary module loads',
             function()
         local harness = load_harness()
         local first_generation = harness.load_generation()
@@ -507,24 +507,24 @@ describe('context-menu registration', function()
         local owner = harness.widgets.Panel{subviews={widget}}
         harness.present_native(owner)
         first:register(widget, definition())
-        first:register_map_tile{
+        local map_handle = first:register_map_tile{
             owner=owner,
             pos={x=1, y=2, z=3},
             definition=definition('Map'),
         }
+        assert.is_not_nil(map_handle)
         assert.equals(2, first:registration_count())
 
         local second_generation = harness.load_generation()
         local second = second_generation.module.manager
-        assert.equals(0, second:registration_count())
-        assert.equals(0, first:registration_count())
-        assert.is_nil(first:resolve_widget(widget))
-        assert.is_false(first:get_diagnostics().current)
-        assert.has_error(function()
-            first:register(widget, definition('Stale'))
-        end)
+        assert.is_equal(first, second)
+        assert.equals(2, second:registration_count())
+        assert.equals(2, first:registration_count())
+        assert.is_not_nil(first:resolve_widget(widget))
+        assert.is_true(first:get_diagnostics().current)
+        assert.is_false(first:register(widget, definition('Updated')))
         assert.is_true(harness.run_next())
-        assert.is_false(
+        assert.is_true(
             first:get_diagnostics().discovery.running)
     end)
 

@@ -380,7 +380,8 @@ describe('DwarfUICore exact map-tile tooltip targets', function()
 
         local second_module = env.load_generation()
         local registry = second_module.registry
-        assert.equals(first_generation + 1,
+        assert.is_equal(first_module.registry, registry)
+        assert.equals(first_generation,
             registry:get_diagnostics().generation)
         assert.equals(handle,
             registry:detect(sample(1, 1, 1, 1, 2, 3)).target)

@@ -8,15 +8,21 @@ local STATE_SLOT = 'tooltip_render_hook'
 local OVERLAY_RENDER_METHOD = 'render_viewscreen_widgets'
 local SCREEN_RENDER_METHOD = 'onRender'
 local function_chain = reqscript('dwarfuicore/utils/function_chain')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
 ---@enum dwarfuicore.TooltipRenderTransport
 TooltipRenderTransport = {
     OVERLAY=1,
     SCREEN=2,
 }
+TooltipRenderTransport = immutable_enum.define(
+    TooltipRenderTransport, 'TooltipRenderTransport')
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[STATE_SLOT]
+local publish_process_state = false
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
 if process_state and process_state.api_version ~= API_VERSION then
     error(('Conflicting DwarfUICore tooltip render-hook versions: ' ..
@@ -44,8 +50,12 @@ if not process_state then
         reorderable_wrappers=setmetatable({}, {__mode='k'}),
         selected_transport=nil,
         selected_owner=nil,
+        runtime_generation=runtime_generation,
     }
-    dfhack.dwarfuicore[STATE_SLOT] = process_state
+    publish_process_state = true
+elseif runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore tooltip render hook belongs to another runtime generation.')
 end
 process_state.failure_count = process_state.failure_count or 0
 process_state.overlay_module_replacement_count =
@@ -75,6 +85,7 @@ process_state.reorderable_wrappers =
 
 ---@class dwarfuicore.TooltipRenderHookState
 ---@field api_version integer
+---@field runtime_generation integer
 ---@field overlay_module table|nil
 ---@field overlay_hook dwarfuicore.TooltipRenderHookRecord|nil
 ---@field screen_hooks table<table, dwarfuicore.TooltipRenderHookRecord>
@@ -546,14 +557,8 @@ function TooltipRenderHookManager:get_diagnostics()
     }
 end
 
--- Loading a same-version module generation retires stale presentation
--- closures while preserving installed trampolines and their predecessor
--- chains. The new generation can adopt them with an idempotent ensure call.
-process_state.generation = process_state.generation + 1
-process_state.presenter = nil
-process_state.selected_transport = nil
-process_state.selected_owner = nil
-process_state.disabled_generation = nil
-process_state.last_error = nil
-
-manager = TooltipRenderHookManager.new(process_state)
+manager = process_state.manager or TooltipRenderHookManager.new(process_state)
+process_state.manager = manager
+if publish_process_state then
+    dfhack.dwarfuicore[STATE_SLOT] = process_state
+end

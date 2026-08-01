@@ -1,9 +1,10 @@
 # Service Provider API Implementation Checklist
 
-Status: Phases 0 and 1 complete. The approved contract, including the
+Status: Phases 0 through 2 complete. The approved contract, including the
 low-level immutable-object mutation boundary, is recorded and frozen; the
 audited namespace, identity, immutability, ordering, and weak-lifetime
-foundations are verified, and runtime-state work may begin with Phase 2.
+foundations and process runtime lifecycle are verified, and atomic service
+acquisition work may begin with Phase 3.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -242,37 +243,37 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 2 - Establish process runtime state and lifecycle
 
-- [ ] Add one private process-state owner under DwarfUICore-owned keys in
+- [x] Add one private process-state owner under DwarfUICore-owned keys in
       `dfhack.dwarfuicore`; correctness must not depend on retention of the root
       script environment.
-- [ ] Store only active generation, runtime status, per-service initialization
+- [x] Store only active generation, runtime status, per-service initialization
       markers, and cached service/facade records in the private process state.
-- [ ] Keep supported public contract majors in their implementing private
+- [x] Keep supported public contract majors in their implementing private
       provider adapters instead of a central runtime descriptor.
-- [ ] Do not add a runtime installation manifest, build identity,
+- [x] Do not add a runtime installation manifest, build identity,
       package-version comparison, content fingerprint, or per-module dependency
       version matrix.
-- [ ] Represent initialization, healthy, disabled, retiring, and retired states
+- [x] Represent initialization, healthy, disabled, retiring, and retired states
       explicitly and reject acquisition from every disallowed state.
-- [ ] Separate service health from public contract compatibility in state,
+- [x] Separate service health from public contract compatibility in state,
       validation, diagnostics, and error reporting.
-- [ ] Refactor process-owned initializers so each is explicitly idempotent and
+- [x] Refactor process-owned initializers so each is explicitly idempotent and
       publishes its state only after local construction succeeds.
-- [ ] Remove module-load behavior that automatically retires or replaces a
+- [x] Remove module-load behavior that automatically retires or replaces a
       healthy owner merely because a script environment was loaded again.
-- [ ] Preserve existing hook-chain safety while associating hook managers,
+- [x] Preserve existing hook-chain safety while associating hook managers,
       registration managers, presenters, pollers, and services with the active
       runtime generation.
-- [ ] Add focused tests for missing, malformed, partial, wrong-generation,
+- [x] Add focused tests for missing, malformed, partial, wrong-generation,
       disabled, retiring, and retired runtime/service state.
-- [ ] Prove validation does not clear environments, invoke teardown, replace
+- [x] Prove validation does not clear environments, invoke teardown, replace
       state, repair state, or rescan overlays.
 
 ### Phase 2 completion gate
 
-- [ ] One process-owned runtime record governs generation, status,
+- [x] One process-owned runtime record governs generation, status,
       initialization, services, and facades without carrying package metadata.
-- [ ] Re-loading a module cannot silently replace a compatible healthy runtime
+- [x] Re-loading a module cannot silently replace a compatible healthy runtime
       owner.
 
 ## Phase 3 - Implement atomic service acquisition

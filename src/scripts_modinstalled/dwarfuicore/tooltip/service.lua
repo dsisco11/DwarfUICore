@@ -12,8 +12,16 @@ local SERVICE_SLOT = 'tooltip_service'
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[SERVICE_SLOT]
+local publish_process_state = false
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
-if not process_state or process_state.api_version ~= API_VERSION then
+if process_state and process_state.api_version ~= API_VERSION then
+    error(('Conflicting DwarfUICore tooltip service versions: process has ' ..
+        '%s, requested %s.'):format(tostring(process_state.api_version),
+            tostring(API_VERSION)))
+end
+if not process_state then
     process_state = {
         api_version=API_VERSION,
         registrations=setmetatable({}, {__mode='k'}),
@@ -24,9 +32,13 @@ if not process_state or process_state.api_version ~= API_VERSION then
         revision=0,
         last_sequence=0,
         intent_observer=nil,
-        generation=0,
+        generation=1,
+        runtime_generation=runtime_generation,
     }
-    dfhack.dwarfuicore[SERVICE_SLOT] = process_state
+    publish_process_state = true
+elseif runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore tooltip service belongs to another runtime generation.')
 end
 
 ---@class dwarfuicore.TooltipIntent
@@ -52,6 +64,8 @@ end
 ---@field last_sequence integer
 ---@field intent_observer dwarfuicore.TooltipIntentObserver|nil
 ---@field generation integer
+---@field runtime_generation integer
+---@field service? dwarfuicore.TooltipService
 
 ---@class dwarfuicore.TooltipService
 ---@field _state dwarfuicore.TooltipServiceState
@@ -289,13 +303,8 @@ function TooltipService:get_diagnostics()
     }
 end
 
-service = TooltipService.new(process_state)
-
--- A same-version module reload preserves weak registrations but retires every
--- target, intent, observer closure, and sequence from the previous generation.
-if process_state.generation > 0 or process_state.target or process_state.intent then
-    service:shutdown()
+service = process_state.service or TooltipService.new(process_state)
+process_state.service = service
+if publish_process_state then
+    dfhack.dwarfuicore[SERVICE_SLOT] = process_state
 end
-process_state.intent_observer = nil
-process_state.last_sequence = 0
-process_state.generation = process_state.generation + 1

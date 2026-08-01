@@ -381,7 +381,7 @@ describe('DwarfUICore tooltip service', function()
         assert.equals(0, service:get_diagnostics().last_sequence)
     end)
 
-    it('clears target, intent, observer, and ordering state on reload',
+    it('preserves target, intent, observer, and ordering across module loads',
             function()
         local process = {dwarfuicore={}}
         local first = load_service(process).service
@@ -398,17 +398,18 @@ describe('DwarfUICore tooltip service', function()
 
         local second = load_service(process).service
         local diagnostics = second:get_diagnostics()
-        assert.same({'enter', 'update', 'leave'}, events)
-        assert.equals(2, notifications)
-        assert.equals(first_generation + 1, diagnostics.generation)
+        assert.is_equal(first, second)
+        assert.same({'enter', 'update'}, events)
+        assert.equals(1, notifications)
+        assert.equals(first_generation, diagnostics.generation)
         assert.equals(1, diagnostics.registration_count)
-        assert.is_nil(diagnostics.target)
-        assert.is_nil(diagnostics.intent)
-        assert.equals(0, diagnostics.last_sequence)
+        assert.is_equal(widget, diagnostics.target)
+        assert.is_not_nil(diagnostics.intent)
+        assert.equals(8, diagnostics.last_sequence)
 
-        assert.is_true(second:accept_pointer_observation(
+        assert.is_false(second:accept_pointer_observation(
             observation(1, 'target', widget, {}, 12, 7)))
-        assert.equals(2, notifications)
+        assert.equals(1, notifications)
     end)
 
     it('exposes only presentation-neutral diagnostics and intent fields',
@@ -446,7 +447,7 @@ describe('DwarfUICore tooltip service', function()
         }, diagnostic_fields)
     end)
 
-    it('retires incompatible process-wide service versions', function()
+    it('rejects incompatible process-wide service versions', function()
         local stale_target = {}
         local stale_intent = {}
         local stale_observer = function() end
@@ -463,14 +464,9 @@ describe('DwarfUICore tooltip service', function()
             },
         }
 
-        local harness = load_service(process)
-
-        assert.is_not_equal(stale_state,
-            process.dwarfuicore.tooltip_service)
-        assert.equals(2, process.dwarfuicore.tooltip_service.api_version)
-        assert.equals(0, harness.service:registration_count())
-        assert.is_nil(harness.service:get_intent())
-        assert.is_nil(harness.service:get_diagnostics().target)
+        assert.has_error(function() load_service(process) end,
+            'Conflicting DwarfUICore tooltip service versions: process has 999, requested 2.')
+        assert.is_equal(stale_state, process.dwarfuicore.tooltip_service)
     end)
 
     it('loads with no GUI, tooltip renderer, or ZScreen implementation',

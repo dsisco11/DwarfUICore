@@ -4,11 +4,12 @@
 
 Approved and frozen on 2026-08-01, including its transitive version 1 public
 data schema and immutable-object low-level mutation boundary. The repository
-split and implementation Phases 0 and 1 are complete. Private namespace,
-identity, immutability, ordering, and weak-lifetime primitives now exist, but
-providers, process runtime state, namespaced service backends, service-contract
-version negotiation, public service APIs, and consumer migration remain
-unimplemented. Any further contract amendment requires explicit re-approval.
+split and implementation Phases 0 through 2 are complete. Private namespace,
+identity, immutability, ordering, weak-lifetime, and process-runtime lifecycle
+infrastructure now exist, but providers, namespaced service backends,
+service-contract version negotiation, public service APIs, and consumer
+migration remain unimplemented. Any further contract amendment requires
+explicit re-approval.
 
 ## Decision summary
 

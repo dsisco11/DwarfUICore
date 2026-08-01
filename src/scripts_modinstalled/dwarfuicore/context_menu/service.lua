@@ -42,6 +42,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@class dwarfuicore.ContextMenuServiceState
 ---@field api_version integer
 ---@field generation integer
+---@field runtime_generation integer
 ---@field session dwarfuicore.ContextMenuOpenSession|nil
 ---@field presentation dwarfuicore.ContextMenuPresentationController|nil
 ---@field disabled_generation integer|nil
@@ -78,13 +79,15 @@ local function default_printer(message)
     end
 end
 
----Creates a fresh destructively reloadable service state.
+---Creates a fresh service state for the active runtime generation.
 ---@param generation integer
+---@param runtime_generation integer
 ---@return dwarfuicore.ContextMenuServiceState
-local function new_state(generation)
+local function new_state(generation, runtime_generation)
     return {
         api_version=API_VERSION,
         generation=generation,
+        runtime_generation=runtime_generation,
         session=nil,
         presentation=nil,
         disabled_generation=nil,
@@ -473,25 +476,17 @@ function ContextMenuService:get_diagnostics()
 end
 
 local previous = dfhack.dwarfuicore[SERVICE_SLOT]
-local generation = previous and previous.generation + 1 or 1
-if previous and previous.service and
-        type(previous.service.shutdown) == 'function' then
-    previous.service:shutdown()
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+if previous and previous.api_version ~= API_VERSION then
+    error(('Conflicting DwarfUICore context-menu service versions: process ' ..
+        'has %s, requested %s.'):format(tostring(previous.api_version),
+            tostring(API_VERSION)))
 end
-
-local state = new_state(generation)
-dfhack.dwarfuicore[SERVICE_SLOT] = state
-
-local registration_manager = registrations.manager
-local input_hook_manager = input_hooks.manager
-local sampler = input_samples.ContextMenuInputSampler.new{
-    has_map_demand=function()
-        return registration_manager:map_registration_count() > 0
-    end,
-}
-local detector = target_detectors.ContextMenuTargetDetector.new{
-    registrations=registration_manager,
-}
+if previous and runtime_generation > 0 then
+    assert(previous.runtime_generation == runtime_generation,
+        'DwarfUICore context-menu service belongs to another runtime generation.')
+end
 
 ---Fails explicitly if invoked before the concrete screen factory is installed.
 ---@return dwarfuicore.ContextMenuPresentationController
@@ -499,11 +494,30 @@ local function unavailable_presentation_factory()
     error('DwarfUICore context-menu presentation is not installed.')
 end
 
-service = ContextMenuService.new(state, {
-    registrations=registration_manager,
-    detector=detector,
-    sampler=sampler,
-    input_hook=input_hook_manager,
-    presentation_factory=unavailable_presentation_factory,
-})
-state.service = service
+if previous then
+    assert(type(previous.service) == 'table',
+        'DwarfUICore context-menu service state is incomplete.')
+    service = previous.service
+else
+    local state = new_state(1, runtime_generation)
+    local registration_manager = registrations.manager
+    local input_hook_manager = input_hooks.manager
+    local sampler = input_samples.ContextMenuInputSampler.new{
+        has_map_demand=function()
+            return registration_manager:map_registration_count() > 0
+        end,
+    }
+    local detector = target_detectors.ContextMenuTargetDetector.new{
+        registrations=registration_manager,
+    }
+    local constructed_service = ContextMenuService.new(state, {
+        registrations=registration_manager,
+        detector=detector,
+        sampler=sampler,
+        input_hook=input_hook_manager,
+        presentation_factory=unavailable_presentation_factory,
+    })
+    state.service = constructed_service
+    dfhack.dwarfuicore[SERVICE_SLOT] = state
+    service = constructed_service
+end

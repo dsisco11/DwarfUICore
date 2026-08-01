@@ -17,7 +17,7 @@ local function load_harness(state)
     if state.demand == nil then state.demand = true end
     if state.map_demand == nil then state.map_demand = false end
     local dfhack = state.dfhack or {
-        dwarfuicore=state.dwarfuicorecore,
+        dwarfuicore=state.dwarfuicore,
         gui={
             getMousePos=function()
                 state.map_reads = state.map_reads + 1
@@ -376,17 +376,21 @@ describe('DwarfUICore pointer poller', function()
         assert.equals(1, #harness.state.callbacks)
     end)
 
-    it('makes callbacks from an older module generation inert', function()
+    it('makes callbacks from an older runtime generation inert', function()
         local state = {
             mouse_x=3,
             mouse_y=8,
             map_demand=true,
             map_pos={x=13, y=18, z=2},
+            dwarfuicore={
+                service_provider_runtime={generation=1},
+            },
         }
         local old_harness = load_harness(state)
         local old_poller = old_harness.new_poller()
         old_poller:start()
 
+        state.dwarfuicore.service_provider_runtime = {generation=2}
         local new_harness = load_harness(state)
         local new_poller = new_harness.new_poller()
         assert.is_false(old_poller:start())

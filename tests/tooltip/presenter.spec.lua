@@ -111,6 +111,7 @@ local function load_environment()
                 require_modules={['plugins.overlay']=overlay},
                 reqscript={
                     ['dwarfuicore/utils/function_chain']=function_chain,
+                    ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 },
             })
         return result
@@ -478,7 +479,7 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.is_false(presenter:start())
     end)
 
-    it('reloads presenter and renderer while adopting one active trampoline',
+    it('preserves presenter, renderer, and trampoline across module loads',
             function()
         local env = load_environment()
         local root = env.widgets.Panel{}
@@ -499,19 +500,19 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         local next_hook = env.load_hook_generation()
         local next_tooltip = env.load_tooltip_generation(next_hook)
         local diagnostics = next_hook.manager:get_diagnostics()
-        assert.is_not_equal(first_presenter, next_tooltip.presenter)
-        assert.is_not_equal(first_renderer,
+        assert.is_equal(first_presenter, next_tooltip.presenter)
+        assert.is_equal(first_renderer,
             next_tooltip.presenter._renderer)
         assert.is_equal(trampoline,
             env.overlay.render_viewscreen_widgets)
-        assert.equals(first_generation + 1, diagnostics.generation)
+        assert.equals(first_generation, diagnostics.generation)
         assert.equals(diagnostics.generation,
             diagnostics.overlay.generation)
         assert.is_true(diagnostics.overlay.outermost)
 
         env.overlay.render_viewscreen_widgets()
-        assert.equals(1, first_presenter:get_diagnostics().render_count)
-        assert.equals(1,
+        assert.equals(2, first_presenter:get_diagnostics().render_count)
+        assert.equals(2,
             next_tooltip.presenter:get_diagnostics().render_count)
         assert.equals(2,
             next_hook.manager:get_diagnostics().render_count)

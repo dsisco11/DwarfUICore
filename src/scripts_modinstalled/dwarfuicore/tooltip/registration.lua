@@ -14,14 +14,18 @@ local target_adapters = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 1
+local RUNTIME_SLOT = 'tooltip_registration_runtime'
 
-local detector = TooltipTargetDetector.new{
-    registrations=input_service:get_registrations(),
-    additional_roots=function()
-        return map_targets:get_owner_roots()
-    end,
-}
-local poller
+dfhack.dwarfuicore = dfhack.dwarfuicore or {}
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+local process_state = dfhack.dwarfuicore[RUNTIME_SLOT]
+if process_state and runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore tooltip polling belongs to another runtime generation.')
+end
+local detector = process_state and process_state.detector or nil
+local poller = process_state and process_state.poller or nil
 
 ---Counts live weak widget registrations without retaining their views.
 ---@return integer
@@ -79,11 +83,27 @@ local function observe_pointer(sample)
     input_service:accept_pointer_observation(map_observation)
 end
 
-poller = PointerPoller.new{
-    observer=observe_pointer,
-    has_demand=has_polling_demand,
-    has_map_demand=has_map_sampling_demand,
-}
+if not poller then
+    local constructed_detector = TooltipTargetDetector.new{
+        registrations=input_service:get_registrations(),
+        additional_roots=function()
+            return map_targets:get_owner_roots()
+        end,
+    }
+    detector = constructed_detector
+    local constructed_poller = PointerPoller.new{
+        observer=observe_pointer,
+        has_demand=has_polling_demand,
+        has_map_demand=has_map_sampling_demand,
+    }
+    process_state = {
+        runtime_generation=runtime_generation,
+        detector=constructed_detector,
+        poller=constructed_poller,
+    }
+    dfhack.dwarfuicore[RUNTIME_SLOT] = process_state
+    poller = constructed_poller
+end
 
 ---Registers any widget for process-wide singleton tooltip targeting.
 ---Registration is valid before attachment; detached widgets are simply skipped.
@@ -158,19 +178,11 @@ function get_diagnostics()
         intent=service_diagnostics.intent,
         revision=service_diagnostics.revision,
         last_sequence=service_diagnostics.last_sequence,
-        poller_module_generation=poller_diagnostics.module_generation,
+        poller_runtime_generation=poller_diagnostics.runtime_generation,
         poller_generation=poller_diagnostics.generation,
         poller_running=poller_diagnostics.running,
         poller_scheduled=poller_diagnostics.scheduled,
         poller_current=poller_diagnostics.current,
         sample_sequence=poller_diagnostics.sample_sequence,
     }
-end
-
--- A coherent reload constructs a new poller generation after the poller
--- module invalidates every callback from the previous generation.
-if registration_count() > 0 then
-    poller:start()
-else
-    input_service:shutdown()
 end

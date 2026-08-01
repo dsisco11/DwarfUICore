@@ -1,13 +1,10 @@
 --@ module=true
 
--- Reload-safe, registration-gated attachment-root discovery.
-
-local MODULE_GENERATION_SLOT = 'context_menu_root_discovery_generation'
+-- Runtime-bound, registration-gated attachment-root discovery.
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
-dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
-local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
 ---@class dwarfuicore.ContextMenuRootDiscoveryOptions
 ---@field has_demand fun(): boolean
@@ -26,7 +23,7 @@ local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 ---@field _on_failure fun(message: string)|nil
 ---@field _scheduler fun(callback: function)
 ---@field _printer fun(message: string)
----@field _module_generation integer
+---@field _runtime_generation integer
 ---@field _generation integer
 ---@field _running boolean
 ---@field _scheduled boolean
@@ -107,7 +104,7 @@ function ContextMenuRootDiscovery.new(options)
         _on_failure=options.on_failure,
         _scheduler=options.scheduler or default_scheduler,
         _printer=options.printer or default_printer,
-        _module_generation=module_generation,
+        _runtime_generation=runtime_generation,
         _generation=0,
         _running=false,
         _scheduled=false,
@@ -117,11 +114,12 @@ function ContextMenuRootDiscovery.new(options)
     }, ContextMenuRootDiscovery)
 end
 
----Returns whether this instance belongs to the active module generation.
+---Returns whether this instance belongs to the active runtime generation.
 ---@return boolean
 function ContextMenuRootDiscovery:_module_is_current()
-    return self._module_generation ==
-        dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
+    local current = dfhack.dwarfuicore.service_provider_runtime
+    local generation = current and current.generation or 0
+    return self._runtime_generation == generation
 end
 
 ---Invokes one discovery collaborator under a traceback boundary.
@@ -186,11 +184,11 @@ end
 ---Queues the sole callback for this instance generation.
 function ContextMenuRootDiscovery:_schedule_next()
     local expected_generation = self._generation
-    local expected_module_generation = self._module_generation
+    local expected_runtime_generation = self._runtime_generation
     self._scheduled = true
     local ok = self:_call('scheduler', function()
         self._scheduler(function()
-            self:_tick(expected_generation, expected_module_generation)
+            self:_tick(expected_generation, expected_runtime_generation)
         end)
     end)
     if not ok then self._scheduled = false end
@@ -198,11 +196,13 @@ end
 
 ---Executes one guarded discovery pass and queues its successor.
 ---@param expected_generation integer
----@param expected_module_generation integer
+---@param expected_runtime_generation integer
 function ContextMenuRootDiscovery:_tick(
-        expected_generation, expected_module_generation)
-    if expected_module_generation ~=
-            dfhack.dwarfuicore[MODULE_GENERATION_SLOT] then
+        expected_generation, expected_runtime_generation)
+    local current_runtime = dfhack.dwarfuicore.service_provider_runtime
+    local current_runtime_generation =
+        current_runtime and current_runtime.generation or 0
+    if expected_runtime_generation ~= current_runtime_generation then
         self._running = false
         self._scheduled = false
         return
@@ -313,7 +313,7 @@ function ContextMenuRootDiscovery:get_diagnostics()
     local root_count = 0
     for _ in pairs(self._roots) do root_count = root_count + 1 end
     return {
-        module_generation=self._module_generation,
+        runtime_generation=self._runtime_generation,
         generation=self._generation,
         current=self:_module_is_current(),
         running=self._running,

@@ -27,25 +27,48 @@ local function weak_values()
     return setmetatable({}, {__mode='v'})
 end
 
----Creates empty reload-safe process state.
+---@class dwarfuicore.TooltipMapTargetProcessState
+---@field api_version integer
+---@field runtime_generation integer
+---@field registrations table
+---@field coordinate_index table
+---@field registration_sequence integer
+---@field generation integer
+---@field registry? dwarfuicore.TooltipMapTargetRegistry
+
+---Creates empty runtime-owned process state.
+---@param runtime_generation integer
 ---@return table
-local function new_process_state()
+local function new_process_state(runtime_generation)
     return {
         api_version=API_VERSION,
+        runtime_generation=runtime_generation,
         registrations=weak_keys(),
         coordinate_index=weak_values(),
         registration_sequence=0,
-        generation=0,
+        generation=1,
     }
 end
 
 local process_state = dfhack.dwarfuicore[REGISTRY_SLOT]
-if type(process_state) ~= 'table' or
-        process_state.api_version ~= API_VERSION then
-    process_state = new_process_state()
-    dfhack.dwarfuicore[REGISTRY_SLOT] = process_state
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+local publish_process_state = false
+if process_state and (type(process_state) ~= 'table' or
+        process_state.api_version ~= API_VERSION) then
+    error(('Conflicting DwarfUICore tooltip map-target versions: process ' ..
+        'has %s, requested %s.'):format(
+            tostring(type(process_state) == 'table' and
+                process_state.api_version or nil), tostring(API_VERSION)))
 end
-process_state.generation = process_state.generation + 1
+if process_state and runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore tooltip map targets belong to another runtime generation.')
+end
+if not process_state then
+    process_state = new_process_state(runtime_generation)
+    publish_process_state = true
+end
 
 ---@class dwarfuicore.MapTileTargetObservation
 ---@field sequence integer
@@ -70,6 +93,7 @@ process_state.generation = process_state.generation + 1
 ---@class dwarfuicore.TooltipMapTargetRegistry
 ---@field _state table
 ---@field _root_resolver dwarfuicore.ViewRootResolver
+---@field _runtime_generation integer
 TooltipMapTargetRegistry = {}
 TooltipMapTargetRegistry.__index = TooltipMapTargetRegistry
 
@@ -150,7 +174,16 @@ function TooltipMapTargetRegistry.new(options)
     return setmetatable({
         _state=options.state,
         _root_resolver=options.root_resolver,
+        _runtime_generation=options.state.runtime_generation or 0,
     }, TooltipMapTargetRegistry)
+end
+
+---Rejects use after the owning core runtime generation changes.
+function TooltipMapTargetRegistry:_assert_current()
+    local current = dfhack.dwarfuicore.service_provider_runtime
+    local generation = current and current.generation or 0
+    assert(self._runtime_generation == generation,
+        'DwarfUICore tooltip map targets belong to another runtime generation.')
 end
 
 ---Returns or creates the weak bucket for one exact coordinate.
@@ -180,6 +213,7 @@ end
 ---@param options dwarfuicore.MapTileTooltipRegistrationOptions
 ---@return dwarfuicore.MapTileTooltipRegistration
 function TooltipMapTargetRegistry:register(options)
+    self:_assert_current()
     assert(type(options) == 'table',
         'DwarfUICore map-tile registration options must be a table.')
     assert(type(options.owner) == 'table',
@@ -211,6 +245,7 @@ end
 ---@param update dwarfuicore.MapTileTooltipUpdate
 ---@return boolean updated
 function TooltipMapTargetRegistry:update(handle, update)
+    self:_assert_current()
     local record = self._state.registrations[handle]
     if not record then return false end
     local x, y, z, tooltip =
@@ -232,6 +267,7 @@ end
 ---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean removed
 function TooltipMapTargetRegistry:unregister(handle)
+    self:_assert_current()
     local record = self._state.registrations[handle]
     if not record then return false end
     self:_remove_from_bucket(handle, record)
@@ -242,6 +278,7 @@ end
 ---Counts live weak registrations without retaining their handles.
 ---@return integer
 function TooltipMapTargetRegistry:registration_count()
+    self:_assert_current()
     local count = 0
     for _ in pairs(self._state.registrations) do count = count + 1 end
     return count
@@ -251,6 +288,7 @@ end
 ---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean
 function TooltipMapTargetRegistry:contains(handle)
+    self:_assert_current()
     return self._state.registrations[handle] ~= nil
 end
 
@@ -258,6 +296,7 @@ end
 ---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return string|nil
 function TooltipMapTargetRegistry:get_tooltip(handle)
+    self:_assert_current()
     local record = self._state.registrations[handle]
     return record and record.tooltip or nil
 end
@@ -265,6 +304,7 @@ end
 ---Builds the current presented owner-root set for screen-space occlusion.
 ---@return table<gui.View, integer>
 function TooltipMapTargetRegistry:get_owner_roots()
+    self:_assert_current()
     local roots = {}
     for _, record in pairs(self._state.registrations) do
         local root = self._root_resolver:resolve(record.owner, true)
@@ -280,6 +320,7 @@ end
 ---@param sample dwarfuicore.PointerSample
 ---@return dwarfuicore.MapTileTargetObservation
 function TooltipMapTargetRegistry:detect(sample)
+    self:_assert_current()
     assert(type(sample) == 'table',
         'DwarfUICore map target detector requires a pointer sample.')
     assert(type(sample.sequence) == 'number',
@@ -328,6 +369,7 @@ end
 ---Returns reload, registration, and exact-index diagnostics.
 ---@return table diagnostics
 function TooltipMapTargetRegistry:get_diagnostics()
+    self:_assert_current()
     local bucket_count = 0
     for _ in pairs(self._state.coordinate_index) do
         bucket_count = bucket_count + 1
@@ -341,7 +383,14 @@ function TooltipMapTargetRegistry:get_diagnostics()
     }
 end
 
-registry = TooltipMapTargetRegistry.new{
-    state=process_state,
-    root_resolver=ViewRootResolver.new(),
-}
+registry = process_state.registry
+if not registry then
+    registry = TooltipMapTargetRegistry.new{
+        state=process_state,
+        root_resolver=ViewRootResolver.new(),
+    }
+    process_state.registry = registry
+end
+if publish_process_state then
+    dfhack.dwarfuicore[REGISTRY_SLOT] = process_state
+end

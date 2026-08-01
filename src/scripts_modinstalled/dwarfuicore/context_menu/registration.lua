@@ -13,8 +13,17 @@ local MODULE_GENERATION_SLOT = 'context_menu_registration_generation'
 local MANAGER_SLOT = 'context_menu_registration_manager'
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
-dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+local existing_manager = dfhack.dwarfuicore[MANAGER_SLOT]
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+if existing_manager and runtime_generation > 0 then
+    assert(existing_manager._runtime_generation == runtime_generation,
+        'DwarfUICore context-menu registrations belong to another runtime generation.')
+end
+if not existing_manager then
+    dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
+        (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+end
 local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 
 ---@class dwarfuicore.ContextMenuWidgetCandidate
@@ -36,6 +45,7 @@ ContextMenuWidgetCandidate.__index = ContextMenuWidgetCandidate
 
 ---@class dwarfuicore.ContextMenuRegistrationManager
 ---@field _module_generation integer
+---@field _runtime_generation integer
 ---@field _root_resolver dwarfuicore.ViewRootResolver
 ---@field _identity_allocator dwarfuicore.ContextMenuRegistrationIdentityAllocator
 ---@field _widget_registrations table<any, table>
@@ -93,7 +103,7 @@ function ContextMenuWidgetCandidate:get_definition_snapshot()
     return self._definition:snapshot()
 end
 
----Creates one weak, destructive-reload registration manager.
+---Creates one weak registration manager for the active runtime generation.
 ---@param options? dwarfuicore.ContextMenuRegistrationManagerOptions
 ---@return dwarfuicore.ContextMenuRegistrationManager
 function ContextMenuRegistrationManager.new(options)
@@ -118,6 +128,7 @@ function ContextMenuRegistrationManager.new(options)
     local resolver = options.root_resolver or ViewRootResolver.new()
     local manager = setmetatable({
         _module_generation=module_generation,
+        _runtime_generation=runtime_generation,
         _root_resolver=resolver,
         _identity_allocator=identity_allocator,
         _widget_registrations=setmetatable({}, {__mode='k'}),
@@ -500,11 +511,7 @@ function ContextMenuRegistrationManager:get_diagnostics()
     }
 end
 
-local previous_manager = dfhack.dwarfuicore[MANAGER_SLOT]
-if previous_manager and type(previous_manager.shutdown) == 'function' then
-    previous_manager:shutdown()
-end
-manager = ContextMenuRegistrationManager.new()
+manager = existing_manager or ContextMenuRegistrationManager.new()
 dfhack.dwarfuicore[MANAGER_SLOT] = manager
 
 ---Registers or re-registers one widget through the process singleton.

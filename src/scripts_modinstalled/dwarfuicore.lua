@@ -3,11 +3,22 @@
 -- DwarfUICore validation and explicit development reload command.
 
 local MODULE_REGISTRY_SCRIPT = 'dwarfuicore/module_registry'
+local SERVICE_RUNTIME_SCRIPT = 'dwarfuicore/service_provider/runtime'
 local TOOLTIP_RUNTIME_SCRIPT = 'dwarfuicore/tooltip/runtime'
 local TOOLTIP_RENDER_HOOK_SCRIPT = 'dwarfuicore/tooltip/render_hook'
 local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
+local PROCESS_OWNER_SLOTS = {
+    'tooltip_map_target_registry',
+    'tooltip_service',
+    'tooltip_registration_runtime',
+    'tooltip_render_hook',
+    'tooltip_runtime',
+    'context_menu_registration_manager',
+    'context_menu_input_hook',
+    'context_menu_service',
+}
 
 ---Returns a loaded script environment without loading an absent script.
 ---@param script_name string
@@ -22,6 +33,20 @@ end
 ---@return table registry
 local function load_module_registry()
     return reqscript(MODULE_REGISTRY_SCRIPT)
+end
+
+---Loads the private process runtime lifecycle owner.
+---@return table runtime
+local function load_service_runtime()
+    return reqscript(SERVICE_RUNTIME_SCRIPT)
+end
+
+---Clears retired owner records only during explicit core reload.
+local function clear_process_owner_slots()
+    if type(dfhack.dwarfuicore) ~= 'table' then return end
+    for _, slot in ipairs(PROCESS_OWNER_SLOTS) do
+        dfhack.dwarfuicore[slot] = nil
+    end
 end
 
 ---Clears script environments only for scripts currently loaded by DFHack.
@@ -87,7 +112,17 @@ end
 ---Loads and validates the current DwarfUICore module generation.
 ---@return table<string, table>
 function initialize()
-    return load_module_registry().load_all(reqscript)
+    local runtime = load_service_runtime()
+    local state, created = runtime.begin_initialization()
+    local result = table.pack(xpcall(function()
+        return load_module_registry().load_all(reqscript)
+    end, debug.traceback))
+    if not result[1] then
+        if created then pcall(runtime.fail_initialization, state.generation) end
+        error(result[2], 0)
+    end
+    if created then runtime.complete_initialization(state.generation) end
+    return result[2]
 end
 
 ---Retires Core-owned runtime owners before an explicit development reload.
@@ -99,6 +134,7 @@ end
 ---Rebuilds the DwarfUICore module generation for explicit development use.
 ---@return table<string, table>
 function reload()
+    local runtime = load_service_runtime()
     local old_registry = load_module_registry()
     local old_names = old_registry.get_script_names()
     local old_modules = {}
@@ -108,20 +144,32 @@ function reload()
         end
     end
 
+    runtime.begin_reload()
     teardown()
-    clear_script_environments(old_modules)
-    dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)
-    dfhack.run_script(MODULE_REGISTRY_SCRIPT)
-    local fresh_registry = load_module_registry()
-    local fresh_modules = {}
-    for _, spec in ipairs(fresh_registry.MODULES) do
-        table.insert(fresh_modules, spec.name)
+    local fresh_state = runtime.begin_reconstruction()
+    clear_process_owner_slots()
+    local result = table.pack(xpcall(function()
+        clear_script_environments(old_modules)
+        dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)
+        dfhack.run_script(MODULE_REGISTRY_SCRIPT)
+        local fresh_registry = load_module_registry()
+        local fresh_modules = {}
+        for _, spec in ipairs(fresh_registry.MODULES) do
+            table.insert(fresh_modules, spec.name)
+        end
+        clear_script_environments(fresh_modules)
+        for _, script_name in ipairs(fresh_modules) do
+            run_module_script(script_name)
+        end
+        local loaded = fresh_registry.load_all(reqscript)
+        load_service_runtime().complete_initialization(fresh_state.generation)
+        return loaded
+    end, debug.traceback))
+    if not result[1] then
+        pcall(runtime.fail_initialization, fresh_state.generation)
+        error(result[2], 0)
     end
-    clear_script_environments(fresh_modules)
-    for _, script_name in ipairs(fresh_modules) do
-        run_module_script(script_name)
-    end
-    return fresh_registry.load_all(reqscript)
+    return result[2]
 end
 
 ---Runs DwarfUICore validation or its explicit development reload command.

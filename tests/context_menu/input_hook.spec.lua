@@ -113,7 +113,7 @@ describe('context-menu input hook', function()
         assert.equals(0, diagnostics.screen_hook_count)
     end)
 
-    it('destructively replaces owned trampolines across module reload',
+    it('preserves its compatible owner and trampolines across module reload',
             function()
         local process = {dwarfuicore={}}
         local predecessor_count = 0
@@ -127,11 +127,12 @@ describe('context-menu input hook', function()
         local trampoline = overlay.feed_viewscreen_widgets
 
         local second = load_hook(process, overlay)
-        assert.is_not_equal(trampoline, overlay.feed_viewscreen_widgets)
+        assert.is_equal(first.manager, second.manager)
+        assert.is_equal(trampoline, overlay.feed_viewscreen_widgets)
         assert.equals(0, second.manager:get_diagnostics().dispatch_count)
         second.manager:set_handler(function() return true end)
-        assert.is_true(second.manager:ensure_native())
-        assert.is_not_equal(trampoline, overlay.feed_viewscreen_widgets)
+        assert.is_false(second.manager:ensure_native())
+        assert.is_equal(trampoline, overlay.feed_viewscreen_widgets)
         assert.is_true(overlay.feed_viewscreen_widgets(
             'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(0, predecessor_count)

@@ -18,40 +18,39 @@ ContextMenuInputTransport = immutable_enum.define({
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[STATE_SLOT]
+local publish_process_state = false
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 if process_state and process_state.api_version ~= API_VERSION then
     error(('Conflicting DwarfUICore context-menu input-hook versions: ' ..
         'process has %s, requested %s.'):format(
             tostring(process_state.api_version), tostring(API_VERSION)))
 end
-local previous_generation = process_state and process_state.generation or 0
-local retired_hooks = {}
-if process_state and process_state.manager and
-        type(process_state.manager.shutdown) == 'function' then
-    pcall(process_state.manager.shutdown, process_state.manager)
-    for _, record in ipairs(process_state.retired_hooks or {}) do
-        if record.foreign_outer_wrapper then
-            table.insert(retired_hooks, record)
-        end
-    end
+if process_state and runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore context-menu input hook belongs to another runtime generation.')
 end
-process_state = {
-    api_version=API_VERSION,
-    generation=previous_generation + 1,
-    handler=nil,
-    failure_handler=nil,
-    native_module=nil,
-    native_hook=nil,
-    screen_hooks=setmetatable({}, {__mode='k'}),
-    retired_hooks=retired_hooks,
-    dispatch_count=0,
-    handled_count=0,
-    delegated_count=0,
-    failure_count=0,
-    last_error=nil,
-    last_failure=nil,
-    disabled_generation=nil,
-}
-dfhack.dwarfuicore[STATE_SLOT] = process_state
+if not process_state then
+    process_state = {
+        api_version=API_VERSION,
+        runtime_generation=runtime_generation,
+        generation=1,
+        handler=nil,
+        failure_handler=nil,
+        native_module=nil,
+        native_hook=nil,
+        screen_hooks=setmetatable({}, {__mode='k'}),
+        retired_hooks={},
+        dispatch_count=0,
+        handled_count=0,
+        delegated_count=0,
+        failure_count=0,
+        last_error=nil,
+        last_failure=nil,
+        disabled_generation=nil,
+    }
+    publish_process_state = true
+end
 
 ---@class dwarfuicore.ContextMenuInputHookRecord
 ---@field transport dwarfuicore.ContextMenuInputTransport
@@ -67,6 +66,7 @@ dfhack.dwarfuicore[STATE_SLOT] = process_state
 
 ---@class dwarfuicore.ContextMenuInputHookState
 ---@field api_version integer
+---@field runtime_generation integer
 ---@field generation integer
 ---@field handler function|nil
 ---@field failure_handler function|nil
@@ -456,5 +456,8 @@ function ContextMenuInputHookManager:get_diagnostics()
     }
 end
 
-manager = ContextMenuInputHookManager.new(process_state)
+manager = process_state.manager or ContextMenuInputHookManager.new(process_state)
 process_state.manager = manager
+if publish_process_state then
+    dfhack.dwarfuicore[STATE_SLOT] = process_state
+end

@@ -5,15 +5,15 @@
 Approved on 2026-08-01 and amended on 2026-08-02 to expose providers through a
 dedicated DFHack script module. Its transitive version 1 public data schema and
 immutable-object low-level mutation boundary remain unchanged. DwarfUICore
-implementation Phases 0 through 8 are complete; legacy removal, documentation,
-and later release work remain outstanding. Any further contract amendment
-requires explicit re-approval.
+implements the approved public contract, including legacy direct API removal
+and public documentation. Any further contract amendment requires explicit
+re-approval.
 
 ## Decision summary
 
 DwarfUICore now owns the process-wide tooltip, context-menu, pointer,
 registration, and presentation infrastructure extracted from DwarfUI. This
-proposal defines a later provider and namespace layer over that current system.
+contract defines the provider and namespace layer over that current system.
 
 DwarfUICore exposes one import-only public services module and one explicitly
 named provider per supported service. Its command entrypoint remains separate.
@@ -101,17 +101,15 @@ initialization.
 
 ### Legacy direct API replacement
 
-The existing `dwarfuicore/tooltip/api` and
-`dwarfuicore/context_menu/api` modules are replaced when this contract ships.
-They accept no consumer namespace, so preserving them as adapters would require
-a shared, invented, or inferred namespace and would violate the explicit
-ownership contract.
+The replaced direct tooltip and context-menu modules accept no consumer
+namespace, so preserving them as adapters would require a shared, invented, or
+inferred namespace and would violate the explicit ownership contract.
 
 This is an intentional breaking replacement. DwarfUI and DwarfUICore's tests
-must migrate to the provider APIs before the old modules, their module-registry
-entries, and their packaged files are removed. No compatibility adapter or
-legacy namespace is shipped. Independent plugins that use the old paths require
-separately authorized migration to the provider contract.
+use the provider APIs. The replaced modules, their module-registry entries, and
+their packaged files are absent. No compatibility adapter or legacy namespace is shipped.
+Independent plugins that use the replaced API require separately authorized
+migration to the provider contract.
 
 ## Proposed public services-module contract
 

@@ -21,23 +21,44 @@ Install DwarfUICore as its own DFHack mod package before installing DwarfUI or
 another dependent plugin. The package identifier is `dwarfuicore`.
 
 The current DwarfUI package declares a runtime dependency of
-`dwarfuicore >= 0.1.0`. A dependent package must install a compatible
+`dwarfuicore >= 0.2.0`. A dependent package must install a compatible
 DwarfUICore package first; it must not bundle a second copy of DwarfUICore's
 scripts. The integration setup tool verifies the installed root script against
 the source package before it installs DwarfUI.
 
-## Current module entrypoints
+## Public service APIs
 
-The extracted tooltip and context-menu APIs remain available through these
-current compatibility entrypoints:
+Import the public services module and construct a typed, namespace-bound API
+with the exact supported contract major. DwarfUICore currently supports major
+`1` for tooltip and context-menu services.
 
 ```lua
-local tooltip = reqscript('dwarfuicore/tooltip/api')
-local context_menu = reqscript('dwarfuicore/context_menu/api')
+local services = reqscript('dwarfuicore/services')
+local tooltip = services.TooltipServiceProvider:new(1, 'my-plugin')
+local context_menu = services.ContextMenuServiceProvider:new(1, 'my-plugin')
 ```
 
-These facades load their prerequisites and preserve the extracted runtime
-state. They are not the proposed service-provider interface.
+The namespace is an ownership boundary, not a security principal. Use one
+stable identifier for a plugin across its entrypoints, saves, and releases.
+APIs using the same namespace share that namespace's registrations; other
+namespaces use the same process-wide runtime but cannot operate on those
+registrations. Each API object is immutable and non-owning. Call
+`clear_namespace()` explicitly at a consumer-controlled reload, disable, or
+teardown boundary when registrations must be removed.
+
+`register()`, `update()`, and `unregister()` return `false` for ordinary
+same-namespace absence. Invalid arguments, stale APIs or handles, foreign
+handles, service health failures, and construction failures raise ordinary Lua
+errors with stable prefixes and category tokens. Use `pcall` around provider
+construction or API calls only when the consumer wants to recover from those
+errors.
+
+Tooltip collisions select the latest eligible contribution. Context-menu
+contributions compose in registration order. Map registration handles are
+opaque and only accept mutation through their creating service, namespace, and
+contract major. The complete versioned data schema, callback contexts, error
+categories, collision behavior, reload rules, and compatibility policy are in
+[the service-provider contract](Docs/service-provider-api-proposal.md).
 
 Running `dwarfuicore` validates the installed package. Running
 `dwarfuicore reload` is the explicit development-only reload command. Ordinary
@@ -66,13 +87,21 @@ The environment alternative is `DWARFUICORE_SOURCE`. Package integration can
 be checked from DwarfUI with `tools/Setup-CoreIntegration.ps1`, which installs
 DwarfUICore before DwarfUI into an isolated mod tree.
 
-## Future public service-provider contract
+## Compatibility and updates
 
-[The service-provider proposal](Docs/service-provider-api-proposal.md) is
-owned and maintained in this repository. It is a proposed, unimplemented
-architecture: no provider classes, consumer namespaces, composite identities,
-exact contract-version negotiation, immutable service handles, or new
-collision rules exist yet. Do not create a service-provider task list or
-migrate independent consumer plugins until that contract is approved.
+The services module and its two provider names are public compatibility
+contracts. Internal implementation paths, registry order, private diagnostics,
+and handle representation are not. Compatible changes retain the same contract
+major; incompatible method, data, ownership, collision, handle, or error
+semantics require a new major.
 
-Migrating independent consumer plugins remains separate future work.
+One DwarfUICore installation must resolve in a running DFHack process. Verify
+package contents offline, then start a fresh process or run the explicit
+development command `dwarfuicore reload` after an update. Replacing a subset
+of files or switching script paths while a generation is active is unsupported.
+
+The release intentionally has no compatibility adapter or compatibility
+namespace for the replaced direct APIs. Provider-consuming DwarfUI requires
+DwarfUICore 0.2.0 or later, and older DwarfUI is not compatible with this
+provider-bearing release. Migrating independent consumer plugins remains
+separate work.

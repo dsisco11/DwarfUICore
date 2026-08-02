@@ -8,7 +8,7 @@ local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',
-    'tooltip_registration_runtime', 'tooltip_runtime',
+    'tooltip_namespace_registry', 'tooltip_registration_runtime', 'tooltip_runtime',
     'context_menu_registration_manager', 'context_menu_input_hook',
     'context_menu_service'}
 

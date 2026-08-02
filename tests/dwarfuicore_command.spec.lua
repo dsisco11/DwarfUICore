@@ -324,8 +324,7 @@ describe('dwarfuicore command lifecycle', function()
 
         assert.same({}, reloaded_root.reload())
         assert.same({'context-menu', 'tooltip'}, events)
-        assert.is_equal(tooltip_namespace_registry,
-            dfhack.dwarfuicore.tooltip_namespace_registry)
+        assert.is_nil(dfhack.dwarfuicore.tooltip_namespace_registry)
         assert.is_equal(unrelated_state,
             dfhack.dwarfuicore.unrelated_state)
         assert.same({REGISTRY_NAME, 'dwarfuicore/alpha',

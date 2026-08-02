@@ -627,63 +627,64 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 9 - Complete documentation, registry, and package contracts
 
-- [ ] Add every new reload-managed DwarfUICore module to
+- [x] Add every new reload-managed DwarfUICore module to
       `dwarfuicore/module_registry.lua` in dependency order and update both load
       and environment-clear order tests.
-- [ ] Delete `dwarfuicore/tooltip/api` and
+- [x] Delete `dwarfuicore/tooltip/api` and
       `dwarfuicore/context_menu/api`, remove their module-registry entries, and
       remove their focused legacy facade tests after all coordinated consumers
       and fixtures use the providers.
-- [ ] Update package-contract tests and package verification for the root,
+- [x] Update package-contract tests and package verification for the root,
       provider classes, private implementations, service modules,
       documentation, and focused tests required by the proposal.
-- [ ] Update the README from "proposed and unimplemented" only after the public
+- [x] Update the README from "proposed and unimplemented" only after the public
       surface exists and its focused tests pass.
-- [ ] Document provider acquisition, namespace selection, exact contract-major
+- [x] Document provider acquisition, namespace selection, exact contract-major
       semantics, immutable API objects, ownership, collision behavior, opaque
       handles, cleanup, error transport, health, reload, and the absence of a
       public diagnostic API.
-- [ ] Document all stable provider/API prefixes and category tokens, the
+- [x] Document all stable provider/API prefixes and category tokens, the
       non-stable status of diagnostic detail, handle-validation precedence, and
       the distinction between errors and ordinary `false` results.
-- [ ] Document `pcall` as the recovery boundary for consumers that choose to
+- [x] Document `pcall` as the recovery boundary for consumers that choose to
       handle constructor or API errors.
-- [ ] Document that API objects are non-owning, individual widget/map
+- [x] Document that API objects are non-owning, individual widget/map
       registrations are weak, and consumer-controlled lifecycle operations must
       call `clear_namespace()` explicitly when namespace cleanup is required.
-- [ ] Document immutable context-menu snapshots, next-open update behavior,
+- [x] Document immutable context-menu snapshots, next-open update behavior,
       full-menu closure on ownership loss, and pre-selection identity
       revalidation.
-- [ ] Document that namespaces are ownership boundaries rather than security
+- [x] Document that namespaces are ownership boundaries rather than security
       principals, explain that deliberate reuse shares state, and require one
       canonical identifier across entrypoints, saves, and releases.
-- [ ] Document compatible and breaking contract changes and keep public contract
+- [x] Document compatible and breaking contract changes and keep public contract
       majors distinct from package and private implementation versions.
-- [ ] Document the supported single-installation model, offline package
+- [x] Document the supported single-installation model, offline package
       verification, fresh-process or explicit-core-reload update boundary, and
       unsupported partial replacement or active script-path switching.
-- [ ] Publish the complete approved transitive LuaDoc schema, including callback
+- [x] Publish the complete approved transitive LuaDoc schema, including callback
       context and public discriminator semantics, without exposing composite
       identities or private diagnostic records.
-- [ ] Add canonical tooltip and context-menu examples using
+- [x] Add canonical tooltip and context-menu examples using
       `reqscript('dwarfuicore/services')` and no per-method namespace argument.
-- [ ] Build and inspect the expanded package and final archive; prove all
+- [x] Build and inspect the expanded package and final archive; prove all
       required files exist and no DwarfUI feature module or unrelated consumer
       code is bundled.
-- [ ] Prove neither legacy direct API path, compatibility adapter, nor invented
+- [x] Prove neither legacy direct API path, compatibility adapter, nor invented
       compatibility namespace exists in source, registry, documentation, or the
       final package.
-- [ ] Prove DwarfUI and the disposable independent test consumer resolve the
-      same intended packaged DwarfUICore installation.
-- [ ] Verify the release artifacts and documentation claim no compatibility for
+- [x] Prove a disposable Core-only test consumer resolves the intended packaged
+      DwarfUICore installation through `dwarfuicore/services`, without loading
+      or depending on DwarfUI.
+- [x] Verify the release artifacts and documentation claim no compatibility for
       old DwarfUI with provider-bearing DwarfUICore or provider-consuming
       DwarfUI with an older DwarfUICore package.
 
 ### Phase 9 completion gate
 
-- [ ] Registry order, expanded package, archive, public documentation, and
+- [x] Registry order, expanded package, archive, public documentation, and
       installed resolution match the approved implementation.
-- [ ] The package exposes no accidental internal module path as a public
+- [x] The package exposes no accidental internal module path as a public
       compatibility promise.
 
 ## Phase 10 - Verification, live acceptance, and cleanup

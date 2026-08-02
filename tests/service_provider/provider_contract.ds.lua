@@ -108,4 +108,25 @@ describe('live service-provider contract', function()
         assert.is_false(replacement:unregister(widget))
         assert.is_true(tooltip:unregister(widget))
     end)
+
+    it('drops tooltip namespace registrations during an explicit Core reload',
+            function()
+        local namespace = 'provider-reload-disposable'
+        local widget = widgets.Panel{}
+        local old_api = reqscript('dwarfuicore/services')
+            .TooltipServiceProvider:new(1, namespace)
+        assert.is_true(old_api:register(widget))
+
+        dfhack.run_command('dwarfuicore', 'reload')
+
+        local fresh_api = reqscript('dwarfuicore/services')
+            .TooltipServiceProvider:new(1, namespace)
+        local ok, failure = pcall(function() old_api:register(widget) end)
+        assert.is_false(ok)
+        assert.equals('DwarfUICore TooltipServiceApi: [STALE_API] ',
+            tostring(failure):sub(1,
+                #'DwarfUICore TooltipServiceApi: [STALE_API] '))
+        assert.is_true(fresh_api:register(widget))
+        assert.is_true(fresh_api:unregister(widget))
+    end)
 end)

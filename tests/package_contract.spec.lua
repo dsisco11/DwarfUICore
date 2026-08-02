@@ -61,6 +61,7 @@ describe('DwarfUICore package contract', function()
             'service_provider/tooltip_provider.lua',
             'service_provider/context_menu_provider.lua',
             'service_provider/weak_store.lua',
+            'services.lua',
         }
 
         for _, relative_path in ipairs(shared_modules) do
@@ -98,7 +99,6 @@ describe('DwarfUICore package contract', function()
 
     it('owns the current tooltip implementation under dwarfuicore', function()
         local tooltip_modules = {
-            'api.lua',
             'map_target.lua',
             'presenter.lua',
             'registration.lua',
@@ -129,7 +129,6 @@ describe('DwarfUICore package contract', function()
     it('owns the current context-menu implementation under dwarfuicore',
             function()
         local context_menu_modules = {
-            'api.lua',
             'definition.lua',
             'input_hook.lua',
             'input_sample.lua',
@@ -195,5 +194,24 @@ describe('DwarfUICore package contract', function()
         assert.is_truthy(services:find('ContextMenuServiceProvider', 1, true))
         assert.is_nil(services:find('function get(', 1, true))
         assert.is_nil(services:find('get_diagnostics', 1, true))
+    end)
+
+    it('does not ship replaced direct APIs or a compatibility namespace',
+            function()
+        for _, relative_path in ipairs({
+                'dwarfuicore/tooltip/api.lua',
+                'dwarfuicore/context_menu/api.lua',
+            }) do
+            assert.is_false(source_exists('src/scripts_modinstalled/' ..
+                relative_path))
+        end
+
+        local readme = read_source('README.md')
+        local proposal = read_source('Docs/service-provider-api-proposal.md')
+        assert.is_nil(readme:find('dwarfuicore/tooltip/api', 1, true))
+        assert.is_nil(readme:find('dwarfuicore/context_menu/api', 1, true))
+        assert.is_truthy(proposal:find(
+            'No compatibility adapter or legacy namespace is shipped.',
+            1, true))
     end)
 end)

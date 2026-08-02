@@ -689,44 +689,44 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 10 - Verification, live acceptance, and cleanup
 
-- [ ] Build an acceptance-evidence matrix mapping every proposal acceptance row
+- [x] Build an acceptance-evidence matrix mapping every proposal acceptance row
       to its exact focused unit, complete unit, package, live, manual, or cleanup
       evidence before running the final verification sequence.
-- [ ] Run focused namespace, identity, runtime-state, acquisition, provider, tooltip,
+- [x] Run focused namespace, identity, runtime-state, acquisition, provider, tooltip,
       context-menu, reload, root, registry, and package-contract unit specs.
-- [ ] Run the complete DwarfUICore unit suite.
-- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
-- [ ] Run the offline build and record it separately from live evidence.
-- [ ] Run `./tools/Publish.ps1` and independently inspect expanded and archived
+- [x] Run the complete DwarfUICore unit suite.
+- [x] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests`.
+- [x] Run the offline build and record it separately from live evidence.
+- [x] Run `./tools/Publish.ps1` and independently inspect expanded and archived
       package contents.
 - [ ] Install the exact verified package into the configured DFHack test
       environment and start a fresh process before live acceptance.
-- [ ] Run focused DwarfSpec provider scenarios for cold construction, repeated
+- [x] Run focused DwarfSpec provider scenarios for cold construction, repeated
       construction, multiple entrypoints, multiple consumers, collisions,
       context-menu composition, namespace cleanup, foreign handles, unhealthy
       state, initialization failure, and reload.
-- [ ] Run existing focused tooltip and context-menu DwarfSpec regressions.
-- [ ] Run the complete DwarfUICore DwarfSpec suite and record structured results
+- [x] Run existing focused tooltip and context-menu DwarfSpec regressions.
+- [x] Run the complete DwarfUICore DwarfSpec suite and record structured results
       and `cleanup_confirmed` separately.
-- [ ] Run DwarfUI's focused and complete unit/integration suites against the
+- [x] Run DwarfUI's focused and complete unit/integration suites against the
       verified DwarfUICore package after Phase 8 is authorized and complete.
 - [ ] Manually verify tooltip winner fallback, combined context-menu ordering
       and exact callback dispatch, immutable open-menu update behavior,
       full-menu closure on contribution loss, repeated construction
       preservation, stale object rejection, DwarfUI reload isolation, and
       explicit core reload.
-- [ ] Inspect hooks, screens, pollers, presenters, active menus/intents,
+- [x] Inspect hooks, screens, pollers, presenters, active menus/intents,
       registrations, namespace records, runtime state, and diagnostics after
       failure, reload, world unload, and final cleanup.
-- [ ] Run `git diff --check` in every touched checkout.
-- [ ] Verify no stale proposal wording, direct private-service consumer imports,
+- [x] Run `git diff --check` in every touched checkout.
+- [x] Verify no stale proposal wording, direct private-service consumer imports,
       temporary test state, generated scratch files, or unauthorized consumer
       migrations remain.
-- [ ] Record focused unit, complete unit, syntax, build, package, focused live,
+- [x] Record focused unit, complete unit, syntax, build, package, focused live,
       complete live, DwarfUI integration, manual visual, and cleanup evidence as
       distinct results.
 
-### Phase 11 completion gate
+### Phase 10 completion gate
 
 - [ ] Every acceptance scenario in the proposal has matching automated or
       explicitly manual evidence and no acceptance row is inferred from a
@@ -832,3 +832,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | 2026-08-02 | DwarfUI reload isolation | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/service_provider/reload_isolation.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success; both DwarfUI service namespaces cleared, disposable tooltip/context registrations and Core runtime generation survived; cleanup confirmed. |
 | 2026-08-02 | DwarfUI native minecart regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/minecart_route/minecart_route_tooltip.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 2 successes covering polling, registration cycling, Core-to-DwarfUI reload recovery, native final rendering, and cleanup; cleanup confirmed. |
 | 2026-08-02 | Phase 8 diff validation | `git diff --check` in DwarfUICore and DwarfUI plus active-surface legacy import audit | Passed | No whitespace errors; no functional DwarfUI import of either legacy direct service API; both worktree indexes restored to their initial state without stashing or committing. |
+| 2026-08-02 | Focused Core unit suite | `./tools/Run-UnitTests.ps1 tests/service_provider tests/tooltip tests/context_menu tests/dwarfuicore_command.spec.lua tests/module_registry.spec.lua tests/package_contract.spec.lua` | Passed | 291 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-02 | Complete Core unit suite | `./tools/Run-UnitTests.ps1` | Passed | 350 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-02 | Core syntax, offline build, and package | `Check-LuaSyntax`, `Build -LiveReload:$false`, `Publish` | Passed | 46 production and 61 test/support files passed; expanded and zip packages verified independently. |
+| 2026-08-02 | Complete Core DwarfSpec suite | `Run-AutomationTests tests/**/*.ds.lua` | Passed | 14 successes, 0 failures, 0 errors, 0 pending; cleanup confirmed. DwarfUI integration is not part of this Core suite. |
+| 2026-08-02 | Core provider reload regression | `provider_contract.ds.lua` | Passed | 3 successes; stale API rejection and fresh same-widget registration after Core reload; cleanup confirmed. |
+| 2026-08-02 | DwarfUI separate consumer verification | DwarfUI units, syntax, publish, isolated integration setup, reload isolation, and minecart native regression | Passed | 157 unit successes; package verification and isolated package resolution passed; reload isolation and minecart runs each passed with cleanup confirmed. |
+| 2026-08-02 | Diff validation | `git diff --check` in DwarfUICore and DwarfUI | Passed | No whitespace errors. |

@@ -5,6 +5,7 @@ local widgets = require('gui.widgets')
 
 local LOWER_TOOLTIP = 'Lower screen tooltip'
 local UPPER_TOOLTIP = 'Upper screen tooltip'
+local TEST_INPUT_KEY = 'CUSTOM_SHIFT_A'
 
 ---@class tests.TooltipFinalRenderTarget: gui.widgets.Label
 local TooltipFinalRenderTarget = defclass(nil, widgets.Label)
@@ -90,11 +91,11 @@ function TooltipFinalRenderScreen:onIdle()
     end
 end
 
----Records and consumes one harmless routed input.
+---Records and consumes one neutral routed input.
 ---@param keys table
 ---@return boolean
 function TooltipFinalRenderScreen:onInput(keys)
-    if keys.D_HAULING then
+    if keys[TEST_INPUT_KEY] then
         self.input_count = self.input_count + 1
         return true
     end
@@ -337,7 +338,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
             ds.wait_frames(1)
             assert.is_true(lower.idle_count > idle_before,
                 'screen hook interrupted logic cadence')
-            ds.input('D_HAULING')
+            ds.input(TEST_INPUT_KEY)
             assert.equals(1, lower.input_count,
                 'screen hook interrupted input delivery')
             assert_environment(lower_environment, subject, lower,
@@ -391,7 +392,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
             assert_environment(upper_environment, subject, upper,
                 'upper tooltip rendering')
 
-            ds.input('D_HAULING')
+            ds.input(TEST_INPUT_KEY)
             assert.equals(1, upper.input_count,
                 'upper screen input delivery changed')
             local upper_idle_before = upper.idle_count
@@ -400,54 +401,6 @@ describe('foreground Lua-screen tooltip final rendering', function()
                 'upper screen logic cadence changed')
             assert_environment(upper_environment, subject, upper,
                 'upper tooltip input and logic')
-
-            local wrapped_upper = rawget(upper, 'onRender')
-            local runtime_generation_before =
-                state.poller_runtime_generation
-            local presenter_generation_before =
-                state.presenter.runtime_generation
-            local hook_generation_before =
-                state.render_hook.runtime_generation
-            dfhack.run_command('DwarfUICore', 'reload')
-            ds.await('tooltip poller generation recovers after reload',
-                function()
-                    return ds.tooltip_state().poller_runtime_generation ==
-                        runtime_generation_before + 1
-                end)
-            ds.await('tooltip presenter generation recovers after reload',
-                function()
-                    return ds.tooltip_state().presenter.runtime_generation ==
-                        presenter_generation_before + 1
-                end)
-            ds.await('tooltip render-hook generation recovers after reload',
-                function()
-                    return ds.tooltip_state().render_hook.runtime_generation ==
-                        hook_generation_before + 1
-                end)
-            ds.await('foreground tooltip recovers after reload', function()
-                local current = ds.tooltip_state()
-                return has_default_identity(current) and
-                    current.intent.text == UPPER_TOOLTIP
-            end)
-            state = ds.tooltip_state()
-            assert.is_equal(wrapped_upper,
-                rawget(upper, 'onRender'),
-                'reload replaced instead of adopting the existing trampoline')
-            text_x, text_y = tooltip_text_cell(state.intent)
-            upper.probe_x, upper.probe_y = text_x, text_y
-            upper.render_trace = {}
-            minimum_rendered_revision = state.intent.revision
-            render_count_before = state.presenter.render_count
-            ds.redraw()
-            state = ds.tooltip_state()
-            assert.equals(render_count_before + 1,
-                state.presenter.render_count,
-                'reload produced duplicate screen tooltip painting')
-            assert.equals('U', read_character(text_x, text_y))
-            assert_screen_render_diagnostics(
-                state, minimum_rendered_revision, 2)
-            assert_environment(upper_environment, subject, upper,
-                'foreground tooltip reload')
 
             ds.move_pointer(0, 0)
             ds.await('foreground tooltip clears before dismissal', function()

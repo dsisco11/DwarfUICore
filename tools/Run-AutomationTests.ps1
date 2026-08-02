@@ -2,7 +2,7 @@
 param(
     [string] $DFHackRunner = $env:DFHACK_RUNNER,
     [string] $DFHackRoot = $env:DFHACK_ROOT,
-    [string] $EnvFile = '.env.local',
+    [string] $EnvFile = '.env',
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $DwarfSpecArgs
 )

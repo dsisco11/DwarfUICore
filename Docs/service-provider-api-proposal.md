@@ -5,7 +5,7 @@
 Approved on 2026-08-01 and amended on 2026-08-02 to expose providers through a
 dedicated DFHack script module. Its transitive version 1 public data schema and
 immutable-object low-level mutation boundary remain unchanged. DwarfUICore
-implementation Phases 0 through 7 are complete; coordinated DwarfUI migration
+implementation Phases 0 through 8 are complete; legacy removal, documentation,
 and later release work remain outstanding. Any further contract amendment
 requires explicit re-approval.
 

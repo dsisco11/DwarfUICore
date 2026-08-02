@@ -586,43 +586,43 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 8 - Migrate DwarfUI as the coordinated consumer
 
-- [ ] Perform this phase only in an explicitly authorized DwarfUI checkout and
+- [x] Perform this phase only in an explicitly authorized DwarfUI checkout and
       record its revision, branch, worktree state, declared DwarfUICore
       dependency, and installed package identity.
-- [ ] Acquire tooltip and context-menu APIs with exact contract major 1 and the
+- [x] Acquire tooltip and context-menu APIs with exact contract major 1 and the
       approved consumer namespace `dwarfui` from DwarfUI-owned entrypoints.
-- [ ] Route all DwarfUI tooltip and context-menu registrations through those
+- [x] Route all DwarfUI tooltip and context-menu registrations through those
       bound APIs without creating another runtime or retaining direct access to
       private DwarfUICore modules.
-- [ ] Remove every DwarfUI dependency on the legacy direct API paths; do not add
+- [x] Remove every DwarfUI dependency on the legacy direct API paths; do not add
       a temporary adapter or assign a compatibility namespace.
-- [ ] Update DwarfUI production code, focused and integration tests, mocks,
+- [x] Update DwarfUI production code, focused and integration tests, mocks,
       documentation, `.luarc.json`, and package/integration tooling together so
       none retains a legacy direct API reference.
-- [ ] Raise DwarfUI's minimum DwarfUICore dependency to the package version that
+- [x] Raise DwarfUI's minimum DwarfUICore dependency to the package version that
       first ships the provider contract; do not publish either coordinated
       package until the matching package is ready.
-- [ ] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
+- [x] Make `dwarfui reload` explicitly clear and rebuild only the `dwarfui`
       namespace through both acquired service APIs while preserving all other
       namespaces and the core generation.
-- [ ] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
+- [x] Route any DwarfUI disable, teardown, or applicable save/map/world cleanup
       through explicit namespace cleanup rather than API-object collection.
-- [ ] Update DwarfUI focused tests and package/integration setup to install and
+- [x] Update DwarfUI focused tests and package/integration setup to install and
       resolve the intended packaged DwarfUICore before DwarfUI.
-- [ ] Add an independent disposable test consumer namespace to prove DwarfUI
+- [x] Add an independent disposable test consumer namespace to prove DwarfUI
       reload isolation; do not edit or migrate a real independent plugin.
-- [ ] Verify DwarfUI feature overlays, widgets, minecart integrations, and other
+- [x] Verify DwarfUI feature overlays, widgets, minecart integrations, and other
       existing service consumers retain their behavior through the provider
       boundary.
 
 ### Phase 8 completion gate
 
-- [ ] DwarfUI is a normal namespace-bound consumer of the one DwarfUICore
+- [x] DwarfUI is a normal namespace-bound consumer of the one DwarfUICore
       runtime.
-- [ ] DwarfUI's production, test, mock, documentation, Lua configuration, and
+- [x] DwarfUI's production, test, mock, documentation, Lua configuration, and
       integration surfaces all use exact contract major 1 and namespace
       `dwarfui`, and its package dependency requires the provider-bearing core.
-- [ ] Reloading DwarfUI clears and rebuilds only `dwarfui`; the disposable
+- [x] Reloading DwarfUI clears and rebuilds only `dwarfui`; the disposable
       consumer's registrations and the DwarfUICore generation survive.
 
 ## Phase 9 - Complete documentation, registry, and package contracts
@@ -823,3 +823,11 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | 2026-08-02 | Provider live contract | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/service_provider/provider_contract.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 2 successes, 0 failures, 0 errors, 0 pending; cleanup confirmed. |
 | 2026-08-02 | Context-menu live acceptance | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/context_menu/map_interaction.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success, 0 failures, 0 errors, 0 pending; cleanup confirmed. |
 | 2026-08-02 | Tooltip live acceptance | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/tooltip/tooltip_overlay_registration_integration.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success, 0 failures, 0 errors, 0 pending; cleanup confirmed. |
+| 2026-08-02 | DwarfUI checkout authorization and baseline | `git status`, `git branch --show-current`, `git rev-parse HEAD`, dependency and installed-script inspection in `D:/CODE/DFHack/DwarfUI` | Passed | User-authorized checkout; branch `context-menu-system`; revision `3ecd341830625c6a1108fa48c89ba5089890a200`; initially clean; declared Core minimum was 0.1.0; installed DwarfUI identity was 0.1.0; live DwarfUI scripts resolved to the authorized source checkout. |
+| 2026-08-02 | Coordinated Core package version | DwarfUICore metadata and `./tools/Publish.ps1` | Passed | Assigned provider-bearing version 0.2.0; expanded and zip package verification passed; built `DwarfUICore-0.2.0.zip`. |
+| 2026-08-02 | DwarfUI complete unit suite | `./tools/Run-UnitTests.ps1 -DwarfUICoreSource D:/CODE/DFHack/DwarfUICore` | Passed | 152 successes, 0 failures, 0 errors, 0 pending after the mandatory second review. |
+| 2026-08-02 | DwarfUI build and package | `./tools/Build.ps1`; `./tools/Publish.ps1` | Passed | Lua 5.4.6 syntax passed for 19 production and 35 test/support files; live reload completed; expanded and zip package verification passed. |
+| 2026-08-02 | DwarfUI package resolution | `./tools/Setup-CoreIntegration.ps1` with the coordinated expanded packages | Passed | Installed DwarfUICore 0.2.0 before DwarfUI in an isolated mods tree; recorded source revision, package hash, resolved Core root script, and install order in `dist/integration/resolution-evidence.json`. |
+| 2026-08-02 | DwarfUI reload isolation | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/service_provider/reload_isolation.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success; both DwarfUI service namespaces cleared, disposable tooltip/context registrations and Core runtime generation survived; cleanup confirmed. |
+| 2026-08-02 | DwarfUI native minecart regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/minecart_route/minecart_route_tooltip.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 2 successes covering polling, registration cycling, Core-to-DwarfUI reload recovery, native final rendering, and cleanup; cleanup confirmed. |
+| 2026-08-02 | Phase 8 diff validation | `git diff --check` in DwarfUICore and DwarfUI plus active-surface legacy import audit | Passed | No whitespace errors; no functional DwarfUI import of either legacy direct service API; both worktree indexes restored to their initial state without stashing or committing. |

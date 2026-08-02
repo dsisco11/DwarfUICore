@@ -13,7 +13,6 @@ local PROCESS_OWNER_SLOTS = {
     'tooltip_map_target_registry',
     'tooltip_service',
     'tooltip_registration_runtime',
-    'tooltip_render_hook',
     'tooltip_runtime',
     'context_menu_registration_manager',
     'context_menu_input_hook',
@@ -78,8 +77,8 @@ end
 local function retire_tooltip()
     local runtime = find_loaded_script_environment(TOOLTIP_RUNTIME_SCRIPT)
     if runtime and runtime.presenter and
-            type(runtime.presenter.shutdown) == 'function' then
-        runtime.presenter:shutdown()
+            type(runtime.presenter.retire_for_reload) == 'function' then
+        runtime.presenter:retire_for_reload()
         return
     end
 

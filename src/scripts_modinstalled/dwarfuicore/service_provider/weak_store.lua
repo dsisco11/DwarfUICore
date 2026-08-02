@@ -94,19 +94,22 @@ end
 ---@return integer target_sequence
 ---@return integer contribution_sequence
 ---@return boolean created
+---@return table|nil existing_record
 function WidgetTargetStore:register(widget, namespace, record)
     local target = self._targets[widget]
+    local contribution = target and target.contributions[namespace] or nil
+    if contribution then
+        return target.target_sequence, contribution.sequence, false,
+            contribution.record
+    end
+    local target_sequence = target and target.target_sequence or
+        self._allocator:allocate_sequence()
+    local contribution_sequence = self._allocator:allocate_sequence()
     if not target then
-        target = {target_sequence=self._allocator:allocate_sequence(),
-            contributions={}}
+        target = {target_sequence=target_sequence, contributions={}}
         self._targets[widget] = target
     end
-    local contribution = target.contributions[namespace]
-    if contribution then
-        contribution.record = record
-        return target.target_sequence, contribution.sequence, false
-    end
-    contribution = {sequence=self._allocator:allocate_sequence(), record=record}
+    contribution = {sequence=contribution_sequence, record=record}
     target.contributions[namespace] = contribution
     return target.target_sequence, contribution.sequence, true
 end
@@ -115,12 +118,16 @@ end
 ---@param widget table
 ---@param namespace string
 ---@return boolean removed
+---@return table|nil record
 function WidgetTargetStore:remove(widget, namespace)
     local target = self._targets[widget]
-    if not target or not target.contributions[namespace] then return false end
+    if not target or not target.contributions[namespace] then
+        return false, nil
+    end
+    local record = target.contributions[namespace].record
     target.contributions[namespace] = nil
     if next(target.contributions) == nil then self._targets[widget] = nil end
-    return true
+    return true, record
 end
 
 ---Returns physical and contribution sequences for one registration.
@@ -133,4 +140,68 @@ function WidgetTargetStore:get_sequences(widget, namespace)
     local contribution = target and target.contributions[namespace]
     if not contribution then return nil, nil end
     return target.target_sequence, contribution.sequence
+end
+
+---Returns one namespace contribution without exposing its storage wrapper.
+---@param widget table
+---@param namespace string
+---@return table|nil record
+---@return integer|nil target_sequence
+---@return integer|nil contribution_sequence
+function WidgetTargetStore:get_contribution(widget, namespace)
+    local target = self._targets[widget]
+    local contribution = target and target.contributions[namespace]
+    if not contribution then return nil, nil, nil end
+    return contribution.record, target.target_sequence, contribution.sequence
+end
+
+---Returns the latest contribution for one physical widget target.
+---@param widget table
+---@return table|nil record
+---@return integer|nil contribution_sequence
+function WidgetTargetStore:get_winner(widget)
+    local target = self._targets[widget]
+    if not target then return nil, nil end
+    local winner
+    for _, contribution in pairs(target.contributions) do
+        if not winner or contribution.sequence > winner.sequence then
+            winner = contribution
+        end
+    end
+    return winner and winner.record or nil, winner and winner.sequence or nil
+end
+
+---Returns whether one physical widget target still has contributions.
+---@param widget table
+---@return boolean present
+function WidgetTargetStore:contains_target(widget)
+    return self._targets[widget] ~= nil
+end
+
+---Counts live namespace contributions without retaining their widgets.
+---@param namespace? string
+---@return integer count
+function WidgetTargetStore:contribution_count(namespace)
+    local count = 0
+    for _, target in pairs(self._targets) do
+        for contribution_namespace in pairs(target.contributions) do
+            if namespace == nil or contribution_namespace == namespace then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+---Visits each live contribution without retaining its widget afterward.
+---@param callback fun(widget: table, namespace: string, record: table, target_sequence: integer, contribution_sequence: integer)
+function WidgetTargetStore:for_each_contribution(callback)
+    assert(type(callback) == 'function',
+        'DwarfUICore widget contribution visitor must be a function.')
+    for widget, target in pairs(self._targets) do
+        for namespace, contribution in pairs(target.contributions) do
+            callback(widget, namespace, contribution.record,
+                target.target_sequence, contribution.sequence)
+        end
+    end
 end

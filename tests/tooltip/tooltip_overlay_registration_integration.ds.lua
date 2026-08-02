@@ -9,6 +9,18 @@ local function diagnostics()
     return ds.tooltip_state()
 end
 
+---Returns whether diagnostics carry one coherent default service identity.
+---@param state table
+---@return boolean
+local function has_default_identity(state)
+    local target_identity = state.target
+    local intent_identity = state.intent and state.intent.source_identity
+    return target_identity ~= nil and intent_identity ~= nil and
+        target_identity.namespace == 'dwarfuicore' and
+        intent_identity.namespace == target_identity.namespace and
+        intent_identity.local_identity == target_identity.local_identity
+end
+
 describe('live tooltip input overlay registration', function()
     local native_subject
     local borrowed_screen
@@ -65,7 +77,7 @@ describe('live tooltip input overlay registration', function()
         if native_subject then
             ds.redraw()
             if target then
-                assert.is_not_equal(target, diagnostics().target)
+                assert.is_nil(diagnostics().target)
             end
         end
         if native_subject and initially_hauling_open then
@@ -95,7 +107,7 @@ describe('live tooltip input overlay registration', function()
         ds.redraw()
         ds.await('registered overlay tooltip target selected', function()
             local state = diagnostics()
-            return state.target == target and state.intent and
+            return has_default_identity(state) and
                 state.intent.text ==
                     'Automation overlay tooltip outside its narrow root.'
         end)
@@ -121,8 +133,7 @@ describe('live tooltip input overlay registration', function()
         ds.redraw()
         ds.await('focus-eligible tooltip target selected again', function()
             local selected = diagnostics()
-            return selected.target == target and
-                selected.intent and
+            return has_default_identity(selected) and
                 selected.intent.text == target_state.tooltip
         end)
 

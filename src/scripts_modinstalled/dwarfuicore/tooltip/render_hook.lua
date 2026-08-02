@@ -54,8 +54,9 @@ if not process_state then
     }
     publish_process_state = true
 elseif runtime_generation > 0 then
-    assert(process_state.runtime_generation == runtime_generation,
-        'DwarfUICore tooltip render hook belongs to another runtime generation.')
+    assert(process_state.runtime_generation <= runtime_generation,
+        'DwarfUICore tooltip render hook belongs to a future runtime generation.')
+    process_state.runtime_generation = runtime_generation
 end
 process_state.failure_count = process_state.failure_count or 0
 process_state.overlay_module_replacement_count =
@@ -506,6 +507,7 @@ function TooltipRenderHookManager:get_diagnostics()
             (failure.owner_ref and failure.owner_ref[1])) or nil
     return {
         api_version=state.api_version,
+        runtime_generation=state.runtime_generation,
         generation=state.generation,
         presenter_installed=type(state.presenter) == 'function',
         disabled_generation=state.disabled_generation,

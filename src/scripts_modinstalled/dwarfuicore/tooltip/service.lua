@@ -49,6 +49,7 @@ end
 ---@field anchor_y integer
 ---@field coordinate_space '"screen-cells"'
 ---@field source_root gui.View
+---@field source_identity table
 
 ---Receives each changed immutable intent, or nil when intent is cleared.
 ---@alias dwarfuicore.TooltipIntentObserver fun(intent: dwarfuicore.TooltipIntent|nil, revision: integer)
@@ -94,6 +95,57 @@ local function get_tooltip(target)
     return value
 end
 
+---Returns whether a value has the complete composite service identity shape.
+---@param value any
+---@return boolean
+local function is_composite_identity(value)
+    return type(value) == 'table' and
+        value.runtime_generation ~= nil and value.service_kind ~= nil and
+        value.contract_major ~= nil and value.namespace ~= nil and
+        value.local_identity ~= nil
+end
+
+---Creates an immutable copy of a composite identity for published intent.
+---@param value any
+---@return any
+local function snapshot_identity(value)
+    if not is_composite_identity(value) then return value end
+    local values = {
+        runtime_generation=value.runtime_generation,
+        service_kind=value.service_kind,
+        contract_major=value.contract_major,
+        namespace=value.namespace,
+        local_identity=value.local_identity,
+    }
+    return setmetatable({}, {
+        __index=values,
+        __newindex=function()
+            error('DwarfUICore tooltip source identities are immutable.', 2)
+        end,
+        __pairs=function()
+            return next, values, nil
+        end,
+        __metatable=false,
+    })
+end
+
+---Returns whether two opaque or composite target identities are equivalent.
+---@param left any
+---@param right any
+---@return boolean
+local function identities_equal(left, right)
+    if left == right then return true end
+    if not is_composite_identity(left) or
+            not is_composite_identity(right) then
+        return false
+    end
+    return left.runtime_generation == right.runtime_generation and
+        left.service_kind == right.service_kind and
+        left.contract_major == right.contract_major and
+        left.namespace == right.namespace and
+        left.local_identity == right.local_identity
+end
+
 ---Creates one immutable tooltip-intent snapshot.
 ---@param observation dwarfuicore.TooltipPointerObservation
 ---@param text string
@@ -108,6 +160,7 @@ local function make_intent(observation, text, revision)
         anchor_y=observation.pointer_y,
         coordinate_space='screen-cells',
         source_root=observation.root,
+        source_identity=snapshot_identity(observation.identity),
     }
     return setmetatable({}, {
         __index=values,
@@ -185,15 +238,24 @@ end
 
 ---Registers one tooltip target with deterministic cross-root sequence.
 ---@param widget gui.View
+---@param target_sequence? integer
 ---@return boolean created
-function TooltipService:register(widget)
+function TooltipService:register(widget, target_sequence)
     assert(type(widget) == 'table',
         'DwarfUICore tooltip registration requires a widget table.')
     local state = self._state
     if state.registrations[widget] then return false end
-    state.registration_sequence = state.registration_sequence + 1
+    if target_sequence == nil then
+        state.registration_sequence = state.registration_sequence + 1
+        target_sequence = state.registration_sequence
+    else
+        assert(math.type(target_sequence) == 'integer' and target_sequence > 0,
+            'DwarfUICore tooltip target sequence must be a positive integer.')
+        state.registration_sequence = math.max(
+            state.registration_sequence, target_sequence)
+    end
     state.registrations[widget] = {
-        sequence=state.registration_sequence,
+        sequence=target_sequence,
     }
     return true
 end
@@ -213,7 +275,7 @@ end
 ---@param identity any
 ---@return boolean changed
 function TooltipService:release_target(identity)
-    if self._state.target ~= identity then return false end
+    if not identities_equal(self._state.target, identity) then return false end
     return self:_clear_target()
 end
 
@@ -255,6 +317,7 @@ function TooltipService:accept_pointer_observation(observation)
     if target and not target:is_current() then target = nil end
 
     local identity = target and target:get_identity() or nil
+    observation.identity = identity
     local previous_identity = state.target
     local previous_adapter = state.target_adapter
     if previous_identity ~= identity then

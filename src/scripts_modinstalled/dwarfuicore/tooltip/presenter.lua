@@ -14,11 +14,14 @@ local class_helpers = reqscript('dwarfuicore/class')
 ---@field get_window_size fun(): integer, integer
 ---@field new_painter fun(width: integer, height: integer): gui.Painter
 ---@field invalidate fun()
+---@field runtime_generation? integer
 
 ---@class dwarfuicore.TooltipPresenterDiagnostics
 ---@field generation integer
+---@field runtime_generation integer
 ---@field active boolean
 ---@field current_intent_revision integer|nil
+---@field current_source_identity table|nil
 ---@field service_revision integer
 ---@field selected_transport dwarfuicore.TooltipRenderTransport|nil
 ---@field selected_owner table|nil
@@ -43,6 +46,7 @@ local class_helpers = reqscript('dwarfuicore/class')
 ---@field _new_painter fun(width: integer, height: integer): gui.Painter
 ---@field _invalidate fun()
 ---@field _generation integer
+---@field _runtime_generation integer
 ---@field _active boolean
 ---@field _selected_revision integer|nil
 ---@field _supported_surface boolean
@@ -84,6 +88,7 @@ function TooltipPresenter.new(options)
         _new_painter=options.new_painter,
         _invalidate=options.invalidate,
         _generation=options.hook_manager:get_diagnostics().generation,
+        _runtime_generation=options.runtime_generation or 0,
         _active=false,
         _selected_revision=nil,
         _supported_surface=false,
@@ -171,6 +176,7 @@ function TooltipPresenter:start()
     self._hook_manager:set_presenter(function(transport, owner)
         return self:present(transport, owner)
     end)
+    self._generation = self._hook_manager:get_diagnostics().generation
     -- Install the native transport at subscription time, then let the current
     -- intent select the one eligible transport owner.
     self._hook_manager:ensure_overlay()
@@ -239,6 +245,21 @@ function TooltipPresenter:shutdown()
     return true
 end
 
+---Retires presentation while retaining inert reload-safe render trampolines.
+---@return boolean changed
+function TooltipPresenter:retire_for_reload()
+    if not self._active then return false end
+    self._active = false
+    self._service:set_intent_observer(nil)
+    self._hook_manager:set_current_intent_revision(nil)
+    self._renderer:set_tooltip(nil, nil, nil, nil)
+    self._hook_manager:set_presenter(nil)
+    self._hook_manager:clear_selection()
+    self._redraw_count = self._redraw_count + 1
+    self._invalidate()
+    return true
+end
+
 ---Returns presentation, selection, layout, redraw, and render diagnostics.
 ---@return dwarfuicore.TooltipPresenterDiagnostics
 function TooltipPresenter:get_diagnostics()
@@ -247,8 +268,10 @@ function TooltipPresenter:get_diagnostics()
     local hook_diagnostics = self._hook_manager:get_diagnostics()
     return {
         generation=self._generation,
+        runtime_generation=self._runtime_generation,
         active=self._active,
         current_intent_revision=intent and intent.revision or nil,
+        current_source_identity=intent and intent.source_identity or nil,
         service_revision=service_diagnostics.revision,
         selected_transport=hook_diagnostics.selected_transport,
         selected_owner=hook_diagnostics.selected_owner,

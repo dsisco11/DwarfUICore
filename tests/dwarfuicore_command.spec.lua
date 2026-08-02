@@ -174,12 +174,18 @@ describe('dwarfuicore command lifecycle', function()
             ['dwarfuicore/beta']=true,
         }
         local dfhack, calls = dfhack_stub(loaded)
+        local tooltip_namespace_registry = {}
+        local unrelated_state = {}
+        dfhack.dwarfuicore = {
+            tooltip_namespace_registry=tooltip_namespace_registry,
+            unrelated_state=unrelated_state,
+        }
         local events = {}
         local root = load_root(registry, dfhack)
         local environments = {
             [RUNTIME_NAME]=runtime_stub(),
             ['dwarfuicore/tooltip/runtime']={
-                presenter={shutdown=function()
+                presenter={retire_for_reload=function()
                     table.insert(events, 'tooltip')
                 end},
             },
@@ -204,6 +210,10 @@ describe('dwarfuicore command lifecycle', function()
 
         assert.same({}, reloaded_root.reload())
         assert.same({'context-menu', 'tooltip'}, events)
+        assert.is_equal(tooltip_namespace_registry,
+            dfhack.dwarfuicore.tooltip_namespace_registry)
+        assert.is_equal(unrelated_state,
+            dfhack.dwarfuicore.unrelated_state)
         assert.same({REGISTRY_NAME, 'dwarfuicore/alpha',
             'dwarfuicore/beta'}, calls.scripts)
         assert.same({

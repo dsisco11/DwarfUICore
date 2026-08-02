@@ -430,6 +430,7 @@ describe('DwarfUICore tooltip service', function()
             anchor_y=true,
             coordinate_space=true,
             revision=true,
+            source_identity=true,
             source_root=true,
             source_sequence=true,
             text=true,

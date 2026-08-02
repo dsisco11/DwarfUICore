@@ -34,6 +34,27 @@ local function load_api()
             return {registration_count=2}
         end,
     }
+    registration.bind=function(namespace, contract_major)
+        state.namespace = namespace
+        state.contract_major = contract_major
+        return {
+            register=function(_, widget)
+                return registration.register(widget)
+            end,
+            unregister=function(_, widget)
+                return registration.unregister(widget)
+            end,
+            register_map_tile=function(_, options)
+                return registration.register_map_tile(options)
+            end,
+            update_map_tile=function(_, handle, update)
+                return registration.update_map_tile(handle, update)
+            end,
+            unregister_map_tile=function(_, handle)
+                return registration.unregister_map_tile(handle)
+            end,
+        }
+    end
     local runtime = {
         presenter={
             get_diagnostics=function()
@@ -59,6 +80,8 @@ describe('DwarfUICore tooltip public API', function()
         assert.is_equal(widget, state.registered)
         assert.is_true(api.unregister(widget))
         assert.is_equal(widget, state.unregistered)
+        assert.equals('dwarfuicore', state.namespace)
+        assert.equals(1, state.contract_major)
     end)
 
     it('delegates exact map-tile registration lifecycle', function()

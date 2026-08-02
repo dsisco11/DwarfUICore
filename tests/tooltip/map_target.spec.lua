@@ -8,6 +8,8 @@ local MAP_TARGET_PATH =
     'src/scripts_modinstalled/dwarfuicore/tooltip/map_target.lua'
 local TARGET_PATH =
     'src/scripts_modinstalled/dwarfuicore/tooltip/target.lua'
+local ENUM_PATH =
+    'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua'
 local _, target_types = module_loader.load(repo_root, TARGET_PATH)
 local ObservationKind = target_types.TooltipPointerObservationKind
 local TargetKind = target_types.TooltipTargetKind
@@ -16,7 +18,7 @@ local TargetKind = target_types.TooltipTargetKind
 ---@return table environment
 local function load_environment()
     local state = {
-        dwarfuicore={},
+        dwarfuicore={service_provider_runtime={generation=1}},
         focus='dwarfmode',
         overlay_state={config={}, db={}},
     }
@@ -52,6 +54,26 @@ local function load_environment()
             end,
         },
     }
+    local _, immutable_proxy = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+    local _, immutable_enum = module_loader.load(repo_root, ENUM_PATH)
+    local _, contracts = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+            reqscript={
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+            },
+        })
+    local _, namespaces = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+    local _, identities = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+            globals={dfhack=dfhack},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/namespace']=namespaces,
+                ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+            },
+        })
 
     ---Loads one root resolver and registry generation over persistent state.
     ---@return table module
@@ -70,6 +92,9 @@ local function load_environment()
                 reqscript={
                     ['dwarfuicore/view_root_resolver']=root_resolver,
                     ['dwarfuicore/tooltip/target']=target_types,
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/identity']=identities,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
                 },
             })
         return map_target
@@ -138,7 +163,10 @@ describe('DwarfUICore exact map-tile tooltip targets', function()
         assert.equals(3, hit.map_z)
         assert.equals(TargetKind.MAP_TILE, hit.target_kind)
         assert.equals(handle, hit.target)
-        assert.equals(handle, hit.identity)
+        assert.equals('dwarfuicore', hit.identity.namespace)
+        assert.equals(1, hit.identity.contract_major)
+        assert.equals(1, hit.identity.runtime_generation)
+        assert.is_not_equal(handle, hit.identity)
         assert.equals(owner, hit.root)
         assert.equals(owner, hit.source_root)
         assert.equals(1, hit.registration_sequence)
@@ -217,23 +245,25 @@ describe('DwarfUICore exact map-tile tooltip targets', function()
             subviews={first_owner, second_owner},
         }
         present_native(env, root)
-        local first = registry:register{
+        local first = registry:register('alpha', {
             owner=first_owner,
             pos={x=1, y=2, z=3},
             tooltip='First',
-        }
-        local second = registry:register{
+        }, 1)
+        local second = registry:register('beta', {
             owner=second_owner,
             pos={x=1, y=2, z=3},
             tooltip='Second',
-        }
+        }, 1)
 
         local hit = registry:detect(sample(1, 3, 4, 1, 2, 3))
         assert.equals(second, hit.target)
+        assert.equals('beta', hit.identity.namespace)
         assert.equals('Second', hit.tooltip)
         second_owner.visible = false
         hit = registry:detect(sample(2, 3, 4, 1, 2, 3))
         assert.equals(first, hit.target)
+        assert.equals('alpha', hit.identity.namespace)
         assert.equals('First', hit.tooltip)
     end)
 
@@ -394,5 +424,29 @@ describe('DwarfUICore exact map-tile tooltip targets', function()
         assert.is_true(registry:unregister(handle))
         assert.equals(0,
             registry:get_diagnostics().coordinate_bucket_count)
+    end)
+
+    it('rejects a recognized handle from a retired runtime generation',
+            function()
+        local env = load_environment()
+        local first_registry = env.load_generation().registry
+        local owner = env.widgets.Panel{}
+        present_native(env, owner)
+        local handle = first_registry:register('alpha', {
+            owner=owner,
+            pos={x=1, y=2, z=3},
+            tooltip='Old',
+        }, 1)
+        env.state.dwarfuicore.service_provider_runtime = {generation=2}
+        env.state.dwarfuicore.tooltip_map_target_registry = nil
+        local current_registry = env.load_generation().registry
+
+        assert.has_error(function()
+            current_registry:update('alpha', handle, {
+                pos={x=4, y=5, z=6},
+                tooltip='Stale',
+            }, 1)
+        end, 'DwarfUICore tooltip map handle belongs to another runtime generation.')
+        assert.equals(0, current_registry:registration_count())
     end)
 end)

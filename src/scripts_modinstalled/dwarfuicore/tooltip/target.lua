@@ -127,17 +127,20 @@ end
 ---@param widget gui.View
 ---@param source_root gui.View
 ---@param registrations table<gui.View, table>
+---@param composite_identity? table
+---@param current_predicate? fun(): boolean
 ---@return dwarfuicore.TooltipTargetAdapter
-function adapt_widget(widget, source_root, registrations)
+function adapt_widget(widget, source_root, registrations, composite_identity,
+        current_predicate)
     assert(type(widget) == 'table',
         'DwarfUICore widget tooltip adapter requires a widget.')
     assert(type(registrations) == 'table',
         'DwarfUICore widget tooltip adapter requires registrations.')
     return TooltipTargetAdapter.new{
-        identity=widget,
+        identity=composite_identity or widget,
         kind=TooltipTargetKind.WIDGET,
         source_root=source_root,
-        is_current=function()
+        is_current=current_predicate or function()
             return registrations[widget] ~= nil
         end,
         get_tooltip=function()
@@ -165,13 +168,14 @@ function adapt_map_tile(candidate, registry)
         'DwarfUICore map tooltip adapter requires a target candidate.')
     assert(type(registry) == 'table',
         'DwarfUICore map tooltip adapter requires a registry.')
-    local handle = candidate.identity
+    local handle = candidate.target
+    local composite_identity = candidate.identity
     return TooltipTargetAdapter.new{
-        identity=handle,
+        identity=composite_identity,
         kind=TooltipTargetKind.MAP_TILE,
         source_root=candidate.source_root,
         is_current=function()
-            return registry:contains(handle)
+            return registry:contains_identity(handle, composite_identity)
         end,
         get_tooltip=function()
             return registry:get_tooltip(handle)

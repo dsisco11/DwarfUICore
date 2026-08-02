@@ -161,6 +161,18 @@ local function index_of(trace, expected)
     return nil
 end
 
+---Returns whether diagnostics carry one coherent default service identity.
+---@param state table
+---@return boolean
+local function has_default_identity(state)
+    local target_identity = state.target
+    local intent_identity = state.intent and state.intent.source_identity
+    return target_identity ~= nil and intent_identity ~= nil and
+        target_identity.namespace == 'dwarfuicore' and
+        intent_identity.namespace == target_identity.namespace and
+        intent_identity.local_identity == target_identity.local_identity
+end
+
 ---Moves onto a registered screen control and awaits its intent.
 ---@param target gui.View
 ---@param expected_text string
@@ -174,7 +186,7 @@ local function select_target(target, expected_text)
     ds.redraw()
     ds.await('registered foreground target publishes intent', function()
         local state = ds.tooltip_state()
-        return state.target == target and state.intent and
+        return has_default_identity(state) and
             state.intent.text == expected_text
     end)
     return ds.tooltip_state()
@@ -390,24 +402,32 @@ describe('foreground Lua-screen tooltip final rendering', function()
                 'upper tooltip input and logic')
 
             local wrapped_upper = rawget(upper, 'onRender')
-            local module_generation_before =
-                state.poller_module_generation
+            local runtime_generation_before =
+                state.poller_runtime_generation
             local presenter_generation_before =
-                state.presenter.generation
+                state.presenter.runtime_generation
             local hook_generation_before =
-                state.render_hook.generation
+                state.render_hook.runtime_generation
             dfhack.run_command('DwarfUICore', 'reload')
+            ds.await('tooltip poller generation recovers after reload',
+                function()
+                    return ds.tooltip_state().poller_runtime_generation ==
+                        runtime_generation_before + 1
+                end)
+            ds.await('tooltip presenter generation recovers after reload',
+                function()
+                    return ds.tooltip_state().presenter.runtime_generation ==
+                        presenter_generation_before + 1
+                end)
+            ds.await('tooltip render-hook generation recovers after reload',
+                function()
+                    return ds.tooltip_state().render_hook.runtime_generation ==
+                        hook_generation_before + 1
+                end)
             ds.await('foreground tooltip recovers after reload', function()
                 local current = ds.tooltip_state()
-                return current.target == upper_target and
-                    current.intent and
-                    current.intent.text == UPPER_TOOLTIP and
-                    current.poller_module_generation ==
-                        module_generation_before + 1 and
-                    current.presenter.generation ==
-                        presenter_generation_before + 1 and
-                    current.render_hook.generation ==
-                        hook_generation_before + 1
+                return has_default_identity(current) and
+                    current.intent.text == UPPER_TOOLTIP
             end)
             state = ds.tooltip_state()
             assert.is_equal(wrapped_upper,

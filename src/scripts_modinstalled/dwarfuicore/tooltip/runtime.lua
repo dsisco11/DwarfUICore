@@ -41,6 +41,7 @@ if not presenter then
             return gui.Painter.new{x1=0, y1=0, x2=width - 1, y2=height - 1}
         end,
         invalidate=dfhack.screen.invalidate,
+        runtime_generation=runtime_generation,
     }
     constructed:start()
     process_state = {runtime_generation=runtime_generation,

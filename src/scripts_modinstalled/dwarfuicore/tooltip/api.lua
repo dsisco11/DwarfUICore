@@ -4,6 +4,8 @@
 
 local registration = reqscript('dwarfuicore/tooltip/registration')
 local runtime = reqscript('dwarfuicore/tooltip/runtime')
+local LEGACY_NAMESPACE = 'dwarfuicore'
+local binding = registration.bind(LEGACY_NAMESPACE, 1)
 
 ---An exact fortress-map tile used only for map-target hit detection.
 ---@class dwarfuicore.MapTilePosition
@@ -43,21 +45,21 @@ local runtime = reqscript('dwarfuicore/tooltip/runtime')
 ---@param widget table
 ---@return boolean created
 function register(widget)
-    return registration.register(widget)
+    return binding:register(widget)
 end
 
 ---Explicitly unregisters a widget; weak lifetime cleanup makes this optional.
 ---@param widget table
 ---@return boolean removed
 function unregister(widget)
-    return registration.unregister(widget)
+    return binding:unregister(widget)
 end
 
 ---Registers one exact map tile with owner-scoped tooltip eligibility.
 ---@param options dwarfuicore.MapTileTooltipRegistrationOptions
 ---@return dwarfuicore.MapTileTooltipRegistration
 function register_map_tile(options)
-    return registration.register_map_tile(options)
+    return binding:register_map_tile(options)
 end
 
 ---Atomically replaces one map registration's exact position and tooltip.
@@ -65,20 +67,20 @@ end
 ---@param update dwarfuicore.MapTileTooltipUpdate
 ---@return boolean updated
 function update_map_tile(handle, update)
-    return registration.update_map_tile(handle, update)
+    return binding:update_map_tile(handle, update)
 end
 
 ---Explicitly removes one exact map-tile registration.
 ---@param handle dwarfuicore.MapTileTooltipRegistration
 ---@return boolean removed
 function unregister_map_tile(handle)
-    return registration.unregister_map_tile(handle)
+    return binding:unregister_map_tile(handle)
 end
 
 ---Returns registration, mediation, and presentation diagnostics.
 ---@return table diagnostics
 function get_diagnostics()
-    local diagnostics = registration.get_diagnostics()
+    local diagnostics = registration.get_diagnostics(LEGACY_NAMESPACE)
     diagnostics.presentation = runtime.presenter:get_diagnostics()
     return diagnostics
 end

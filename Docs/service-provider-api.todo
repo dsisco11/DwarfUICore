@@ -336,52 +336,52 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 4 - Namespace the tooltip backend
 
-- [ ] Change widget registration keys from `widget` to `(namespace, widget)`
+- [x] Change widget registration keys from `widget` to `(namespace, widget)`
       while retaining weak widget lifetime behavior approved in Phase 0.
-- [ ] Make same-namespace repeat registration idempotent without disturbing the
+- [x] Make same-namespace repeat registration idempotent without disturbing the
       original sequence; allow different namespaces to register the same widget
       independently.
-- [ ] Create one namespace-neutral physical widget target record on the first
+- [x] Create one namespace-neutral physical widget target record on the first
       contribution, preserve its target sequence across later namespace changes,
       and delete it only with the last contribution.
-- [ ] Allocate map identities and handles through the shared composite identity
+- [x] Allocate map identities and handles through the shared composite identity
       contract and enforce namespace, service, contract-major, and generation
       ownership on update and removal.
-- [ ] Make tooltip map updates atomic while preserving the opaque handle,
+- [x] Make tooltip map updates atomic while preserving the opaque handle,
       composite identity, and original contribution sequence.
-- [ ] Carry composite source identity through widget and map candidates, target
+- [x] Carry composite source identity through widget and map candidates, target
       adaptation, mediation, intent, presenter state, and private diagnostics.
-- [ ] Resolve eligible tooltip collisions by greatest process-wide original
+- [x] Resolve eligible tooltip collisions by greatest process-wide original
       contribution sequence only after namespace-neutral physical target
       selection, and reveal the next eligible contribution when the winner is
       removed or becomes ineligible.
-- [ ] Ensure unregister and `clear_namespace()` remove only the bound tooltip
+- [x] Ensure unregister and `clear_namespace()` remove only the bound tooltip
       namespace and release idle polling/presentation state only when no
       remaining namespace has demand.
-- [ ] Retain private tooltip diagnostics for tests and development tooling,
+- [x] Retain private tooltip diagnostics for tests and development tooling,
       namespace their registration data, and expose none of them through the
       provider API.
-- [ ] Preserve ordinary repeated construction, multiple entrypoints using one
+- [x] Preserve ordinary repeated construction, multiple entrypoints using one
       namespace, different consumers, and cross-service construction without
       replacing the tooltip backend.
-- [ ] Add unit coverage for same-widget ownership, widget and map collisions,
+- [x] Add unit coverage for same-widget ownership, widget and map collisions,
       foreign handles, namespace cleanup, weak lifetime, ineligibility fallback,
       stale generations, private diagnostic isolation, absence of a public
       diagnostic surface, and runtime preservation.
-- [ ] Prove adding, updating, unregistering, clearing, or collecting one
+- [x] Prove adding, updating, unregistering, clearing, or collecting one
       namespace contribution does not reorder a still-registered physical
       widget against another root or change widget/blocker/map hit-testing.
-- [ ] Prove collecting an API object changes no tooltip registration, polling,
+- [x] Prove collecting an API object changes no tooltip registration, polling,
       presentation, namespace, facade, or service-health state.
-- [ ] Update existing tooltip unit and DwarfSpec fixtures to exercise the
+- [x] Update existing tooltip unit and DwarfSpec fixtures to exercise the
       namespaced backend without weakening their pointer, render-hook,
       presentation, or cleanup assertions.
 
 ### Phase 4 completion gate
 
-- [ ] Tooltip registration, detection, mediation, presentation, cleanup, and
+- [x] Tooltip registration, detection, mediation, presentation, cleanup, and
       private diagnostics retain namespace ownership end to end.
-- [ ] Removing or invalidating one namespace cannot remove or hide the next
+- [x] Removing or invalidating one namespace cannot remove or hide the next
       eligible namespace contribution permanently.
 
 ## Phase 5 - Namespace and compose the context-menu backend

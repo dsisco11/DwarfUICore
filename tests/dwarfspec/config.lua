@@ -32,6 +32,7 @@ local function snapshot_render_hook(diagnostics)
     local failure = diagnostics.last_failure
     return {
         api_version=diagnostics.api_version,
+        runtime_generation=diagnostics.runtime_generation,
         generation=diagnostics.generation,
         presenter_installed=diagnostics.presenter_installed,
         disabled_generation=diagnostics.disabled_generation,
@@ -78,8 +79,10 @@ end
 local function snapshot_presenter(diagnostics)
     return {
         generation=diagnostics.generation,
+        runtime_generation=diagnostics.runtime_generation,
         active=diagnostics.active,
         current_intent_revision=diagnostics.current_intent_revision,
+        current_source_identity=diagnostics.current_source_identity,
         service_revision=diagnostics.service_revision,
         selected_transport=diagnostics.selected_transport,
         selected_owner_present=diagnostics.selected_owner ~= nil,

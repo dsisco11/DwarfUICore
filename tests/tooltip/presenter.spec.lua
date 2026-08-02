@@ -204,9 +204,11 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         root:updateLayout(widget_harness.rect(0, 0, 40, 20))
         env.state.df_viewscreen = {widgets=root}
         local handle = {}
+        local composite_identity = {namespace='plugin', local_identity=1}
         local registry = {
-            contains=function(_, candidate)
-                return candidate == handle
+            contains_identity=function(_, candidate, candidate_identity)
+                return candidate == handle and
+                    candidate_identity == composite_identity
             end,
             get_tooltip=function(_, candidate)
                 return candidate == handle and 'Map tooltip' or nil
@@ -214,12 +216,18 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         }
         local map_target = env.target_adapter.adapt_map_tile({
             kind=ObservationKind.TARGET,
-            identity=handle,
+            target=handle,
+            identity=composite_identity,
             source_root=root,
         }, registry)
 
         env.service:accept_pointer_observation(
             observation(1, map_target, root, 3, 4))
+        local source_identity = env.service:get_intent().source_identity
+        assert.equals(composite_identity.namespace,
+            source_identity.namespace)
+        assert.equals(composite_identity.local_identity,
+            source_identity.local_identity)
         env.overlay.render_viewscreen_widgets()
 
         local diagnostics = env.tooltip.presenter:get_diagnostics()
@@ -227,6 +235,8 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.equals('Map tooltip',
             env.tooltip.presenter._renderer.label.text)
         assert.equals(1, diagnostics.render_count)
+        assert.equals(composite_identity.local_identity,
+            diagnostics.current_source_identity.local_identity)
         assert.is_equal(root,
             env.service:get_intent().source_root)
     end)

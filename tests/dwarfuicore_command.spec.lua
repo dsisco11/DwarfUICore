@@ -3,6 +3,7 @@ local repo_root = require('support.repo_root')
 
 local ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore/command.lua'
 local PUBLIC_ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore.lua'
+local SERVICES_PATH = 'src/scripts_modinstalled/dwarfuicore/services.lua'
 local REGISTRY_NAME = 'dwarfuicore/module_registry'
 local RUNTIME_NAME = 'dwarfuicore/service_provider/runtime'
 
@@ -26,7 +27,8 @@ local function runtime_stub()
         end,
         begin_reload=function()
             if not state then state={generation=1, status='healthy'} end
-            assert.equals('healthy', state.status)
+            assert.is_true(state.status == 'healthy' or
+                state.status == 'disabled')
             state.status='retiring'
             return state
         end,
@@ -35,6 +37,35 @@ local function runtime_stub()
             return state
         end,
     }
+end
+
+---Creates a reload runtime seam whose final state remains inspectable.
+---@return table runtime
+---@return fun(): table state
+local function reload_runtime_stub()
+    local state = {generation=1, status='healthy'}
+    local runtime = {
+        begin_reload=function()
+            assert.equals('healthy', state.status)
+            state.status = 'retiring'
+            return state
+        end,
+        begin_reconstruction=function()
+            assert.equals('retiring', state.status)
+            state = {generation=state.generation + 1, status='initializing'}
+            return state
+        end,
+        complete_initialization=function(generation)
+            assert.equals(state.generation, generation)
+            state.status = 'healthy'
+        end,
+        fail_initialization=function(generation)
+            assert.equals(state.generation, generation)
+            assert.equals('initializing', state.status)
+            state.status = 'disabled'
+        end,
+    }
+    return runtime, function() return state end
 end
 
 ---Creates a controlled DFHack command surface and call log.
@@ -125,22 +156,42 @@ local function registry_stub(modules, load_all)
 end
 
 describe('dwarfuicore command lifecycle', function()
-    it('keeps the importable root limited to its closed services namespace',
-            function()
-        local calls = {command=0, tooltip=0, context_menu=0}
+    it('keeps the importable command root free of service exports', function()
+        local calls = {command=0}
+        local _, root = module_loader.load(repo_root, PUBLIC_ROOT_PATH, {
+            globals={dfhack_flags={module=true}},
+            reqscript={['dwarfuicore/command']={main=function()
+                calls.command = calls.command + 1
+            end}},
+        })
+
+        assert.is_nil(root.services)
+        assert.is_nil(root.initialize)
+        assert.is_nil(root.reload)
+        assert.same({command=0}, calls)
+    end)
+
+    it('exposes typed providers from the dedicated services module', function()
+        local calls = {tooltip=0, context_menu=0}
         local providers = {
             TooltipServiceProvider={new=function() end},
             ContextMenuServiceProvider={new=function() end},
         }
-        local _, root = module_loader.load(repo_root, PUBLIC_ROOT_PATH, {
-            globals={dfhack_flags={module=true}},
+        local _, services = module_loader.load(repo_root, SERVICES_PATH, {
             reqscript={
-                ['dwarfuicore/command']={main=function()
-                    calls.command = calls.command + 1
-                end},
                 ['dwarfuicore/service_provider/immutable_proxy']={
-                    new_factory=function(_, _, properties)
-                        return {create=function() return properties end}
+                    new_factory=function(_, methods, properties)
+                        methods = methods or {}
+                        properties = properties or {}
+                        return {
+                            create=function()
+                                local proxy = {}
+                                return setmetatable(proxy, {__index=function(_, key)
+                                    return methods[key] or properties[key]
+                                end})
+                            end,
+                            is_instance=function() return true end,
+                        }
                     end,
                 },
                 ['dwarfuicore/service_provider/tooltip_provider']={
@@ -157,12 +208,12 @@ describe('dwarfuicore command lifecycle', function()
                 },
             },
         })
-        assert.equals(providers.TooltipServiceProvider,
-            root.services.TooltipServiceProvider)
-        assert.is_nil(root.initialize)
-        assert.is_nil(root.reload)
-        assert.is_nil(root.get)
-        assert.same({command=0, tooltip=1, context_menu=1}, calls)
+        assert.is_not_equal(providers.TooltipServiceProvider,
+            services.TooltipServiceProvider)
+        services.TooltipServiceProvider:new(1, 'plugin')
+        assert.is_nil(services.get)
+        assert.is_nil(services.get_diagnostics)
+        assert.same({tooltip=1, context_menu=0}, calls)
     end)
 
     it('exports validation, teardown, and explicit reload as a module',
@@ -351,5 +402,55 @@ describe('dwarfuicore command lifecycle', function()
         assert.is_truthy(tostring(failure):find(
             'DwarfUICore reload failed while loading ' .. module_name,
             1, true))
+    end)
+
+    it('retries explicit reconstruction after a corrected failure', function()
+        local module_name = 'dwarfuicore/retryable'
+        local registry = registry_stub({module_name})
+        local dfhack = dfhack_stub({[module_name]=true})
+        local failed = true
+        local run_script = dfhack.run_script
+        dfhack.run_script = function(name)
+            run_script(name)
+            if name == module_name and failed then
+                error('controlled retryable failure')
+            end
+        end
+        local root = load_root(registry, dfhack)
+
+        assert.has_error(root.reload)
+        failed = false
+        assert.same({}, root.reload())
+    end)
+
+    it('retires old APIs even when owner teardown fails', function()
+        local registry = registry_stub()
+        local dfhack = dfhack_stub({['dwarfuicore/tooltip/runtime']=true})
+        local runtime, get_state = reload_runtime_stub()
+        local _, root = module_loader.load(repo_root, ROOT_PATH, {
+            globals={
+                dfhack=dfhack,
+                dfhack_flags={module=true},
+                qerror=function(message) error(message, 0) end,
+            },
+            reqscript={
+                [REGISTRY_NAME]=registry,
+                [RUNTIME_NAME]=runtime,
+                ['dwarfuicore/tooltip/runtime']={
+                    presenter={retire_for_reload=function()
+                        error('controlled teardown failure')
+                    end},
+                },
+                ['dwarfuicore/tooltip/render_hook']={},
+                ['dwarfuicore/context_menu/service']={},
+                ['dwarfuicore/context_menu/registration']={},
+            },
+        })
+
+        local ok, failure = pcall(root.reload)
+        assert.is_false(ok)
+        assert.is_truthy(tostring(failure):find('controlled teardown failure',
+            1, true))
+        assert.same({generation=2, status='disabled'}, get_state())
     end)
 end)

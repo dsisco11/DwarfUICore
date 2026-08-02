@@ -5,13 +5,26 @@ local namespace = reqscript('dwarfuicore/service_provider/namespace')
 local immutable_proxy = reqscript('dwarfuicore/service_provider/immutable_proxy')
 
 local PROCESS_SLOT = 'service_provider_identity'
+local HANDLE_IDENTITY_SLOT = 'service_provider_map_handle_identities'
 local STATE_VERSION = 1
+local SEPARATED_HANDLE_STATE_VERSION = 2
 local IDENTITY_FIELDS = {
     runtime_generation=true,
     service_kind=true,
     contract_major=true,
     namespace=true,
     local_identity=true,
+}
+local PROCESS_STATE_FIELDS = {
+    version=true,
+    next_identity=true,
+    next_sequence=true,
+}
+local SEPARATED_HANDLE_STATE_FIELDS = {
+    version=true,
+    next_identity=true,
+    next_sequence=true,
+    map_handle_identities=true,
 }
 local MAP_COORDINATE_MIN = -0x8000
 local MAP_COORDINATE_MAX = 0x7fff
@@ -134,10 +147,10 @@ local function validate_process_state(state)
         'DwarfUICore process identity state must be a table.')
     assert(getmetatable(state) == nil,
         'DwarfUICore process identity state must be plain data.')
-    local expected = {version=true, next_identity=true, next_sequence=true}
     for key in next, state do
-        assert(expected[key],
-            'DwarfUICore process identity state contains an unknown field.')
+        assert(PROCESS_STATE_FIELDS[key],
+            ('DwarfUICore process identity state contains an unknown field %s.')
+                :format(tostring(key)))
     end
     assert(rawget(state, 'version') == STATE_VERSION,
         'DwarfUICore process identity state version is unsupported.')
@@ -148,6 +161,24 @@ local function validate_process_state(state)
             rawget(state, 'next_sequence') >= 0,
         'DwarfUICore next sequence must be a non-negative integer.')
     return state
+end
+
+---Migrates the transient combined state into two compatible process slots.
+---@param state table
+local function separate_handle_identity_state(state)
+    if rawget(state, 'version') ~= SEPARATED_HANDLE_STATE_VERSION then return end
+    for key in next, state do
+        assert(SEPARATED_HANDLE_STATE_FIELDS[key],
+            'DwarfUICore combined identity state contains an unknown field.')
+    end
+    local identities = rawget(state, 'map_handle_identities')
+    local metatable = type(identities) == 'table' and getmetatable(identities)
+    assert(type(identities) == 'table' and type(metatable) == 'table' and
+            metatable.__mode == 'k',
+        'DwarfUICore combined map handle identity registry must have weak keys.')
+    dfhack.dwarfuicore[HANDLE_IDENTITY_SLOT] = identities
+    state.map_handle_identities = nil
+    state.version = STATE_VERSION
 end
 
 ---Returns the one process-owned counter state, creating it when absent.
@@ -163,7 +194,28 @@ local function get_process_state()
         state = {version=STATE_VERSION, next_identity=0, next_sequence=0}
         dfhack.dwarfuicore[PROCESS_SLOT] = state
     end
+    separate_handle_identity_state(state)
     return validate_process_state(state)
+end
+
+---Returns the reload-stable weak registry that recognizes opaque map handles.
+---@return table<table, dwarfuicore.CompositeIdentity> identities
+local function get_map_handle_identities()
+    assert(type(dfhack) == 'table',
+        'DwarfUICore map handle identity lookup requires DFHack process state.')
+    if dfhack.dwarfuicore == nil then dfhack.dwarfuicore = {} end
+    assert(type(dfhack.dwarfuicore) == 'table',
+        'DwarfUICore process namespace must be a table.')
+    local identities = dfhack.dwarfuicore[HANDLE_IDENTITY_SLOT]
+    if identities == nil then
+        identities = setmetatable({}, {__mode='k'})
+        dfhack.dwarfuicore[HANDLE_IDENTITY_SLOT] = identities
+    end
+    local metatable = type(identities) == 'table' and getmetatable(identities)
+    assert(type(identities) == 'table' and type(metatable) == 'table' and
+            metatable.__mode == 'k',
+        'DwarfUICore map handle identity registry must have weak keys.')
+    return identities
 end
 
 ---Copy-constructs and validates one complete composite identity.
@@ -275,14 +327,17 @@ function create_map_handle(identity)
             'DwarfUICore allocated map handle identity was modified.')
     end
     allocated_identity_snapshots[identity] = nil
-    return handle_factory:create(CompositeIdentity.new(allocated))
+    local handle = handle_factory:create(CompositeIdentity.new(allocated))
+    get_map_handle_identities()[handle] = CompositeIdentity.new(allocated)
+    return handle
 end
 
 ---Returns a copy of a recognized map handle's private identity.
 ---@param handle any
 ---@return table|nil identity
 function get_map_handle_identity(handle)
-    local value = handle_factory:get_backing(handle)
+    local value = get_map_handle_identities()[handle] or
+        handle_factory:get_backing(handle)
     return value and CompositeIdentity.new(value) or nil
 end
 
@@ -290,5 +345,6 @@ end
 ---@param handle any
 ---@return boolean recognized
 function is_map_handle(handle)
-    return handle_factory:is_instance(handle)
+    return get_map_handle_identities()[handle] ~= nil or
+        handle_factory:is_instance(handle)
 end

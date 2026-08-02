@@ -68,6 +68,24 @@ describe('service-provider process runtime', function()
             'DwarfUICore runtime generation does not match.')
     end)
 
+    it('allows explicit reconstruction retry after a failed generation',
+            function()
+        local process = {dwarfuicore={
+            service_provider_runtime=healthy_state(4)}}
+        local runtime = load_runtime(process)
+        runtime.begin_reload()
+        local failed = runtime.begin_reconstruction()
+        runtime.fail_initialization(failed.generation)
+
+        local retrying = runtime.begin_reload()
+        assert.equals(contracts.RuntimeStatus.RETIRING, retrying.status)
+        local recovered = runtime.begin_reconstruction()
+        runtime.complete_initialization(recovered.generation)
+
+        assert.equals(6, recovered.generation)
+        assert.equals(contracts.RuntimeStatus.HEALTHY, recovered.status)
+    end)
+
     it('represents and rejects every non-acquirable runtime status', function()
         for _, status in ipairs({contracts.RuntimeStatus.INITIALIZING,
                 contracts.RuntimeStatus.DISABLED,

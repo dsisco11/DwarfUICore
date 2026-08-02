@@ -50,8 +50,11 @@ describe('service-provider identity primitives', function()
         assert.equals(2, allocator:allocate_sequence())
         assert.same({version=1, next_identity=3, next_sequence=2},
             allocator:snapshot())
-        assert.same({version=1, next_identity=3, next_sequence=2},
-            process.dwarfuicore.service_provider_identity)
+        local state = process.dwarfuicore.service_provider_identity
+        assert.equals(1, state.version)
+        assert.equals(3, state.next_identity)
+        assert.equals(2, state.next_sequence)
+        assert.is_nil(state.map_handle_identities)
     end)
 
     it('preserves plain counters across module reconstruction', function()
@@ -65,6 +68,20 @@ describe('service-provider identity primitives', function()
         assert.equals(2, allocated.local_identity)
         assert.equals(2, second:allocate_sequence())
         assert.is_nil(process.dwarfuicore.identity_allocator)
+    end)
+
+    it('keeps the counter schema compatible with prior reloads',
+            function()
+        local process = {dwarfuicore={service_provider_identity={
+            version=1, next_identity=4, next_sequence=7}}}
+        local allocator = load_identity(process).get_process_allocator()
+
+        assert.equals(5, allocator:allocate_identity(2,
+            contracts.ServiceKind.CONTEXT_MENU, 1, 'plugin').local_identity)
+        assert.equals(8, allocator:allocate_sequence())
+        assert.equals(1, process.dwarfuicore.service_provider_identity.version)
+        assert.is_nil(process.dwarfuicore.service_provider_identity
+            .map_handle_identities)
     end)
 
     it('keeps identities unique across every composite domain dimension', function()
@@ -122,8 +139,10 @@ describe('service-provider identity primitives', function()
     end)
 
     it('rejects malformed state, invalid domains, and counter exhaustion', function()
+        local handles = setmetatable({}, {__mode='k'})
         local process = {dwarfuicore={service_provider_identity={
-            version=1, next_identity=math.maxinteger, next_sequence=0}}}
+            version=2, next_identity=math.maxinteger, next_sequence=0,
+            map_handle_identities=handles}}}
         local allocator = load_identity(process).get_process_allocator()
         assert.has_error(function()
             allocator:allocate_identity(1, contracts.ServiceKind.TOOLTIP,
@@ -135,11 +154,13 @@ describe('service-provider identity primitives', function()
         assert.has_error(function() allocator:allocate_sequence() end,
             'DwarfUICore process sequence counter is exhausted.')
         process.dwarfuicore.service_provider_identity = {
-            version=1, next_identity=0, next_sequence=0, unexpected=true}
+            version=2, next_identity=0, next_sequence=0,
+            map_handle_identities=handles, unexpected=true}
         assert.has_error(function() allocator:allocate_sequence() end,
-            'DwarfUICore process identity state contains an unknown field.')
+            'DwarfUICore combined identity state contains an unknown field.')
         process.dwarfuicore.service_provider_identity = setmetatable({
-            version=1, next_identity=0, next_sequence=0}, {__index={}})
+            version=2, next_identity=0, next_sequence=0,
+            map_handle_identities=handles}, {__index={}})
         assert.has_error(function() allocator:allocate_sequence() end,
             'DwarfUICore process identity state must be plain data.')
         process.dwarfuicore.service_provider_identity = nil
@@ -183,6 +204,36 @@ describe('service-provider identity primitives', function()
         assert.equals('plugin',
             identity.get_map_handle_identity(handle).namespace)
         assert.is_false(identity.is_map_handle({}))
+    end)
+
+    it('recognizes old opaque handles after identity-module reconstruction',
+            function()
+        local process = {}
+        local first = load_identity(process)
+        local allocated = first.get_process_allocator():allocate_identity(4,
+            contracts.ServiceKind.TOOLTIP, 1, 'plugin')
+        local handle = first.create_map_handle(allocated)
+        local second = load_identity(process)
+
+        assert.is_true(second.is_map_handle(handle))
+        assert.same(allocated, second.get_map_handle_identity(handle))
+    end)
+
+    it('does not retain map handles through reload-stable recognition state',
+            function()
+        local process = {}
+        local identity = load_identity(process)
+        local allocated = identity.get_process_allocator():allocate_identity(1,
+            contracts.ServiceKind.TOOLTIP, 1, 'plugin')
+        local handle = identity.create_map_handle(allocated)
+        local registry = process.dwarfuicore.service_provider_map_handle_identities
+        assert.is_true(next(registry) ~= nil)
+
+        handle = nil
+        collectgarbage('collect')
+        collectgarbage('collect')
+
+        assert.is_nil(next(registry))
     end)
 
     it('rejects malformed and incomplete handle identities', function()

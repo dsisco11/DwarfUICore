@@ -43,7 +43,7 @@ function TooltipFinalRenderScreen:init()
         tooltip=self.tooltip_text,
     }
     self:addviews{self.tooltip_target}
-    assert(reqscript('dwarfuicore').services.TooltipServiceProvider:new(
+    assert(reqscript('dwarfuicore/services').TooltipServiceProvider:new(
         1, 'test-tooltip-final-render'):register(self.tooltip_target))
 end
 
@@ -454,7 +454,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
                 local current = ds.tooltip_state()
                 return current.target == nil and current.intent == nil
             end)
-            local tooltip = reqscript('dwarfuicore').services
+            local tooltip = reqscript('dwarfuicore/services')
                 .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
             assert.is_true(tooltip:unregister(upper_target))
             assert.is_true(tooltip:unregister(lower_target))
@@ -507,7 +507,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
         end
 
         cleanup_step('clear tooltip registrations', function()
-            local tooltip = reqscript('dwarfuicore').services
+            local tooltip = reqscript('dwarfuicore/services')
                 .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
             if upper_target then tooltip:unregister(upper_target) end
             if lower_target then tooltip:unregister(lower_target) end

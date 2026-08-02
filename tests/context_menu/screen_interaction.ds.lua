@@ -2,7 +2,7 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local context_menu = reqscript('dwarfuicore').services
+local context_menu = reqscript('dwarfuicore/services')
     .ContextMenuServiceProvider:new(1, 'test-context-screen')
 local registrations = reqscript('dwarfuicore/context_menu/registration')
 local services = reqscript('dwarfuicore/context_menu/service')

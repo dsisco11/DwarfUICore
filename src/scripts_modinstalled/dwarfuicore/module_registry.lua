@@ -22,6 +22,7 @@ MODULES = {
     {name='dwarfuicore/service_provider/context_menu_adapter_v1', contract='build_facade'},
     {name='dwarfuicore/service_provider/tooltip_provider', contract='get_provider'},
     {name='dwarfuicore/service_provider/context_menu_provider', contract='get_provider'},
+    {name='dwarfuicore/services', contract='TooltipServiceProvider', contract_type='table'},
     {name='dwarfuicore/service_provider/weak_store', contract='WeakRegistrationStore', contract_type='table'},
     {name='dwarfuicore/class', contract='is_instance_of'},
     {name='dwarfuicore/map_projection', contract='project_visible'},

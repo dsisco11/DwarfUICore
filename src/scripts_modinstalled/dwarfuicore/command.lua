@@ -118,10 +118,11 @@ function reload()
         if name ~= MODULE_REGISTRY_SCRIPT then table.insert(old_modules, name) end
     end
     runtime.begin_reload()
-    teardown()
-    local fresh_state = runtime.begin_reconstruction()
-    clear_process_owner_slots()
+    local fresh_state
     local result = table.pack(xpcall(function()
+        teardown()
+        fresh_state = runtime.begin_reconstruction()
+        clear_process_owner_slots()
         clear_script_environments(old_modules)
         dfhack.run_command('devel/clear-script-env', MODULE_REGISTRY_SCRIPT)
         dfhack.run_script(MODULE_REGISTRY_SCRIPT)
@@ -135,7 +136,13 @@ function reload()
         return loaded
     end, debug.traceback))
     if not result[1] then
-        pcall(runtime.fail_initialization, fresh_state.generation)
+        if fresh_state == nil then
+            local promoted, state = pcall(runtime.begin_reconstruction)
+            if promoted then fresh_state = state end
+        end
+        if fresh_state then
+            pcall(runtime.fail_initialization, fresh_state.generation)
+        end
         error(result[2], 0)
     end
     return result[2]

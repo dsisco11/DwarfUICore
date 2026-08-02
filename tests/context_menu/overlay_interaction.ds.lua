@@ -1,7 +1,7 @@
 -- Native registered-overlay context-menu interaction acceptance.
 
 local gui = require('gui')
-local context_menu = reqscript('dwarfuicore').services
+local context_menu = reqscript('dwarfuicore/services')
     .ContextMenuServiceProvider:new(1, 'test-context-overlay')
 local services = reqscript('dwarfuicore/context_menu/service')
 

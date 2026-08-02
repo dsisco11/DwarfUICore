@@ -49,10 +49,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Locked scope and constraints
 
-- [ ] The public dependency entrypoint is `reqscript('dwarfuicore')`.
+- [ ] The public dependency entrypoint is the import-only
+      `reqscript('dwarfuicore/services')` module; `dwarfuicore` remains a
+      command and is not a dependency API.
 - [ ] The only public provider exports are
-      `dwarfuicore.services.TooltipServiceProvider` and
-      `dwarfuicore.services.ContextMenuServiceProvider`.
+      `services.TooltipServiceProvider` and
+      `services.ContextMenuServiceProvider`.
 - [ ] Provider construction requires an exact positive integer contract major
       and a validated stable consumer namespace.
 - [ ] DwarfUICore allocates every local registration identity. Consumers never
@@ -457,11 +459,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 6 - Expose providers and immutable version 1 APIs
 
-- [x] Define lightweight root-bound `TooltipServiceProvider` and
+- [x] Define lightweight services-module `TooltipServiceProvider` and
       `ContextMenuServiceProvider` classes without eagerly loading private
       service implementations.
-- [x] Export them through a closed read-only `services` empty proxy with private
-      backing storage; reject replacement and consumer-added provider types.
+- [x] Export them as the only provider values from the dedicated DFHack script
+      module; keep provider and API objects immutable and treat mutation of the
+      module environment as unsupported consumer behavior.
 - [x] Implement `new(contractVersion, consumerNamespace)` with both arguments
       mandatory, provider-specific stable prefixes, exact major negotiation,
       namespace validation, and shared atomic acquisition.
@@ -493,9 +496,10 @@ Migration of any other consumer plugin remains explicitly out of scope.
       register API-object finalizers or namespace lease counts.
 - [x] Prove collecting an API object changes no context-menu registration,
       composition, active menu, namespace, facade, or service-health state.
-- [x] Prove importing `reqscript('dwarfuicore')` does no service initialization,
+- [x] Prove importing `reqscript('dwarfuicore/services')` does no service initialization,
       reload, teardown, environment clearing, or overlay rescan.
-- [x] Update root, provider, API, module-registry, and package-contract tests for
+- [x] Update command-root, services-module, provider, API, module-registry, and
+      package-contract tests for
       the complete public surface and the absence of a global `get()` or public
       service discriminator.
 - [x] Assert the exact method set and return semantics for both APIs, including
@@ -546,37 +550,38 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 7 - Make explicit development reload generation-safe
 
-- [ ] Mark the active generation retiring and reject new acquisitions before
+- [x] Mark the active generation retiring and reject new acquisitions before
       destructive teardown begins.
-- [ ] Retire every core runtime owner, invalidate all namespaces, APIs, handles,
+- [x] Retire every core runtime owner, invalidate all namespaces, APIs, handles,
       callbacks, presentations, hooks, and service facades from the old
       generation.
-- [ ] Clear only DwarfUICore reload-managed script environments in the registry's
+- [x] Clear only DwarfUICore reload-managed script environments in the registry's
       safe order and rebuild prerequisites in dependency order.
-- [ ] Rescan core presentation integrations only as part of explicit
+- [x] Rescan core presentation integrations only as part of explicit
       `dwarfuicore reload` reconstruction, never from provider construction or a
       service API method.
-- [ ] Publish a new healthy generation only after complete reconstruction and
+- [x] Publish a new healthy generation only after complete reconstruction and
       runtime/service validation succeeds.
-- [ ] On reconstruction failure, leave no retired facade or service marked
+- [x] On reconstruction failure, leave no retired facade or service marked
       healthy and keep every old API object stale.
-- [ ] Preserve foreign hook wrappers according to the existing safe-retirement
+- [x] Preserve foreign hook wrappers according to the existing safe-retirement
       contracts and report any unavoidable inert trampoline in diagnostics.
-- [ ] Prove constructors and API methods cannot reach reload, teardown,
+- [x] Prove constructors and API methods cannot reach reload, teardown,
       environment-clearing, or overlay-rescan operations.
-- [ ] Add command and live lifecycle tests for successful reload, failed reload,
+- [x] Add command and live lifecycle tests for successful reload, failed reload,
       stale objects, acquisition during retiring/initializing states, and clean
       retry after correction.
-- [ ] Prove `dwarfui reload` neither invokes this operation nor changes another
-      namespace or the DwarfUICore generation.
+- [x] Add a live DwarfUI-reload isolation test that records the DwarfUICore
+      generation, registers an independent namespace, runs `dwarfui reload`,
+      and proves both remain intact without an indirect Core reload.
 
 ### Phase 7 completion gate
 
-- [ ] Successful reload creates one coherent new generation; failed reload
+- [x] Successful reload creates one coherent new generation; failed reload
       leaves no falsely healthy runtime.
-- [ ] No old API object, opaque handle, callback, hook owner, menu, tooltip
+- [x] No old API object, opaque handle, callback, hook owner, menu, tooltip
       intent, or namespace record can act on the new generation.
-- [ ] Explicit `dwarfuicore reload` is the only operation permitted to globally
+- [x] Explicit `dwarfuicore reload` is the only operation permitted to globally
       retire every namespace or rescan core presentation integrations.
 
 ## Phase 8 - Migrate DwarfUI as the coordinated consumer
@@ -661,7 +666,7 @@ Migration of any other consumer plugin remains explicitly out of scope.
       context and public discriminator semantics, without exposing composite
       identities or private diagnostic records.
 - [ ] Add canonical tooltip and context-menu examples using
-      `reqscript('dwarfuicore')` and no per-method namespace argument.
+      `reqscript('dwarfuicore/services')` and no per-method namespace argument.
 - [ ] Build and inspect the expanded package and final archive; prove all
       required files exist and no DwarfUI feature module or unrelated consumer
       code is bundled.
@@ -731,8 +736,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Definition of done
 
-- [ ] `reqscript('dwarfuicore').services` is a closed immutable namespace with
-      exactly the approved provider classes.
+- [ ] `reqscript('dwarfuicore/services')` exports exactly the approved immutable
+      provider objects, while `reqscript('dwarfuicore')` exposes no service API.
 - [ ] Both providers enforce exact major 1 and the approved namespace contract
       before service initialization.
 - [ ] Namespace handling is syntax-only: no reserved names, allocation,

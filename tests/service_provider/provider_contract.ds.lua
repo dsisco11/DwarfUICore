@@ -33,12 +33,21 @@ end
 describe('live service-provider contract', function()
     it('constructs distinct immutable namespace APIs over shared backends',
             function()
-        local core = reqscript('dwarfuicore')
-        assert.same({}, keys(core.services))
-        assert.is_nil(core.services.get_diagnostics)
+        local services = reqscript('dwarfuicore/services')
+        local provider_names = keys(services)
+        for index = #provider_names, 1, -1 do
+            if provider_names[index] == 'dfhack_flags' then
+                table.remove(provider_names, index)
+            end
+        end
+        table.sort(provider_names)
+        assert.same({'ContextMenuServiceProvider', 'TooltipServiceProvider'},
+            provider_names)
+        assert.is_nil(reqscript('dwarfuicore').services)
+        assert.is_nil(services.get_diagnostics)
 
-        local tooltip_provider = core.services.TooltipServiceProvider
-        local context_provider = core.services.ContextMenuServiceProvider
+        local tooltip_provider = services.TooltipServiceProvider
+        local context_provider = services.ContextMenuServiceProvider
         assert.same({}, keys(tooltip_provider))
         assert.same({}, keys(context_provider))
 
@@ -63,8 +72,8 @@ describe('live service-provider contract', function()
     end)
 
     it('keeps registrations alive after an API object is collected', function()
-        local core = reqscript('dwarfuicore')
-        local provider = core.services.ContextMenuServiceProvider
+        local services = reqscript('dwarfuicore/services')
+        local provider = services.ContextMenuServiceProvider
         local namespace = 'provider-api-collection'
         local api = provider:new(1, namespace)
         local widget = widgets.Panel{}
@@ -80,7 +89,7 @@ describe('live service-provider contract', function()
             on_select=function() end}}}))
         assert.is_false(api:register(widget, {entries={{label='Repeat',
             on_select=function() end}}}))
-        local tooltip = core.services.TooltipServiceProvider:new(1, namespace)
+        local tooltip = services.TooltipServiceProvider:new(1, namespace)
         assert.is_true(tooltip:register(widget))
         local before = registration.manager:get_diagnostics()
         assert.equals(initial.widget_registration_count + 1,

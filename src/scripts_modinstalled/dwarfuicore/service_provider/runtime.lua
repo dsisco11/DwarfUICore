@@ -199,12 +199,13 @@ function fail_initialization(expected_generation)
     return state
 end
 
----Marks a healthy generation as retiring before explicit teardown.
+---Marks a healthy or disabled generation as retiring before explicit teardown.
 ---@return dwarfuicore.ServiceProviderRuntimeState state
 function begin_reload()
     local state = validate()
-    assert(state.status == contracts.RuntimeStatus.HEALTHY,
-        'DwarfUICore runtime is not healthy for reload.')
+    assert(state.status == contracts.RuntimeStatus.HEALTHY or
+            state.status == contracts.RuntimeStatus.DISABLED,
+        'DwarfUICore runtime cannot begin reload in its current state.')
     state.status = contracts.RuntimeStatus.RETIRING
     return state
 end

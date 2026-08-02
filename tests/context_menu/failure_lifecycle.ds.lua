@@ -9,7 +9,7 @@ local PROCESS_STATE_SLOT = 'context_menu_component_probe'
 ---Returns the current-generation public API.
 ---@return table
 local function api()
-    return reqscript('dwarfuicore').services.ContextMenuServiceProvider:new(
+    return reqscript('dwarfuicore/services').ContextMenuServiceProvider:new(
         1, 'test-context-failure')
 end
 

@@ -1,6 +1,6 @@
 -- Real overlay-discovery integration contracts for tooltip input intent.
 
-local tooltip = reqscript('dwarfuicore').services.TooltipServiceProvider:new(
+local tooltip = reqscript('dwarfuicore/services').TooltipServiceProvider:new(
     1, 'test-tooltip-overlay')
 local overlay = require('plugins.overlay')
 

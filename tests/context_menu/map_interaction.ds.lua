@@ -2,7 +2,7 @@
 
 local gui = require('gui')
 local guidm = require('gui.dwarfmode')
-local context_menu = reqscript('dwarfuicore').services
+local context_menu = reqscript('dwarfuicore/services')
     .ContextMenuServiceProvider:new(1, 'test-context-map')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local services = reqscript('dwarfuicore/context_menu/service')

@@ -2,14 +2,12 @@
 
 ## Status
 
-Approved and frozen on 2026-08-01, including its transitive version 1 public
-data schema and immutable-object low-level mutation boundary. The repository
-split and implementation Phases 0 through 3 are complete. Private namespace,
-identity, immutability, ordering, weak-lifetime, and process-runtime lifecycle
-infrastructure now exist, together with atomic private service acquisition and
-stable provider-error rendering. Providers, namespaced service backends,
-public service APIs, and consumer migration remain unimplemented. Any further
-contract amendment requires explicit re-approval.
+Approved on 2026-08-01 and amended on 2026-08-02 to expose providers through a
+dedicated DFHack script module. Its transitive version 1 public data schema and
+immutable-object low-level mutation boundary remain unchanged. DwarfUICore
+implementation Phases 0 through 7 are complete; coordinated DwarfUI migration
+and later release work remain outstanding. Any further contract amendment
+requires explicit re-approval.
 
 ## Decision summary
 
@@ -17,15 +15,16 @@ DwarfUICore now owns the process-wide tooltip, context-menu, pointer,
 registration, and presentation infrastructure extracted from DwarfUI. This
 proposal defines a later provider and namespace layer over that current system.
 
-DwarfUICore exposes one public root module and one explicitly named provider
-class per supported service. Every provider construction requires both an exact
-integer contract major and the stable namespace of the consuming plugin:
+DwarfUICore exposes one import-only public services module and one explicitly
+named provider per supported service. Its command entrypoint remains separate.
+Every provider construction requires both an exact integer contract major and
+the stable namespace of the consuming plugin:
 
 ```lua
-local dwarfuiCore = reqscript('dwarfuicore')
+local services = reqscript('dwarfuicore/services')
 
 local tooltipService =
-    dwarfuiCore.services.TooltipServiceProvider:new(1, 'dwarfdirect')
+    services.TooltipServiceProvider:new(1, 'dwarfdirect')
 
 tooltipService:register(widget)
 ```
@@ -33,10 +32,10 @@ tooltipService:register(widget)
 Context menus use the parallel provider:
 
 ```lua
-local dwarfuiCore = reqscript('dwarfuicore')
+local services = reqscript('dwarfuicore/services')
 
 local contextMenuService =
-    dwarfuiCore.services.ContextMenuServiceProvider:new(1, 'dwarfdirect')
+    services.ContextMenuServiceProvider:new(1, 'dwarfdirect')
 
 contextMenuService:register(widget, definition)
 ```
@@ -114,31 +113,27 @@ entries, and their packaged files are removed. No compatibility adapter or
 legacy namespace is shipped. Independent plugins that use the old paths require
 separately authorized migration to the provider contract.
 
-## Proposed public root contract
+## Proposed public services-module contract
 
-The public provider surface in this contract does not exist in the repository
-yet. Private namespace, identity, runtime-lifecycle, and atomic-acquisition
-infrastructure now exists, but `dwarfuicore.services`, the provider classes,
-`new(version, namespace)`, namespace-bound service APIs, and their collision
-rules remain unimplemented. The current direct module entrypoints predate this
-contract and are replaced as specified under **Legacy direct API replacement**.
+The public provider surface is an import-only DFHack script module, separate
+from the `dwarfuicore` command entrypoint. Consumers import it through
+`reqscript('dwarfuicore/services')`, following DFHack's supported mechanism for
+sharing Lua script APIs. Importing the command script is not a dependency API.
 
-The root module exports a closed, read-only `services` namespace:
+The services module exports exactly the two typed providers:
 
 ```lua
-local dwarfuiCore = reqscript('dwarfuicore')
+local services = reqscript('dwarfuicore/services')
 
-local tooltipProvider = dwarfuiCore.services.TooltipServiceProvider
-local contextMenuProvider = dwarfuiCore.services.ContextMenuServiceProvider
+local tooltipProvider = services.TooltipServiceProvider
+local contextMenuProvider = services.ContextMenuServiceProvider
 ```
 
 The provider names are public compatibility contracts. Internal module paths,
 registry entries, load order, implementation classes, and facade module
-identity are not.
-
-The namespace is implemented as an empty proxy with private backing storage so
-assignment cannot replace an existing provider export. Consumers cannot add or
-register provider types.
+identity are not. Provider and API objects are immutable. As with other DFHack
+script modules, mutation of the returned module environment is unsupported;
+consumers do not replace exports or add provider types.
 
 ## Consumer namespace contract
 
@@ -789,10 +784,11 @@ Provider construction rejects:
 - prerequisite load failures; and
 - reentrant or cyclic initialization.
 
-The lightweight provider classes are defined at the stable root boundary.
+The lightweight provider classes are defined at the dedicated public services
+module boundary.
 Private implementations and service modules load only when `new()` is called,
 allowing missing implementation failures to use the provider-specific error
-prefix. If `reqscript('dwarfuicore')` itself cannot resolve, DFHack's
+prefix. If `reqscript('dwarfuicore/services')` itself cannot resolve, DFHack's
 missing-script error is the appropriate indication that DwarfUICore is absent.
 
 ## Contract versioning policy
@@ -847,7 +843,7 @@ project work:
 
 1. Approve this exact public contract, including version negotiation, namespace
    rules, identity and collision behavior, and compatibility policy.
-2. Implement the root contract, runtime state, namespace system, providers,
+2. Implement the services-module contract, runtime state, namespace system, providers,
    immutable API objects, and focused contract tests in DwarfUICore.
 3. Migrate DwarfUI to the approved provider APIs through namespace `dwarfui`
    without introducing a second runtime, and raise its minimum dependency to
@@ -918,9 +914,9 @@ Proceed with DwarfUICore as the reusable dependency boundary and adopt this
 canonical pattern:
 
 ```lua
-local dwarfuiCore = reqscript('dwarfuicore')
+local services = reqscript('dwarfuicore/services')
 local tooltipService =
-    dwarfuiCore.services.TooltipServiceProvider:new(1, 'my-plugin')
+    services.TooltipServiceProvider:new(1, 'my-plugin')
 ```
 
 The required version prevents accidental binding to a breaking contract. The

@@ -19,10 +19,10 @@ its own location and validates the runner's discovered file list.
 Support modules provide isolated DFHack-style module loading. Tests and
 `.luarocks/` are outside `src/` and are not included in published packages.
 
-Live product tests will default to recursively discovered `*.ds.lua` files
-beneath `tests/`, executed by the installed DwarfSpec dependency declared in
-the repository rockspec. The repository bootstrap contains no live specs; they
-move with their owned systems during the extraction.
+Live product tests are recursively discovered from `*.ds.lua` files beneath
+`tests/` and executed by the installed DwarfSpec dependency declared in the
+repository rockspec. The tooltip and context-menu tests exercise the systems
+owned by DwarfUICore.
 
 ```powershell
 dwarfspec list

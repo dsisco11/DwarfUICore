@@ -5,6 +5,7 @@
 local gui = require('gui')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local renderers = reqscript('dwarfuicore/context_menu/renderer')
+local identities = reqscript('dwarfuicore/service_provider/identity')
 local services = reqscript('dwarfuicore/context_menu/service')
 local targets = reqscript('dwarfuicore/context_menu/target')
 
@@ -99,7 +100,7 @@ function ContextMenuScreen:resolve_anchor()
     end
     local projected = map_projection.project_visible(
         self.anchor.map_position)
-    return projected and {x=projected.x, y=projected.y} or nil
+    return projected and identities.ScreenPosition.new(projected) or nil
 end
 
 ---Returns whether the current pointer lies in the complete Window frame.

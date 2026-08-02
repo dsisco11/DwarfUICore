@@ -13,6 +13,8 @@ local IDENTITY_FIELDS = {
     namespace=true,
     local_identity=true,
 }
+local MAP_COORDINATE_MIN = -0x8000
+local MAP_COORDINATE_MAX = 0x7fff
 
 ---Plain reload-stable process identity counter state.
 ---@class dwarfuicore.ProcessIdentityState
@@ -32,6 +34,28 @@ ProcessIdentityAllocator = {}
 ---@field local_identity integer
 CompositeIdentity = {}
 
+---@class dwarfuicore.MapTilePosition
+---@field x integer
+---@field y integer
+---@field z integer
+MapTilePosition = {}
+MapTilePosition.__index = MapTilePosition
+
+---@class dwarfuicore.ScreenPosition
+---@field x integer
+---@field y integer
+ScreenPosition = {}
+ScreenPosition.__index = ScreenPosition
+
+---@class dwarfuicore.ContextMenuSelectionContext
+---@field screen_position dwarfuicore.ScreenPosition
+---@field map_position? dwarfuicore.MapTilePosition
+---@field source gui.View|dwarfuicore.ContextMenuMapRegistration
+---@field source_root dwarfuicore.PresentationOwner
+---@field owner? dwarfuicore.PresentationOwner
+ContextMenuSelectionContext = {}
+ContextMenuSelectionContext.__index = ContextMenuSelectionContext
+
 local allocated_identity_snapshots = setmetatable({}, {__mode='k'})
 
 ---Returns whether a value is a positive integer.
@@ -39,6 +63,59 @@ local allocated_identity_snapshots = setmetatable({}, {__mode='k'})
 ---@return boolean valid
 local function is_positive_integer(value)
     return math.type(value) == 'integer' and value > 0
+end
+
+---Copy-constructs and validates one exact fortress-map position.
+---@param value any
+---@return dwarfuicore.MapTilePosition position
+function MapTilePosition.new(value)
+    local value_type = type(value)
+    assert(value_type == 'table' or value_type == 'userdata',
+        'DwarfUICore map tile position must be a table or userdata.')
+    assert(math.type(value.x) == 'integer' and value.x >= MAP_COORDINATE_MIN and
+            value.x <= MAP_COORDINATE_MAX and math.type(value.y) == 'integer' and
+            value.y >= MAP_COORDINATE_MIN and value.y <= MAP_COORDINATE_MAX and
+            math.type(value.z) == 'integer' and value.z >= MAP_COORDINATE_MIN and
+            value.z <= MAP_COORDINATE_MAX,
+        'DwarfUICore map tile position requires signed 16-bit x, y, and z.')
+    return setmetatable({x=value.x, y=value.y, z=value.z}, MapTilePosition)
+end
+
+---Copy-constructs and validates one exact interface-cell position.
+---@param value any
+---@return dwarfuicore.ScreenPosition position
+function ScreenPosition.new(value)
+    assert(type(value) == 'table' and math.type(value.x) == 'integer' and
+            math.type(value.y) == 'integer',
+        'DwarfUICore screen position requires integer x and y.')
+    return setmetatable({x=value.x, y=value.y}, ScreenPosition)
+end
+
+---Copy-constructs one approved public context-menu callback context.
+---@param value any
+---@return dwarfuicore.ContextMenuSelectionContext context
+function ContextMenuSelectionContext.new(value)
+    assert(type(value) == 'table',
+        'DwarfUICore context-menu selection context must be a table.')
+    local allowed = {screen_position=true, map_position=true, source=true,
+        source_root=true, owner=true}
+    for key in pairs(value) do
+        assert(type(key) == 'string' and allowed[key],
+            ('DwarfUICore context-menu selection context contains ' ..
+                'unsupported field %s.'):format(tostring(key)))
+    end
+    assert(value.source ~= nil and value.source_root ~= nil,
+        'DwarfUICore context-menu selection context requires source and source root.')
+    local context = {
+        screen_position=ScreenPosition.new(value.screen_position),
+        source=value.source,
+        source_root=value.source_root,
+        owner=value.owner,
+    }
+    if value.map_position ~= nil then
+        context.map_position = MapTilePosition.new(value.map_position)
+    end
+    return setmetatable(context, ContextMenuSelectionContext)
 end
 
 ---Returns whether a value is a recognized service kind.

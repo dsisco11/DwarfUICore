@@ -457,66 +457,91 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 6 - Expose providers and immutable version 1 APIs
 
-- [ ] Define lightweight root-bound `TooltipServiceProvider` and
+- [x] Define lightweight root-bound `TooltipServiceProvider` and
       `ContextMenuServiceProvider` classes without eagerly loading private
       service implementations.
-- [ ] Export them through a closed read-only `services` empty proxy with private
+- [x] Export them through a closed read-only `services` empty proxy with private
       backing storage; reject replacement and consumer-added provider types.
-- [ ] Implement `new(contractVersion, consumerNamespace)` with both arguments
+- [x] Implement `new(contractVersion, consumerNamespace)` with both arguments
       mandatory, provider-specific stable prefixes, exact major negotiation,
       namespace validation, and shared atomic acquisition.
-- [ ] Return a distinct immutable namespace-bound API object on every successful
+- [x] Return a distinct immutable namespace-bound API object on every successful
       construction, including repeated construction for the same namespace.
-- [ ] Implement `get_contract_version()` and `get_namespace()` from private
+- [x] Implement `get_contract_version()` and `get_namespace()` from private
       backing data and validate the active generation before every method.
-- [ ] Implement every approved tooltip and context-menu version 1 method as a
+- [x] Implement every approved tooltip and context-menu version 1 method as a
       direct namespace-bound delegation with no per-call namespace parameter.
-- [ ] Implement the exact approved transitive public LuaDoc schemas and reject
+- [x] Implement the exact approved transitive public LuaDoc schemas and reject
       malformed required fields, unknown closed discriminator values, and
       invalid callback shapes before mutation.
-- [ ] Render API failures through the service API prefix and one of `STALE_API`,
+- [x] Render API failures through the service API prefix and one of `STALE_API`,
       `INVALID_ARGUMENT`, `FOREIGN_HANDLE`, `STALE_HANDLE`,
       or `SERVICE_UNHEALTHY`.
-- [ ] Add a table-driven API-failure matrix covering every category and the
+- [x] Add a table-driven API-failure matrix covering every category and the
       proposal's validation precedence, with state unchanged after each raised
       error and `false` reserved for absent same-domain registrations.
-- [ ] Validate API generation, handle shape, handle generation, and handle
+- [x] Validate API generation, handle shape, handle generation, and handle
       domain in the approved order; return `false` only for an absent or removed
       same-domain registration.
-- [ ] Reject stale API objects and handles after generation retirement with the
+- [x] Reject stale API objects and handles after generation retirement with the
       approved stable error category.
-- [ ] Prove API objects cannot attach fields, replace methods, inspect facades,
+- [x] Prove API objects cannot attach fields, replace methods, inspect facades,
       mutate provider exports, or operate on another namespace.
-- [ ] Prove tooltip and context-menu APIs using the same namespace share no
+- [x] Prove tooltip and context-menu APIs using the same namespace share no
       registration state because service kind remains part of identity.
-- [ ] Prove the public APIs expose no `close()` or `release()` method and do not
+- [x] Prove the public APIs expose no `close()` or `release()` method and do not
       register API-object finalizers or namespace lease counts.
-- [ ] Prove collecting an API object changes no context-menu registration,
+- [x] Prove collecting an API object changes no context-menu registration,
       composition, active menu, namespace, facade, or service-health state.
-- [ ] Prove importing `reqscript('dwarfuicore')` does no service initialization,
+- [x] Prove importing `reqscript('dwarfuicore')` does no service initialization,
       reload, teardown, environment clearing, or overlay rescan.
-- [ ] Update root, provider, API, module-registry, and package-contract tests for
+- [x] Update root, provider, API, module-registry, and package-contract tests for
       the complete public surface and the absence of a global `get()` or public
       service discriminator.
-- [ ] Assert the exact method set and return semantics for both APIs, including
+- [x] Assert the exact method set and return semantics for both APIs, including
       first-registration versus repeat/replacement `created`, absent
       same-domain `updated`/`removed`, and namespace-wide `changed` booleans;
       prove no public diagnostic method or unapproved method is exposed.
-- [ ] Migrate DwarfUICore tests and fixtures away from both legacy direct API
+- [x] Migrate DwarfUICore tests and fixtures away from both legacy direct API
       paths so they exercise the namespace-bound provider contract before the
       legacy modules are deleted.
-- [ ] Prove constructors and methods raise ordinary Lua errors, never call
+- [x] Prove constructors and methods raise ordinary Lua errors, never call
       `qerror()`, never return `nil, error`, and mutate no state after any
       validation, ownership, contract, runtime-state, or health failure.
-- [ ] Prove a resolvable root with a missing private implementation reports the
+- [x] Prove a resolvable root with a missing private implementation reports the
       provider-specific `INITIALIZATION_FAILED` contract, while a missing root
       script remains DFHack's ordinary missing-script error.
+- [x] Replace loose composite-identity copying in context-menu diagnostics with
+      `CompositeIdentity.new()` so every identity snapshot uses the canonical
+      validating copy-constructor.
+- [x] Introduce copy-constructors for the named `MapTilePosition` and
+      `ScreenPosition` value types, then route map registration, anchor,
+      projection, and callback-context copies through them rather than ad-hoc
+      `{x=..., y=..., z=...}` tables.
+- [x] Define `ContextMenuSelectionContext.new()` as the sole callback-context
+      construction boundary; copy its nested value types through their
+      constructors and expose only the approved public fields, not internal
+      target/anchor kinds or composite registration identity.
+- [x] Add focused regression coverage for value-type isolation, constructor
+      validation, diagnostic identity copies, and the exact public
+      `ContextMenuSelectionContext` field set.
+- [x] Route `ContextMenuScreen:resolve_anchor()`'s projected placement through
+      `ScreenPosition.new()` instead of constructing a loose `{x=..., y=...}`
+      table, updating the screen module's dependency seam as needed.
+- [x] Add a regression proving the projected anchor is an isolated validated
+      `ScreenPosition`, so later mutation of the projection result cannot alter
+      menu placement.
+- [x] Complete the provider contract DwarfSpec run through the project tooling,
+      then record its result and cleanup confirmation without inferring success
+      from the previous command timeouts.
+- [x] Run the applicable package and live acceptance checks for this completed
+      provider surface, recording each result separately from unit evidence.
 
 ### Phase 6 completion gate
 
-- [ ] The canonical proposal examples work against one shared backend and exact
+- [x] The canonical proposal examples work against one shared backend and exact
       version 1 APIs.
-- [ ] The root and API object surfaces contain only approved immutable public
+- [x] The root and API object surfaces contain only approved immutable public
       contracts.
 
 ## Phase 7 - Make explicit development reload generation-safe
@@ -784,3 +809,12 @@ Migration of any other consumer plugin remains explicitly out of scope.
 | | Installed resolution | Fresh DFHack process with DwarfUI and a disposable independent consumer | Pending | Confirm one packaged DwarfUICore resolution and one backend per service. |
 | | Live manual acceptance | Registered tooltip and composed context menu across two namespaces | Pending | Verify collision fallback, ordering, dispatch, isolation, reload, and cleanup. |
 | 2026-08-01 | Diff validation | `git diff --check` in each touched checkout | Passed | Audited Phase 1 production, test, registry, proposal, and planning changes. |
+| 2026-08-02 | Value-type constructor build | `./tools/Build.ps1` | Passed | Lua 5.4.6 syntax check passed for 48 production and 60 test/support files; reload completed. |
+| 2026-08-02 | Value-type constructor unit suite | `./tools/Run-UnitTests.ps1` | Passed | 341 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-02 | Provider live contract | `./tools/Run-AutomationTests.ps1 tests/service_provider/provider_contract.ds.lua` | Unverified | The harness produced no result before both the two- and five-minute command limits; no pass or failure is inferred. |
+| 2026-08-02 | Projected-anchor regression | `./tools/Run-UnitTests.ps1 tests/context_menu/screen.spec.lua` | Passed | 22 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-02 | Complete unit suite | `./tools/Run-UnitTests.ps1` | Passed | 342 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-02 | Package verification | `./tools/Publish.ps1` | Passed | Expanded and zip package verification passed; rebuilt `DwarfUICore-0.1.0.zip`. |
+| 2026-08-02 | Provider live contract | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/service_provider/provider_contract.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 2 successes, 0 failures, 0 errors, 0 pending; cleanup confirmed. |
+| 2026-08-02 | Context-menu live acceptance | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/context_menu/map_interaction.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success, 0 failures, 0 errors, 0 pending; cleanup confirmed. |
+| 2026-08-02 | Tooltip live acceptance | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs @('tests/tooltip/tooltip_overlay_registration_integration.ds.lua', '--verbose', '--queue-timeout', '15')` | Passed | 1 success, 0 failures, 0 errors, 0 pending; cleanup confirmed. |

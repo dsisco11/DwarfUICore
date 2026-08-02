@@ -12,19 +12,31 @@
 ---The returned proxies enforce the approved ordinary-Lua mutation boundary.
 ---@param label string
 ---@param methods? table<string, function>
+---@param properties? table<string, any>
 ---@return dwarfuicore.ImmutableProxyFactory factory
-function new_factory(label, methods)
+function new_factory(label, methods, properties)
     assert(type(label) == 'string' and label ~= '',
         'DwarfUICore immutable proxy label must be a non-empty string.')
     methods = methods or {}
     assert(type(methods) == 'table',
         'DwarfUICore immutable proxy methods must be a table.')
+    properties = properties or {}
+    assert(type(properties) == 'table',
+        'DwarfUICore immutable proxy properties must be a table.')
     local backing_by_proxy = setmetatable({}, {__mode='k'})
     local method_data = {}
     for name, method in pairs(methods) do
         assert(type(name) == 'string' and type(method) == 'function',
             'DwarfUICore immutable proxy methods must be named functions.')
         method_data[name] = method
+    end
+    local property_data = {}
+    for name, value in pairs(properties) do
+        assert(type(name) == 'string' and name ~= '',
+            'DwarfUICore immutable proxy properties must be named.')
+        assert(method_data[name] == nil,
+            'DwarfUICore immutable proxy property conflicts with a method.')
+        property_data[name] = value
     end
     local factory = {}
 
@@ -37,7 +49,11 @@ function new_factory(label, methods)
         local proxy = {}
         backing_by_proxy[proxy] = backing
         return setmetatable(proxy, {
-            __index=method_data,
+            __index=function(_, key)
+                local method = method_data[key]
+                if method ~= nil then return method end
+                return property_data[key]
+            end,
             __newindex=function()
                 error(('DwarfUICore %s is immutable.'):format(label), 2)
             end,

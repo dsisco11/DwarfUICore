@@ -8,6 +8,19 @@ local guidm = require('gui.dwarfmode')
 ---@field x integer
 ---@field y integer
 ---@field z integer
+MapProjectionResult = {}
+MapProjectionResult.__index = MapProjectionResult
+
+---Copies and validates one projected interface-cell position.
+---@param value any
+---@return dwarfuicore.MapProjectionResult result
+function MapProjectionResult.new(value)
+    assert(type(value) == 'table' and math.type(value.x) == 'integer' and
+            math.type(value.y) == 'integer' and math.type(value.z) == 'integer',
+        'DwarfUICore map projection result requires integer x, y, and z.')
+    return setmetatable({x=value.x, y=value.y, z=value.z},
+        MapProjectionResult)
+end
 
 ---Returns whether a fortress world is currently available.
 ---@return boolean
@@ -36,7 +49,7 @@ end
 function world_to_interface(pos, viewport)
     if not pos or not viewport then return nil end
     if not dfhack.screen.inGraphicsMode() then
-        return viewport:tileToScreen(pos)
+        return MapProjectionResult.new(viewport:tileToScreen(pos))
     end
 
     local gps = df.global.gps
@@ -52,7 +65,7 @@ function world_to_interface(pos, viewport)
 
     local map_tile_pixels = zoom // 4
     if map_tile_pixels <= 0 then return nil end
-    return {
+    return MapProjectionResult.new{
         x=math.ceil(map_tile_pixels * (pos.x - corner.x) /
             gps.tile_pixel_x),
         y=math.ceil(map_tile_pixels * (pos.y - corner.y) /
@@ -79,7 +92,7 @@ function project_visible(pos, viewport)
             projected.y >= viewport.height then
         return nil
     end
-    return {
+    return MapProjectionResult.new{
         x=projected.x + origin.x,
         y=projected.y + origin.y,
         z=projected.z,

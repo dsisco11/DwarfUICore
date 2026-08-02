@@ -77,6 +77,18 @@ local function viewport(x, y, z, width, height)
 end
 
 describe('DwarfUICore map projection', function()
+    it('copy-constructs projected positions without retaining mutable input', function()
+        local projection = fixture()
+        local input = {x=4, y=5, z=6}
+        local result = projection.MapProjectionResult.new(input)
+
+        input.x, input.y, input.z = 7, 8, 9
+        assert.same({x=4, y=5, z=6}, result)
+        assert.has_error(function()
+            projection.MapProjectionResult.new{x=1.5, y=0, z=0}
+        end)
+    end)
+
     it('uses the active text viewport and exact edge visibility', function()
         local projection, state = fixture()
         state.active_viewport = viewport(10, 20, 3, 8, 6)

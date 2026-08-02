@@ -1,6 +1,7 @@
 -- Real overlay-discovery integration contracts for tooltip input intent.
 
-local tooltip = reqscript('dwarfuicore/tooltip/api')
+local tooltip = reqscript('dwarfuicore').services.TooltipServiceProvider:new(
+    1, 'test-tooltip-overlay')
 local overlay = require('plugins.overlay')
 
 ---Returns the product diagnostics registered in tests/dwarfspec/config.lua.
@@ -16,7 +17,7 @@ local function has_default_identity(state)
     local target_identity = state.target
     local intent_identity = state.intent and state.intent.source_identity
     return target_identity ~= nil and intent_identity ~= nil and
-        target_identity.namespace == 'dwarfuicore' and
+        target_identity.namespace == 'test-tooltip-overlay' and
         intent_identity.namespace == target_identity.namespace and
         intent_identity.local_identity == target_identity.local_identity
 end
@@ -72,7 +73,7 @@ describe('live tooltip input overlay registration', function()
     after_each(function()
         if widget then widget.viewscreens = original_viewscreens end
         if target then
-            assert.is_true(tooltip.unregister(target))
+            assert.is_true(tooltip:unregister(target))
         end
         if native_subject then
             ds.redraw()

@@ -7,12 +7,9 @@ local targets = reqscript('dwarfuicore/context_menu/target')
 local contracts = reqscript('dwarfuicore/service_provider/contracts')
 local identities = reqscript('dwarfuicore/service_provider/identity')
 local namespaces = reqscript('dwarfuicore/service_provider/namespace')
-local numbers = reqscript('dwarfuicore/utils/numbers')
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
-local COORDINATE_MIN = -0x8000
-local COORDINATE_MAX = 0x7fff
 local COORDINATE_MASK = 0xffff
 local DEFAULT_NAMESPACE = 'dwarfuicore'
 local DEFAULT_CONTRACT_MAJOR = 1
@@ -76,28 +73,6 @@ local function validate_fields(value, fields, label)
             ('DwarfUICore %s contains unsupported field %s.'):format(
                 label, tostring(field)))
     end
-end
-
----Copies and validates one exact map position.
----@param position any
----@param label string
----@return {x: integer, y: integer, z: integer}
-local function copy_position(position, label)
-    local position_type = type(position)
-    assert(position_type == 'table' or position_type == 'userdata',
-        ('DwarfUICore %s requires an exact map position.'):format(label))
-    assert(numbers.is_integer(position.x) and
-            position.x >= COORDINATE_MIN and
-            position.x <= COORDINATE_MAX and
-            numbers.is_integer(position.y) and
-            position.y >= COORDINATE_MIN and
-            position.y <= COORDINATE_MAX and
-            numbers.is_integer(position.z) and
-            position.z >= COORDINATE_MIN and
-            position.z <= COORDINATE_MAX,
-        ('DwarfUICore %s requires signed 16-bit integer x, y, and z.'):format(
-            label))
-    return {x=position.x, y=position.y, z=position.z}
 end
 
 ---Packs one signed-16-bit DF coordinate into a collision-free 48-bit key.
@@ -246,7 +221,7 @@ function ContextMenuMapTargetRegistry:register(consumer_namespace, options,
     validate_fields(options, REGISTRATION_FIELDS, 'map-tile registration')
     assert(type(options.owner) == 'table',
         'DwarfUICore map-tile registration requires an owner.')
-    local position = copy_position(options.pos, 'map-tile registration')
+    local position = identities.MapTilePosition.new(options.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         options.definition)
 
@@ -299,7 +274,7 @@ function ContextMenuMapTargetRegistry:update(consumer_namespace, handle, update,
     assert(type(update) == 'table',
         'DwarfUICore map-tile update must be a table.')
     validate_fields(update, UPDATE_FIELDS, 'map-tile update')
-    local position = copy_position(update.pos, 'map-tile update')
+    local position = identities.MapTilePosition.new(update.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         update.definition)
 
@@ -457,7 +432,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:detect(position)
-    local copied = copy_position(position, 'map-tile target sample')
+    local copied = identities.MapTilePosition.new(position)
     self:_prune()
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     if not bucket then return nil end
@@ -476,7 +451,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfuicore.ContextMenuMapCandidate[] candidates
 function ContextMenuMapTargetRegistry:detect_contributions(position)
-    local copied = copy_position(position, 'map-tile target sample')
+    local copied = identities.MapTilePosition.new(position)
     self:_prune()
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     local candidates = {}
@@ -560,13 +535,9 @@ function ContextMenuMapTargetRegistry:get_diagnostics()
     local contributions = {}
     for _, record in pairs(self._registrations) do
         local identity = record.identity
-        table.insert(contributions, {identity={
-            runtime_generation=identity.runtime_generation,
-            service_kind=identity.service_kind,
-            contract_major=identity.contract_major,
-            namespace=identity.namespace,
-            local_identity=identity.local_identity,
-        }, contribution_sequence=record.sequence})
+        table.insert(contributions, {identity=
+            identities.CompositeIdentity.new(identity),
+            contribution_sequence=record.sequence})
     end
     table.sort(contributions, function(left, right)
         return left.contribution_sequence < right.contribution_sequence

@@ -101,9 +101,23 @@ end
 
 ---Validates runtime state and renders it through the provider boundary.
 ---@param service_kind dwarfuicore.ServiceKind
+---@param initialize_cold_runtime boolean
 ---@return dwarfuicore.ServiceProviderRuntimeState state
-local function validate_runtime(service_kind)
+local function validate_runtime(service_kind, initialize_cold_runtime)
     local result = table.pack(pcall(runtime.validate))
+    if not result[1] and initialize_cold_runtime then
+        local initialized = table.pack(pcall(runtime.begin_initialization))
+        if initialized[1] and initialized[3] then
+            local completed = table.pack(pcall(runtime.complete_initialization,
+                initialized[2].generation))
+            if not completed[1] then result = completed end
+        end
+        if initialized[1] and not initialized[3] then
+            result = table.pack(pcall(runtime.validate))
+        elseif initialized[1] and initialized[3] and result[1] == false then
+            result = table.pack(pcall(runtime.validate))
+        end
+    end
     if not result[1] then
         fail(service_kind, contracts.ErrorCategory.SERVICE_UNHEALTHY,
             ('Runtime state is unavailable or malformed: %s Restart the ' ..
@@ -126,9 +140,10 @@ end
 ---@param load_adapter dwarfuicore.ServiceAcquisitionAdapterLoader
 ---@param requested_major any
 ---@param consumer_namespace any
+---@param initialize_cold_runtime? boolean
 ---@return dwarfuicore.ServiceAcquisitionMetadata metadata
 function acquire(service_kind, contract_major, load_adapter, requested_major,
-        consumer_namespace)
+        consumer_namespace, initialize_cold_runtime)
     assert(PREFIX_BY_SERVICE_KIND[service_kind],
         'DwarfUICore acquisition service kind is invalid.')
     if math.type(requested_major) ~= 'integer' or requested_major <= 0 then
@@ -162,7 +177,7 @@ function acquire(service_kind, contract_major, load_adapter, requested_major,
                 'installation or perform an explicit DwarfUICore reload.')
                 :format(tostring(adapter_failure)))
     end
-    local state = validate_runtime(service_kind)
+    local state = validate_runtime(service_kind, initialize_cold_runtime == true)
     if state.initializing[service_kind] then
         fail(service_kind, contracts.ErrorCategory.INITIALIZATION_BUSY,
             'Service initialization is already active for this generation.')

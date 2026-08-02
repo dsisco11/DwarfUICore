@@ -1,7 +1,8 @@
 local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
-local ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore.lua'
+local ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore/command.lua'
+local PUBLIC_ROOT_PATH = 'src/scripts_modinstalled/dwarfuicore.lua'
 local REGISTRY_NAME = 'dwarfuicore/module_registry'
 local RUNTIME_NAME = 'dwarfuicore/service_provider/runtime'
 
@@ -82,6 +83,17 @@ local function load_root(registry, dfhack)
             ['dwarfuicore/tooltip/render_hook']={},
             ['dwarfuicore/context_menu/service']={},
             ['dwarfuicore/context_menu/registration']={},
+            ['dwarfuicore/service_provider/immutable_proxy']={
+                new_factory=function(_, _, properties)
+                    return {create=function() return properties or {} end}
+                end,
+            },
+            ['dwarfuicore/service_provider/tooltip_provider']={
+                get_provider=function() return {new=function() end} end,
+            },
+            ['dwarfuicore/service_provider/context_menu_provider']={
+                get_provider=function() return {new=function() end} end,
+            },
         },
     })
     return root
@@ -113,6 +125,46 @@ local function registry_stub(modules, load_all)
 end
 
 describe('dwarfuicore command lifecycle', function()
+    it('keeps the importable root limited to its closed services namespace',
+            function()
+        local calls = {command=0, tooltip=0, context_menu=0}
+        local providers = {
+            TooltipServiceProvider={new=function() end},
+            ContextMenuServiceProvider={new=function() end},
+        }
+        local _, root = module_loader.load(repo_root, PUBLIC_ROOT_PATH, {
+            globals={dfhack_flags={module=true}},
+            reqscript={
+                ['dwarfuicore/command']={main=function()
+                    calls.command = calls.command + 1
+                end},
+                ['dwarfuicore/service_provider/immutable_proxy']={
+                    new_factory=function(_, _, properties)
+                        return {create=function() return properties end}
+                    end,
+                },
+                ['dwarfuicore/service_provider/tooltip_provider']={
+                    get_provider=function()
+                        calls.tooltip = calls.tooltip + 1
+                        return providers.TooltipServiceProvider
+                    end,
+                },
+                ['dwarfuicore/service_provider/context_menu_provider']={
+                    get_provider=function()
+                        calls.context_menu = calls.context_menu + 1
+                        return providers.ContextMenuServiceProvider
+                    end,
+                },
+            },
+        })
+        assert.equals(providers.TooltipServiceProvider,
+            root.services.TooltipServiceProvider)
+        assert.is_nil(root.initialize)
+        assert.is_nil(root.reload)
+        assert.is_nil(root.get)
+        assert.same({command=0, tooltip=1, context_menu=1}, calls)
+    end)
+
     it('exports validation, teardown, and explicit reload as a module',
             function()
         local dfhack = dfhack_stub()
@@ -184,6 +236,17 @@ describe('dwarfuicore command lifecycle', function()
         local root = load_root(registry, dfhack)
         local environments = {
             [RUNTIME_NAME]=runtime_stub(),
+            ['dwarfuicore/service_provider/immutable_proxy']={
+                new_factory=function(_, _, properties)
+                    return {create=function() return properties or {} end}
+                end,
+            },
+            ['dwarfuicore/service_provider/tooltip_provider']={
+                get_provider=function() return {new=function() end} end,
+            },
+            ['dwarfuicore/service_provider/context_menu_provider']={
+                get_provider=function() return {new=function() end} end,
+            },
             ['dwarfuicore/tooltip/runtime']={
                 presenter={retire_for_reload=function()
                     table.insert(events, 'tooltip')
@@ -254,6 +317,17 @@ describe('dwarfuicore command lifecycle', function()
                     manager={shutdown=function()
                         table.insert(events, 'context-menu-partial')
                     end},
+                },
+                ['dwarfuicore/service_provider/immutable_proxy']={
+                    new_factory=function(_, _, properties)
+                        return {create=function() return properties or {} end}
+                    end,
+                },
+                ['dwarfuicore/service_provider/tooltip_provider']={
+                    get_provider=function() return {new=function() end} end,
+                },
+                ['dwarfuicore/service_provider/context_menu_provider']={
+                    get_provider=function() return {new=function() end} end,
                 },
             },
         })

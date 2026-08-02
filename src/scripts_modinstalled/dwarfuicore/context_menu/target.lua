@@ -38,17 +38,6 @@ ContextMenuTargetDescriptor.__index = ContextMenuTargetDescriptor
 ContextMenuAnchorDescriptor = {}
 ContextMenuAnchorDescriptor.__index = ContextMenuAnchorDescriptor
 
----@class dwarfuicore.ContextMenuSelectionContext
----@field target_kind dwarfuicore.ContextMenuTargetKind
----@field anchor_kind dwarfuicore.ContextMenuAnchorKind
----@field registration_identity table
----@field screen_position {x: integer, y: integer}
----@field map_position? {x: integer, y: integer, z: integer}
----@field source any
----@field source_root any
----@field owner? any
----@field contributions? table[]
-
 ---@class dwarfuicore.ContextMenuOpenSessionOptions
 ---@field definition dwarfuicore.ContextMenuDefinitionSnapshot
 ---@field target dwarfuicore.ContextMenuTargetDescriptor
@@ -74,24 +63,6 @@ ContextMenuOpenSession.__index = ContextMenuOpenSession
 ---@param x any
 ---@param y any
 ---@param label string
-local function validate_screen_position(x, y, label)
-    assert(numbers.is_integer(x) and numbers.is_integer(y),
-        ('DwarfUICore %s requires integer x and y.'):format(label))
-end
-
----Validates one exact map coordinate.
----@param position any
----@param label string
-local function validate_map_position(position, label)
-    local position_type = type(position)
-    assert(position_type == 'table' or position_type == 'userdata',
-        ('DwarfUICore %s requires an exact map position.'):format(label))
-    assert(numbers.is_integer(position.x) and
-            numbers.is_integer(position.y) and
-            numbers.is_integer(position.z),
-        ('DwarfUICore %s requires integer x, y, and z.'):format(label))
-end
-
 ---Creates a target descriptor or copies an existing descriptor instance.
 ---@param kind dwarfuicore.ContextMenuTargetKind|dwarfuicore.ContextMenuTargetDescriptor
 ---@param registration_identity? table
@@ -131,20 +102,15 @@ function ContextMenuAnchorDescriptor.new(kind, options)
     assert(type(options) == 'table' and
             type(options.screen_position) == 'table',
         'DwarfUICore context-menu anchor requires a screen position.')
-    local screen_position = options.screen_position
-    validate_screen_position(
-        screen_position.x, screen_position.y, 'context-menu anchor')
+    local screen_position = identities.ScreenPosition.new(
+        options.screen_position)
     local descriptor = {
         kind=kind,
-        screen_position={x=screen_position.x, y=screen_position.y},
+        screen_position=screen_position,
     }
     if kind == ContextMenuAnchorKind.MAP_TILE then
-        validate_map_position(options.map_position, 'map-tile anchor')
-        descriptor.map_position = {
-            x=options.map_position.x,
-            y=options.map_position.y,
-            z=options.map_position.z,
-        }
+        descriptor.map_position = identities.MapTilePosition.new(
+            options.map_position)
     else
         assert(options.map_position == nil,
             'DwarfUICore screen-position anchors cannot contain a map position.')
@@ -172,7 +138,7 @@ function ContextMenuAnchorDescriptor.map_tile(position, screen_x, screen_y)
     return ContextMenuAnchorDescriptor.new(
         ContextMenuAnchorKind.MAP_TILE, {
         screen_position={x=screen_x, y=screen_y},
-        map_position={x=position.x, y=position.y, z=position.z},
+        map_position=identities.MapTilePosition.new(position),
     })
 end
 
@@ -338,22 +304,16 @@ function ContextMenuOpenSession:create_selection_context(entry_index)
             contribution = candidate
             local sources = self._weak_sources[index]
             local anchor = self._anchor
-            local context = {
-                target_kind=self._target.kind,
-                anchor_kind=anchor.kind,
-                registration_identity=identities.CompositeIdentity.new(
-                    contribution.identity),
-                screen_position={x=anchor.screen_position.x,
-                    y=anchor.screen_position.y},
+            local context_values = {
+                screen_position=anchor.screen_position,
                 source=sources.source,
                 source_root=self._weak_sources.source_root.value,
                 owner=sources.owner,
             }
             if anchor.map_position then
-                context.map_position={x=anchor.map_position.x,
-                    y=anchor.map_position.y, z=anchor.map_position.z}
+                context_values.map_position = anchor.map_position
             end
-            return context
+            return identities.ContextMenuSelectionContext.new(context_values)
         end
     end
     return nil

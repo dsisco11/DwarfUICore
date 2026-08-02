@@ -213,20 +213,21 @@ describe('context-menu targets and sessions', function()
                 session:get_state())
         end, source, root, owner)
 
+        local isolated = session:create_selection_context()
+        isolated.screen_position.x = 99
+        isolated.map_position.x = 99
         assert.is_true(session:select(1))
         assert.is_false(session:select(1))
         assert.equals(1, #calls)
         local context = calls[1]
-        assert.equals(targets.ContextMenuTargetKind.MAP_TILE,
-            context.target_kind)
-        assert.equals(targets.ContextMenuAnchorKind.MAP_TILE,
-            context.anchor_kind)
-        assert.equals(7, context.registration_identity.local_identity)
         assert.same({x=4, y=5}, context.screen_position)
         assert.same({x=10, y=20, z=30}, context.map_position)
         assert.is_equal(source, context.source)
         assert.is_equal(root, context.source_root)
         assert.is_equal(owner, context.owner)
+        assert.is_nil(context.registration_identity)
+        assert.is_nil(context.target_kind)
+        assert.is_nil(context.anchor_kind)
     end)
 
     it('retains ordinary handler closure semantics', function()
@@ -246,12 +247,10 @@ describe('context-menu targets and sessions', function()
         local first_source, second_source, root = {}, {}, {}
         local calls = {}
         local first = definition(function(context)
-            table.insert(calls, {'first', context.source,
-                context.registration_identity.local_identity})
+            table.insert(calls, {'first', context.source})
         end)
         local second = definition(function(context)
-            table.insert(calls, {'second', context.source,
-                context.registration_identity.local_identity})
+            table.insert(calls, {'second', context.source})
         end)
         local session = targets.ContextMenuOpenSession.new{
             definition=first,
@@ -267,7 +266,7 @@ describe('context-menu targets and sessions', function()
 
         assert.equals(2, #session:get_definition_snapshot().entries)
         assert.is_true(session:select(2))
-        assert.same({'second', second_source, 2}, calls[1])
+        assert.same({'second', second_source}, calls[1])
     end)
 
     it('remains closed when a selected handler raises', function()

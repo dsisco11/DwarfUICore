@@ -699,14 +699,11 @@ function ContextMenuRegistrationManager:get_diagnostics()
     local widget_contributions = {}
     self._widget_store:for_each_contribution(function(_, namespace, record,
             target_sequence, contribution_sequence)
-        local identity = record.identity
-        table.insert(widget_contributions, {identity={
-            runtime_generation=identity.runtime_generation,
-            service_kind=identity.service_kind,
-            contract_major=identity.contract_major,
-            namespace=namespace,
-            local_identity=identity.local_identity,
-        }, target_sequence=target_sequence,
+        local identity = identities.CompositeIdentity.new(record.identity)
+        assert(identity.namespace == namespace,
+            'DwarfUICore widget contribution namespace is inconsistent.')
+        table.insert(widget_contributions, {identity=identity,
+            target_sequence=target_sequence,
             contribution_sequence=contribution_sequence})
     end)
     table.sort(widget_contributions, function(left, right)

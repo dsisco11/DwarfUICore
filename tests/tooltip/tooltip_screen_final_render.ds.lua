@@ -43,8 +43,8 @@ function TooltipFinalRenderScreen:init()
         tooltip=self.tooltip_text,
     }
     self:addviews{self.tooltip_target}
-    assert(reqscript('dwarfuicore/tooltip/api').register(
-        self.tooltip_target))
+    assert(reqscript('dwarfuicore').services.TooltipServiceProvider:new(
+        1, 'test-tooltip-final-render'):register(self.tooltip_target))
 end
 
 ---Records the parent composition boundary.
@@ -168,7 +168,7 @@ local function has_default_identity(state)
     local target_identity = state.target
     local intent_identity = state.intent and state.intent.source_identity
     return target_identity ~= nil and intent_identity ~= nil and
-        target_identity.namespace == 'dwarfuicore' and
+        target_identity.namespace == 'test-tooltip-final-render' and
         intent_identity.namespace == target_identity.namespace and
         intent_identity.local_identity == target_identity.local_identity
 end
@@ -454,10 +454,10 @@ describe('foreground Lua-screen tooltip final rendering', function()
                 local current = ds.tooltip_state()
                 return current.target == nil and current.intent == nil
             end)
-            assert.is_true(reqscript('dwarfuicore/tooltip/api').unregister(
-                upper_target))
-            assert.is_true(reqscript('dwarfuicore/tooltip/api').unregister(
-                lower_target))
+            local tooltip = reqscript('dwarfuicore').services
+                .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
+            assert.is_true(tooltip:unregister(upper_target))
+            assert.is_true(tooltip:unregister(lower_target))
 
             local lower_native = lower._native
             upper:dismiss()
@@ -507,9 +507,10 @@ describe('foreground Lua-screen tooltip final rendering', function()
         end
 
         cleanup_step('clear tooltip registrations', function()
-            local tooltip = reqscript('dwarfuicore/tooltip/api')
-            if upper_target then tooltip.unregister(upper_target) end
-            if lower_target then tooltip.unregister(lower_target) end
+            local tooltip = reqscript('dwarfuicore').services
+                .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
+            if upper_target then tooltip:unregister(upper_target) end
+            if lower_target then tooltip:unregister(lower_target) end
         end)
         cleanup_step('retire screen render hooks', function()
             reqscript('dwarfuicore/tooltip/render_hook').manager:shutdown()

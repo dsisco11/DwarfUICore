@@ -111,6 +111,18 @@ local function screen_fixture()
         end,
     }
     local projection = {position=nil}
+    local ScreenPosition = {}
+    ScreenPosition.__index = ScreenPosition
+    local identities = {
+        ScreenPosition={
+            new=function(position)
+                assert.equals('number', type(position.x))
+                assert.equals('number', type(position.y))
+                return setmetatable({x=position.x, y=position.y},
+                    ScreenPosition)
+            end,
+        },
+    }
     local dfhack = {
         pen=pen,
         screen={
@@ -127,6 +139,7 @@ local function screen_fixture()
                 project_visible=function() return projection.position end,
             },
             ['dwarfuicore/context_menu/renderer']=renderer,
+            ['dwarfuicore/service_provider/identity']=identities,
             ['dwarfuicore/context_menu/service']={service=service},
             ['dwarfuicore/context_menu/target']={
                 ContextMenuAnchorKind={SCREEN_POSITION=1, MAP_TILE=2},
@@ -173,6 +186,7 @@ local function screen_fixture()
         mouse=mouse,
         parent_inputs=parent_inputs,
         projection=projection,
+        ScreenPosition=ScreenPosition,
     }
 end
 
@@ -393,6 +407,22 @@ describe('DwarfUICore context-menu screen', function()
         fixture.projection.position = {x=5, y=3, z=0}
         fixture.screen:render({})
         assert.same({x=5, y=3}, fixture.screen.menu_window.anchor)
+    end)
+
+    it('copies projected anchors through the screen-position constructor',
+            function()
+        local fixture = screen_fixture()
+        fixture.screen.anchor = {
+            kind=2, screen_position={x=2, y=2},
+            map_position={x=10, y=20, z=3},
+        }
+        fixture.projection.position = {x=7, y=4, z=0}
+
+        local anchor = fixture.screen:resolve_anchor()
+        fixture.projection.position.x, fixture.projection.position.y = 9, 8
+
+        assert.equals(fixture.ScreenPosition, getmetatable(anchor))
+        assert.same({x=7, y=4}, anchor)
     end)
 
     it('closes a map menu when projection becomes invalid', function()

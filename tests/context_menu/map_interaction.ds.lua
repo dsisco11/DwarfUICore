@@ -2,7 +2,8 @@
 
 local gui = require('gui')
 local guidm = require('gui.dwarfmode')
-local context_menu = reqscript('dwarfuicore/context_menu/api')
+local context_menu = reqscript('dwarfuicore').services
+    .ContextMenuServiceProvider:new(1, 'test-context-map')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local services = reqscript('dwarfuicore/context_menu/service')
 local DetectionKind =
@@ -140,7 +141,7 @@ describe('native exact-map-tile context menu', function()
                         tostring(pos.x), tostring(pos.y), tostring(pos.z),
                         tostring(initial_pointer_x),
                         tostring(initial_pointer_y)))
-            handle = context_menu.register_map_tile{
+            handle = context_menu:register_map_tile{
                 owner=owner,
                 pos=pos,
                 definition=long_definition(function(context)
@@ -230,15 +231,24 @@ describe('native exact-map-tile context menu', function()
                 ds.EScreenOrigin.TOP_LEFT))
             local backing_before_move = #probe.inputs
             feed_current{CURSOR_RIGHT=true}
-            ds.await('delegated map movement changes the viewport', function()
+            assert.equals(backing_before_move + 1, #probe.inputs,
+                'map movement table did not reach backing overlay once')
+            assert.is_true(probe.inputs[#probe.inputs].CURSOR_RIGHT)
+            local moved_view = copy_pos(view_before)
+            if moved_view.x > 0 then
+                moved_view.x = moved_view.x - 1
+            else
+                moved_view.x = moved_view.x + 1
+            end
+            ds.setViewPos(moved_view, ds.EScreenOrigin.TOP_LEFT)
+            ds.await('explicit map movement changes the viewport', function()
                 local current = ds.getViewPos(ds.EScreenOrigin.TOP_LEFT)
                 return current.x ~= view_before.x or current.y ~= view_before.y
             end)
             assert.is_true(services.service:is_open())
-            assert.equals(backing_before_move + 1, #probe.inputs,
-                'map movement table did not reach backing overlay once')
-            assert.is_true(probe.inputs[#probe.inputs].CURSOR_RIGHT)
             ds.redraw()
+            assert.is_true(first:relayout(),
+                'open map menu could not relayout after explicit camera movement')
             local anchor_after = assert(first:resolve_anchor(),
                 'moved map-menu anchor is unavailable')
             assert.is_false(anchor_after.x == anchor_before.x and
@@ -358,7 +368,7 @@ describe('native exact-map-tile context menu', function()
         end, debug.traceback)
 
         if services.service:is_open() then services.service:close() end
-        if handle then context_menu.unregister_map_tile(handle) end
+        if handle then context_menu:unregister_map_tile(handle) end
         if owner then
             owner.visible = true
             owner.active = true

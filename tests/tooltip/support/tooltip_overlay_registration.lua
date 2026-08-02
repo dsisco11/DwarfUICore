@@ -4,7 +4,8 @@
 
 local overlay = require('plugins.overlay')
 local widgets = require('gui.widgets')
-local tooltip = reqscript('dwarfuicore/tooltip/api')
+local tooltip = reqscript('dwarfuicore').services.TooltipServiceProvider:new(
+    1, 'test-tooltip-overlay')
 
 ---@class tests.TooltipRegistrationOverlay: plugins.overlay.OverlayWidget
 local TooltipRegistrationOverlay = defclass(nil, overlay.OverlayWidget)
@@ -25,7 +26,7 @@ function TooltipRegistrationOverlay:init()
         tooltip='Automation overlay tooltip outside its narrow root.',
     }
     self:addviews{self.tooltip_target}
-    tooltip.register(self.tooltip_target)
+    tooltip:register(self.tooltip_target)
 end
 
 OVERLAY_WIDGETS = {tooltip_probe=TooltipRegistrationOverlay}

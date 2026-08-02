@@ -67,6 +67,14 @@ if process_state and (type(process_state) ~= 'table' or
             tostring(type(process_state) == 'table' and
                 process_state.api_version or nil), tostring(API_VERSION)))
 end
+
+---Returns whether one value fits a signed DF coordinate component.
+---@param value any
+---@return boolean valid
+local function is_signed_16(value)
+    return math.type(value) == 'integer' and value >= COORDINATE_MIN and
+        value <= COORDINATE_MAX
+end
 if process_state and runtime_generation > 0 then
     assert(process_state.runtime_generation == runtime_generation,
         'DwarfUICore tooltip map targets belong to another runtime generation.')
@@ -103,22 +111,6 @@ end
 TooltipMapTargetRegistry = {}
 TooltipMapTargetRegistry.__index = TooltipMapTargetRegistry
 
----Returns whether a number is an exact integer.
----@param value any
----@return boolean
-local function is_integer(value)
-    return type(value) == 'number' and value % 1 == 0
-end
-
----Returns whether a value fits one signed DF coordinate component.
----@param value any
----@return boolean
-local function is_signed_16(value)
-    return is_integer(value) and
-        value >= COORDINATE_MIN and
-        value <= COORDINATE_MAX
-end
-
 ---Packs one signed-16-bit DF coordinate into a collision-free 48-bit key.
 ---@param x integer
 ---@param y integer
@@ -140,15 +132,10 @@ end
 local function copy_mutable_state(options, label)
     assert(type(options) == 'table',
         ('DwarfUICore %s must be a table.'):format(label))
-    local pos = options.pos
-    local pos_type = type(pos)
-    assert(pos_type == 'table' or pos_type == 'userdata',
-        ('DwarfUICore %s requires an exact map position.'):format(label))
-    assert(is_signed_16(pos.x) and is_signed_16(pos.y) and is_signed_16(pos.z),
-        ('DwarfUICore %s position requires signed 16-bit integer x, y, and z.'):format(label))
+    local position = identity.MapTilePosition.new(options.pos)
     assert(options.tooltip == nil or type(options.tooltip) == 'string',
         ('DwarfUICore %s tooltip must be a string or nil.'):format(label))
-    return pos.x, pos.y, pos.z, options.tooltip
+    return position.x, position.y, position.z, options.tooltip
 end
 
 ---Validates one private tooltip registration ownership domain.
@@ -530,7 +517,8 @@ function TooltipMapTargetRegistry:get_diagnostics(consumer_namespace)
             table.insert(registrations, {
                 identity=identity.CompositeIdentity.new(record.identity),
                 contribution_sequence=record.sequence,
-                map_position={x=record.x, y=record.y, z=record.z},
+                map_position=identity.MapTilePosition.new{
+                    x=record.x, y=record.y, z=record.z},
             })
         end
     end

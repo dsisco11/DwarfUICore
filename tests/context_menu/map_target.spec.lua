@@ -220,7 +220,7 @@ describe('context-menu exact map targets', function()
             {x=0, y=0, z=32768},
         } do
             assert_fails_with(
-                'requires signed 16-bit integer x, y, and z', function()
+                'requires signed 16-bit x, y, and z', function()
                 harness.registry:register{
                     owner=owner,
                     pos=position,
@@ -228,7 +228,7 @@ describe('context-menu exact map targets', function()
                 }
             end)
             assert_fails_with(
-                'requires signed 16-bit integer x, y, and z', function()
+                'requires signed 16-bit x, y, and z', function()
                 harness.registry:detect(position)
             end)
         end
@@ -456,5 +456,20 @@ describe('context-menu exact map targets', function()
         assert.equals(0, diagnostics.coordinate_count)
         assert.equals(0, diagnostics.registration_sequence)
         assert.equals(0, #harness.registry:clear())
+    end)
+
+    it('returns isolated canonical identity copies in diagnostics', function()
+        local harness = load_harness()
+        local owner, root = {}, {}
+        harness.present(owner, root)
+        harness.registry:register{
+            owner=owner, pos={x=1, y=2, z=3}, definition=definition(),
+        }
+        local first = harness.registry:get_diagnostics().contributions[1]
+        first.identity.namespace = 'mutated'
+        local second = harness.registry:get_diagnostics().contributions[1]
+
+        assert.equals('dwarfuicore', second.identity.namespace)
+        assert.is_not_equal(first.identity, second.identity)
     end)
 end)

@@ -2,7 +2,8 @@
 
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local context_menu = reqscript('dwarfuicore/context_menu/api')
+local context_menu = reqscript('dwarfuicore').services
+    .ContextMenuServiceProvider:new(1, 'test-context-screen')
 local registrations = reqscript('dwarfuicore/context_menu/registration')
 local services = reqscript('dwarfuicore/context_menu/service')
 local PointerPolicy =
@@ -111,7 +112,7 @@ describe('Lua-screen context menu', function()
             })
             source = source_subject:raw()
             target = source.context_target
-            context_menu.register(target, definition(function(context)
+            context_menu:register(target, definition(function(context)
                 selections = selections + 1
                 last_context = context
             end))
@@ -233,7 +234,7 @@ describe('Lua-screen context menu', function()
             end)
             caller_definition.title = 'Original title'
             caller_definition.entries[1].label = 'Original entry'
-            assert.is_true(context_menu.update(target, caller_definition))
+            assert.is_true(context_menu:update(target, caller_definition))
             caller_definition.title = 'Mutated title'
             caller_definition.entries[1].label = 'Mutated entry'
             ds.move_pointer(x, y)
@@ -258,7 +259,7 @@ describe('Lua-screen context menu', function()
             local failing_calls = 0
             local handler_failure_count =
                 services.service:get_diagnostics().handler_failure_count
-            assert.is_true(context_menu.update(target, definition(
+            assert.is_true(context_menu:update(target, definition(
                 function()
                     failing_calls = failing_calls + 1
                     error('expected selection failure')
@@ -275,7 +276,7 @@ describe('Lua-screen context menu', function()
             assert.equals(handler_failure_count + 1,
                 services.service:get_diagnostics().handler_failure_count)
 
-            assert.is_true(context_menu.update(target, definition(
+            assert.is_true(context_menu:update(target, definition(
                 function(context)
                     selections = selections + 1
                     last_context = context
@@ -294,7 +295,7 @@ describe('Lua-screen context menu', function()
             source:addviews{ephemeral}
             source:updateLayout()
             local ephemeral_handler_calls = 0
-            context_menu.register(ephemeral, {
+            context_menu:register(ephemeral, {
                 entries={{
                     label='Disposable',
                     on_select=function()
@@ -345,8 +346,8 @@ describe('Lua-screen context menu', function()
         if upper_render_spy then upper_render_spy:revert() end
         if upper then upper:dismiss() end
         if services.service:is_open() then services.service:close() end
-        if target then context_menu.unregister(target) end
-        if ephemeral then context_menu.unregister(ephemeral) end
+        if target then context_menu:unregister(target) end
+        if ephemeral then context_menu:unregister(ephemeral) end
         registrations.clear_namespace('alpha', 1)
         registrations.clear_namespace('beta', 1)
         services.service:clear_world_state()

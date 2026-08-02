@@ -55,6 +55,11 @@ describe('DwarfUICore package contract', function()
             'service_provider/identity.lua',
             'service_provider/runtime.lua',
             'service_provider/acquisition.lua',
+            'service_provider/api.lua',
+            'service_provider/tooltip_adapter_v1.lua',
+            'service_provider/context_menu_adapter_v1.lua',
+            'service_provider/tooltip_provider.lua',
+            'service_provider/context_menu_provider.lua',
             'service_provider/weak_store.lua',
         }
 
@@ -178,5 +183,13 @@ describe('DwarfUICore package contract', function()
             assert.is_false(source_exists(
                 'src/scripts_modinstalled/' .. feature))
         end
+    end)
+
+    it('ships only the approved provider root contract', function()
+        local root = read_source('src/scripts_modinstalled/dwarfuicore.lua')
+        assert.is_truthy(root:find('TooltipServiceProvider', 1, true))
+        assert.is_truthy(root:find('ContextMenuServiceProvider', 1, true))
+        assert.is_nil(root:find('function get(', 1, true))
+        assert.is_nil(root:find('get_diagnostics', 1, true))
     end)
 end)

@@ -246,6 +246,23 @@ describe('DwarfUICore context-menu screen', function()
         assert.equals(0, #fixture.parent_inputs)
     end)
 
+    it('uses normal child routing for menu-owned input', function()
+        local fixture = screen_fixture()
+        local routed
+        fixture.screen.inputToSubviews = function(_, keys)
+            routed = keys
+            return true
+        end
+        fixture.screen.menu_window.onInput = function()
+            error('menu dispatch bypassed screen child routing')
+        end
+
+        fixture.screen:onInput{SELECT=true}
+
+        assert.same({SELECT=true}, routed)
+        assert.equals(0, #fixture.parent_inputs)
+    end)
+
     it('selects an entry from native List left-click handling', function()
         local fixture = screen_fixture()
         fixture.mouse.x = fixture.screen.menu_window.frame_body.x1

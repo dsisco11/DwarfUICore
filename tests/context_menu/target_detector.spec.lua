@@ -29,6 +29,25 @@ local function load_environment()
         repo_root, BASE .. 'utils/numbers.lua')
     local _, immutable_enum = module_loader.load(
         repo_root, BASE .. 'utils/immutable_enum.lua')
+    local _, immutable_proxy = module_loader.load(repo_root,
+        BASE .. 'service_provider/immutable_proxy.lua')
+    local _, contracts = module_loader.load(repo_root,
+        BASE .. 'service_provider/contracts.lua', {
+            reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+        })
+    local _, namespaces = module_loader.load(repo_root,
+        BASE .. 'service_provider/namespace.lua')
+    local _, identities = module_loader.load(repo_root,
+        BASE .. 'service_provider/identity.lua', {
+            globals={dfhack=dfhack},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/namespace']=namespaces,
+                ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+            },
+        })
+    local _, weak_store = module_loader.load(repo_root,
+        BASE .. 'service_provider/weak_store.lua')
     local _, definitions = module_loader.load(
         repo_root, BASE .. 'context_menu/definition.lua', {
             reqscript={['dwarfuicore/utils/numbers']=numbers},
@@ -37,6 +56,7 @@ local function load_environment()
         repo_root, BASE .. 'context_menu/target.lua', {
             reqscript={
                 ['dwarfuicore/context_menu/definition']=definitions,
+                ['dwarfuicore/service_provider/identity']=identities,
                 ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 ['dwarfuicore/utils/numbers']=numbers,
             },
@@ -71,10 +91,14 @@ local function load_environment()
         ['dwarfuicore/context_menu/definition']=definitions,
         ['dwarfuicore/context_menu/target']=targets,
         ['dwarfuicore/utils/numbers']=numbers,
+        ['dwarfuicore/service_provider/contracts']=contracts,
+        ['dwarfuicore/service_provider/identity']=identities,
+        ['dwarfuicore/service_provider/namespace']=namespaces,
         ['dwarfuicore/view_root_resolver']=root_resolver,
     }
     local _, map_target = module_loader.load(
         repo_root, BASE .. 'context_menu/map_target.lua', {
+            globals={dfhack=dfhack},
             reqscript=map_dependencies,
         })
     local _, registration = module_loader.load(
@@ -86,6 +110,10 @@ local function load_environment()
                 ['dwarfuicore/context_menu/root_discovery']=root_discovery,
                 ['dwarfuicore/context_menu/target']=targets,
                 ['dwarfuicore/view_root_resolver']=root_resolver,
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/identity']=identities,
+                ['dwarfuicore/service_provider/namespace']=namespaces,
+                ['dwarfuicore/service_provider/weak_store']=weak_store,
             },
         })
     local manager = registration.ContextMenuRegistrationManager.new{
@@ -183,7 +211,7 @@ describe('DwarfUICore context-menu target detector', function()
         assert.equals(env.DetectionKind.TARGET, result.kind)
         assert.is_equal(other, result.candidate.source)
         assert.equals(env.TargetKind.WIDGET, result.target.kind)
-        assert.equals(result.candidate.identity,
+        assert.same(result.candidate.identity,
             result.target.registration_identity)
         assert.equals(env.AnchorKind.SCREEN_POSITION, result.anchor.kind)
         assert.same({3, 3}, {
@@ -274,7 +302,7 @@ describe('DwarfUICore context-menu target detector', function()
             sample(env, 3, 3, {x=5, y=6, z=7}))
         assert.equals(env.DetectionKind.TARGET, result.kind)
         assert.equals(env.TargetKind.MAP_TILE, result.target.kind)
-        assert.equals(identity, result.target.registration_identity)
+        assert.same(identity, result.target.registration_identity)
         assert.equals(env.AnchorKind.MAP_TILE, result.anchor.kind)
         assert.same({x=5, y=6, z=7}, result.anchor.map_position)
 
@@ -308,7 +336,7 @@ describe('DwarfUICore context-menu target detector', function()
             env.manager:resolve_map_tile(second).identity
         local result = env.detector:detect(
             sample(env, 4, 4, {x=2, y=2, z=2}))
-        assert.equals(second_identity, result.target.registration_identity)
+        assert.same(second_identity, result.target.registration_identity)
 
         env.manager:update_map_tile(first, {
             pos={x=1, y=1, z=1},
@@ -321,12 +349,12 @@ describe('DwarfUICore context-menu target detector', function()
 
         result = env.detector:detect(
             sample(env, 4, 4, {x=2, y=2, z=2}))
-        assert.equals(second_identity, result.target.registration_identity)
+        assert.same(second_identity, result.target.registration_identity)
 
         env.state.eligible[second_owner] = false
         result = env.detector:detect(
             sample(env, 4, 4, {x=2, y=2, z=2}))
-        assert.equals(
+        assert.same(
             env.manager:resolve_map_tile(first).identity,
             result.target.registration_identity)
     end)

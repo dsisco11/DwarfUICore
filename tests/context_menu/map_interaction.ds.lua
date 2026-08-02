@@ -367,6 +367,10 @@ describe('native exact-map-tile context menu', function()
         services.service:clear_world_state()
         if initial_view then
             ds.setViewPos(initial_view, ds.EScreenOrigin.TOP_LEFT)
+            ds.redraw()
+            assert.same(initial_view, copy_pos(ds.getViewPos(
+                ds.EScreenOrigin.TOP_LEFT)),
+                'map context-menu fixture did not restore its initial viewport')
         end
         if initial_pause ~= nil and ds.isGamePaused() ~= initial_pause then
             ds.setGamePaused(initial_pause)

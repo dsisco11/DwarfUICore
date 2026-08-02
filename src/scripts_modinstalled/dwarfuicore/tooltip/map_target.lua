@@ -202,17 +202,6 @@ local function validate_handle_domain(handle, consumer_namespace,
     return handle_identity
 end
 
----Copies one composite identity for non-authoritative diagnostics.
----@param value table
----@return table copy
-local function copy_identity(value)
-    return {runtime_generation=value.runtime_generation,
-        service_kind=value.service_kind,
-        contract_major=value.contract_major,
-        namespace=value.namespace,
-        local_identity=value.local_identity}
-end
-
 ---Builds one presentation-neutral miss observation.
 ---@param sample dwarfuicore.PointerSample
 ---@return dwarfuicore.MapTileTargetObservation
@@ -420,7 +409,7 @@ end
 function TooltipMapTargetRegistry:get_identity(handle)
     self:_assert_current()
     local record = self._state.registrations[handle]
-    return record and copy_identity(record.identity) or nil
+    return record and identity.CompositeIdentity.new(record.identity) or nil
 end
 
 ---Returns one handle's current tooltip value without exposing its record.
@@ -539,7 +528,7 @@ function TooltipMapTargetRegistry:get_diagnostics(consumer_namespace)
         if consumer_namespace == nil or
                 record.namespace == consumer_namespace then
             table.insert(registrations, {
-                identity=copy_identity(record.identity),
+                identity=identity.CompositeIdentity.new(record.identity),
                 contribution_sequence=record.sequence,
                 map_position={x=record.x, y=record.y, z=record.z},
             })

@@ -83,12 +83,18 @@ end
 ---Resolves the current placement anchor without mutating native map state.
 ---@return {x: integer, y: integer}|nil
 function ContextMenuScreen:resolve_anchor()
+    if self.actions.session_is_valid and not self.actions.session_is_valid() then
+        return nil
+    end
     if self.anchor.kind == AnchorKind.SCREEN_POSITION then
         return self.anchor.screen_position
     end
     local root = self.session:get_source_root()
-    if not self.actions.map_session_is_valid() or
-            not self:source_root_is_presented(root) then
+    if self.actions.map_session_is_valid and
+            not self.actions.map_session_is_valid() then
+        return nil
+    end
+    if not self:source_root_is_presented(root) then
         return nil
     end
     local projected = map_projection.project_visible(
@@ -120,7 +126,7 @@ end
 function ContextMenuScreen:onDismiss()
     if self._presentation_closed then return end
     self._presentation_closed = true
-    self.actions.close()
+    self.actions.close('presentation dismissed')
 end
 
 ---Dismisses the native screen exactly once without creating a second close.
@@ -182,7 +188,7 @@ function ContextMenuScreen:onInput(keys)
     local handled = false
     local owned = keys._MOUSE_L or (wheel and inside) or list_owned
     local ok, failure = xpcall(function()
-        handled = not not self.menu_window:onInput(keys)
+        handled = self:inputToSubviews(keys)
     end, debug.traceback)
     if not ok then
         if not owned then self:sendInputToParent(keys) end
@@ -202,11 +208,11 @@ end
 function ContextMenuScreen:render(dc)
     local ok, failure = xpcall(function()
         if not self.session:is_valid() then
-            self.actions.close()
+            self.actions.close('weak source invalidation')
             return
         end
         if not self:relayout() then
-            self.actions.close()
+            self.actions.close('anchor invalidation')
             return
         end
         ContextMenuScreen.super.render(self, dc)

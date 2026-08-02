@@ -145,6 +145,7 @@ local function load_environment(state)
             globals={dfhack=dfhack},
             reqscript={
                 ['dwarfuicore/tooltip/target']=target_adapter,
+                ['dwarfuicore/service_provider/identity']=identities,
             },
         })
         local _, registration = module_loader.load(

@@ -19,14 +19,10 @@ local function load_api()
             return name
         end
     end
-    local service = {
-        get_diagnostics=function() return {started=true} end,
-    }
     local _, api = module_loader.load(repo_root, API_PATH, {
         reqscript={
             ['dwarfuicore/context_menu/registration']=registration,
             ['dwarfuicore/context_menu/screen']={},
-            ['dwarfuicore/context_menu/service']={service=service},
         },
     })
     return api, calls
@@ -52,10 +48,10 @@ describe('DwarfUICore context-menu public API', function()
         assert.equals(handle, calls[6].arguments[1])
     end)
 
-    it('exposes started service diagnostics without an open API', function()
+    it('does not expose private service diagnostics', function()
         local api = load_api()
 
-        assert.is_true(api.get_diagnostics().started)
+        assert.is_nil(api.get_diagnostics)
         assert.is_nil(api.open)
         assert.is_nil(api.replace)
     end)

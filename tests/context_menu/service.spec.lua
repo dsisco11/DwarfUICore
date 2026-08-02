@@ -52,6 +52,12 @@ local function registration_double()
         self.failure_observer = callback
     end
 
+    ---Stores the contribution-removal observer.
+    ---@param callback function|nil
+    function manager:set_removal_observer(callback)
+        self.removal_observer = callback
+    end
+
     ---Disables registration and discovery for this generation.
     ---@param message string
     ---@return boolean
@@ -196,6 +202,16 @@ local function load_harness(state)
         return self.options.source_root
     end
 
+    ---Returns whether this controlled session contains one exact identity.
+    ---@param identity table
+    ---@return boolean
+    function Session:contains_identity(identity)
+        for _, contribution in ipairs(self.options.contributions or {}) do
+            if contribution.identity == identity then return true end
+        end
+        return false
+    end
+
     ---Returns one live controlled callback context.
     ---@return table|nil
     function Session:create_selection_context()
@@ -250,6 +266,7 @@ local function detection(callback)
     local candidate = {
         source={},
         root={},
+        identity={},
         definition={
             entries={{
                 label='Action',
@@ -340,6 +357,21 @@ describe('context-menu service', function()
         assert.is_false(service:is_open())
         assert.equals(1, presentation.closed)
         assert.is_false(service:close())
+    end)
+
+    it('closes an open session synchronously when a contribution is removed',
+            function()
+        local harness = load_harness()
+        local registrations = registration_double()
+        local service = create_service(harness, {registrations=registrations})
+        local target = detection()
+
+        service:start()
+        assert.is_true(service:open(target))
+        assert.is_not_nil(registrations.removal_observer)
+        registrations.removal_observer(target.candidate.identity)
+
+        assert.is_false(service:is_open())
     end)
 
     it('validates an open map session against identity and copied position',

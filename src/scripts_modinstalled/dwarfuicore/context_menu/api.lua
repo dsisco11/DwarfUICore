@@ -4,7 +4,6 @@
 
 local registrations = reqscript('dwarfuicore/context_menu/registration')
 reqscript('dwarfuicore/context_menu/screen')
-local services = reqscript('dwarfuicore/context_menu/service')
 
 ---Registers or re-registers one UI widget context menu.
 ---@param widget table
@@ -49,10 +48,4 @@ end
 ---@return boolean removed
 function unregister_map_tile(handle)
     return registrations.unregister_map_tile(handle)
-end
-
----Returns the active service diagnostics for tests and support.
----@return table
-function get_diagnostics()
-    return services.service:get_diagnostics()
 end

@@ -24,6 +24,14 @@ local IDENTITY_FIELDS = {
 ---@class dwarfuicore.ProcessIdentityAllocator
 ProcessIdentityAllocator = {}
 
+---@class dwarfuicore.CompositeIdentity
+---@field runtime_generation integer
+---@field service_kind dwarfuicore.ServiceKind
+---@field contract_major integer
+---@field namespace string
+---@field local_identity integer
+CompositeIdentity = {}
+
 local allocated_identity_snapshots = setmetatable({}, {__mode='k'})
 
 ---Returns whether a value is a positive integer.
@@ -81,10 +89,10 @@ local function get_process_state()
     return validate_process_state(state)
 end
 
----Copies and validates one complete composite identity.
+---Copy-constructs and validates one complete composite identity.
 ---@param value any
----@return table identity
-local function copy_identity(value)
+---@return dwarfuicore.CompositeIdentity identity
+function CompositeIdentity.new(value)
     assert(type(value) == 'table',
         'DwarfUICore map handle identity must be a table.')
     for key in next, value do
@@ -110,6 +118,21 @@ local function copy_identity(value)
         local_identity=local_identity}
 end
 
+---Returns whether two complete composite identities have equal fields.
+---@param left any
+---@param right any
+---@return boolean equal
+function CompositeIdentity.equals(left, right)
+    local ok_left, copied_left = pcall(CompositeIdentity.new, left)
+    local ok_right, copied_right = pcall(CompositeIdentity.new, right)
+    return ok_left and ok_right and
+        copied_left.runtime_generation == copied_right.runtime_generation and
+        copied_left.service_kind == copied_right.service_kind and
+        copied_left.contract_major == copied_right.contract_major and
+        copied_left.namespace == copied_right.namespace and
+        copied_left.local_identity == copied_right.local_identity
+end
+
 ---Allocates one internal composite registration identity.
 ---@param runtime_generation integer
 ---@param service_kind dwarfuicore.ServiceKind
@@ -129,10 +152,10 @@ function ProcessIdentityAllocator:allocate_identity(runtime_generation,
     assert(state.next_identity < math.maxinteger,
         'DwarfUICore process identity counter is exhausted.')
     state.next_identity = state.next_identity + 1
-    local identity = copy_identity({runtime_generation=runtime_generation,
+    local identity = CompositeIdentity.new({runtime_generation=runtime_generation,
         service_kind=service_kind, contract_major=contract_major,
         namespace=consumer_namespace, local_identity=state.next_identity})
-    allocated_identity_snapshots[identity] = copy_identity(identity)
+    allocated_identity_snapshots[identity] = CompositeIdentity.new(identity)
     return identity
 end
 
@@ -166,7 +189,7 @@ local handle_factory = immutable_proxy.new_factory('map registration handle')
 ---@param identity table
 ---@return table handle
 function create_map_handle(identity)
-    local current = copy_identity(identity)
+    local current = CompositeIdentity.new(identity)
     local allocated = allocated_identity_snapshots[identity]
     assert(allocated,
         'DwarfUICore map handle identity was not allocated by this runtime.')
@@ -175,7 +198,7 @@ function create_map_handle(identity)
             'DwarfUICore allocated map handle identity was modified.')
     end
     allocated_identity_snapshots[identity] = nil
-    return handle_factory:create(copy_identity(allocated))
+    return handle_factory:create(CompositeIdentity.new(allocated))
 end
 
 ---Returns a copy of a recognized map handle's private identity.
@@ -183,7 +206,7 @@ end
 ---@return table|nil identity
 function get_map_handle_identity(handle)
     local value = handle_factory:get_backing(handle)
-    return value and copy_identity(value) or nil
+    return value and CompositeIdentity.new(value) or nil
 end
 
 ---Returns whether a value is a recognized map-registration handle.

@@ -18,6 +18,7 @@ ContextMenuDetectionKind = immutable_enum.define({
 ---@class dwarfuicore.ContextMenuTargetDetection
 ---@field kind dwarfuicore.ContextMenuDetectionKind
 ---@field candidate? dwarfuicore.ContextMenuWidgetCandidate|dwarfuicore.ContextMenuMapCandidate
+---@field candidates? table[]
 ---@field target? dwarfuicore.ContextMenuTargetDescriptor
 ---@field anchor? dwarfuicore.ContextMenuAnchorDescriptor
 ---@field root? any
@@ -107,8 +108,12 @@ function ContextMenuTargetDetector:detect(sample)
     end
 
     if winner then
+        local candidates = self._registrations.resolve_widget_contributions and
+            self._registrations:resolve_widget_contributions(
+                winner.candidate.source) or {winner.candidate}
         return detection(ContextMenuDetectionKind.TARGET, {
             candidate=winner.candidate,
+            candidates=candidates,
             target=targets.ContextMenuTargetDescriptor.new(
                 TargetKind.WIDGET, winner.candidate.identity),
             anchor=targets.ContextMenuAnchorDescriptor.screen_position(
@@ -125,16 +130,28 @@ function ContextMenuTargetDetector:detect(sample)
         return detection(ContextMenuDetectionKind.MISS)
     end
 
-    local candidate = self._registrations:detect_map_tile{
+    local map_position = {
         x=sample.map_x,
         y=sample.map_y,
         z=sample.map_z,
     }
+    local candidates = self._registrations.detect_map_contributions and
+        self._registrations:detect_map_contributions(map_position) or nil
+    local candidate = candidates and candidates[#candidates] or
+        self._registrations:detect_map_tile(map_position)
     if not candidate then
         return detection(ContextMenuDetectionKind.MISS)
     end
+    if candidates then
+        local selected = {}
+        for _, value in ipairs(candidates) do
+            if value.root == candidate.root then table.insert(selected, value) end
+        end
+        candidates = selected
+    end
     return detection(ContextMenuDetectionKind.TARGET, {
         candidate=candidate,
+        candidates=candidates or {candidate},
         target=targets.ContextMenuTargetDescriptor.new(
             TargetKind.MAP_TILE, candidate.identity),
         anchor=targets.ContextMenuAnchorDescriptor.map_tile(

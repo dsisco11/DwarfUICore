@@ -4,6 +4,25 @@ local widget_harness = require('support.widget_harness')
 local _, target_types = module_loader.load(repo_root,
     'src/scripts_modinstalled/dwarfuicore/tooltip/target.lua')
 local ObservationKind = target_types.TooltipPointerObservationKind
+local _, immutable_enum = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
+local _, immutable_proxy = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+local _, contracts = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+        reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+    })
+local _, namespaces = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+local _, identities = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+        globals={dfhack={}},
+        reqscript={
+            ['dwarfuicore/service_provider/contracts']=contracts,
+            ['dwarfuicore/service_provider/namespace']=namespaces,
+            ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+        },
+    })
 
 local function load_environment()
     local state = {
@@ -102,6 +121,7 @@ local function load_environment()
             globals={dfhack=process},
             reqscript={
                 ['dwarfuicore/tooltip/target']=target_types,
+                ['dwarfuicore/service_provider/identity']=identities,
             },
         })
     local function load_hook_generation()

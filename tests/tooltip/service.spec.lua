@@ -7,6 +7,25 @@ local TARGET_PATH =
     'src/scripts_modinstalled/dwarfuicore/tooltip/target.lua'
 local _, target_types = module_loader.load(repo_root, TARGET_PATH)
 local ObservationKind = target_types.TooltipPointerObservationKind
+local _, immutable_enum = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
+local _, immutable_proxy = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+local _, contracts = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+        reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+    })
+local _, namespaces = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+local _, identities = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+        globals={dfhack={}},
+        reqscript={
+            ['dwarfuicore/service_provider/contracts']=contracts,
+            ['dwarfuicore/service_provider/namespace']=namespaces,
+            ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+        },
+    })
 
 ---Loads one service generation over isolated process-wide state.
 ---@param process table|nil
@@ -17,7 +36,10 @@ local function load_service(process)
     local _, service_module = module_loader.load(repo_root, SERVICE_PATH, {
         globals={dfhack=dfhack},
         require_modules={},
-        reqscript={['dwarfuicore/tooltip/target']=target_types},
+        reqscript={
+            ['dwarfuicore/tooltip/target']=target_types,
+            ['dwarfuicore/service_provider/identity']=identities,
+        },
     })
     return {
         dfhack=dfhack,

@@ -89,6 +89,38 @@ describe('service-provider identity primitives', function()
         assert.equals(5, #identities)
     end)
 
+    it('copy-constructs and compares composite identities', function()
+        local identity = load_identity({})
+        local original = {
+            runtime_generation=3,
+            service_kind=contracts.ServiceKind.CONTEXT_MENU,
+            contract_major=2,
+            namespace='plugin',
+            local_identity=9,
+        }
+        local copied = identity.CompositeIdentity.new(original)
+
+        assert.same(original, copied)
+        assert.is_not_equal(original, copied)
+        original.namespace = 'changed'
+        assert.equals('plugin', copied.namespace)
+        assert.is_true(identity.CompositeIdentity.equals(copied, {
+            runtime_generation=3,
+            service_kind=contracts.ServiceKind.CONTEXT_MENU,
+            contract_major=2,
+            namespace='plugin',
+            local_identity=9,
+        }))
+        assert.is_false(identity.CompositeIdentity.equals(copied, {
+            runtime_generation=3,
+            service_kind=contracts.ServiceKind.CONTEXT_MENU,
+            contract_major=2,
+            namespace='plugin',
+            local_identity=10,
+        }))
+        assert.is_false(identity.CompositeIdentity.equals(copied, {}))
+    end)
+
     it('rejects malformed state, invalid domains, and counter exhaustion', function()
         local process = {dwarfuicore={service_provider_identity={
             version=1, next_identity=math.maxinteger, next_sequence=0}}}

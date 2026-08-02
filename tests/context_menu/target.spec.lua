@@ -18,13 +18,39 @@ local _, definitions = module_loader.load(repo_root, DEFINITION_PATH, {
         ['dwarfuicore/utils/numbers']=numbers,
     },
 })
+local _, immutable_proxy = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+local _, contracts = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+        reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+    })
+local _, namespaces = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+local _, identities = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+        globals={dfhack={}},
+        reqscript={
+            ['dwarfuicore/service_provider/contracts']=contracts,
+            ['dwarfuicore/service_provider/namespace']=namespaces,
+            ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+        },
+    })
 local _, targets = module_loader.load(repo_root, TARGET_PATH, {
     reqscript={
         ['dwarfuicore/context_menu/definition']=definitions,
+        ['dwarfuicore/service_provider/identity']=identities,
         ['dwarfuicore/utils/immutable_enum']=immutable_enum,
         ['dwarfuicore/utils/numbers']=numbers,
     },
 })
+
+---Creates one complete test-only composite context-menu identity.
+---@param local_identity integer
+---@return table
+local function identity(local_identity)
+    return {runtime_generation=1, service_kind=2, contract_major=1,
+        namespace='tests', local_identity=local_identity}
+end
 
 ---Returns one validated definition with a caller-supplied handler.
 ---@param handler fun(context: table)
@@ -49,7 +75,7 @@ local function map_session(handler, source, root, owner)
     return targets.ContextMenuOpenSession.new{
         definition=definition(handler),
         target=targets.ContextMenuTargetDescriptor.new(
-            targets.ContextMenuTargetKind.MAP_TILE, 7),
+            targets.ContextMenuTargetKind.MAP_TILE, identity(7)),
         anchor=targets.ContextMenuAnchorDescriptor.map_tile(
             {x=10, y=20, z=30}, 4, 5),
         source=source,
@@ -82,26 +108,9 @@ describe('context-menu targets and sessions', function()
         end)
     end)
 
-    it('allocates new identities while allowing registrations to retain one',
-            function()
-        local allocator =
-            targets.ContextMenuRegistrationIdentityAllocator.new()
-        local registration = {identity=allocator:allocate()}
-        local original = registration.identity
-
-        registration.definition = 're-registered'
-        assert.equals(original, registration.identity)
-        registration.definition = 'updated'
-        assert.equals(original, registration.identity)
-
-        registration = nil
-        local replacement = {identity=allocator:allocate()}
-        assert.equals(original + 1, replacement.identity)
-    end)
-
     it('copies target and both anchor descriptor kinds', function()
         local target = targets.ContextMenuTargetDescriptor.new(
-            targets.ContextMenuTargetKind.WIDGET, 3)
+            targets.ContextMenuTargetKind.WIDGET, identity(3))
         local screen =
             targets.ContextMenuAnchorDescriptor.screen_position(8, 9)
         local map_position = {x=1, y=2, z=3}
@@ -111,7 +120,7 @@ describe('context-menu targets and sessions', function()
 
         assert.same({
             kind=targets.ContextMenuTargetKind.WIDGET,
-            registration_identity=3,
+            registration_identity=identity(3),
         }, target)
         assert.same({x=8, y=9}, screen.screen_position)
         assert.same({x=1, y=2, z=3}, map.map_position)
@@ -122,7 +131,7 @@ describe('context-menu targets and sessions', function()
 
     it('uses descriptor constructors as copy constructors', function()
         local target = targets.ContextMenuTargetDescriptor.new(
-            targets.ContextMenuTargetKind.MAP_TILE, 8)
+            targets.ContextMenuTargetKind.MAP_TILE, identity(8))
         local anchor = targets.ContextMenuAnchorDescriptor.map_tile(
             {x=1, y=2, z=3}, 4, 5)
         local target_copy =
@@ -130,10 +139,10 @@ describe('context-menu targets and sessions', function()
         local anchor_copy =
             targets.ContextMenuAnchorDescriptor.new(anchor)
 
-        target.registration_identity = 9
+        target.registration_identity = identity(9)
         anchor.screen_position.x = 9
         anchor.map_position.x = 9
-        assert.equals(8, target_copy.registration_identity)
+        assert.equals(8, target_copy.registration_identity.local_identity)
         assert.same({x=4, y=5}, anchor_copy.screen_position)
         assert.same({x=1, y=2, z=3}, anchor_copy.map_position)
     end)
@@ -146,7 +155,7 @@ describe('context-menu targets and sessions', function()
             captured = context
         end)
         local target = targets.ContextMenuTargetDescriptor.new(
-            targets.ContextMenuTargetKind.MAP_TILE, 7)
+            targets.ContextMenuTargetKind.MAP_TILE, identity(7))
         local position = {x=10, y=20, z=30}
         local anchor = targets.ContextMenuAnchorDescriptor.map_tile(
             position, 4, 5)
@@ -161,7 +170,7 @@ describe('context-menu targets and sessions', function()
 
         validated.title = 'Mutated'
         validated.entries[1].label = 'Mutated'
-        target.registration_identity = 99
+        target.registration_identity = identity(99)
         anchor.screen_position.x = 99
         anchor.map_position.x = 99
         position.x = 99
@@ -171,16 +180,16 @@ describe('context-menu targets and sessions', function()
         local session_anchor = session:get_anchor_descriptor()
         assert.equals('Actions', session_definition.title)
         assert.equals('Select', session_definition.entries[1].label)
-        assert.equals(7, session_target.registration_identity)
+        assert.equals(7, session_target.registration_identity.local_identity)
         assert.same({x=4, y=5}, session_anchor.screen_position)
         assert.same({x=10, y=20, z=30}, session_anchor.map_position)
 
         session_definition.title = 'External mutation'
-        session_target.registration_identity = 100
+        session_target.registration_identity = identity(100)
         session_anchor.map_position.x = 100
         assert.equals('Actions', session:get_definition_snapshot().title)
         assert.equals(7,
-            session:get_target_descriptor().registration_identity)
+            session:get_target_descriptor().registration_identity.local_identity)
         assert.equals(10,
             session:get_anchor_descriptor().map_position.x)
 
@@ -212,7 +221,7 @@ describe('context-menu targets and sessions', function()
             context.target_kind)
         assert.equals(targets.ContextMenuAnchorKind.MAP_TILE,
             context.anchor_kind)
-        assert.equals(7, context.registration_identity)
+        assert.equals(7, context.registration_identity.local_identity)
         assert.same({x=4, y=5}, context.screen_position)
         assert.same({x=10, y=20, z=30}, context.map_position)
         assert.is_equal(source, context.source)
@@ -230,6 +239,35 @@ describe('context-menu targets and sessions', function()
         external.count = 10
         assert.is_true(session:select(1))
         assert.equals(11, external.count)
+    end)
+
+    it('combines ordered contributions and dispatches each entry to its source',
+            function()
+        local first_source, second_source, root = {}, {}, {}
+        local calls = {}
+        local first = definition(function(context)
+            table.insert(calls, {'first', context.source,
+                context.registration_identity.local_identity})
+        end)
+        local second = definition(function(context)
+            table.insert(calls, {'second', context.source,
+                context.registration_identity.local_identity})
+        end)
+        local session = targets.ContextMenuOpenSession.new{
+            definition=first,
+            target=targets.ContextMenuTargetDescriptor.new(
+                targets.ContextMenuTargetKind.WIDGET, identity(1)),
+            anchor=targets.ContextMenuAnchorDescriptor.screen_position(4, 5),
+            source=first_source,
+            source_root=root,
+            contributions={{identity=identity(1), definition=first,
+                source=first_source}, {identity=identity(2), definition=second,
+                source=second_source}},
+        }
+
+        assert.equals(2, #session:get_definition_snapshot().entries)
+        assert.is_true(session:select(2))
+        assert.same({'second', second_source, 2}, calls[1])
     end)
 
     it('remains closed when a selected handler raises', function()

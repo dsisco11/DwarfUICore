@@ -25,7 +25,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@class dwarfuicore.ContextMenuPresentationActions
 ---@field close fun(): boolean
 ---@field select fun(entry_index: integer): boolean
----@field map_session_is_valid fun(): boolean
+---@field session_is_valid fun(): boolean
 ---@field fail fun(stage: string, failure: any)
 
 ---Creates a hidden controller; visible side effects begin only in `show()`.
@@ -50,6 +50,8 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@field last_failure table|nil
 ---@field failure_count integer
 ---@field last_handler_error string|nil
+---@field last_invalid_reason string|nil
+---@field last_close_reason string|nil
 ---@field handler_failure_count integer
 ---@field open_count integer
 ---@field close_count integer
@@ -95,6 +97,8 @@ local function new_state(generation, runtime_generation)
         last_failure=nil,
         failure_count=0,
         last_handler_error=nil,
+        last_invalid_reason=nil,
+        last_close_reason=nil,
         handler_failure_count=0,
         open_count=0,
         close_count=0,
@@ -158,13 +162,14 @@ end
 
 ---Closes authoritative state before invoking presentation cleanup.
 ---@return boolean changed
-function ContextMenuService:_close_unprotected()
+function ContextMenuService:_close_unprotected(reason)
     local state = self._state
     local session = state.session
     local presentation = state.presentation
     if not session and not presentation then return false end
     state.session = nil
     state.presentation = nil
+    state.last_close_reason = reason
     local failures = {}
     if presentation then
         local ok, failure = xpcall(function()
@@ -173,6 +178,8 @@ function ContextMenuService:_close_unprotected()
         if not ok then table.insert(failures, tostring(failure)) end
     end
     if session then
+        state.last_invalid_reason = session.get_invalid_reason and
+            session:get_invalid_reason() or nil
         local ok, failure = xpcall(function()
             session:close()
         end, debug.traceback)
@@ -235,6 +242,16 @@ function ContextMenuService:_open_unprotected(detection)
     local state = self._state
     if self:is_disabled() or state.session ~= nil then return false end
     local candidate = detection.candidate
+    local contributions = {}
+    for index, value in ipairs(detection.candidates or {candidate}) do
+        contributions[index] = {
+            identity=value.identity,
+            definition=value:get_definition_snapshot(),
+            source=value.source,
+            owner=detection.target.kind == TargetKind.MAP_TILE and
+                value.owner or nil,
+        }
+    end
     local session = targets.ContextMenuOpenSession.new{
         definition=candidate:get_definition_snapshot(),
         target=detection.target,
@@ -243,25 +260,35 @@ function ContextMenuService:_open_unprotected(detection)
         source_root=detection.root,
         owner=detection.target.kind == TargetKind.MAP_TILE and
             candidate.owner or nil,
+        contributions=contributions,
     }
     state.session = session
+    local function session_is_valid()
+        if session.is_valid and not session:is_valid() then
+            self:close()
+            return false
+        end
+        local target = session:get_target_descriptor()
+        if target.kind == TargetKind.WIDGET then return true end
+        if self._registrations.validate_open_session then
+            if self._registrations:validate_open_session(session) then return true end
+            self:close()
+            return false
+        end
+        local root = session:get_source_root()
+        local anchor = session:get_anchor_descriptor()
+        local current = root and self._registrations:resolve_open_map_identity(
+            target.registration_identity, root)
+        local pos = current and current.pos
+        local expected = anchor.map_position
+        return pos ~= nil and expected ~= nil and pos.x == expected.x and
+            pos.y == expected.y and pos.z == expected.z
+    end
     local actions = {
-        close=function() return self:close() end,
+        close=function(reason) return self:close(reason) end,
         select=function(entry_index) return self:select(entry_index) end,
-        map_session_is_valid=function()
-            local target = session:get_target_descriptor()
-            if target.kind ~= TargetKind.MAP_TILE then return true end
-            local root = session:get_source_root()
-            local anchor = session:get_anchor_descriptor()
-            local candidate = root and
-                self._registrations:resolve_open_map_identity(
-                    target.registration_identity, root)
-            local pos = candidate and candidate.pos
-            local expected = anchor.map_position
-            return pos ~= nil and expected ~= nil and
-                pos.x == expected.x and pos.y == expected.y and
-                pos.z == expected.z
-        end,
+        session_is_valid=session_is_valid,
+        map_session_is_valid=session_is_valid,
         fail=function(stage, failure)
             self:_disable(stage, failure, true)
         end,
@@ -298,10 +325,10 @@ end
 
 ---Closes the active session through the sole service transition.
 ---@return boolean changed
-function ContextMenuService:close()
+function ContextMenuService:close(reason)
     if self:is_disabled() then return false end
     local ok, changed = xpcall(function()
-        return self:_close_unprotected()
+        return self:_close_unprotected(reason)
     end, debug.traceback)
     if not ok then
         self:_disable('close transition', changed, true)
@@ -321,7 +348,12 @@ function ContextMenuService:select(entry_index)
     assert(numbers.is_integer(entry_index) and
             definition.entries[entry_index] ~= nil,
         'DwarfUICore context-menu selection requires a valid entry index.')
-    local context = session:create_selection_context()
+    if self._registrations.validate_open_session and
+            not self._registrations:validate_open_session(session) then
+        self:close()
+        return false
+    end
+    local context = session:create_selection_context(entry_index)
     if not context then
         self:close()
         return false
@@ -418,6 +450,12 @@ function ContextMenuService:start()
     self._registrations:set_failure_observer(function(message)
         self:_disable('root discovery', message, false)
     end)
+    if self._registrations.set_removal_observer then
+        self._registrations:set_removal_observer(function(identity)
+            local session = self._state.session
+            if session and session:contains_identity(identity) then self:close() end
+        end)
+    end
     self._registrations:set_menu_open_predicate(function()
         return self:is_open()
     end)
@@ -443,6 +481,9 @@ function ContextMenuService:shutdown()
     changed = (ok and closed) or changed
     self._registrations:set_root_observer(nil)
     self._registrations:set_failure_observer(nil)
+    if self._registrations.set_removal_observer then
+        self._registrations:set_removal_observer(nil)
+    end
     self._registrations:set_menu_open_predicate(function() return false end)
     changed = self._registrations:shutdown() or changed
     changed = self._input_hook:shutdown() or changed
@@ -466,6 +507,8 @@ function ContextMenuService:get_diagnostics()
         last_failure=state.last_failure,
         failure_count=state.failure_count,
         last_handler_error=state.last_handler_error,
+        last_invalid_reason=state.last_invalid_reason,
+        last_close_reason=state.last_close_reason,
         handler_failure_count=state.handler_failure_count,
         open_count=state.open_count,
         close_count=state.close_count,

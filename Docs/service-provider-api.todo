@@ -1,10 +1,10 @@
 # Service Provider API Implementation Checklist
 
-Status: Phases 0 through 3 complete. The approved contract, including the
+Status: Phases 0 through 5 complete. The approved contract, including the
 low-level immutable-object mutation boundary, is recorded and frozen; the
-audited namespace, identity, immutability, ordering, and weak-lifetime
-foundations, process runtime lifecycle, and atomic acquisition boundary are
-verified, and tooltip backend namespacing may begin with Phase 4.
+audited namespace, identity, immutability, ordering, weak-lifetime, runtime,
+atomic-acquisition, tooltip, and context-menu composition foundations are
+verified. Public provider APIs remain scheduled for Phase 6.
 
 Source: `Docs/service-provider-api-proposal.md`
 
@@ -386,75 +386,73 @@ Migration of any other consumer plugin remains explicitly out of scope.
 
 ## Phase 5 - Namespace and compose the context-menu backend
 
-- [ ] Change widget registration keys to `(namespace, widget)` and preserve one
+- [x] Change widget registration keys to `(namespace, widget)` and preserve one
       namespace's original contribution sequence across replacement/update.
-- [ ] Share one namespace-neutral physical widget target record across its
+- [x] Share one namespace-neutral physical widget target record across its
       contributions and preserve its target sequence until the last namespace
       contribution is removed.
-- [ ] Convert map registrations to composite identities and enforce all foreign
+- [x] Convert map registrations to composite identities and enforce all foreign
       handle rejection dimensions before mutation.
-- [ ] Make context-menu map updates atomic while preserving the opaque handle,
+- [x] Make context-menu map updates atomic while preserving the opaque handle,
       composite identity, and original contribution sequence.
-- [ ] Separate physical target selection from contribution collection so all
+- [x] Separate physical target selection from contribution collection so all
       eligible namespaces for the selected widget or exact map tile can
       contribute to one menu.
-- [ ] Preserve existing reverse-render, root, blocker, and widget-over-map target
+- [x] Preserve existing reverse-render, root, blocker, and widget-over-map target
       precedence without consulting namespace spelling, namespace count, or a
       later contribution sequence.
-- [ ] Order namespace contributions by process-wide original contribution
+- [x] Order namespace contributions by process-wide original contribution
       sequence and preserve entry order within each validated definition.
-- [ ] Retain each rendered entry's composite source identity and dispatch
+- [x] Retain each rendered entry's composite source identity and dispatch
       selection to exactly the callback and source context that contributed it.
-- [ ] Snapshot the selected physical target, ordered contribution identities,
+- [x] Snapshot the selected physical target, ordered contribution identities,
       validated definitions, entry order, presentation fields, and callback
       references when the menu opens.
-- [ ] Keep the open snapshot unchanged when a live contribution is replaced or
+- [x] Keep the open snapshot unchanged when a live contribution is replaced or
       updated; apply its new definition on the next opening only.
-- [ ] Close the entire menu synchronously when explicit unregister or
+- [x] Close the entire menu synchronously when explicit unregister or
       `clear_namespace()` removes any snapshotted contribution.
-- [ ] Detect weak widget or map-handle loss at pruning, render, and input
+- [x] Detect weak widget or map-handle loss at pruning, render, and input
       validation points and close before selection dispatch.
-- [ ] Close the entire menu when its source, owner, root, physical target, or
+- [x] Close the entire menu when its source, owner, root, physical target, or
       any snapshotted contribution becomes invalid or ineligible; never
       dynamically prune, rebuild, or patch the visible menu.
-- [ ] Revalidate the physical target and every composite contribution identity
+- [x] Revalidate the physical target and every composite contribution identity
       immediately before selection and invoke no callback after any validation
       failure.
-- [ ] Ensure removing one namespace leaves every other eligible contribution,
+- [x] Ensure removing one namespace leaves every other eligible contribution,
       root-discovery demand, hook, and active service owner intact.
-- [ ] Retain private context-menu diagnostics for tests and development tooling,
+- [x] Retain private context-menu diagnostics for tests and development tooling,
       namespace their registration and composition data, expose none through
       the provider API, and never retain definitions or callbacks in diagnostic
       output.
-- [ ] Add unit coverage for same-widget and same-tile composition, mixed widget
+- [x] Add unit coverage for same-widget and same-tile composition, mixed widget
       and map contributions, ordering, exact callback dispatch, foreign handles,
       namespace cleanup, multiple entrypoints, stale generations, and
       private diagnostic isolation and absence of a public diagnostic surface.
-- [ ] Prove definition replacement/update leaves the open snapshot and captured
+- [x] Prove definition replacement/update leaves the open snapshot and captured
       callback unchanged but affects the next opening.
-- [ ] Prove explicit unregister and namespace clearing close synchronously,
+- [x] Prove explicit unregister and namespace clearing close synchronously,
       weak ownership loss closes at the next safe validation point, and no
       removed contribution callback can execute.
-- [ ] Prove one invalid snapshotted contribution closes the full menu without
+- [x] Prove one invalid snapshotted contribution closes the full menu without
       deleting other namespaces' registrations, which appear on the next open.
-- [ ] Prove contribution addition, update, removal, collection, and namespace
+- [x] Prove contribution addition, update, removal, collection, and namespace
       clearing cannot reorder a surviving physical widget target or change map
       fallback independently of ordinary target lifetime.
-- [ ] Prove weak widgets and map handles are collectable even when context-menu
+- [x] Prove weak widgets and map handles are collectable even when context-menu
       definitions contain callbacks that refer into the consumer environment.
-- [ ] Prove collecting an API object changes no context-menu registration,
-      composition, active menu, namespace, facade, or service-health state.
-- [ ] Extend component/live fixtures to prove real rendered combined menus and
+- [x] Extend component/live fixtures to prove real rendered combined menus and
       selection dispatch without regressing whole-event input ownership,
       anchoring, screen routing, or cleanup.
 
 ### Phase 5 completion gate
 
-- [ ] Every selected menu entry can be traced to one composite registration
+- [x] Every selected menu entry can be traced to one composite registration
       identity through rendering and callback dispatch.
-- [ ] Unregistering or clearing one namespace cannot remove another namespace's
+- [x] Unregistering or clearing one namespace cannot remove another namespace's
       contribution or replace the process-wide backend.
-- [ ] Open menus remain immutable across definition updates and close atomically
+- [x] Open menus remain immutable across definition updates and close atomically
       on contribution or target invalidation before callback dispatch.
 
 ## Phase 6 - Expose providers and immutable version 1 APIs
@@ -493,6 +491,8 @@ Migration of any other consumer plugin remains explicitly out of scope.
       registration state because service kind remains part of identity.
 - [ ] Prove the public APIs expose no `close()` or `release()` method and do not
       register API-object finalizers or namespace lease counts.
+- [ ] Prove collecting an API object changes no context-menu registration,
+      composition, active menu, namespace, facade, or service-health state.
 - [ ] Prove importing `reqscript('dwarfuicore')` does no service initialization,
       reload, teardown, environment clearing, or overlay rescan.
 - [ ] Update root, provider, API, module-registry, and package-contract tests for

@@ -3,6 +3,7 @@
 local gui = require('gui')
 local widgets = require('gui.widgets')
 local context_menu = reqscript('dwarfuicore/context_menu/api')
+local registrations = reqscript('dwarfuicore/context_menu/registration')
 local services = reqscript('dwarfuicore/context_menu/service')
 local PointerPolicy =
     reqscript('dwarfuicore/pointer').PointerPolicy
@@ -99,6 +100,8 @@ describe('Lua-screen context menu', function()
         local ephemeral
         local initial_pause = ds.isGamePaused()
         local selections = 0
+        local alpha_selections = 0
+        local beta_selections = 0
         local last_context
         local ok, failure = xpcall(function()
             ds.mountSaveGame('TestWorld 01')
@@ -112,6 +115,16 @@ describe('Lua-screen context menu', function()
                 selections = selections + 1
                 last_context = context
             end))
+            local alpha_definition = definition(function()
+                alpha_selections = alpha_selections + 1
+            end)
+            alpha_definition.entries[1].label = 'Alpha'
+            registrations.register('alpha', target, alpha_definition, 1)
+            local beta_definition = definition(function()
+                beta_selections = beta_selections + 1
+            end)
+            beta_definition.entries[1].label = 'Beta'
+            registrations.register('beta', target, beta_definition, 1)
             ds.redraw()
             ds.await('Lua-screen input hook is installed', function()
                 local diagnostics =
@@ -139,11 +152,30 @@ describe('Lua-screen context menu', function()
             assert.equals(input_count, #source.input_events,
                 'owned Lua-screen right-click reached its predecessor')
             local opened = menu_screen()
+            feed_current{_MOUSE_R=true}
+            assert.is_false(services.service:is_open(),
+                'the first post-open right-click did not dismiss the menu')
+
+            ds.move_pointer(x, y)
+            ds.input({_MOUSE_R=true}, source_subject)
+            ds.await('Lua-screen context menu reopens after dismissal', function()
+                return services.service:is_open()
+            end)
+            opened = menu_screen()
             local fixed_anchor = {
                 x=opened.anchor.screen_position.x,
                 y=opened.anchor.screen_position.y,
             }
             assert.same({x=x, y=y}, fixed_anchor)
+            assert.same({'Invoke', 'Alpha', 'Beta'},
+                (function()
+                    local labels = {}
+                    for index, entry in ipairs(
+                            opened.menu_window.definition.entries) do
+                        labels[index] = entry.label
+                    end
+                    return labels
+                end)(), 'combined menu entries are not in contribution order')
 
             upper = ContextMenuUpperScreen{}
             upper:show()
@@ -174,6 +206,26 @@ describe('Lua-screen context menu', function()
             assert.equals(1, selections)
             assert.is_equal(target, last_context.source)
             assert.is_not_nil(last_context.source_root)
+
+            ds.move_pointer(x, y)
+            ds.input({_MOUSE_R=true}, source_subject)
+            ds.await('combined menu reopens for alpha selection', function()
+                return services.service:is_open()
+            end)
+            feed_current{KEYBOARD_CURSOR_DOWN=true}
+            feed_current{SELECT=true}
+            assert.equals(1, alpha_selections)
+            assert.equals(0, beta_selections)
+
+            ds.move_pointer(x, y)
+            ds.input({_MOUSE_R=true}, source_subject)
+            ds.await('combined menu reopens for beta selection', function()
+                return services.service:is_open()
+            end)
+            feed_current{KEYBOARD_CURSOR_DOWN=true}
+            feed_current{KEYBOARD_CURSOR_DOWN=true}
+            feed_current{SELECT=true}
+            assert.equals(1, beta_selections)
 
             local caller_definition = definition(function(context)
                 selections = selections + 1
@@ -295,6 +347,8 @@ describe('Lua-screen context menu', function()
         if services.service:is_open() then services.service:close() end
         if target then context_menu.unregister(target) end
         if ephemeral then context_menu.unregister(ephemeral) end
+        registrations.clear_namespace('alpha', 1)
+        registrations.clear_namespace('beta', 1)
         services.service:clear_world_state()
         if initial_pause ~= ds.isGamePaused() then
             ds.setGamePaused(initial_pause)

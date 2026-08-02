@@ -5,6 +5,7 @@
 -- has no presentation implementation or UI-host dependency.
 
 local target_adapters = reqscript('dwarfuicore/tooltip/target')
+local identities = reqscript('dwarfuicore/service_provider/identity')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 2
@@ -95,35 +96,22 @@ local function get_tooltip(target)
     return value
 end
 
----Returns whether a value has the complete composite service identity shape.
----@param value any
----@return boolean
-local function is_composite_identity(value)
-    return type(value) == 'table' and
-        value.runtime_generation ~= nil and value.service_kind ~= nil and
-        value.contract_major ~= nil and value.namespace ~= nil and
-        value.local_identity ~= nil
-end
-
 ---Creates an immutable copy of a composite identity for published intent.
 ---@param value any
 ---@return any
 local function snapshot_identity(value)
-    if not is_composite_identity(value) then return value end
-    local values = {
-        runtime_generation=value.runtime_generation,
-        service_kind=value.service_kind,
-        contract_major=value.contract_major,
-        namespace=value.namespace,
-        local_identity=value.local_identity,
-    }
+    local copied
+    local recognized = pcall(function()
+        copied = identities.CompositeIdentity.new(value)
+    end)
+    if not recognized then return value end
     return setmetatable({}, {
-        __index=values,
+        __index=copied,
         __newindex=function()
             error('DwarfUICore tooltip source identities are immutable.', 2)
         end,
         __pairs=function()
-            return next, values, nil
+            return next, copied, nil
         end,
         __metatable=false,
     })
@@ -135,15 +123,7 @@ end
 ---@return boolean
 local function identities_equal(left, right)
     if left == right then return true end
-    if not is_composite_identity(left) or
-            not is_composite_identity(right) then
-        return false
-    end
-    return left.runtime_generation == right.runtime_generation and
-        left.service_kind == right.service_kind and
-        left.contract_major == right.contract_major and
-        left.namespace == right.namespace and
-        left.local_identity == right.local_identity
+    return identities.CompositeIdentity.equals(left, right)
 end
 
 ---Creates one immutable tooltip-intent snapshot.

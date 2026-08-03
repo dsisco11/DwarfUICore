@@ -507,55 +507,75 @@ installed mod, or sibling repository was changed.
 
 ## Phase 4 - Implement prompt values, handles, and state transitions
 
-- [ ] Add `USER_PROMPT` to the existing immutable numeric `ServiceKind` enum and
+- [x] Add `USER_PROMPT` to the existing immutable numeric `ServiceKind` enum and
       update every exhaustive validator, count, prefix map, diagnostic, and test.
-- [ ] Add `SERVICE_BUSY` to the immutable numeric error contract with the exact
+- [x] Add `SERVICE_BUSY` to the immutable numeric error contract with the exact
       stable token and extend count/mapping tests without changing existing
       category values or meanings.
-- [ ] Add immutable/copying value objects for
+- [x] Add immutable/copying value objects for
       `MapLocationPromptOptions` and the internal request snapshot.
-- [ ] Validate that options contain only `title`, `message`, `on_select`, and
+- [x] Validate that options contain only `title`, `message`, `on_select`, and
       optional `on_cancel`; require their proposal-defined types and accept
       empty strings and embedded newlines.
-- [ ] Copy the API-bound validated namespace into the request snapshot. Do not
+- [x] Copy the API-bound validated namespace into the request snapshot. Do not
       accept a namespace display field or infer attribution from prompt text.
-- [ ] Add a dedicated immutable `MapLocationPrompt` handle registry backed by
+- [x] Add a dedicated immutable `MapLocationPrompt` handle registry backed by
       an allocated composite identity unless Phase 1 proves a smaller safe use
       of an existing generic handle facility.
-- [ ] Preserve handle validation precedence: malformed is `INVALID_ARGUMENT`,
+- [x] Preserve handle validation precedence: malformed is `INVALID_ARGUMENT`,
       recognized old generation is `STALE_HANDLE`, another current domain is
       `FOREIGN_HANDLE`, and a terminal same-domain handle returns false.
-- [ ] Add immutable numeric internal enums for every closed prompt state and
+- [x] Add immutable numeric internal enums for every closed prompt state and
       terminal-cause set.
-- [ ] Implement one process-wide authoritative pending-request slot with atomic
+- [x] Implement one process-wide authoritative pending-request slot with atomic
       busy rejection before menu, input, render, or indicator mutation.
-- [ ] Implement one idempotent state-machine terminal decision shared by the
+- [x] Implement one idempotent state-machine terminal decision shared by the
       modeled completion, cancellation, cleanup, failure, and reload causes.
-- [ ] Mark the old handle inactive and clear pending state before invoking
+- [x] Mark the old handle inactive and clear pending state before invoking
       ordered injected cleanup ports for input, render, tooltip suppression,
       indicator ownership, and invalidation. At this phase, use stand-ins rather
       than claiming those later adapters are integrated.
-- [ ] Invoke at most one mutually exclusive callback after every injected cleanup
+- [x] Invoke at most one mutually exclusive callback after every injected cleanup
       port has run; contain callback failure and record private diagnostics.
-- [ ] Retain request callbacks until termination. Dropping an API or handle must
+- [x] Retain request callbacks until termination. Dropping an API or handle must
       not cancel an active prompt.
-- [ ] Add diagnostics for active identity/namespace, state, terminal cause and
+- [x] Add diagnostics for active identity/namespace, state, terminal cause and
       counts, callback failures, and current generation without exposing
       callback functions.
 
 ### Phase 4 completion gate
 
-- [ ] Focused tests cover exact option validation/copying, immutable values,
+- [x] Focused tests cover exact option validation/copying, immutable values,
       handle identity and error precedence, busy rejection, terminal same-domain
       behavior, garbage collection, and namespace isolation.
-- [ ] State-model tests use injected cleanup stand-ins to cover every terminal
+- [x] State-model tests use injected cleanup stand-ins to cover every terminal
       cause, repeated terminal requests, callback failure, mutual exclusion, and
       state-before-cleanup-before-callback ordering. They do not count as
       integrated input, render, indicator, lifecycle, or live evidence.
-- [ ] Tests prove callback-visible positions are detached values and consumer
+- [x] Tests prove callback-visible positions are detached values and consumer
       mutation cannot alter stored options or ownership.
-- [ ] The follow-up review confirms one process-wide prompt, no queue or
+- [x] The follow-up review confirms one process-wide prompt, no queue or
       replacement path, exact error tokens, and no spoofable namespace label.
+
+### Phase 4 implementation record
+
+- `ServiceKind.USER_PROMPT=3` and `ErrorCategory.SERVICE_BUSY=11` append to the
+  existing immutable contracts without changing earlier values. Runtime and
+  identity validators plus provider/API prefix maps recognize the new service.
+- `user_prompt/value.lua` owns immutable copied option and request snapshots.
+  The request namespace comes only from the validated binding argument; prompt
+  text cannot supply or override attribution.
+- `identity.lua` owns a distinct opaque prompt-handle family and reload-stable
+  weak registry over allocated composite identities. Prompt handles never
+  masquerade as map-registration handles.
+- `user_prompt/service.lua` owns the single production process slot and exposes
+  constructor injection only for model tests. Its one terminal path clears the
+  pending request, runs the five cleanup stand-ins in contract order, reaches
+  idle, and then contains one mutually exclusive callback.
+- This phase makes model and stand-in claims only. Public provider assembly,
+  concrete input/render/tooltip/indicator/invalidation adapters, lifecycle
+  teardown, module-registry integration, and live acceptance remain assigned
+  to later checklist phases.
 
 ## Phase 5 - Implement the prompt renderer and native indicator adapter
 
@@ -1005,7 +1025,12 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | 2026-08-03 | Phase 3 final-screen tooltip regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/tooltip/tooltip_screen_final_render.ds.lua` | Pass | Final settled-source protocol-2 run passed 1 success, 0 failures, 0 errors, 0 pending with terminal status, `mount_verified=true`, and `cleanup_confirmed=true`. Both Phase 3 live runs resolved `DFHACK_RUNNER` to `G:\Steam\steamapps\common\Dwarf Fortress\hack\dfhack-run.exe`; no stale or nonterminal run was counted. |
 | 2026-08-03 | Phase 3 follow-up review | Phase 3 contract, proposal presentation transaction, final source/tests, validation evidence, proposal hash, and repository/index state | Pass after correction | Review corrected two ownership gaps before closure: compatible hook adoption now refreshes the retained manager facade so current private methods exist without replacing trampolines, and active authoritative re-selection now retains the exact prepared owner instead of consulting a possibly replaced overlay module. It also added direct cleanup-failure proof and prepared/active diagnostics. Every task and gate maps to final evidence; no public API, second backend, fullscreen screen, registration change, context-menu change, or parallel hook exists. Proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`. |
 | 2026-08-03 | Phase 3 independent completion audit | Created goal, Phase 3 contract, proposal, final diff, implementation/test mappings, validation records, proposal hash, and repository/index state | Pass | High-confidence fresh read-only audit found all ten tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. The compositor branch was resolved as inapplicable; concrete prompt rendering, runtime binding, invalidation, lifecycle cancellation, and integrated presentation-failure handling remain intentionally deferred. Phase 3 markers were checked only after this audit passed. |
-| | Prompt state/provider units | `./tools/Run-UnitTests.ps1 <focused prompt paths>` | Pending | Values, handles, API, lifecycle, errors. |
+| 2026-08-03 | Phase 4 focused prompt model | `./tools/Run-UnitTests.ps1 tests/user_prompt/value.spec.lua tests/user_prompt/service.spec.lua` | Pass | Final strengthened source passed 14 successes, 0 failures, 0 errors, 0 pending. Tests cover exact option/request copying, immutable snapshots, non-spoofable namespace ownership, process-shared busy rejection, every terminal cause, ordered cleanup stand-ins, exact-once mutually exclusive callbacks, callback and cleanup failure containment, detached callback positions, handle collection, namespace isolation, and eligible callback reentry without a queue. |
+| 2026-08-03 | Phase 4 complete units and naming | `./tools/Run-UnitTests.ps1` | Pass | Final settled source passed 385 successes, 0 failures, 0 errors, 0 pending; the wrapper's naming precondition also passed. Shared contract, identity, runtime, acquisition, and API regressions cover the appended service kind, error token, weak handle family, and exact prefixes. |
+| 2026-08-03 | Phase 4 syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pass | Lua 5.4.6 syntax passed for 48 production and 63 test/support files. |
+| 2026-08-03 | Phase 4 offline build and package | `./tools/Build.ps1 -LiveReload:$false`; `./tools/Publish.ps1`; explicit `./tools/VerifyPackage.ps1` | Pass | Offline build, expanded verification, ZIP verification, and aggregate verification passed. Source/expanded inventory: 49 files and 439,003 bytes. ZIP: 49 entries, 439,003 uncompressed bytes, 106,688 archive bytes. No installed-runtime or integrated-adapter claim is made. |
+| 2026-08-03 | Phase 4 follow-up review | Phase 4 contract, proposal state/callback lifecycle, final source/tests, negative-scope search, proposal hash, and repository/index state | Pass | Review confirmed one production process slot; constructor-injected state is test-only. Busy rejection precedes identity allocation and cleanup-port mutation; no queue or active-request replacement path exists; callback-created successor prompts occur only after idle as approved. Diagnostics omit requests and callbacks, option fields cannot spoof namespace attribution, and all concrete UI/lifecycle adapters remain later work. Proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`; diff checks pass and nothing is staged. |
+| 2026-08-03 | Phase 4 independent completion audit | Created goal, Phase 4 contract, proposal, complete diff including untracked prompt modules/specs, final validation evidence, proposal hash, and repository/index state | Pass | High-confidence fresh read-only audit found all fourteen tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. Public provider assembly, real adapters, lifecycle teardown/reentry barriers, registry integration, and live proof were explicitly reclassified as expected later scope. Phase 4 markers were checked only after this audit passed. |
 | | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |
 | | Indicator units | `./tools/Run-UnitTests.ps1 <focused indicator paths>` | Pending | Hover, sentinel, takeover, restore. |
 | | Indicator takeover acceptance | Installed-runtime native-value mutation after first prompt write | Pending | Prove relinquishment and skipped restoration; simulation alone is insufficient. |

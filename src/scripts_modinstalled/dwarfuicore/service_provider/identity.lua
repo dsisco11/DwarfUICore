@@ -6,6 +6,8 @@ local immutable_proxy = reqscript('dwarfuicore/service_provider/immutable_proxy'
 
 local PROCESS_SLOT = 'service_provider_identity'
 local HANDLE_IDENTITY_SLOT = 'service_provider_map_handle_identities'
+local PROMPT_HANDLE_IDENTITY_SLOT =
+    'service_provider_prompt_handle_identities'
 local STATE_VERSION = 1
 local SEPARATED_HANDLE_STATE_VERSION = 2
 local IDENTITY_FIELDS = {
@@ -136,7 +138,8 @@ end
 ---@return boolean valid
 local function is_service_kind(value)
     return value == contracts.ServiceKind.TOOLTIP or
-        value == contracts.ServiceKind.CONTEXT_MENU
+        value == contracts.ServiceKind.CONTEXT_MENU or
+        value == contracts.ServiceKind.USER_PROMPT
 end
 
 ---Validates the exact reload-stable counter state shape.
@@ -215,6 +218,26 @@ local function get_map_handle_identities()
     assert(type(identities) == 'table' and type(metatable) == 'table' and
             metatable.__mode == 'k',
         'DwarfUICore map handle identity registry must have weak keys.')
+    return identities
+end
+
+---Returns the reload-stable weak registry that recognizes prompt handles.
+---@return table<table, dwarfuicore.CompositeIdentity> identities
+local function get_prompt_handle_identities()
+    assert(type(dfhack) == 'table',
+        'DwarfUICore prompt handle identity lookup requires DFHack process state.')
+    if dfhack.dwarfuicore == nil then dfhack.dwarfuicore = {} end
+    assert(type(dfhack.dwarfuicore) == 'table',
+        'DwarfUICore process namespace must be a table.')
+    local identities = dfhack.dwarfuicore[PROMPT_HANDLE_IDENTITY_SLOT]
+    if identities == nil then
+        identities = setmetatable({}, {__mode='k'})
+        dfhack.dwarfuicore[PROMPT_HANDLE_IDENTITY_SLOT] = identities
+    end
+    local metatable = type(identities) == 'table' and getmetatable(identities)
+    assert(type(identities) == 'table' and type(metatable) == 'table' and
+            metatable.__mode == 'k',
+        'DwarfUICore prompt handle identity registry must have weak keys.')
     return identities
 end
 
@@ -313,12 +336,16 @@ function get_process_allocator()
 end
 
 local handle_factory = immutable_proxy.new_factory('map registration handle')
+local prompt_handle_factory = immutable_proxy.new_factory(
+    'map location prompt handle')
 
 ---Creates an opaque immutable map-registration handle from copied identity.
 ---@param identity table
 ---@return table handle
 function create_map_handle(identity)
     local current = CompositeIdentity.new(identity)
+    assert(current.service_kind ~= contracts.ServiceKind.USER_PROMPT,
+        'DwarfUICore prompt identities require prompt handles.')
     local allocated = allocated_identity_snapshots[identity]
     assert(allocated,
         'DwarfUICore map handle identity was not allocated by this runtime.')
@@ -347,4 +374,70 @@ end
 function is_map_handle(handle)
     return get_map_handle_identities()[handle] ~= nil or
         handle_factory:is_instance(handle)
+end
+
+---Creates an opaque immutable map-location prompt handle from copied identity.
+---@param identity table
+---@return dwarfuicore.MapLocationPrompt handle
+function create_prompt_handle(identity)
+    local current = CompositeIdentity.new(identity)
+    assert(current.service_kind == contracts.ServiceKind.USER_PROMPT,
+        'DwarfUICore prompt handles require a UserPrompt identity.')
+    local allocated = allocated_identity_snapshots[identity]
+    assert(allocated,
+        'DwarfUICore prompt handle identity was not allocated by this runtime.')
+    for field in pairs(IDENTITY_FIELDS) do
+        assert(current[field] == allocated[field],
+            'DwarfUICore allocated prompt handle identity was modified.')
+    end
+    allocated_identity_snapshots[identity] = nil
+    local handle = prompt_handle_factory:create(CompositeIdentity.new(allocated))
+    get_prompt_handle_identities()[handle] = CompositeIdentity.new(allocated)
+    return handle
+end
+
+---Returns a copy of a recognized prompt handle's private identity.
+---@param handle any
+---@return table|nil identity
+function get_prompt_handle_identity(handle)
+    local value = get_prompt_handle_identities()[handle] or
+        prompt_handle_factory:get_backing(handle)
+    return value and CompositeIdentity.new(value) or nil
+end
+
+---Returns whether a value is a recognized map-location prompt handle.
+---@param handle any
+---@return boolean recognized
+function is_prompt_handle(handle)
+    return get_prompt_handle_identities()[handle] ~= nil or
+        prompt_handle_factory:is_instance(handle)
+end
+
+---Classifies a prompt handle against one current API ownership domain.
+---@param handle any
+---@param runtime_generation integer
+---@param contract_major integer
+---@param consumer_namespace string
+---@return dwarfuicore.CompositeIdentity|nil identity
+---@return dwarfuicore.ErrorCategory|nil error_category
+function classify_prompt_handle(handle, runtime_generation, contract_major,
+        consumer_namespace)
+    assert(is_positive_integer(runtime_generation),
+        'DwarfUICore runtime generation must be a positive integer.')
+    assert(is_positive_integer(contract_major),
+        'DwarfUICore contract major must be a positive integer.')
+    namespace.validate(consumer_namespace)
+    local identity = get_prompt_handle_identity(handle)
+    if identity == nil then
+        return nil, contracts.ErrorCategory.INVALID_ARGUMENT
+    end
+    if identity.runtime_generation ~= runtime_generation then
+        return nil, contracts.ErrorCategory.STALE_HANDLE
+    end
+    if identity.service_kind ~= contracts.ServiceKind.USER_PROMPT or
+            identity.contract_major ~= contract_major or
+            identity.namespace ~= consumer_namespace then
+        return nil, contracts.ErrorCategory.FOREIGN_HANDLE
+    end
+    return identity, nil
 end

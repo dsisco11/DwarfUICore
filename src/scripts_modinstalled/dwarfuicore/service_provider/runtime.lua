@@ -25,7 +25,8 @@ local SERVICE_FIELDS = {generation=true, health=true, value=true}
 ---@return boolean valid
 local function is_service_kind(value)
     return value == contracts.ServiceKind.TOOLTIP or
-        value == contracts.ServiceKind.CONTEXT_MENU
+        value == contracts.ServiceKind.CONTEXT_MENU or
+        value == contracts.ServiceKind.USER_PROMPT
 end
 
 ---Returns whether a value is a known runtime status.

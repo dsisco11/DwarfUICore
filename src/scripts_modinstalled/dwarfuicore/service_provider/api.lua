@@ -8,6 +8,7 @@ local runtime = reqscript('dwarfuicore/service_provider/runtime')
 local PREFIX_BY_SERVICE_KIND = {
     [contracts.ServiceKind.TOOLTIP]='DwarfUICore TooltipServiceApi:',
     [contracts.ServiceKind.CONTEXT_MENU]='DwarfUICore ContextMenuServiceApi:',
+    [contracts.ServiceKind.USER_PROMPT]='DwarfUICore UserPromptServiceApi:',
 }
 
 ---Provides namespace-scoped access to the shared tooltip runtime.

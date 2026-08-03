@@ -12,6 +12,7 @@ describe('service-provider internal contracts', function()
     it('defines immutable numeric closed state sets', function()
         assert.equals(1, contracts.ServiceKind.TOOLTIP)
         assert.equals(2, contracts.ServiceKind.CONTEXT_MENU)
+        assert.equals(3, contracts.ServiceKind.USER_PROMPT)
         assert.equals(5, contracts.RuntimeStatus.RETIRED)
         assert.equals(3, contracts.ServiceHealth.HEALTHY)
         for _, enum in ipairs({contracts.ServiceKind, contracts.RuntimeStatus,
@@ -27,6 +28,7 @@ describe('service-provider internal contracts', function()
             INITIALIZATION_BUSY=true, INITIALIZATION_FAILED=true,
             STALE_API=true, INVALID_ARGUMENT=true, FOREIGN_HANDLE=true,
             STALE_HANDLE=true,
+            SERVICE_BUSY=true,
         }
         local actual = {}
         local count = 0

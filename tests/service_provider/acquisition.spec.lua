@@ -153,6 +153,15 @@ describe('service-provider atomic acquisition', function()
         assert_category(failure, 'ContextMenu', 'INVALID_VERSION')
     end)
 
+    it('uses the UserPrompt provider prefix for its service kind', function()
+        local state = healthy_state()
+        local process = {dwarfuicore={service_provider_runtime=state}}
+        local acquisition = load_acquisition(process)
+        local adapter = complete_adapter(contracts.ServiceKind.USER_PROMPT)
+        local failure = acquire_failure(acquisition, adapter, 0, 'consumer')
+        assert_category(failure, 'UserPrompt', 'INVALID_VERSION')
+    end)
+
     it('validates public arguments before a missing private implementation',
             function()
         local process = {dwarfuicore={}}

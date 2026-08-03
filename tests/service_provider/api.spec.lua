@@ -168,6 +168,27 @@ describe('namespace-bound service API proxy', function()
             'Tooltip', 'INVALID_ARGUMENT')
     end)
 
+    it('uses the approved UserPrompt API prefix', function()
+        local runtime, state = runtime_stub()
+        local api = load_api(runtime, {
+            get_map_handle_identity=function() end,
+        })
+        local factory = api.new_factory(
+            contracts.ServiceKind.USER_PROMPT,
+            'UserPromptServiceApi', {'clear_namespace'})
+        local object = factory:create({
+            facade={clear_namespace=function() return false end},
+            contract_major=1,
+            namespace='consumer',
+            generation=7,
+            service_kind=contracts.ServiceKind.USER_PROMPT,
+        })
+        state.generation = 8
+
+        assert_category(function() object:clear_namespace() end,
+            'UserPrompt', 'STALE_API')
+    end)
+
     it('uses the complete API failure precedence matrix without delegation',
             function()
         local cases = {

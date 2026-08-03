@@ -8,6 +8,8 @@ local PREFIX_BY_SERVICE_KIND = {
     [contracts.ServiceKind.TOOLTIP]='DwarfUICore TooltipServiceProvider:',
     [contracts.ServiceKind.CONTEXT_MENU]=
         'DwarfUICore ContextMenuServiceProvider:',
+    [contracts.ServiceKind.USER_PROMPT]=
+        'DwarfUICore UserPromptServiceProvider:',
 }
 
 ---@class dwarfuicore.ServiceAcquisitionAdapter

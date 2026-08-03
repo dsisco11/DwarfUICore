@@ -150,6 +150,24 @@ describe('service-provider process runtime', function()
             contracts.ServiceKind.TOOLTIP, 1))
     end)
 
+    it('accepts UserPrompt in every service-kind-keyed runtime map', function()
+        local state = healthy_state()
+        local process = {dwarfuicore={service_provider_runtime=state}}
+        local runtime = load_runtime(process)
+        local service, created = runtime.initialize_service(
+            contracts.ServiceKind.USER_PROMPT,
+            function(generation) return {generation=generation} end)
+
+        assert.is_true(created)
+        assert.equals(service, runtime.get_service(
+            contracts.ServiceKind.USER_PROMPT, 1))
+        local facade = {}
+        runtime.publish_facade(
+            contracts.ServiceKind.USER_PROMPT, 1, facade)
+        assert.equals(facade, runtime.get_facade(
+            contracts.ServiceKind.USER_PROMPT, 1))
+    end)
+
     it('clears failed initialization without facade or healthy publication', function()
         local state = healthy_state()
         local process = {dwarfuicore={service_provider_runtime=state}}

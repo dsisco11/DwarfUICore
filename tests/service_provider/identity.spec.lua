@@ -40,6 +40,8 @@ describe('service-provider identity primitives', function()
             contracts.ServiceKind.TOOLTIP, 1, 'alpha')
         local cross_domain = allocator:allocate_identity(2,
             contracts.ServiceKind.CONTEXT_MENU, 3, 'beta')
+        local prompt = allocator:allocate_identity(2,
+            contracts.ServiceKind.USER_PROMPT, 1, 'gamma')
         assert.equals(1, first.local_identity)
         assert.equals(2, second.local_identity)
         assert.equals(3, cross_domain.local_identity)
@@ -48,11 +50,12 @@ describe('service-provider identity primitives', function()
             namespace='beta', local_identity=3}, cross_domain)
         assert.equals(1, allocator:allocate_sequence())
         assert.equals(2, allocator:allocate_sequence())
-        assert.same({version=1, next_identity=3, next_sequence=2},
+        assert.equals(4, prompt.local_identity)
+        assert.same({version=1, next_identity=4, next_sequence=2},
             allocator:snapshot())
         local state = process.dwarfuicore.service_provider_identity
         assert.equals(1, state.version)
-        assert.equals(3, state.next_identity)
+        assert.equals(4, state.next_identity)
         assert.equals(2, state.next_sequence)
         assert.is_nil(state.map_handle_identities)
     end)
@@ -217,6 +220,69 @@ describe('service-provider identity primitives', function()
 
         assert.is_true(second.is_map_handle(handle))
         assert.same(allocated, second.get_map_handle_identity(handle))
+    end)
+
+    it('keeps prompt handles opaque, distinct, reload-stable, and weak',
+            function()
+        local process = {}
+        local first = load_identity(process)
+        local allocated = first.get_process_allocator():allocate_identity(4,
+            contracts.ServiceKind.USER_PROMPT, 1, 'plugin')
+        local handle = first.create_prompt_handle(allocated)
+
+        assert.is_true(first.is_prompt_handle(handle))
+        assert.is_false(first.is_map_handle(handle))
+        assert.same(allocated, first.get_prompt_handle_identity(handle))
+        assert.is_nil(first.get_map_handle_identity(handle))
+        assert.same({}, (function()
+            local exposed = {}
+            for key, value in pairs(handle) do exposed[key] = value end
+            return exposed
+        end)())
+        assert.is_false(getmetatable(handle))
+        assert.has_error(function() handle.namespace = 'other' end,
+            'DwarfUICore map location prompt handle is immutable.')
+
+        local second = load_identity(process)
+        assert.is_true(second.is_prompt_handle(handle))
+        assert.same(allocated, second.get_prompt_handle_identity(handle))
+        local registry = process.dwarfuicore
+            .service_provider_prompt_handle_identities
+        local weak = setmetatable({handle}, {__mode='v'})
+        handle = nil
+        collectgarbage('collect')
+        collectgarbage('collect')
+        assert.is_nil(weak[1])
+        assert.is_nil(next(registry))
+    end)
+
+    it('classifies prompt handles in malformed stale and foreign order',
+            function()
+        local identity = load_identity({})
+        local allocator = identity.get_process_allocator()
+        local current = identity.create_prompt_handle(
+            allocator:allocate_identity(7,
+                contracts.ServiceKind.USER_PROMPT, 1, 'plugin'))
+        local stale = identity.create_prompt_handle(
+            allocator:allocate_identity(6,
+                contracts.ServiceKind.USER_PROMPT, 1, 'other'))
+
+        local recognized, category = identity.classify_prompt_handle(
+            {}, 7, 1, 'plugin')
+        assert.is_nil(recognized)
+        assert.equals(contracts.ErrorCategory.INVALID_ARGUMENT, category)
+        recognized, category = identity.classify_prompt_handle(
+            stale, 7, 1, 'plugin')
+        assert.is_nil(recognized)
+        assert.equals(contracts.ErrorCategory.STALE_HANDLE, category)
+        recognized, category = identity.classify_prompt_handle(
+            current, 7, 1, 'other')
+        assert.is_nil(recognized)
+        assert.equals(contracts.ErrorCategory.FOREIGN_HANDLE, category)
+        recognized, category = identity.classify_prompt_handle(
+            current, 7, 1, 'plugin')
+        assert.same(identity.get_prompt_handle_identity(current), recognized)
+        assert.is_nil(category)
     end)
 
     it('does not retain map handles through reload-stable recognition state',

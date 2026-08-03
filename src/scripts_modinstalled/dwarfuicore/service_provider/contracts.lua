@@ -3,7 +3,11 @@
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
 ---@enum dwarfuicore.ServiceKind
-ServiceKind = immutable_enum.define({TOOLTIP=1, CONTEXT_MENU=2}, 'ServiceKind')
+ServiceKind = immutable_enum.define({
+    TOOLTIP=1,
+    CONTEXT_MENU=2,
+    USER_PROMPT=3,
+}, 'ServiceKind')
 ---@enum dwarfuicore.RuntimeStatus
 RuntimeStatus = immutable_enum.define({INITIALIZING=1, HEALTHY=2, DISABLED=3,
     RETIRING=4, RETIRED=5}, 'RuntimeStatus')
@@ -15,6 +19,7 @@ ErrorCategory = immutable_enum.define({
     INVALID_VERSION=1, UNSUPPORTED_VERSION=2, INVALID_NAMESPACE=3,
     SERVICE_UNHEALTHY=4, INITIALIZATION_BUSY=5, INITIALIZATION_FAILED=6,
     STALE_API=7, INVALID_ARGUMENT=8, FOREIGN_HANDLE=9, STALE_HANDLE=10,
+    SERVICE_BUSY=11,
 }, 'ErrorCategory')
 
 local ERROR_TOKEN_BY_CATEGORY = {
@@ -28,6 +33,7 @@ local ERROR_TOKEN_BY_CATEGORY = {
     [ErrorCategory.INVALID_ARGUMENT]='INVALID_ARGUMENT',
     [ErrorCategory.FOREIGN_HANDLE]='FOREIGN_HANDLE',
     [ErrorCategory.STALE_HANDLE]='STALE_HANDLE',
+    [ErrorCategory.SERVICE_BUSY]='SERVICE_BUSY',
 }
 
 ---Returns the stable public token for an internal error category.

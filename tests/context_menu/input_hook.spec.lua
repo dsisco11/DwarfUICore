@@ -25,6 +25,42 @@ local function load_hook(process, overlay)
 end
 
 describe('context-menu input hook', function()
+    it('dispatches before native delegation with exact boundary values',
+            function()
+        local events = {}
+        local viewscreen = {}
+        local keys = {CUSTOM=true}
+        local overlay = {
+            feed_viewscreen_widgets=function(name, owner, input, marker)
+                table.insert(events, 'predecessor')
+                assert.equals('dwarfmode', name)
+                assert.is_equal(viewscreen, owner)
+                assert.is_equal(keys, input)
+                assert.equals('marker', marker)
+                return 'first', nil, 'third'
+            end,
+        }
+        local module = load_hook({dwarfuicore={}}, overlay)
+        module.manager:set_handler(function(input, transport, owner)
+            table.insert(events, 'handler')
+            assert.is_equal(keys, input)
+            assert.equals(
+                module.ContextMenuInputTransport.NATIVE, transport)
+            assert.is_equal(overlay, owner)
+            return false
+        end)
+        module.manager:ensure_native()
+
+        local result = table.pack(overlay.feed_viewscreen_widgets(
+            'dwarfmode', viewscreen, keys, 'marker'))
+
+        assert.same({'handler', 'predecessor'}, events)
+        assert.equals(3, result.n)
+        assert.equals('first', result[1])
+        assert.is_nil(result[2])
+        assert.equals('third', result[3])
+    end)
+
     it('consumes a handled native table and preserves miss returns exactly',
             function()
         local calls = {}

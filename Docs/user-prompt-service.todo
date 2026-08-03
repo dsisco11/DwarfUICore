@@ -83,59 +83,233 @@ the evidence specified by their phase gate.
 
 ## Phase 1 - Characterize existing seams and map the change
 
-- [ ] Map the current provider flow from `dwarfuicore/services` through provider,
+- [x] Map the current provider flow from `dwarfuicore/services` through provider,
       acquisition, immutable API, adapter, service record, process state,
       identity, reload, registry, and package ownership.
-- [ ] Map the current context-menu input path through native
+- [x] Map the current context-menu input path through native
       `plugins.overlay.feed_viewscreen_widgets`, Lua-screen `onInput`, root
       reconciliation, handler dispatch, predecessor delegation, and reload
       adoption.
-- [ ] Map every internal context-menu opening and closing path, including the
+- [x] Map every internal context-menu opening and closing path, including the
       service method needed to close an existing session without selecting an
       entry.
-- [ ] Map the tooltip intent, presenter, renderer, completed-render hooks,
+- [x] Map the tooltip intent, presenter, renderer, completed-render hooks,
       selected transport, redraw, motion, resize, and reload-adoption path.
-- [ ] Map current pointer and map sampling and prove where
+- [x] Map current pointer and map sampling and prove where
       `dfhack.gui.getMousePos()` can return nil.
-- [ ] Revalidate the sibling DwarfDirect evidence read-only: its input-owning
+- [x] Revalidate the sibling DwarfDirect evidence read-only: its input-owning
       surface runs before competing dwarfmode handlers and consumes handled
       input by returning true. Record why its fullscreen screen, validation,
       and targeting state remain rejected here.
-- [ ] Map the identity and API validation code and record why the existing
+- [x] Map the identity and API validation code and record why the existing
       map-registration handle registry and hard-coded API handle validation are
       insufficient or sufficient for `MapLocationPrompt` handles.
-- [ ] Verify from the target DFHack source and installed bindings that
+- [x] Verify from the target DFHack source and installed bindings that
       `gui.paint_frame()` centers a supplied title and determine its exact cell
       capacity and clipping behavior.
-- [ ] Verify the target DFHack representation and inactive sentinel for
+- [x] Verify the target DFHack representation and inactive sentinel for
       `df.global.game.main_interface.recenter_indicator_m` and prove direct
       assignment does not pan, recenter, change z-level, or alter follow state.
-- [ ] Record the sibling DwarfUI mood-popover selection path and the underlying
+- [x] Record the sibling DwarfUI mood-popover selection path and the underlying
       DFHack implementation that establish `recenter_indicator_m` as the native
       tile-selection indicator; do not edit either sibling checkout.
-- [ ] Add characterization tests for context-menu pre-delegation order, exact
+- [x] Add characterization tests for context-menu pre-delegation order, exact
       predecessor arguments and returns, foreign wrappers, failure behavior,
       root reconciliation, and Core reload adoption.
-- [ ] Add characterization tests for tooltip completed-render selection,
+- [x] Add characterization tests for tooltip completed-render selection,
       single-owner dispatch, draw order, motion, resize, clamping, suppression
       feasibility, and Core reload adoption.
-- [ ] Record a concrete sufficiency verdict for the current input and render
+- [x] Record a concrete sufficiency verdict for the current input and render
       seams. For each insufficient seam, name the smallest internal extension
       required; do not authorize unrelated shared refactoring.
-- [ ] Produce the exact expected production, unit, DwarfSpec, documentation,
+- [x] Produce the exact expected production, unit, DwarfSpec, documentation,
       registry, reload, build, and package file map.
 
 ### Phase 1 completion gate
 
-- [ ] Characterization tests fail under representative changes to input order,
+- [x] Characterization tests fail under representative changes to input order,
       predecessor preservation, completed-render owner selection, or reload
       adoption.
-- [ ] The input/render sufficiency verdict is supported by current code and
+- [x] The input/render sufficiency verdict is supported by current code and
       tests, not by the removed implementation plan.
-- [ ] Every proposed shared-type change is tied to a specific version 1
+- [x] Every proposed shared-type change is tied to a specific version 1
       requirement that cannot be implemented safely through the current API.
-- [ ] The follow-up review confirms the file map and smallest-change decisions
+- [x] The follow-up review confirms the file map and smallest-change decisions
       cover the proposal without expanding consumer scope.
+
+### Phase 1 characterization record
+
+Repository evidence was collected at DwarfUICore HEAD
+`d9e2e303848f4c1fceafb8be90a802a7ed18cc6d`. Sibling repositories were read
+only. DwarfDirect HEAD `4616ceba` was clean; DwarfUI HEAD `33f5e525` contained
+unrelated minecart-route work that remains untouched; DFHack HEAD `425442d`
+supplied the native implementation evidence below.
+
+#### Existing ownership and lifecycle map
+
+- Provider acquisition runs from `dwarfuicore/services.lua` through the
+  immutable provider proxy, the service-specific provider, `acquisition.lua`,
+  `runtime.lua`, the service adapter, `api.lua`, and `identity.lua`. The process
+  runtime owns one service record and facade cache per immutable numeric
+  `ServiceKind`; `module_registry.lua`, the reload command, package inventory,
+  and provider contract tests establish reload and distribution ownership.
+- Context-menu input has one authoritative owner in
+  `context_menu/input_hook.lua`. Its native trampoline wraps
+  `plugins.overlay.feed_viewscreen_widgets`; its weak Lua-screen trampolines
+  wrap `onInput`. Both dispatch before the predecessor, preserve exact
+  arguments and packed returns, reconcile the current root, adopt compatible
+  wrappers across reload, and leave foreign outer wrappers inert when retired.
+  Handler failure currently disables the handler and delegates to the
+  predecessor.
+- `context_menu/service.lua` installs that one handler. `_MOUSE_R` sampling can
+  call the sole `open()` transition. Selection, dismissal, registration
+  removal, world-state cleanup, failure disablement, shutdown, and screen
+  actions converge on `close(reason)` or its protected implementation. That
+  close operation clears the session before presentation cleanup and is the
+  required non-selecting close seam for prompt activation.
+- Tooltip state remains authoritative in `tooltip/service.lua`.
+  `tooltip/presenter.lua` reads each intent, resolves native-overlay versus
+  exact current Lua-screen ownership, selects one transport in
+  `tooltip/render_hook.lua`, lays out on revision or viewport-size changes, and
+  asks `tooltip/renderer.lua` to paint after the predecessor completes.
+  Renderer mutation invalidates the screen; pointer motion, clamping, resize,
+  selected-owner dispatch, exact returns, foreign wrappers, and reload adoption
+  are already characterized by the focused tooltip specs.
+- Screen-pointer sampling uses `dfhack.screen.getMousePos()` in `pointer.lua`.
+  Map sampling is demand-gated and calls `dfhack.gui.getMousePos()` in
+  `pointer_poller.lua` and `context_menu/input_sample.lua`; nil is a normal
+  unavailable-map result. Prompt completion must therefore sample once inside
+  the `_MOUSE_L` release handler and must not reuse a polling or indicator
+  sample.
+
+#### Sibling and DFHack evidence
+
+- DwarfDirect's fullscreen `DwarfDirectOverlay:onInput()` runs its interaction
+  handler before competing dwarfmode behavior and returns true for handled
+  targeting gestures, including mouse and Escape boundaries. Its fullscreen
+  screen, command-specific validation, and private targeting state remain
+  rejected because DwarfUICore already owns root-aware native and Lua-screen
+  seams and the approved prompt accepts every sampled position, including nil.
+- DwarfUI mood-popover list submission calls `open_row()`, whose default unit
+  opener calls `dfhack.gui.revealInDwarfmodeMap(pos, true, true)`. DFHack's
+  `Gui.cpp` implementation changes view/follow state before assigning
+  `recenter_indicator_m`, establishing the native selection indicator while
+  also proving why UserPrompt must assign the field directly instead of calling
+  the reveal helper.
+- `df.d_interface.xml` and generated `main_interface.h` type
+  `recenter_indicator_m` as `df.coord`. The generated constructor initializes
+  all three signed 16-bit fields to `-30000`; `df.coord:isValid()` uses a
+  nonnegative x coordinate. The focused installed-runtime characterization
+  snapshots and restores the field, writes a detached coordinate and the exact
+  sentinel, and verifies `window_x`, `window_y`, `window_z`, `follow_unit`, and
+  `follow_item` remain unchanged.
+- Target source and installed `gui.lua` contain the same `paint_frame()` title
+  implementation. For total frame width `W`, it paints
+  `'  '..title..'  '` into `W - 2` top-border cells, starting at
+  `x1 + max(0, floor((W - 4 - #title) / 2))`. A complete title therefore needs
+  `W >= #title + 6`; narrower output is clipped deterministically from the
+  right. Source SHA-256 is
+  `1B42A70840C92A8AF15B912237FA78A6882406B993A40A2E341641058E9DD048`;
+  the inspected installed function is text-identical even though its full-file
+  SHA-256 is
+  `0BB625D245B6593B773355F56BCEDFFD7B3898C525FBB2C4CCEE162FB7E8B4DB`.
+
+#### Sufficiency and smallest-change verdict
+
+- The input seam is insufficient as currently shaped. It exposes one
+  context-menu-owned handler, has no prompt-first ordered consumer slot, and
+  treats every handler failure as unowned by delegating. Contract major 1
+  requires prompt-first arbitration and consumption after a prompt-owned
+  failure. The smallest safe extension is to generalize this existing private
+  owner into a deterministic two-consumer dispatcher: injected UserPrompt
+  first, context-menu opening second, with pre-dispatch ownership
+  classification and owner-specific failure notification. The existing
+  native/screen trampolines, root reconciliation, predecessor contract,
+  foreign-wrapper behavior, and reload adoption remain intact. No public input
+  API, fullscreen screen, general registration framework, or parallel hook is
+  authorized.
+- The completed-render seam is sufficient. Its single selected owner can gain
+  one private authoritative prompt-intent slot and one ordinary-tooltip
+  suppression flag. The presenter can choose the prompt renderer while active
+  and otherwise retain the current tooltip renderer and intent. The
+  characterization proves presentation can be hidden while tooltip
+  registration, selected intent, hook owner, and later resumption remain
+  intact. No second render hook, tooltip registration, or public tooltip
+  internals are authorized.
+- Existing composite identity allocation is reusable, but map-registration
+  handles and `api.lua`'s hard-coded map-handle validation are insufficient.
+  Contract major 1 requires a distinct prompt-handle domain with service,
+  contract-major, namespace, generation, stale/foreign/current classification,
+  and terminal `cancel()`/`is_active()` behavior. The smallest change is a
+  prompt-specific weak handle registry plus operation-aware private API
+  validation; prompt handles must not masquerade as map registrations.
+
+#### Exact expected file map
+
+The following is the implementation boundary. A later change outside this map
+requires a recorded proposal requirement and a revised smallest-change verdict.
+Production module paths below are relative to `src/scripts_modinstalled/`;
+every other path is repository-relative.
+
+- New production modules:
+  `dwarfuicore/service_provider/user_prompt_adapter_v1.lua`,
+  `dwarfuicore/service_provider/user_prompt_provider.lua`,
+  `dwarfuicore/user_prompt/value.lua`,
+  `dwarfuicore/user_prompt/input_consumer.lua`,
+  `dwarfuicore/user_prompt/indicator.lua`,
+  `dwarfuicore/user_prompt/renderer.lua`,
+  `dwarfuicore/user_prompt/service.lua`, and
+  `dwarfuicore/user_prompt/runtime.lua`.
+- Existing production modules expected to change:
+  `dwarfuicore/services.lua`, `dwarfuicore/module_registry.lua`,
+  `dwarfuicore/command.lua`,
+  `dwarfuicore/service_provider/contracts.lua`,
+  `dwarfuicore/service_provider/identity.lua`,
+  `dwarfuicore/service_provider/runtime.lua`,
+  `dwarfuicore/service_provider/acquisition.lua`,
+  `dwarfuicore/service_provider/api.lua`,
+  `dwarfuicore/context_menu/input_hook.lua`,
+  `dwarfuicore/context_menu/service.lua`,
+  `dwarfuicore/tooltip/presenter.lua`, and
+  `dwarfuicore/tooltip/runtime.lua`.
+- Focused unit files expected to be added:
+  `tests/user_prompt/value.spec.lua`,
+  `tests/user_prompt/input_consumer.spec.lua`,
+  `tests/user_prompt/indicator.spec.lua`,
+  `tests/user_prompt/renderer.spec.lua`,
+  `tests/user_prompt/service.spec.lua`, and
+  `tests/user_prompt/runtime.spec.lua`.
+- Existing unit files expected to change:
+  `tests/context_menu/input_hook.spec.lua`,
+  `tests/context_menu/service.spec.lua`,
+  `tests/tooltip/presenter.spec.lua`,
+  `tests/tooltip/render_hook.spec.lua`,
+  `tests/service_provider/contracts.spec.lua`,
+  `tests/service_provider/identity.spec.lua`,
+  `tests/service_provider/runtime.spec.lua`,
+  `tests/service_provider/acquisition.spec.lua`,
+  `tests/service_provider/api.spec.lua`,
+  `tests/service_provider/providers.spec.lua`,
+  `tests/service_provider/value_types.spec.lua`,
+  `tests/module_registry.spec.lua`, `tests/package_contract.spec.lua`, and
+  `tests/dwarfuicore_command.spec.lua`.
+- DwarfSpec files expected to be added:
+  `tests/user_prompt/indicator_characterization.ds.lua`,
+  `tests/user_prompt/map_input.ds.lua`,
+  `tests/user_prompt/final_render.ds.lua`,
+  `tests/user_prompt/lifecycle.ds.lua`, and
+  `tests/user_prompt/runtime_reload.ds.lua`. Existing context-menu, tooltip, and
+  provider DwarfSpec files are regression evidence and are not expected to
+  change.
+- Documentation changes are limited to `README.md` and this
+  `Docs/user-prompt-service.todo` execution record.
+  `Docs/user-prompt-service-proposal.md` remains unchanged.
+- Registry/reload/package ownership is represented by
+  `dwarfuicore/module_registry.lua`, `dwarfuicore/command.lua`, provider/runtime
+  modules, `tests/module_registry.spec.lua`, `tests/package_contract.spec.lua`,
+  and `tests/dwarfuicore_command.spec.lua`. The existing build and publish tools,
+  `.env`, rockspec, installed mod files, DwarfUI, DwarfDirect, and DFHack are not
+  expected to change.
 
 ## Phase 2 - Establish prompt-first input ownership
 
@@ -697,7 +871,14 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | 2026-08-03 | Proposal traceability | Acceptance criteria, non-goals, rejected alternatives, and traceability table | Pass | Every acceptance criterion and every non-goal/rejected alternative maps to at least one implementation phase and one planned evidence row. Finer details remain governed by the proposal. |
 | 2026-08-03 | Phase 0 follow-up review | Proposal, Phase 0 contract, current diff, repository status, and baseline evidence | Pass | Confirmed no production work began, the proposal hash is unchanged, the only tracked change is this checklist's baseline record, and the evidence distinguishes later regressions. The review strengthened surface evidence by naming exact seams and fixtures. |
 | 2026-08-03 | Phase 0 independent completion audit | Created goal, Phase 0 contract, proposal, current repository state, and recorded evidence | Pass | High-confidence audit found no confirmed issue, partial requirement, or evidence gap. The native-indicator characterization is explicitly required in Phase 1 and is expected pending work, not a Phase 0 defect. Phase 0 markers were checked only after this audit passed. |
-| | Characterization units | Focused existing input/render/provider specs | Pending | Prove insufficiency before shared edits. |
+| 2026-08-03 | Characterization units | `./tools/Run-UnitTests.ps1 tests/context_menu/input_hook.spec.lua tests/tooltip/render_hook.spec.lua tests/tooltip/presenter.spec.lua tests/tooltip/renderer.spec.lua` | Pass | 48 successes, 0 failures, 0 errors, 0 pending. The assertions directly distinguish handler-before-predecessor order, packed trailing-nil returns, selected-owner-only render, predecessor-before-presenter order, and stable trampoline adoption; reversing or removing any representative invariant makes its named example fail. |
+| 2026-08-03 | Native indicator characterization | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/user_prompt/indicator_characterization.ds.lua` | Pass | 1 success, 0 failures, 0 errors, 0 pending; exact `df.coord` sentinel and direct field assignment were verified with view/follow snapshots restored; `cleanup_confirmed=true`. The named DwarfSpec argument preserved runner resolution as `G:\Steam\steamapps\common\Dwarf Fortress\hack\dfhack-run.exe`. |
+| 2026-08-03 | Characterization syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pass | Lua 5.4.6 syntax passed for 46 production and 61 test/support files. |
+| 2026-08-03 | Phase 1 complete unit regression | `./tools/Run-UnitTests.ps1` | Pass | 352 successes, 0 failures, 0 errors, 0 pending. Unit naming runs as a required precondition of this wrapper. |
+| 2026-08-03 | Phase 1 follow-up review | Phase 1 contract, approved proposal, source/test mappings, current diff, and exact file boundary | Pass | All fourteen tasks and four completion-gate requirements map to current evidence. Review removed a redundant proposed handle module in favor of the established identity owner and replaced a vague documentation candidate with exact files. No production or sibling source changed, proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`, and every shared change is traced to a contract-major-1 requirement. |
+| 2026-08-03 | Phase 1 mutation sensitivity | Four reversible production mutations; focused input/render specs; restored focused and complete unit reruns | Pass | Calling the native predecessor before dispatch failed 3 input examples (5/3/0); dropping packed returns failed 2 and errored 1 (5/2/1); omitting selected-owner equality failed the selected-owner example (22/1/0); forcing reload rewrapping by bypassing both compatible-adoption branches failed 5 render-hook examples (18/5/0). An initial single-branch bypass remained green because the second compatible-chain branch still adopted the same hook, so it was correctly reclassified as behavior-preserving rather than counted. Every mutation was immediately reversed. Restored focused seams passed 48/48 and restored complete units passed 352/352; canonical production blobs equal the index, neither production file appears in the final status, and no production change remains. |
+| 2026-08-03 | Phase 1 post-mutation follow-up review | Phase 1 contract, final characterization diff, mutation results, restored-source hashes, and repository/index status | Pass | The previously missing direct mutation evidence now covers all four named invariants. The behavior-preserving single-branch reload mutation is disclosed rather than misreported. Both temporarily touched production files have worktree hashes equal to their index blobs and no staged or unstaged diff. Final scope remains the todo plus three characterization tests; the proposal and sibling repositories remain unchanged. |
+| 2026-08-03 | Phase 1 independent completion audit | Created goal, Phase 1 contract, proposal, final diff, source/test mappings, terminal results, mutation evidence, and restored repository state | Pass | High-confidence fresh audit found all fourteen tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. Phase 1 markers were checked only after this audit passed. |
 | | Negative-scope audit | Public symbols, source search, file map, and diff | Pending | Prove every non-goal and rejected alternative remains absent. |
 | | Shared input units | `./tools/Run-UnitTests.ps1 <focused input paths>` | Pending | Ownership, failure, delegation, reload. |
 | | Shared render units | `./tools/Run-UnitTests.ps1 <focused render paths>` | Pending | Suppression, selection, reload. |

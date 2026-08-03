@@ -509,6 +509,40 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.is_false(presenter:start())
     end)
 
+    it('can hide presentation without clearing the selected tooltip intent',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Retained tooltip')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+        env.overlay.render_viewscreen_widgets()
+
+        local intent = env.service:get_intent()
+        local selected_owner =
+            env.hook.manager:get_diagnostics().selected_owner
+        env.tooltip.presenter._renderer:set_tooltip(nil, nil, nil, nil)
+
+        assert.is_false(env.tooltip.presenter._renderer.visible)
+        assert.is_equal(intent, env.service:get_intent())
+        assert.is_equal(widget,
+            env.service:get_diagnostics().target)
+        assert.is_equal(selected_owner,
+            env.hook.manager:get_diagnostics().selected_owner)
+
+        env.service:accept_pointer_observation(
+            observation(2, widget, root, 3, 2))
+        env.overlay.render_viewscreen_widgets()
+        assert.is_true(env.tooltip.presenter._renderer.visible)
+        assert.equals('Retained tooltip',
+            env.tooltip.presenter._renderer.label.text)
+        assert.is_equal(widget,
+            env.service:get_diagnostics().target)
+    end)
+
     it('preserves presenter, renderer, and trampoline across module loads',
             function()
         local env = load_environment()

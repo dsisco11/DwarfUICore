@@ -579,55 +579,55 @@ installed mod, or sibling repository was changed.
 
 ## Phase 5 - Implement the prompt renderer and native indicator adapter
 
-- [ ] Add an input-transparent prompt renderer with distinct interior title and
+- [x] Add an input-transparent prompt renderer with distinct interior title and
       message regions, wrapping, background/frame styling, preferred placement
       below the pointer, and viewport clamping.
-- [ ] Pass the validated owning namespace as the title argument to
+- [x] Pass the validated owning namespace as the title argument to
       `gui.paint_frame()` so it appears centered in the top border.
-- [ ] Keep prompt title and namespace attribution as separate renderer fields
+- [x] Keep prompt title and namespace attribution as separate renderer fields
       and visual roles.
-- [ ] Size the frame to the greater of wrapped content requirements and
+- [x] Size the frame to the greater of wrapped content requirements and
       `#namespace + 6` cells when the viewport permits.
-- [ ] When the namespace does not fit, pre-truncate it to the available label
+- [x] When the namespace does not fit, pre-truncate it to the available label
       cells: use the longest fitting prefix plus ASCII `...` when at least four
       cells are available, otherwise use the fitting prefix without an ellipsis.
-- [ ] Center the already-truncated namespace and retain the complete namespace
+- [x] Center the already-truncated namespace and retain the complete namespace
       in request and handle state.
-- [ ] Recompute layout on content, pointer, and viewport changes and invalidate
+- [x] Recompute layout on content, pointer, and viewport changes and invalidate
       old/new screen cells so motion and disappearance do not leave artifacts.
-- [ ] Hide the prompt window and native indicator without terminating when no
+- [x] Hide the prompt window and native indicator without terminating when no
       screen-pointer coordinate is available; restore presentation when pointer
       coordinates return.
-- [ ] Add an injected native-indicator adapter over
+- [x] Add an injected native-indicator adapter over
       `df.global.game.main_interface.recenter_indicator_m`.
-- [ ] Snapshot a detached pre-prompt indicator value before the first write and
+- [x] Snapshot a detached pre-prompt indicator value before the first write and
       retain the exact last value written by the prompt.
-- [ ] Assign the current map hover directly while available and the verified
+- [x] Assign the current map hover directly while available and the verified
       inactive representation while unavailable; never call
       `dfhack.gui.revealInDwarfmodeMap()` or `renderMapOverlay()`.
-- [ ] Before every later write, compare the native value with the prompt's last
+- [x] Before every later write, compare the native value with the prompt's last
       write. On mismatch, record external takeover, relinquish ownership for the
       rest of the prompt, stop writing, and skip restoration.
-- [ ] On termination, restore the detached snapshot only if the prompt still
+- [x] On termination, restore the detached snapshot only if the prompt still
       owns the current native value.
-- [ ] Keep visual hover sampling separate from the authoritative input-event
+- [x] Keep visual hover sampling separate from the authoritative input-event
       completion sample.
 
 ### Phase 5 completion gate
 
-- [ ] Renderer tests cover distinct namespace/title/message content, full and
+- [x] Renderer tests cover distinct namespace/title/message content, full and
       empty strings, exact copied text, embedded-newline preservation, wrapping,
       preferred below-pointer placement, every-edge clamping, motion, resize,
       pointer absence, invalidation, and input transparency.
-- [ ] Namespace tests cover exact centering, `#namespace + 6` sizing, all
+- [x] Namespace tests cover exact centering, `#namespace + 6` sizing, all
       truncation branches, narrow viewports, full-state retention, and absence
       of any consumer override.
-- [ ] Indicator tests cover initial snapshot, hover motion, off-map hiding,
+- [x] Indicator tests cover initial snapshot, hover motion, off-map hiding,
       owned restore, external takeover before each write after the first and
       before restoration, and modeled adapter termination invocations without
       pan, z-level, or follow-state changes. These are not integrated lifecycle
       claims.
-- [ ] The follow-up review confirms prompt completion never reads the indicator
+- [x] The follow-up review confirms prompt completion never reads the indicator
       cache and the renderer is not registered as a normal tooltip.
 
 ## Phase 6 - Add the public provider and assemble the runtime

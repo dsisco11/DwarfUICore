@@ -413,43 +413,97 @@ new UserPrompt module, or context-menu registration/definition was changed.
 
 ## Phase 3 - Establish completed-render composition and tooltip suppression
 
-- [ ] If Phase 1 proves the current render owner sufficient, add private support
+- [x] If Phase 1 proves the current render owner sufficient, add private support
       for an injected authoritative presentation intent and ordinary-tooltip
       suppression flag, and record why no generalization was needed.
-- [ ] If it is insufficient, extend the current completed-render owner with the
+- [x] If it is insufficient, extend the current completed-render owner with the
       smallest internal compositor/presenter arbitration needed for tooltip and
       UserPrompt intents.
-- [ ] Retain exactly one authoritative completed-render hook chain for native,
+- [x] Retain exactly one authoritative completed-render hook chain for native,
       overlay, and Lua-screen surfaces.
-- [ ] Preserve current tooltip registration, target selection, selected intent,
+- [x] Preserve current tooltip registration, target selection, selected intent,
       redraw, layout, renderer, and reload behavior while no prompt is active.
-- [ ] Prove with injected stand-in intent that the owner can suppress only
+- [x] Prove with injected stand-in intent that the owner can suppress only
       ordinary tooltip presentation while retaining tooltip registrations and
       selected intent unchanged. Defer binding this flag to active UserPrompt
       state until Phase 7.
-- [ ] Route an injected authoritative presentation intent only through its
+- [x] Route an injected authoritative presentation intent only through its
       selected supported root and do not transfer it to an unrelated root.
-- [ ] Keep the authoritative-intent slot independent from tooltip registration
+- [x] Keep the authoritative-intent slot independent from tooltip registration
       and context-menu presentation state; defer the concrete prompt renderer to
       Phase 5.
-- [ ] Define rollback-safe preparation and non-failing publication/retirement
+- [x] Define rollback-safe preparation and non-failing publication/retirement
       operations for the activation transaction.
-- [ ] Preserve reload-safe trampoline adoption and one completed render per
+- [x] Preserve reload-safe trampoline adoption and one completed render per
       selected owner.
-- [ ] Update registry, reload, package, diagnostics, and focused tests for the
+- [x] Update registry, reload, package, diagnostics, and focused tests for the
       selected design.
 
 ### Phase 3 completion gate
 
-- [ ] Existing tooltip unit and final-render DwarfSpec behavior is unchanged
+- [x] Existing tooltip unit and final-render DwarfSpec behavior is unchanged
       while no prompt is active.
-- [ ] Stand-in intent tests prove the suppression capability hides only the
+- [x] Stand-in intent tests prove the suppression capability hides only the
       ordinary tooltip window and that normal presentation resumes with retained
       intent when suppression clears.
-- [ ] Tests prove one completed-render owner per surface with no duplicate or
+- [x] Tests prove one completed-render owner per surface with no duplicate or
       stale authoritative-intent rendering across Core reload.
-- [ ] The follow-up review confirms no second tooltip backend, normal tooltip
+- [x] The follow-up review confirms no second tooltip backend, normal tooltip
       registration, fullscreen screen, or parallel render hook was introduced.
+
+### Phase 3 implementation record
+
+Phase 1 proved the current completed-render owner sufficient, so the
+conditional compositor/generalization branch was intentionally not selected.
+The implementation adds only the private authoritative-intent capability to
+the existing tooltip presenter and retains the existing hook chain:
+
+- `tooltip/presenter.lua` owns one prepared exact-token transaction and one
+  active authoritative intent. Preparation validates the supplied supported
+  root and rendering callback and ensures its existing native-overlay or weak
+  Lua-screen seam without publishing intent or suppression state. Activation
+  publishes the exact prepared intent, selects its already-prepared owner, and
+  enables the ordinary-tooltip suppression flag through non-throwing
+  operations. Release clears authoritative ownership and suppression before
+  best-effort restoration of the still-authoritative tooltip service intent.
+- The stand-in callback receives the existing full-viewport painter plus the
+  selected transport and owner. It renders only through that exact owner;
+  ordinary tooltip observations may continue changing while suppression is
+  active without transferring authoritative presentation to their roots.
+- Tooltip registrations, target selection, service intent, renderer state,
+  context-menu presentation, and existing public provider APIs remain
+  independent and unchanged. Suppression skips ordinary tooltip painting; it
+  does not unregister targets or discard selected tooltip intent, so the same
+  intent resumes after release.
+- `tooltip/render_hook.lua` remains the sole completed-render trampoline owner.
+  Its existing ensure operations gained one private non-selecting preparation
+  mode, and `select_owner()` performs only the already-validated transport and
+  owner assignments needed by the activation commit. This small separation is
+  required to keep preparation behaviorally inactive; it is not a compositor,
+  second presenter, registration framework, or parallel hook.
+- Ordinary module construction still reuses the healthy presenter. Explicit
+  presenter retirement releases prepared or active authoritative state and
+  suppression before leaving the existing trampolines inert for adoption by
+  the next Core generation. Compatible hook-module adoption refreshes the
+  process-owned manager facade in place so the retained chain gains the current
+  private methods without replacing its state or trampolines.
+- Registry order and package inventory require no production change because no
+  module was added or moved. Focused package coverage proves only
+  `dwarfuicore/tooltip/render_hook.lua` owns the native completed-render seam
+  and no `dwarfuicore/user_prompt/render_hook.lua` exists.
+
+Actual Phase 3 files are limited to:
+
+- production: `dwarfuicore/tooltip/presenter.lua` and
+  `dwarfuicore/tooltip/render_hook.lua`;
+- focused units: `tests/tooltip/presenter.spec.lua`,
+  `tests/tooltip/render_hook.spec.lua`, and
+  `tests/package_contract.spec.lua`; and
+- this execution record.
+
+No proposal, public provider/API, tooltip registration/service/renderer,
+context-menu module, fullscreen screen, new UserPrompt production module,
+installed mod, or sibling repository was changed.
 
 ## Phase 4 - Implement prompt values, handles, and state transitions
 
@@ -943,7 +997,14 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | 2026-08-03 | Phase 2 Lua-screen live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/context_menu/screen_interaction.ds.lua` | Pass | Final-source protocol-2 run passed 1 success, 0 failures, 0 errors, 0 pending with terminal status and `cleanup_confirmed=true`; the exact instance seam remained functional. |
 | 2026-08-03 | Phase 2 follow-up review | Phase 2 contract, proposal input transaction, final source/tests, validation evidence, proposal hash, and repository/index status | Pass after correction | Review found that an intervening context-root reconciliation could retire a merely prepared priority root before activation. Effective-root reconciliation now reserves either the active or prepared priority root, and the focused test directly proves prepared-but-inactive transparency, reconciliation survival, non-rewrapping activation, and rollback. Final focused units passed 51/51, full units 360/360, syntax, live regressions, build, and package checks passed; proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`. |
 | 2026-08-03 | Phase 2 independent completion audit | Created goal, Phase 2 contract, proposal, final diff, implementation/test mappings, validation records, proposal hash, and repository/index state | Pass | High-confidence fresh read-only audit found all eleven tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. The inactive conditional branch was explicitly resolved as inapplicable; concrete UserPrompt lifecycle and integrated prompt-owned failure coverage remain intentionally deferred. Phase 2 markers were checked only after this audit passed. |
-| | Shared render units | `./tools/Run-UnitTests.ps1 <focused render paths>` | Pending | Suppression, selection, reload. |
+| 2026-08-03 | Phase 3 shared render units | `./tools/Run-UnitTests.ps1 tests/tooltip/presenter.spec.lua tests/tooltip/render_hook.spec.lua tests/tooltip/service.spec.lua tests/module_registry.spec.lua tests/package_contract.spec.lua tests/dwarfuicore_command.spec.lua` | Pass | Final settled source passed 77 successes, 0 failures, 0 errors, 0 pending. Stand-ins cover prepared inactivity, suppression with retained tooltip state, exact-root ownership, non-failing exact-token activation, normal and faulted rollback, compatible manager adoption, and stale-intent retirement. |
+| 2026-08-03 | Phase 3 complete units and naming | `./tools/Run-UnitTests.ps1` | Pass | Final settled source passed 366 successes, 0 failures, 0 errors, 0 pending; the wrapper's naming precondition also passed. |
+| 2026-08-03 | Phase 3 syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pass | Lua 5.4.6 syntax passed for 46 production and 61 test/support files. |
+| 2026-08-03 | Phase 3 offline build and package | `./tools/Build.ps1 -LiveReload:$false`; `./tools/Publish.ps1`; explicit `./tools/VerifyPackage.ps1` | Pass | Final settled-source build, expanded verification, ZIP verification, and aggregate verification passed. Source/expanded inventory: 47 files and 412,633 bytes. ZIP: 47 entries, 412,633 uncompressed bytes, 100,763 archive bytes. No installed-runtime claim. |
+| 2026-08-03 | Phase 3 completed-render live seams | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/tooltip/tooltip_render_seams.ds.lua` | Pass | Final settled-source protocol-2 run passed 2 successes, 0 failures, 0 errors, 0 pending with terminal status, `mount_verified=true`, and `cleanup_confirmed=true`. |
+| 2026-08-03 | Phase 3 final-screen tooltip regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/tooltip/tooltip_screen_final_render.ds.lua` | Pass | Final settled-source protocol-2 run passed 1 success, 0 failures, 0 errors, 0 pending with terminal status, `mount_verified=true`, and `cleanup_confirmed=true`. Both Phase 3 live runs resolved `DFHACK_RUNNER` to `G:\Steam\steamapps\common\Dwarf Fortress\hack\dfhack-run.exe`; no stale or nonterminal run was counted. |
+| 2026-08-03 | Phase 3 follow-up review | Phase 3 contract, proposal presentation transaction, final source/tests, validation evidence, proposal hash, and repository/index state | Pass after correction | Review corrected two ownership gaps before closure: compatible hook adoption now refreshes the retained manager facade so current private methods exist without replacing trampolines, and active authoritative re-selection now retains the exact prepared owner instead of consulting a possibly replaced overlay module. It also added direct cleanup-failure proof and prepared/active diagnostics. Every task and gate maps to final evidence; no public API, second backend, fullscreen screen, registration change, context-menu change, or parallel hook exists. Proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`. |
+| 2026-08-03 | Phase 3 independent completion audit | Created goal, Phase 3 contract, proposal, final diff, implementation/test mappings, validation records, proposal hash, and repository/index state | Pass | High-confidence fresh read-only audit found all ten tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. The compositor branch was resolved as inapplicable; concrete prompt rendering, runtime binding, invalidation, lifecycle cancellation, and integrated presentation-failure handling remain intentionally deferred. Phase 3 markers were checked only after this audit passed. |
 | | Prompt state/provider units | `./tools/Run-UnitTests.ps1 <focused prompt paths>` | Pending | Values, handles, API, lifecycle, errors. |
 | | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |
 | | Indicator units | `./tools/Run-UnitTests.ps1 <focused indicator paths>` | Pending | Hover, sentinel, takeover, restore. |

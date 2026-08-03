@@ -114,6 +114,8 @@ describe('DwarfUICore tooltip render-hook manager', function()
         assert.equals(first_generation,
             second.manager:get_diagnostics().generation)
         assert.is_equal(first.manager, second.manager)
+        assert.is_equal(second.TooltipRenderHookManager,
+            getmetatable(second.manager))
         second.manager:set_presenter(function() calls = calls + 1 end)
         assert.is_false(second.manager:ensure_overlay())
         assert.is_equal(trampoline, overlay.render_viewscreen_widgets)
@@ -145,6 +147,37 @@ describe('DwarfUICore tooltip render-hook manager', function()
 
         screen:onRender()
         assert.equals(1, calls)
+    end)
+
+    it('prepares a screen seam without changing the selected owner', function()
+        local overlay = overlay_with(function() end)
+        local screen = {onRender=function() end}
+        local calls = {}
+        local module = load_hook({dwarfuicore={}}, function() return overlay end)
+        module.manager:set_presenter(function(_, owner)
+            table.insert(calls, owner)
+            return #calls
+        end)
+        module.manager:ensure_overlay()
+        local selected = module.manager:get_diagnostics()
+        assert.equals(module.TooltipRenderTransport.OVERLAY,
+            selected.selected_transport)
+        assert.is_equal(overlay, selected.selected_owner)
+
+        assert.is_true(module.manager:ensure_screen(screen, false))
+        selected = module.manager:get_diagnostics()
+        assert.equals(module.TooltipRenderTransport.OVERLAY,
+            selected.selected_transport)
+        assert.is_equal(overlay, selected.selected_owner)
+        screen:onRender()
+        assert.same({}, calls)
+
+        module.manager:select_owner(
+            module.TooltipRenderTransport.SCREEN, screen)
+        overlay.render_viewscreen_widgets()
+        assert.same({}, calls)
+        screen:onRender()
+        assert.same({screen}, calls)
     end)
 
     it('preserves owning overlay wrappers and repairs true replacement',

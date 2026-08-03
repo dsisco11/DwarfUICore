@@ -272,17 +272,20 @@ function TooltipRenderHookManager:mark_wrapper_reorderable(wrapper)
     return true
 end
 
----Selects and idempotently repairs the exported native-overlay render seam.
+---Idempotently repairs the exported native-overlay render seam.
+---@param select_owner? boolean whether to select this owner after preparation
 ---@return boolean changed
-function TooltipRenderHookManager:ensure_overlay()
+function TooltipRenderHookManager:ensure_overlay(select_owner)
     local state = self._state
     local overlay = require('plugins.overlay')
     local current = overlay[OVERLAY_RENDER_METHOD]
     assert(type(current) == 'function',
         'plugins.overlay.render_viewscreen_widgets must be a function.')
 
-    state.selected_transport = TooltipRenderTransport.OVERLAY
-    state.selected_owner = overlay
+    if select_owner ~= false then
+        state.selected_transport = TooltipRenderTransport.OVERLAY
+        state.selected_owner = overlay
+    end
     local previous = state.overlay_hook
     if state.overlay_module == overlay and previous and
             current == previous.active_trampoline then
@@ -334,10 +337,11 @@ function TooltipRenderHookManager:ensure_overlay()
     return true
 end
 
----Selects and idempotently repairs one Lua screen's effective render seam.
+---Idempotently repairs one Lua screen's effective render seam.
 ---@param owner table
+---@param select_owner? boolean whether to select this owner after preparation
 ---@return boolean changed
-function TooltipRenderHookManager:ensure_screen(owner)
+function TooltipRenderHookManager:ensure_screen(owner, select_owner)
     assert(type(owner) == 'table',
         'DwarfUICore tooltip screen-hook owner must be a table.')
     local current = owner[SCREEN_RENDER_METHOD]
@@ -345,8 +349,10 @@ function TooltipRenderHookManager:ensure_screen(owner)
         'DwarfUICore tooltip screen owner onRender must be a function.')
 
     local state = self._state
-    state.selected_transport = TooltipRenderTransport.SCREEN
-    state.selected_owner = owner
+    if select_owner ~= false then
+        state.selected_transport = TooltipRenderTransport.SCREEN
+        state.selected_owner = owner
+    end
     local previous = state.screen_hooks[owner]
     if previous and current == previous.active_trampoline then
         previous.generation = state.generation
@@ -395,6 +401,14 @@ function TooltipRenderHookManager:ensure_screen(owner)
     state.screen_hooks[owner] = record
     rawset(owner, SCREEN_RENDER_METHOD, trampoline)
     return true
+end
+
+---Selects one already-prepared render owner through non-throwing assignments.
+---@param transport dwarfuicore.TooltipRenderTransport
+---@param owner table
+function TooltipRenderHookManager:select_owner(transport, owner)
+    self._state.selected_transport = transport
+    self._state.selected_owner = owner
 end
 
 ---Clears transport selection without removing installed inert trampolines.
@@ -560,6 +574,7 @@ function TooltipRenderHookManager:get_diagnostics()
 end
 
 manager = process_state.manager or TooltipRenderHookManager.new(process_state)
+setmetatable(manager, TooltipRenderHookManager)
 process_state.manager = manager
 if publish_process_state then
     dfhack.dwarfuicore[STATE_SLOT] = process_state

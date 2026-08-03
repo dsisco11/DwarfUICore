@@ -42,6 +42,10 @@ the evidence specified by their phase gate.
       `Docs/user-prompt-service-proposal.md`, including the version 1 API,
       `SERVICE_BUSY`, tooltip suppression, lifecycle callbacks, and namespace
       border attribution.
+- [ ] As part of that approval, update the proposal's Status section from
+      `Proposed` to `Approved` and record the approval date and exact revision;
+      do not begin production work while the authoritative document still says
+      implementation is unauthorized.
 - [ ] Record the repository branch, revision, worktree/index state, package
       version, module registry order, and configured installed-runtime
       resolution before production edits.
@@ -63,13 +67,15 @@ the evidence specified by their phase gate.
 - [ ] Record current native, overlay, and Lua-screen surface support and any
       baseline limitation that affects UserPrompt acceptance.
 - [ ] Verify the proposal traceability table in this checklist maps every
-      acceptance criterion to at least one implementation phase and planned
-      evidence row; correct omissions before production work.
+      acceptance criterion, non-goal, and rejected alternative to at least one
+      implementation phase and planned evidence row; correct omissions before
+      production work.
 
 ### Phase 0 completion gate
 
-- [ ] The proposal is approved and no unresolved contract choice is hidden in
-      an implementation task.
+- [ ] The proposal is approved, its Status section records that approval and
+      exact revision, and no unresolved contract choice is hidden in an
+      implementation task.
 - [ ] Baseline failures and unrelated worktree changes are explicitly recorded
       and are not attributed to UserPrompt.
 - [ ] The traceability table covers every proposal requirement and rejected
@@ -150,10 +156,13 @@ the evidence specified by their phase gate.
       `true`, and skip every later consumer and predecessor after handling.
 - [ ] When every consumer returns false, invoke the predecessor exactly once
       with unchanged arguments and preserve all returns including trailing nils.
-- [ ] Let the dispatcher identify prompt-owned boundaries before protected
-      prompt dispatch so an internal prompt failure still returns `true`.
-- [ ] Terminate a failing active prompt safely, record private diagnostics, and
-      prevent its owned event from leaking to context-menu or base-game input.
+- [ ] Let the dispatcher identify an injected consumer's owned boundaries before
+      protected dispatch so consumer failure still returns `true`; prove this
+      infrastructure behavior with a stand-in consumer before UserPrompt state
+      exists.
+- [ ] Report protected-dispatch failure to the injected consumer owner without
+      embedding UserPrompt lifecycle knowledge in the shared dispatcher. Defer
+      actual prompt termination and diagnostics integration to Phases 7 and 8.
 - [ ] Preserve the characterized failure policy for events not owned by an
       active prompt.
 - [ ] Prepare/reconcile the current map-capable input surface before prompt
@@ -163,9 +172,10 @@ the evidence specified by their phase gate.
 
 ### Phase 2 completion gate
 
-- [ ] Tests prove prompt-first order, exact boolean handling, exact predecessor
-      preservation, failure consumption, inactive transparency, and no duplicate
-      dispatch after construction or reload.
+- [ ] Stand-in consumer tests prove priority order, exact boolean handling, exact
+      predecessor preservation, owned-failure consumption, inactive
+      transparency, failure notification, and no duplicate dispatch after
+      construction or reload.
 - [ ] Tests prove exactly one native input trampoline and no parallel live
       context-menu/UserPrompt hook owner.
 - [ ] Existing focused context-menu input unit and live behavior remains green
@@ -175,9 +185,9 @@ the evidence specified by their phase gate.
 
 ## Phase 3 - Establish completed-render composition and tooltip suppression
 
-- [ ] If Phase 1 proves the current render owner sufficient, add independent
-      prompt presentation and tooltip suppression through its existing private
-      extension points and record why no generalization was needed.
+- [ ] If Phase 1 proves the current render owner sufficient, add private support
+      for an injected authoritative presentation intent and ordinary-tooltip
+      suppression flag, and record why no generalization was needed.
 - [ ] If it is insufficient, extend the current completed-render owner with the
       smallest internal compositor/presenter arbitration needed for tooltip and
       UserPrompt intents.
@@ -185,12 +195,15 @@ the evidence specified by their phase gate.
       overlay, and Lua-screen surfaces.
 - [ ] Preserve current tooltip registration, target selection, selected intent,
       redraw, layout, renderer, and reload behavior while no prompt is active.
-- [ ] Suppress only ordinary tooltip presentation while a prompt is active;
-      retain tooltip registrations and selected intent unchanged.
-- [ ] Render UserPrompt only through its selected supported root and do not
-      transfer an active prompt to an unrelated root.
-- [ ] Keep the prompt renderer independent from tooltip registration and
-      context-menu presentation state.
+- [ ] Prove with injected stand-in intent that the owner can suppress only
+      ordinary tooltip presentation while retaining tooltip registrations and
+      selected intent unchanged. Defer binding this flag to active UserPrompt
+      state until Phase 7.
+- [ ] Route an injected authoritative presentation intent only through its
+      selected supported root and do not transfer it to an unrelated root.
+- [ ] Keep the authoritative-intent slot independent from tooltip registration
+      and context-menu presentation state; defer the concrete prompt renderer to
+      Phase 5.
 - [ ] Define rollback-safe preparation and non-failing publication/retirement
       operations for the activation transaction.
 - [ ] Preserve reload-safe trampoline adoption and one completed render per
@@ -202,10 +215,11 @@ the evidence specified by their phase gate.
 
 - [ ] Existing tooltip unit and final-render DwarfSpec behavior is unchanged
       while no prompt is active.
-- [ ] Tests prove prompt presentation suppresses only the ordinary tooltip
-      window and that normal presentation resumes with retained intent.
+- [ ] Stand-in intent tests prove the suppression capability hides only the
+      ordinary tooltip window and that normal presentation resumes with retained
+      intent when suppression clears.
 - [ ] Tests prove one completed-render owner per surface with no duplicate or
-      stale prompt rendering across Core reload.
+      stale authoritative-intent rendering across Core reload.
 - [ ] The follow-up review confirms no second tooltip backend, normal tooltip
       registration, fullscreen screen, or parallel render hook was introduced.
 
@@ -233,12 +247,14 @@ the evidence specified by their phase gate.
       terminal-cause set.
 - [ ] Implement one process-wide authoritative pending-request slot with atomic
       busy rejection before menu, input, render, or indicator mutation.
-- [ ] Implement one idempotent terminal transition shared by completion,
-      cancellation, cleanup, failure, and reload.
-- [ ] Mark the old handle inactive and clear pending state before retiring
-      input, render, tooltip suppression, and indicator ownership.
-- [ ] Invoke at most one mutually exclusive callback after all owned resources
-      are clear; contain callback failure and record private diagnostics.
+- [ ] Implement one idempotent state-machine terminal decision shared by the
+      modeled completion, cancellation, cleanup, failure, and reload causes.
+- [ ] Mark the old handle inactive and clear pending state before invoking
+      ordered injected cleanup ports for input, render, tooltip suppression,
+      indicator ownership, and invalidation. At this phase, use stand-ins rather
+      than claiming those later adapters are integrated.
+- [ ] Invoke at most one mutually exclusive callback after every injected cleanup
+      port has run; contain callback failure and record private diagnostics.
 - [ ] Retain request callbacks until termination. Dropping an API or handle must
       not cancel an active prompt.
 - [ ] Add diagnostics for active identity/namespace, state, terminal cause and
@@ -250,8 +266,10 @@ the evidence specified by their phase gate.
 - [ ] Focused tests cover exact option validation/copying, immutable values,
       handle identity and error precedence, busy rejection, terminal same-domain
       behavior, garbage collection, and namespace isolation.
-- [ ] State tests cover every terminal cause, repeated terminal requests,
-      callback failure, mutual exclusion, and state-before-callback ordering.
+- [ ] State-model tests use injected cleanup stand-ins to cover every terminal
+      cause, repeated terminal requests, callback failure, mutual exclusion, and
+      state-before-cleanup-before-callback ordering. They do not count as
+      integrated input, render, indicator, lifecycle, or live evidence.
 - [ ] Tests prove callback-visible positions are detached values and consumer
       mutation cannot alter stored options or ownership.
 - [ ] The follow-up review confirms one process-wide prompt, no queue or
@@ -296,9 +314,9 @@ the evidence specified by their phase gate.
 ### Phase 5 completion gate
 
 - [ ] Renderer tests cover distinct namespace/title/message content, full and
-      empty strings, wrapping, preferred below-pointer placement, every-edge
-      clamping, motion, resize, pointer absence, invalidation, and input
-      transparency.
+      empty strings, exact copied text, embedded-newline preservation, wrapping,
+      preferred below-pointer placement, every-edge clamping, motion, resize,
+      pointer absence, invalidation, and input transparency.
 - [ ] Namespace tests cover exact centering, `#namespace + 6` sizing, all
       truncation branches, narrow viewports, full-state retention, and absence
       of any consumer override.
@@ -364,6 +382,9 @@ the evidence specified by their phase gate.
       not only right-click dispatch, so no menu can open while a prompt is active.
 - [ ] Keep context-menu registrations unchanged and remove the guard immediately
       when the prompt terminates.
+- [ ] Bind the completed-render owner's authoritative intent and
+      ordinary-tooltip suppression flag to the committed active prompt, and
+      clear both through the terminal cleanup order.
 - [ ] Activate the prompt input consumer exactly while the prompt is pending and
       give it first refusal ahead of context-menu and predecessor handling.
 - [ ] `_MOUSE_L_DOWN`: always return true with no sample, terminal transition,
@@ -382,6 +403,9 @@ the evidence specified by their phase gate.
 - [ ] Delegate wheel, movement, pause, and every other unowned input unchanged.
 - [ ] Keep owned events consumed when prompt dispatch or callback processing
       fails; never leak them to context-menu or base-game behavior.
+- [ ] Connect the shared dispatcher's protected-failure notification to internal
+      prompt cancellation so the owned event remains consumed and the prompt
+      cannot remain pending after handler failure.
 
 ### Phase 7 completion gate
 
@@ -393,6 +417,8 @@ the evidence specified by their phase gate.
       immediately after termination.
 - [ ] Tests prove atomic activation and rollback at every injected fallible
       preparation point, with no failing operation between menu close and commit.
+- [ ] Tests prove committed prompt state alone controls authoritative render
+      intent and tooltip suppression, and both clear on every terminal path.
 - [ ] The follow-up review searches for conditional left completion, cached
       indicator completion, owned-event delegation, context-menu bypass, and
       pending-but-inert state.
@@ -426,9 +452,10 @@ the evidence specified by their phase gate.
 
 ### Phase 8 completion gate
 
-- [ ] Tests cover every lifecycle cause, exact callback choice/count, resource
-      cleanup order, eligible and rejected reentry, callback failure, partial
-      initialization, and old-generation invalidation.
+- [ ] Integrated tests cover every lifecycle cause, exact callback choice/count,
+      real input/render/tooltip/indicator cleanup order, eligible and rejected
+      reentry, callback failure, partial initialization, and old-generation
+      invalidation; these replace the Phase 4 stand-ins with actual adapters.
 - [ ] Reload tests prove no hidden prompt, active consumer, tooltip suppression,
       stale renderer, indicator damage, duplicate hook, or retired healthy
       facade remains.
@@ -471,6 +498,10 @@ the evidence specified by their phase gate.
       `cleanup_confirmed`.
 - [ ] Inspect the built and installed package for all UserPrompt/shared modules,
       exact registry order, one owner per hook seam, and no obsolete file.
+- [ ] Audit public symbols, production source, package contents, and the complete
+      diff against every proposal non-goal and rejected alternative; record that
+      no prohibited prompt operation, lifecycle mechanism, consumer migration,
+      UI owner, tooltip exposure, marker path, or completion source was added.
 - [ ] Run `git diff --check` after generated-artifact and temporary-state cleanup.
 
 ### Phase 9 completion gate
@@ -491,6 +522,9 @@ the evidence specified by their phase gate.
       changes.
 - [ ] Open a prompt with distinctive namespace, title, and message values and
       capture final-screen evidence of all three in their specified locations.
+- [ ] Open prompts with embedded newlines and empty title/message combinations;
+      capture final-screen evidence that accepted text is preserved and the two
+      interior regions remain distinct when non-empty.
 - [ ] Prove the full namespace is centered in the top border when it fits and
       the deterministic ASCII truncation rule is used on a constrained viewport.
 - [ ] Move the pointer across normal, edge, and unavailable screen positions;
@@ -510,8 +544,13 @@ the evidence specified by their phase gate.
       behavior resumes afterward.
 - [ ] Prove representative unowned input delegates unchanged.
 - [ ] Capture the native map indicator following hover, hiding off-map, restoring
-      prior owned state, respecting simulated/observed external takeover, and
-      causing no pan, recenter, z-level, or follow-state change.
+      prior owned state, and causing no pan, recenter, z-level, or follow-state
+      change.
+- [ ] In the installed runtime, after UserPrompt's first native indicator write,
+      mutate the actual native value as an external owner would; prove the next
+      prompt update detects the mismatch, permanently stops writing for that
+      prompt, and skips snapshot restoration. Keep simulated fault-injection
+      evidence separate as a unit result.
 - [ ] Prove completion uses the fresh event sample rather than the last visual
       indicator position.
 - [ ] Exercise completion, right-click, Escape, and explicit-cancel callbacks
@@ -533,7 +572,8 @@ the evidence specified by their phase gate.
       behavior; unit layout assertions alone do not.
 - [ ] Installed-runtime evidence proves exact input consumption, completion,
       both cancellation gestures, menu exclusion, unowned delegation, callback
-      reentry, lifecycle cleanup, reload safety, and owner restoration.
+      reentry, lifecycle cleanup, reload safety, owner restoration, and actual
+      external-indicator-takeover relinquishment.
 - [ ] The independent review reports no unmet proposal or checklist item and no
       unexplained divergence.
 - [ ] Cleanup is terminal and `cleanup_confirmed` is recorded.
@@ -611,6 +651,14 @@ the evidence specified by their phase gate.
 | Terminal ordering, callbacks, reentry, and lifecycle cancellation | 4, 8 | State/lifecycle units; live input and lifecycle runs |
 | Reload, stale generations, hook adoption, and cleanup | 2, 3, 6, 8 | Reload units/live run; installed-runtime inspection |
 | Documentation, registry, package, and distinct evidence boundaries | 9, 10 | Docs/package audit; evidence table; final review |
+| No generic prompt dispatch, public prompt-kind enum, or additional prompt operation | 4, 6, 10 | Public API/symbol audit; provider units; final review |
+| No queue, priority, replacement policy, timeout, persistence, promise, coroutine suspension, or blocking API | 4, 6, 10 | State/API units; public API audit; final review |
+| No consumer-defined map validation or rejection path | 7, 10 | Input units; installed-runtime left-release acceptance |
+| No fullscreen screen or parallel input/render hook owner | 1, 2, 3, 10 | Seam characterization; hook-owner units; installed-runtime inspection |
+| No tooltip registration or public tooltip-internal access | 3, 5, 6, 10 | Render/provider units; public API audit; installed-runtime inspection |
+| No custom marker, map overlay renderer, or reveal helper | 5, 10 | Indicator units; source/symbol audit; installed-runtime observation |
+| No completion from displayed marker or cached visual sample | 5, 7, 10 | Indicator/input units; installed-runtime click sampling |
+| No migration of DwarfUI, DwarfDirect, or another consumer | 1, 9, 10 | File-map/diff audit; final independent review |
 
 Every row remains pending until its referenced phase gates and evidence rows are
 complete. The proposal remains authoritative if this table omits finer detail.
@@ -627,11 +675,13 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | | Baseline offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | No live claim. |
 | | Baseline package | Publish, then verifier with emitted source/zip/expanded paths | Pending | Inspect expanded/archive separately. |
 | | Characterization units | Focused existing input/render/provider specs | Pending | Prove insufficiency before shared edits. |
+| | Negative-scope audit | Public symbols, source search, file map, and diff | Pending | Prove every non-goal and rejected alternative remains absent. |
 | | Shared input units | `./tools/Run-UnitTests.ps1 <focused input paths>` | Pending | Ownership, failure, delegation, reload. |
 | | Shared render units | `./tools/Run-UnitTests.ps1 <focused render paths>` | Pending | Suppression, selection, reload. |
 | | Prompt state/provider units | `./tools/Run-UnitTests.ps1 <focused prompt paths>` | Pending | Values, handles, API, lifecycle, errors. |
 | | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |
 | | Indicator units | `./tools/Run-UnitTests.ps1 <focused indicator paths>` | Pending | Hover, sentinel, takeover, restore. |
+| | Indicator takeover acceptance | Installed-runtime native-value mutation after first prompt write | Pending | Prove relinquishment and skipped restoration; simulation alone is insufficient. |
 | | Context-menu live regression | One focused context-menu DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
 | | Tooltip live regression | One focused tooltip DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
 | | UserPrompt live input | One focused UserPrompt input DwarfSpec run | Pending | Exact input/menu/callback behavior. |

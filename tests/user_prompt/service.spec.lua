@@ -93,6 +93,7 @@ describe('UserPrompt state model', function()
     it('defines immutable complete state and terminal-cause sets', function()
         local context = load_context()
         local state = context.module.UserPromptState
+        local availability = context.module.UserPromptAvailability
         local cause = context.module.UserPromptTerminalCause
 
         assert.same({IDLE=1, ACTIVATING=2, ACTIVE=3, TERMINATING=4},
@@ -106,7 +107,14 @@ describe('UserPrompt state model', function()
             for _ in pairs(cause) do count = count + 1 end
             return count
         end)())
+        assert.same({AVAILABLE=1, TRANSIENT_UNAVAILABLE=2, DISABLED=3,
+            RETIRED=4}, (function()
+                local copy = {}
+                for key, value in pairs(availability) do copy[key] = value end
+                return copy
+            end)())
         assert.has_error(function() state.OTHER = 99 end)
+        assert.has_error(function() availability.OTHER = 99 end)
         assert.has_error(function() cause.OTHER = 99 end)
     end)
 
@@ -589,5 +597,167 @@ describe('UserPrompt state model', function()
         assert.same({'close-menu', 'commit', 'activate-invalidate',
             'input', 'render', 'tooltip_suppression', 'indicator',
             'invalidation', 'cancel'}, events)
+    end)
+
+    it('permits replacement reentry for every consumer-driven terminal path',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, example in ipairs{
+                {cause=causes.LEFT_RELEASE, complete=true},
+                {cause=causes.RIGHT_RELEASE},
+                {cause=causes.ESCAPE},
+                {cause=causes.API_CANCEL, api_cancel=true},
+            } do
+            local service
+            local replacement
+            local callback = function()
+                replacement = service:start(request(context, 'replacement'), 1)
+            end
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}))
+            local handle = service:start(request(context, 'owner',
+                example.complete and callback or nil,
+                example.complete and nil or callback), 1)
+
+            if example.complete then
+                assert.is_true(service:complete(nil))
+            elseif example.api_cancel then
+                assert.is_true(service:cancel(handle, 'owner', 1))
+            else
+                assert.is_true(service:cancel_active(example.cause))
+            end
+            assert.is_true(service:is_active(replacement, 'replacement', 1))
+        end
+    end)
+
+    it('rejects lifecycle callback reentry while restoring later admission',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, cause in ipairs{
+                causes.INPUT_ROOT_LOSS,
+                causes.PRESENTATION_ROOT_LOSS,
+                causes.WORLD_UNLOAD,
+            } do
+            local service
+            local callback_failure
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}))
+            service:start(request(context, 'owner', nil, function()
+                local ok, failure = pcall(function()
+                    service:start(request(context, 'replacement'), 1)
+                end)
+                assert.is_false(ok)
+                callback_failure = tostring(failure)
+                local diagnostics = service:get_diagnostics()
+                assert.equals(
+                    context.module.UserPromptAvailability.TRANSIENT_UNAVAILABLE,
+                    diagnostics.availability)
+                assert.equals(cause, diagnostics.unavailable_cause)
+            end), 1)
+
+            assert.is_true(service:cancel_active(cause))
+            assert.is_truthy(callback_failure:find(
+                '[SERVICE_UNHEALTHY]', 1, true))
+            assert.equals(context.module.UserPromptAvailability.AVAILABLE,
+                service:get_diagnostics().availability)
+            local later = service:start(request(context, 'later'), 1)
+            assert.is_true(service:is_active(later, 'later', 1))
+        end
+    end)
+
+    it('disables only UserPrompt after internal or terminal-cleanup failure',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, failing_port in ipairs{
+                false, 'input', 'render', 'tooltip_suppression', 'indicator',
+                'invalidation',
+            } do
+            local events = {}
+            local service
+            local callback_count = 0
+            local callback_reentry_failure
+            local cleanup = cleanup_ports(events, function(name)
+                if name == failing_port then error(name .. ' failed') end
+            end)
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup)
+            service:start(request(context, 'owner', nil, function()
+                callback_count = callback_count + 1
+                local ok, failure = pcall(function()
+                    service:start(request(context, 'replacement'), 1)
+                end)
+                assert.is_false(ok)
+                callback_reentry_failure = tostring(failure)
+            end), 1)
+
+            local cause = failing_port == false and
+                causes.INTERNAL_FAILURE or causes.API_CANCEL
+            assert.is_true(service:cancel_active(cause))
+            assert.equals(1, callback_count)
+            assert.same({'input', 'render', 'tooltip_suppression', 'indicator',
+                'invalidation'}, events)
+            assert.is_truthy(callback_reentry_failure:find(
+                '[SERVICE_UNHEALTHY]', 1, true))
+            local diagnostics = service:get_diagnostics()
+            assert.equals(context.module.UserPromptAvailability.DISABLED,
+                diagnostics.availability)
+            assert.equals(causes.INTERNAL_FAILURE,
+                diagnostics.unavailable_cause)
+            assert.equals(failing_port == false and 1 or 0,
+                diagnostics.internal_failure_count)
+            if failing_port == false then
+                assert.is_truthy(diagnostics.last_internal_error:find(
+                    'Internal prompt failure.', 1, true))
+            end
+            assert.equals(failing_port == false and 0 or 1,
+                #diagnostics.last_cleanup_failures)
+            assert_category(function()
+                service:start(request(context, 'later'), 1)
+            end, 'SERVICE_UNHEALTHY')
+        end
+    end)
+
+    it('retires idle and active generations before reload callback dispatch',
+            function()
+        local context = load_context()
+        local service
+        local callback_count = 0
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        service:start(request(context, 'owner', nil, function()
+            callback_count = callback_count + 1
+            assert.equals(context.module.UserPromptAvailability.RETIRED,
+                service:get_diagnostics().availability)
+            assert_category(function()
+                service:start(request(context, 'replacement'), 1)
+            end, 'SERVICE_UNHEALTHY')
+        end), 1)
+
+        assert.is_true(service:retire_for_reload())
+        assert.equals(1, callback_count)
+        assert.is_false(service:retire_for_reload())
+        assert.equals(context.module.UserPromptAvailability.RETIRED,
+            service:get_diagnostics().availability)
+        assert_category(function()
+            service:start(request(context, 'later'), 1)
+        end, 'SERVICE_UNHEALTHY')
+
+        local failing_cleanup = cleanup_ports({}, function(name)
+            if name == 'indicator' then error('retirement cleanup failed') end
+        end)
+        local failing_service = context.module.UserPromptService.new(
+            context.module.new_state(7), failing_cleanup)
+        failing_service:start(request(context, 'failing'), 1)
+        assert.is_true(failing_service:retire_for_reload())
+        local diagnostics = failing_service:get_diagnostics()
+        assert.equals(context.module.UserPromptAvailability.RETIRED,
+            diagnostics.availability)
+        assert.equals(context.module.UserPromptTerminalCause.CORE_RELOAD,
+            diagnostics.unavailable_cause)
+        assert.equals('indicator',
+            diagnostics.last_cleanup_failures[1].port)
     end)
 end)

@@ -161,6 +161,40 @@ describe('UserPrompt native indicator adapter', function()
         end
     end)
 
+    it('irrevocably relinquishes ownership when terminal restore fails',
+            function()
+        local indicator = load_indicator()
+        for _, failure_point in ipairs{'read', 'write'} do
+            local native_port, state = port({x=5, y=6, z=7})
+            local adapter = indicator.NativeIndicatorAdapter.new(native_port)
+            adapter:update({x=1, y=2, z=3})
+            local original_read = native_port.read
+            local original_write = native_port.write
+            if failure_point == 'read' then
+                native_port.read = function() error('release read failed') end
+            else
+                native_port.write = function(value)
+                    if value.x == 5 then error('restore write failed') end
+                    return original_write(value)
+                end
+            end
+
+            local ok, failure = pcall(function() adapter:release() end)
+            assert.is_false(ok)
+            assert.is_truthy(tostring(failure):find(
+                failure_point == 'read' and 'release read failed' or
+                    'restore write failed', 1, true))
+            local diagnostics = adapter:get_diagnostics()
+            assert.is_false(diagnostics.acquired, failure_point)
+            assert.is_false(diagnostics.owns, failure_point)
+            assert.is_false(diagnostics.prepared, failure_point)
+            native_port.read = original_read
+            native_port.write = original_write
+            assert.is_false(adapter:release(), failure_point)
+            assert.same({x=1, y=2, z=3}, state.native, failure_point)
+        end
+    end)
+
     it('contains no map reveal, overlay render, or completion sample path',
             function()
         local file = assert(io.open(repo_root .. '/' .. INDICATOR_PATH, 'rb'))

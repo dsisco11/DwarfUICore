@@ -103,7 +103,10 @@ local function retire_user_prompt()
         return
     end
     local module = find_loaded_script_environment(USER_PROMPT_SERVICE_SCRIPT)
-    if module and module.service and module.UserPromptTerminalCause and
+    if module and module.service and
+            type(module.service.retire_for_reload) == 'function' then
+        module.service:retire_for_reload()
+    elseif module and module.service and module.UserPromptTerminalCause and
             type(module.service.cancel_active) == 'function' then
         module.service:cancel_active(module.UserPromptTerminalCause.CORE_RELOAD)
     end

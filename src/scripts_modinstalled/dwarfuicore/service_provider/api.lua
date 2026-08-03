@@ -12,6 +12,8 @@ local PREFIX_BY_SERVICE_KIND = {
 }
 local USER_PROMPT_BUSY_PREFIX =
     'DwarfUICore UserPromptService: [SERVICE_BUSY] '
+local USER_PROMPT_UNHEALTHY_PREFIX =
+    'DwarfUICore UserPromptService: [SERVICE_UNHEALTHY] '
 
 ---Provides namespace-scoped access to the shared tooltip runtime.
 ---@class dwarfuicore.TooltipServiceApi
@@ -272,6 +274,14 @@ function new_factory(service_kind, label, operation_names)
                         delegate_failure:sub(1, #USER_PROMPT_BUSY_PREFIX) ==
                             USER_PROMPT_BUSY_PREFIX then
                     fail(service_kind, contracts.ErrorCategory.SERVICE_BUSY,
+                        delegate_failure)
+                end
+                if service_kind == contracts.ServiceKind.USER_PROMPT and
+                        delegate_failure:sub(
+                            1, #USER_PROMPT_UNHEALTHY_PREFIX) ==
+                                USER_PROMPT_UNHEALTHY_PREFIX then
+                    fail(service_kind,
+                        contracts.ErrorCategory.SERVICE_UNHEALTHY,
                         delegate_failure)
                 end
                 fail(service_kind, contracts.ErrorCategory.INVALID_ARGUMENT,

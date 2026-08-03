@@ -304,9 +304,16 @@ describe('dwarfuicore command lifecycle', function()
             unrelated_state=unrelated_state,
         }
         local events = {}
+        local service_runtime = runtime_stub()
+        local begin_reload = service_runtime.begin_reload
+        service_runtime.begin_reload = function()
+            local state = begin_reload()
+            table.insert(events, 'runtime-retiring')
+            return state
+        end
         local root = load_root(registry, dfhack)
         local environments = {
-            [RUNTIME_NAME]=runtime_stub(),
+            [RUNTIME_NAME]=service_runtime,
             ['dwarfuicore/service_provider/immutable_proxy']={
                 new_factory=function(_, _, properties)
                     return {create=function() return properties or {} end}
@@ -342,6 +349,7 @@ describe('dwarfuicore command lifecycle', function()
             },
             ['dwarfuicore/user_prompt/runtime']={
                 retire_for_reload=function()
+                    assert.equals('runtime-retiring', events[1])
                     table.insert(events, 'user-prompt')
                 end,
             },
@@ -360,7 +368,8 @@ describe('dwarfuicore command lifecycle', function()
         })
 
         assert.same({}, reloaded_root.reload())
-        assert.same({'user-prompt', 'context-menu', 'tooltip'}, events)
+        assert.same({'runtime-retiring', 'user-prompt', 'context-menu',
+            'tooltip'}, events)
         assert.is_nil(dfhack.dwarfuicore.tooltip_namespace_registry)
         assert.is_nil(dfhack.dwarfuicore.user_prompt_service)
         assert.is_equal(unrelated_state,
@@ -415,7 +424,7 @@ describe('dwarfuicore command lifecycle', function()
                 },
                 ['dwarfuicore/user_prompt/service']={
                     UserPromptTerminalCause={CORE_RELOAD=10},
-                    service={cancel_active=function()
+                    service={retire_for_reload=function()
                         table.insert(events, 'user-prompt-partial')
                     end},
                 },

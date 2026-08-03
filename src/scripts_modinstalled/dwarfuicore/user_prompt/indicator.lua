@@ -131,9 +131,15 @@ end
 ---@return boolean restored
 function NativeIndicatorAdapter:release()
     if not self._acquired then return false end
-    local restore = self._last_written ~= nil and self:_verify_ownership()
-    if restore then self._port.write(copy_coord(self._snapshot)) end
+    local restore = false
+    local ok, failure = xpcall(function()
+        restore = self._last_written ~= nil and self:_verify_ownership()
+        if restore then self._port.write(copy_coord(self._snapshot)) end
+    end, debug.traceback)
+    self._acquired = false
     self._owns = false
+    self._prepared = false
+    if not ok then error(failure, 0) end
     return restore
 end
 

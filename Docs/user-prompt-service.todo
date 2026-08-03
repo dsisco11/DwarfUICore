@@ -735,53 +735,77 @@ installed mod, or sibling repository was changed.
 
 ## Phase 8 - Complete lifecycle, failure, and reload integration
 
-- [ ] Implement the fixed terminal order: mark inactive/remove pending state,
+- [x] Implement the fixed terminal order: mark inactive/remove pending state,
       release input, clear prompt render intent and tooltip suppression,
       restore/relinquish indicator, invalidate presentation, then invoke one
       callback behind failure containment.
-- [ ] Apply completion only to left release and cancellation to right release,
+- [x] Apply completion only to left release and cancellation to right release,
       Escape, `cancel`, owning `clear_namespace`, input-root loss,
       presentation-root loss, world/map unload, internal prompt failure, and
       explicit Core reload.
-- [ ] Invoke `on_cancel()` when supplied for every cancellation cause and never
+- [x] Invoke `on_cancel()` when supplied for every cancellation cause and never
       invoke `on_select` for the same prompt.
-- [ ] Allow completion, right-click, Escape, and explicit-cancel callbacks to
+- [x] Allow completion, right-click, Escape, and explicit-cancel callbacks to
       synchronously open a replacement prompt after old ownership is clear.
-- [ ] Reject same-namespace reentry during `clear_namespace()` until cleanup
+- [x] Reject same-namespace reentry during `clear_namespace()` until cleanup
       callback dispatch completes.
-- [ ] Reject reentry during input-root loss, presentation-root loss, world/map
+- [x] Reject reentry during input-root loss, presentation-root loss, world/map
       unload, service failure, and Core retirement through the corresponding
       unavailable surface/runtime state.
-- [ ] Mark Core runtime retirement before reload cancellation callbacks and
+- [x] Mark Core runtime retirement before reload cancellation callbacks and
       retire UserPrompt state before shared input/render owners.
-- [ ] Preserve reload-safe inert trampoline adoption for the next generation
+- [x] Preserve reload-safe inert trampoline adoption for the next generation
       and invalidate every old API and handle.
-- [ ] Ensure partial initialization, service disablement, callback failure, and
+- [x] Ensure partial initialization, service disablement, callback failure, and
       teardown failure leave tooltip/context-menu registrations and foreign
       owners intact.
-- [ ] Fault-inject every terminal cleanup operation. Prove prompt-owned state is
+- [x] Fault-inject every terminal cleanup operation. Prove prompt-owned state is
       cleared or irrevocably relinquished before exact-once callback dispatch,
       no prompt can revive or remain pending, foreign owners remain intact, and
       every contained cleanup failure is diagnosed.
-- [ ] Add lifecycle and failure diagnostics without exposing consumer callbacks.
+- [x] Add lifecycle and failure diagnostics without exposing consumer callbacks.
 
 ### Phase 8 completion gate
 
-- [ ] Integrated tests cover every lifecycle cause, exact callback choice/count,
+- [x] Integrated tests cover every lifecycle cause, exact callback choice/count,
       real input/render/tooltip/indicator cleanup order, eligible and rejected
       reentry, callback failure, partial initialization, and old-generation
       invalidation; these replace the Phase 4 stand-ins with actual adapters.
-- [ ] Lifecycle tests exercise input-root and presentation-root loss separately,
+- [x] Lifecycle tests exercise input-root and presentation-root loss separately,
       including exact-once cancellation, rejected callback reentry, resource
       cleanup, and retained foreign ownership for each.
-- [ ] Terminal fault-injection tests cover every cleanup operation and prove the
+- [x] Terminal fault-injection tests cover every cleanup operation and prove the
       cleanup-failure guarantees without weakening callback ordering or count.
-- [ ] Reload tests prove no hidden prompt, active consumer, tooltip suppression,
+- [x] Reload tests prove no hidden prompt, active consumer, tooltip suppression,
       stale renderer, indicator damage, duplicate hook, or retired healthy
       facade remains.
-- [ ] Existing tooltip and context-menu lifecycle/reload suites remain green.
-- [ ] The follow-up review verifies the terminal order and all reentry rules
+- [x] Existing tooltip and context-menu lifecycle/reload suites remain green.
+- [x] The follow-up review verifies the terminal order and all reentry rules
       directly against the proposal's state and sequence diagrams.
+
+### Phase 8 implementation record
+
+- The terminal state machine now clears authoritative state before ordered
+  cleanup and exact-once callback dispatch. Lifecycle, internal-failure, and
+  reload boundaries apply their required callback-time availability policy.
+- Runtime integration detects input-root, presentation-root, and world loss;
+  contains owned input and presentation failures; retires its lifecycle
+  callback before reload cancellation; and preserves foreign tooltip and
+  context-menu ownership through all cleanup paths.
+- Cleanup fault injection covers input, render intent, renderer state, tooltip
+  suppression, native indicator release, and presentation invalidation.
+  Contained cleanup failures disable only UserPrompt and are exposed through
+  callback-free diagnostics.
+- A two-generation reconstruction test proves complete retirement cleanup,
+  stale old API and handle rejection, one successor lifecycle callback, and
+  successful reuse of the shared input and render adapters.
+- Final automated evidence: UserPrompt `61/61`, UserPrompt provider `9/9`, full
+  unit suite `450/450`, tooltip `110/110`, context-menu `120/120`, service API
+  `8/8`, and command `11/11`. Lua syntax passed for 54 production and 68
+  test/support files; `git diff --check` passed with line-ending warnings only.
+- The required follow-up review found and corrected owned input leakage during
+  input-root loss. The independent completion re-audit then returned PASS with
+  no remaining Phase 8 discrepancy or evidence gap.
 
 ## Phase 9 - Complete documentation, packaging, and automated qualification
 

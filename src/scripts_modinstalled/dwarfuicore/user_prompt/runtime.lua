@@ -19,6 +19,9 @@ local presenter = tooltip_runtime.presenter
 local context_service = context_service_module.service
 local renderer = renderer_module.UserPromptRenderer{}
 local causes = service_module.UserPromptTerminalCause
+local STATE_CHANGE_SLOT = 'dwarfuicore-user-prompt'
+local active_surface = nil
+local state_change_callback = nil
 
 ---@type dwarfuicore.UserPromptInputConsumer
 local input_consumer = input_consumer_module.UserPromptInputConsumer.new{
@@ -26,8 +29,8 @@ local input_consumer = input_consumer_module.UserPromptInputConsumer.new{
     get_map_position=function() return dfhack.gui.getMousePos() end,
     complete=function(position) return prompt_service:complete(position) end,
     cancel=function(cause) return prompt_service:cancel_active(cause) end,
-    on_failure=function()
-        prompt_service:cancel_active(causes.INTERNAL_FAILURE)
+    on_failure=function(message)
+        prompt_service:fail_active(message)
     end,
     causes=causes,
 }
@@ -42,20 +45,70 @@ local function resolve_surface()
     return input_manager:resolve_current_surface()
 end
 
+---Cancels an active prompt when its selected map surface is no longer usable.
+---@param root_loss_cause dwarfuicore.UserPromptTerminalCause
+---@return boolean current
+local function ensure_active_surface(root_loss_cause)
+    if not prompt_service:has_active_prompt() then return true end
+    if type(dfhack.isMapLoaded) ~= 'function' or
+            not dfhack.isMapLoaded() then
+        prompt_service:cancel_active(causes.WORLD_UNLOAD)
+        return false
+    end
+    local ok, current = xpcall(resolve_surface, debug.traceback)
+    if not ok then
+        prompt_service:fail_active(current)
+        return false
+    end
+    if current ~= active_surface then
+        prompt_service:cancel_active(root_loss_cause)
+        return false
+    end
+    return true
+end
+
+local input_callbacks = input_consumer:callbacks()
+
+---@type dwarfuicore.PriorityInputConsumer
+local guarded_input_callbacks = {
+    owns=function(keys, transport, owner)
+        local owned = input_callbacks.owns(keys, transport, owner)
+        if not ensure_active_surface(causes.INPUT_ROOT_LOSS) then return owned end
+        return owned
+    end,
+    handle=input_callbacks.handle,
+    on_failure=input_callbacks.on_failure,
+}
+
 ---Builds the authoritative completed-render callback for one request.
 ---@param request dwarfuicore.MapLocationPromptRequest
 ---@param indicator dwarfuicore.NativeIndicatorAdapter
+---@param surface table
 ---@return function present
-local function build_presenter(request, indicator)
+local function build_presenter(request, indicator, surface)
     return function(painter)
-        local pointer_x, pointer_y = dfhack.screen.getMousePos()
-        local map_position = nil
-        if pointer_x ~= nil and pointer_y ~= nil then
-            map_position = dfhack.gui.getMousePos()
+        if active_surface ~= surface or
+                not ensure_active_surface(causes.PRESENTATION_ROOT_LOSS) then
+            return
         end
-        indicator:update(map_position)
-        renderer:set_prompt(request, pointer_x, pointer_y, painter)
-        renderer:render(painter)
+        local ok, failure = xpcall(function()
+            local pointer_x, pointer_y = dfhack.screen.getMousePos()
+            local map_position = nil
+            if pointer_x ~= nil and pointer_y ~= nil then
+                map_position = dfhack.gui.getMousePos()
+            end
+            indicator:update(map_position)
+            renderer:set_prompt(request, pointer_x, pointer_y, painter)
+            renderer:render(painter)
+        end, debug.traceback)
+        if not ok then
+            prompt_service:fail_active(failure)
+            if dfhack.printerr then
+                pcall(dfhack.printerr,
+                    'DwarfUICore UserPrompt presentation failed:\n' ..
+                        tostring(failure))
+            end
+        end
     end
 end
 
@@ -64,13 +117,13 @@ local activation = {
     resolve_surface=resolve_surface,
     prepare_input=function(surface)
         return input_manager:prepare_priority_consumer(
-            surface, input_consumer:callbacks())
+            surface, guarded_input_callbacks)
     end,
     prepare_render=function(surface, request)
         local indicator = indicator_module.NativeIndicatorAdapter.new()
         return {
             intent=presenter:prepare_authoritative_intent(
-                surface, build_presenter(request, indicator)),
+                surface, build_presenter(request, indicator, surface)),
             indicator=indicator,
         }
     end,
@@ -95,6 +148,7 @@ local activation = {
         context_service:close('user-prompt-activation')
     end,
     commit=function(resources)
+        active_surface = resources.surface
         input_manager:activate_priority_consumer(resources.input)
         resources.indicator:commit_prepared()
         presenter:activate_authoritative_intent(resources.render.intent)
@@ -106,14 +160,34 @@ local activation = {
     end,
 }
 
+---Runs every sub-operation of one cleanup boundary before reporting failure.
+---@param name string
+---@param operations function[]
+local function run_cleanup_operations(name, operations)
+    local failures = {}
+    for _, operation in ipairs(operations) do
+        local ok, failure = xpcall(operation, debug.traceback)
+        if not ok then table.insert(failures, tostring(failure)) end
+    end
+    if #failures > 0 then
+        error(('DwarfUICore UserPrompt %s cleanup failed:\n%s'):format(
+            name, table.concat(failures, '\n')), 0)
+    end
+end
+
 ---@type dwarfuicore.UserPromptCleanupPorts
 local cleanup = {
     input=function(_, _, _, resources)
+        active_surface = nil
         input_manager:release_priority_consumer(resources.input)
     end,
     render=function(_, _, _, resources)
-        renderer:set_prompt(nil, nil, nil, nil)
-        presenter:release_authoritative_render(resources.render.intent)
+        run_cleanup_operations('render', {
+            function()
+                presenter:release_authoritative_render(resources.render.intent)
+            end,
+            function() renderer:set_prompt(nil, nil, nil, nil) end,
+        })
     end,
     tooltip_suppression=function(_, _, _, resources)
         presenter:release_tooltip_suppression(resources.render.intent)
@@ -130,6 +204,32 @@ prompt_service:configure_runtime(cleanup, activation)
 context_service:set_opening_guard(function()
     return prompt_service:has_active_prompt()
 end)
+
+---Cancels the prompt when DFHack announces that the world has unloaded.
+---@param code integer
+local function handle_state_change(code)
+    if code == SC_WORLD_UNLOADED then
+        prompt_service:cancel_active(causes.WORLD_UNLOAD)
+    end
+end
+
+---Installs the generation-owned world lifecycle callback when available.
+local function install_state_change_callback()
+    if type(dfhack.onStateChange) ~= 'table' then return end
+    state_change_callback = handle_state_change
+    dfhack.onStateChange[STATE_CHANGE_SLOT] = state_change_callback
+end
+
+---Removes only the world lifecycle callback still owned by this generation.
+local function remove_state_change_callback()
+    if type(dfhack.onStateChange) == 'table' and
+            dfhack.onStateChange[STATE_CHANGE_SLOT] == state_change_callback then
+        dfhack.onStateChange[STATE_CHANGE_SLOT] = nil
+    end
+    state_change_callback = nil
+end
+
+install_state_change_callback()
 
 ---@class dwarfuicore.UserPromptRuntime
 ---@field generation integer
@@ -161,6 +261,9 @@ function validate(value, expected_generation)
         type(service.cancel) == 'function' and
         type(service.is_active) == 'function' and
         type(service.clear_namespace) == 'function' and
+        type(service.cancel_active) == 'function' and
+        type(service.fail_active) == 'function' and
+        type(service.retire_for_reload) == 'function' and
         type(current) == 'table' and
         current.runtime_generation == expected_generation,
         'DwarfUICore UserPrompt runtime is incomplete or stale.')
@@ -177,6 +280,6 @@ end
 ---Cancels the active prompt before shared owners retire during Core reload.
 ---@return boolean changed
 function retire_for_reload()
-    return runtime.service:cancel_active(
-        service_module.UserPromptTerminalCause.CORE_RELOAD)
+    remove_state_change_callback()
+    return runtime.service:retire_for_reload()
 end

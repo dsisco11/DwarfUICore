@@ -2,14 +2,20 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 ---Loads the complete UserPrompt provider stack over one controlled process.
+---@param settings? table
 ---@return table context
-local function load_context()
-    local process = {dwarfuicore={}}
+local function load_context(settings)
+    settings = settings or {}
+    local process = settings.process or {dwarfuicore={}}
+    local ui = settings.ui or {root={}}
+    process.onStateChange = process.onStateChange or {}
     process.isMapLoaded = function() return true end
     process.gui = {getMousePos=function() return nil end}
     process.screen = {
         getMousePos=function() return nil end,
-        invalidate=function() end,
+        invalidate=function()
+            ui.invalidation_count = (ui.invalidation_count or 0) + 1
+        end,
     }
     local _, immutable_enum = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
@@ -39,8 +45,15 @@ local function load_context()
                 ['dwarfuicore/service_provider/contracts']=contracts,
             },
         })
-    local state = runtime.begin_initialization()
-    runtime.complete_initialization(state.generation)
+    local state
+    if process.dwarfuicore.service_provider_runtime == nil then
+        state = runtime.begin_initialization()
+    else
+        state = runtime.validate()
+    end
+    if state.status == contracts.RuntimeStatus.INITIALIZING then
+        runtime.complete_initialization(state.generation)
+    end
     local _, acquisition = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/service_provider/acquisition.lua', {
             reqscript={
@@ -78,24 +91,54 @@ local function load_context()
     local context_service = {
         close=function() return false end,
         get_open_source_root=function() return nil end,
-        set_opening_guard=function() end,
+        set_opening_guard=function(_, guard) ui.opening_guard = guard end,
     }
-    local input_manager = {
-        resolve_current_surface=function() return {} end,
-        prepare_priority_consumer=function() return {} end,
-        release_priority_consumer=function() return true end,
-        activate_priority_consumer=function() return true end,
+    local input_manager = settings.input_manager or {
+        resolve_current_surface=function() return ui.root end,
+        prepare_priority_consumer=function(_, _, callbacks)
+            ui.prepared_input = {callbacks=callbacks}
+            return ui.prepared_input
+        end,
+        release_priority_consumer=function(_, prepared)
+            if ui.prepared_input == prepared then ui.prepared_input = nil end
+            if ui.active_input == prepared then ui.active_input = nil end
+            return true
+        end,
+        activate_priority_consumer=function(_, prepared)
+            ui.prepared_input = nil
+            ui.active_input = prepared
+            return true
+        end,
     }
-    local presenter = {
-        prepare_authoritative_intent=function() return {} end,
-        release_authoritative_intent=function() return true end,
-        activate_authoritative_intent=function() return true end,
+    local presenter = settings.presenter or {
+        prepare_authoritative_intent=function(_, _, present)
+            ui.prepared_render = {present=present}
+            return ui.prepared_render
+        end,
+        release_authoritative_intent=function(_, prepared)
+            if ui.prepared_render == prepared then ui.prepared_render = nil end
+            return true
+        end,
+        activate_authoritative_intent=function(_, prepared)
+            ui.prepared_render = nil
+            ui.active_render = prepared
+            ui.tooltip_suppressed = true
+            return true
+        end,
         invalidate_authoritative_intent=function() return true end,
-        release_authoritative_render=function() return true end,
-        release_tooltip_suppression=function() return true end,
+        release_authoritative_render=function(_, prepared)
+            if ui.active_render == prepared then ui.active_render = nil end
+            return true
+        end,
+        release_tooltip_suppression=function()
+            ui.tooltip_suppressed = false
+            return true
+        end,
     }
     local renderer_class = setmetatable({}, {__call=function()
-        return {set_prompt=function() end, render=function() end}
+        return {set_prompt=function(_, request)
+            ui.rendered_request = request
+        end, render=function() end}
     end})
     local _, prompt_runtime = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/runtime.lua', {
@@ -106,10 +149,19 @@ local function load_context()
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
                 ['dwarfuicore/user_prompt/indicator']={
                     NativeIndicatorAdapter={new=function()
+                        local indicator = {released=false}
+                        ui.indicator = indicator
                         return {prepare=function() end,
-                            commit_prepared=function() return true end,
+                            commit_prepared=function()
+                                indicator.acquired = true
+                                return true
+                            end,
                             update=function() end,
-                            release=function() return true end}
+                            release=function()
+                                indicator.acquired = false
+                                indicator.released = true
+                                return true
+                            end}
                     end},
                 },
                 ['dwarfuicore/user_prompt/input_consumer']={
@@ -141,7 +193,8 @@ local function load_context()
                 ['dwarfuicore/service_provider/user_prompt_adapter_v1']=adapter,
             },
         })
-    return {process=process, contracts=contracts, runtime=runtime,
+    return {process=process, ui=ui, input_manager=input_manager,
+        presenter=presenter, contracts=contracts, runtime=runtime,
         state=state, identity=identity, values=values, service=service,
         adapter=adapter, prompt_runtime=prompt_runtime,
         provider=provider.get_provider()}
@@ -296,6 +349,104 @@ describe('UserPrompt provider runtime', function()
             'DwarfUICore UserPromptServiceApi: [SERVICE_BUSY] ', 1, true))
         local replacement = api:prompt_map_location(options())
         assert.is_true(api:is_active(replacement))
+    end)
+
+    it('reports contained service failure without damaging other providers',
+            function()
+        local context = load_context()
+        local tooltip_service = {name='tooltip'}
+        local menu_service = {name='context-menu'}
+        context.runtime.initialize_service(
+            context.contracts.ServiceKind.TOOLTIP,
+            function() return tooltip_service end)
+        context.runtime.initialize_service(
+            context.contracts.ServiceKind.CONTEXT_MENU,
+            function() return menu_service end)
+        local api = context.provider:new(1, 'consumer')
+        local callback_failure
+        api:prompt_map_location(options(nil, function()
+            local ok, failure = pcall(function()
+                api:prompt_map_location(options())
+            end)
+            assert.is_false(ok)
+            callback_failure = tostring(failure)
+        end))
+
+        assert.is_true(context.service.service:cancel_active(
+            context.service.UserPromptTerminalCause.INTERNAL_FAILURE))
+        assert.is_truthy(callback_failure:find(
+            'DwarfUICore UserPromptServiceApi: [SERVICE_UNHEALTHY] ',
+            1, true))
+        assert.equals(context.contracts.ServiceHealth.UNHEALTHY,
+            context.state.services[
+                context.contracts.ServiceKind.USER_PROMPT].health)
+        assert_category(function() api:prompt_map_location(options()) end,
+            'ServiceApi', 'SERVICE_UNHEALTHY')
+        assert_category(function() api:get_contract_version() end,
+            'ServiceApi', 'SERVICE_UNHEALTHY')
+        assert_category(function() context.provider:new(1, 'other') end,
+            'ServiceProvider', 'SERVICE_UNHEALTHY')
+        assert.is_equal(tooltip_service, context.runtime.get_service(
+            context.contracts.ServiceKind.TOOLTIP))
+        assert.is_equal(menu_service, context.runtime.get_service(
+            context.contracts.ServiceKind.CONTEXT_MENU))
+    end)
+
+    it('reconstructs one clean generation and invalidates old APIs and handles',
+            function()
+        local first = load_context()
+        local old_api = first.provider:new(1, 'consumer')
+        local old_handle = old_api:prompt_map_location(options())
+        local old_indicator = first.ui.indicator
+        local old_state_callback = first.process.onStateChange[
+            'dwarfuicore-user-prompt']
+        assert.is_not_nil(first.ui.active_input)
+        assert.is_not_nil(first.ui.active_render)
+        assert.is_true(first.ui.tooltip_suppressed)
+        assert.is_true(old_indicator.acquired)
+
+        first.runtime.begin_reload()
+        assert.is_true(first.prompt_runtime.retire_for_reload())
+        assert.is_nil(first.process.onStateChange[
+            'dwarfuicore-user-prompt'])
+        assert.is_nil(first.ui.active_input)
+        assert.is_nil(first.ui.active_render)
+        assert.is_false(first.ui.tooltip_suppressed)
+        assert.is_nil(first.ui.rendered_request)
+        assert.is_false(old_indicator.acquired)
+        assert.is_true(old_indicator.released)
+
+        local successor = first.runtime.begin_reconstruction()
+        first.process.dwarfuicore.user_prompt_service = nil
+        local second = load_context({
+            process=first.process,
+            ui=first.ui,
+            input_manager=first.input_manager,
+            presenter=first.presenter,
+        })
+        assert.equals(successor.generation, second.state.generation)
+        assert_category(function() old_api:get_contract_version() end,
+            'ServiceApi', 'STALE_API')
+        local fresh_api = second.provider:new(1, 'consumer')
+        assert_category(function() fresh_api:is_active(old_handle) end,
+            'ServiceApi', 'STALE_HANDLE')
+        local new_callback = second.process.onStateChange[
+            'dwarfuicore-user-prompt']
+        assert.is_not_nil(new_callback)
+        assert.is_not_equal(old_state_callback, new_callback)
+        local callback_count = 0
+        for key, callback in pairs(second.process.onStateChange) do
+            if key == 'dwarfuicore-user-prompt' and callback ~= nil then
+                callback_count = callback_count + 1
+            end
+        end
+        assert.equals(1, callback_count)
+
+        local fresh_handle = fresh_api:prompt_map_location(options())
+        assert.is_true(fresh_api:is_active(fresh_handle))
+        assert.is_not_nil(second.ui.active_input)
+        assert.is_not_nil(second.ui.active_render)
+        assert.is_true(second.ui.tooltip_suppressed)
     end)
 
     it('enforces malformed, stale, and foreign prompt-handle precedence',

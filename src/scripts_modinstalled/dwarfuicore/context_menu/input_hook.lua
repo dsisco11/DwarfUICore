@@ -355,6 +355,38 @@ function ContextMenuInputHookManager:_ensure_root(root)
     return self:ensure_native()
 end
 
+---Resolves the exact current root that can share the existing input seam.
+---A tracked Lua screen wins; otherwise the current native map viewscreen lends
+---its widget root to the native overlay transport.
+---@return table|nil root
+function ContextMenuInputHookManager:resolve_current_surface()
+    local gui_api = dfhack.gui
+    if type(gui_api) ~= 'table' or
+            type(gui_api.getCurViewscreen) ~= 'function' or
+            type(gui_api.getDFViewscreen) ~= 'function' then
+        return nil
+    end
+    local current = gui_api.getCurViewscreen(true)
+    for owner, record in pairs(self._state.screen_hooks) do
+        if record.active and owner._native == current and
+                type(owner.onInput) == 'function' then
+            return owner
+        end
+    end
+    for root in pairs(self._state.context_roots) do
+        if type(root) == 'table' and root._native == current and
+                type(root.onInput) == 'function' then
+            return root
+        end
+    end
+    local native = gui_api.getDFViewscreen(true)
+    if native ~= nil and current == native and
+            type(native.widgets) == 'table' then
+        return native.widgets
+    end
+    return nil
+end
+
 ---Prepares every fallible dependency for one priority consumer.
 ---The returned value is inactive until activate_priority_consumer() commits it.
 ---@param root table

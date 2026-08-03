@@ -607,6 +607,48 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.is_false(diagnostics.tooltip_suppressed)
     end)
 
+    it('invalidates and releases render before restoring tooltip suppression',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Retained tooltip')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+
+        local prepared = env.tooltip.presenter:prepare_authoritative_intent(
+            root, function() end)
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        local invalidations = env.state.invalidations
+        assert.is_false(
+            env.tooltip.presenter:invalidate_authoritative_intent({}))
+        assert.is_true(
+            env.tooltip.presenter:invalidate_authoritative_intent(prepared))
+        assert.equals(invalidations + 1, env.state.invalidations)
+
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_render(prepared))
+        local diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.authoritative_intent_active)
+        assert.is_true(diagnostics.tooltip_suppressed)
+        assert.is_nil(env.hook.manager:get_diagnostics().selected_owner)
+
+        assert.is_true(
+            env.tooltip.presenter:release_tooltip_suppression(prepared))
+        diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.tooltip_suppressed)
+        assert.is_equal(env.overlay,
+            env.hook.manager:get_diagnostics().selected_owner)
+        assert.is_equal(widget, env.service:get_diagnostics().target)
+        assert.is_false(
+            env.tooltip.presenter:release_authoritative_render(prepared))
+        assert.is_false(
+            env.tooltip.presenter:release_tooltip_suppression(prepared))
+    end)
+
     it('keeps an authoritative intent on its exact prepared screen root',
             function()
         local env = load_environment()

@@ -254,6 +254,18 @@ function TooltipPresenter:activate_authoritative_intent(prepared)
     return true
 end
 
+---Invalidates the selected owner for one active authoritative intent.
+---@param prepared any
+---@return boolean invalidated
+function TooltipPresenter:invalidate_authoritative_intent(prepared)
+    if self._authoritative_intent ~= prepared or not prepared.active then
+        return false
+    end
+    self._redraw_count = self._redraw_count + 1
+    self._invalidate()
+    return true
+end
+
 ---Releases one prepared or active intent before best-effort tooltip recovery.
 ---@param prepared any
 ---@return boolean changed
@@ -271,6 +283,43 @@ function TooltipPresenter:release_authoritative_intent(prepared)
     end
     if not changed then return false end
     prepared.active = false
+    prepared.released = true
+    local ok, failure = xpcall(function()
+        self:_select_current_intent()
+    end, debug.traceback)
+    if not ok then
+        self._last_authoritative_cleanup_error = tostring(failure)
+        self._hook_manager:clear_selection()
+        if dfhack.printerr then
+            pcall(dfhack.printerr,
+                'DwarfUICore authoritative presentation cleanup failed:\n' ..
+                    tostring(failure))
+        end
+    end
+    return true
+end
+
+---Clears only active authoritative rendering before tooltip suppression.
+---@param prepared any
+---@return boolean changed
+function TooltipPresenter:release_authoritative_render(prepared)
+    if self._authoritative_intent ~= prepared then return false end
+    self._authoritative_intent = nil
+    prepared.active = false
+    self._selected_revision = nil
+    self._hook_manager:set_current_intent_revision(nil)
+    self._hook_manager:clear_selection()
+    return true
+end
+
+---Clears ordinary-tooltip suppression and restores retained tooltip intent.
+---@param prepared any
+---@return boolean changed
+function TooltipPresenter:release_tooltip_suppression(prepared)
+    if not self._tooltip_suppressed or type(prepared) ~= 'table' then
+        return false
+    end
+    self._tooltip_suppressed = false
     prepared.released = true
     local ok, failure = xpcall(function()
         self:_select_current_intent()

@@ -355,6 +355,32 @@ describe('context-menu service', function()
         assert.is_false(service:close())
     end)
 
+    it('blocks every opening path while the process guard is active', function()
+        local harness = load_harness()
+        local factory, presentation = presenter_factory()
+        local service = create_service(harness, {
+            presentation_factory=factory,
+        })
+        local blocked = true
+        service:set_opening_guard(function() return blocked end)
+
+        assert.is_false(service:open(detection()))
+        assert.is_false(service:handle_opening_input(
+            {_MOUSE_R=true}, 1, {}))
+        assert.is_false(service:is_open())
+        assert.equals(0, presentation.shown)
+
+        blocked = false
+        local opened_detection = detection()
+        assert.is_true(service:open(opened_detection))
+        assert.is_true(service:is_open())
+        assert.is_equal(opened_detection.root,
+            service:get_open_source_root())
+        assert.equals(1, presentation.shown)
+        assert.is_true(service:close())
+        assert.is_nil(service:get_open_source_root())
+    end)
+
     it('closes an open session synchronously when a contribution is removed',
             function()
         local harness = load_harness()

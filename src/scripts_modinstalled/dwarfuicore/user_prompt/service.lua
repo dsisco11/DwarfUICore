@@ -42,15 +42,28 @@ UserPromptTerminalCause = immutable_enum.define({
 }, 'UserPromptTerminalCause')
 
 ---@class dwarfuicore.UserPromptCleanupPorts
----@field input fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause)
----@field render fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause)
----@field tooltip_suppression fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause)
----@field indicator fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause)
----@field invalidation fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause)
+---@field input fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause, resources: table)
+---@field render fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause, resources: table)
+---@field tooltip_suppression fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause, resources: table)
+---@field indicator fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause, resources: table)
+---@field invalidation fun(identity: dwarfuicore.CompositeIdentity, request: table, cause: dwarfuicore.UserPromptTerminalCause, resources: table)
 
 ---@class dwarfuicore.UserPromptPendingRequest
 ---@field identity dwarfuicore.CompositeIdentity
 ---@field request table
+---@field resources table
+
+---@class dwarfuicore.UserPromptActivationPorts
+---@field resolve_surface fun(): table|nil
+---@field prepare_input fun(surface: table): any
+---@field prepare_render fun(surface: table, request: table): any
+---@field prepare_indicator fun(surface: table, request: table, resources: table): any
+---@field rollback_input fun(prepared: any)
+---@field rollback_render fun(prepared: any)
+---@field rollback_indicator fun(prepared: any)
+---@field close_menu fun()
+---@field commit fun(resources: table)
+---@field invalidate fun(resources: table)
 
 ---@class dwarfuicore.UserPromptServiceState
 ---@field api_version integer
@@ -75,6 +88,7 @@ UserPromptTerminalCause = immutable_enum.define({
 ---@class dwarfuicore.UserPromptService
 ---@field private _state dwarfuicore.UserPromptServiceState
 ---@field private _cleanup dwarfuicore.UserPromptCleanupPorts
+---@field private _activation dwarfuicore.UserPromptActivationPorts
 UserPromptService = {}
 UserPromptService.__index = UserPromptService
 
@@ -91,6 +105,23 @@ local function stand_in_cleanup_ports()
         tooltip_suppression=no_op,
         indicator=no_op,
         invalidation=no_op,
+    }
+end
+
+---Creates behaviorally inert activation ports for isolated state-model tests.
+---@return dwarfuicore.UserPromptActivationPorts ports
+local function stand_in_activation_ports()
+    return {
+        resolve_surface=function() return {} end,
+        prepare_input=function() return {} end,
+        prepare_render=function() return {} end,
+        prepare_indicator=function() return {} end,
+        rollback_input=no_op,
+        rollback_render=no_op,
+        rollback_indicator=no_op,
+        close_menu=no_op,
+        commit=no_op,
+        invalidate=no_op,
     }
 end
 
@@ -154,11 +185,30 @@ local function validate_cleanup_ports(cleanup)
     return cleanup
 end
 
+---Validates one complete activation-port set.
+---@param activation any
+---@return dwarfuicore.UserPromptActivationPorts activation
+local function validate_activation_ports(activation)
+    assert(type(activation) == 'table',
+        'DwarfUICore UserPrompt activation ports must be a table.')
+    for _, name in ipairs{
+            'resolve_surface', 'prepare_input', 'prepare_render',
+            'prepare_indicator', 'rollback_input', 'rollback_render',
+            'rollback_indicator', 'close_menu', 'commit', 'invalidate',
+        } do
+        assert(type(activation[name]) == 'function',
+            ('DwarfUICore UserPrompt activation port %s must be a function.')
+                :format(name))
+    end
+    return activation
+end
+
 ---Creates one prompt state machine over process-owned state and cleanup ports.
 ---@param state dwarfuicore.UserPromptServiceState
 ---@param cleanup? dwarfuicore.UserPromptCleanupPorts
+---@param activation? dwarfuicore.UserPromptActivationPorts
 ---@return dwarfuicore.UserPromptService service
-function UserPromptService.new(state, cleanup)
+function UserPromptService.new(state, cleanup, activation)
     assert(type(state) == 'table' and state.api_version == API_VERSION,
         'DwarfUICore UserPrompt service requires compatible process state.')
     assert(math.type(state.runtime_generation) == 'integer' and
@@ -169,7 +219,20 @@ function UserPromptService.new(state, cleanup)
     return setmetatable({
         _state=state,
         _cleanup=validate_cleanup_ports(cleanup or stand_in_cleanup_ports()),
+        _activation=validate_activation_ports(
+            activation or stand_in_activation_ports()),
     }, UserPromptService)
+end
+
+---Installs the concrete runtime adapters before any prompt can be admitted.
+---@param cleanup dwarfuicore.UserPromptCleanupPorts
+---@param activation dwarfuicore.UserPromptActivationPorts
+function UserPromptService:configure_runtime(cleanup, activation)
+    assert(self._state.status == UserPromptState.IDLE and
+            self._state.pending == nil,
+        'DwarfUICore UserPrompt runtime cannot change while active.')
+    self._cleanup = validate_cleanup_ports(cleanup)
+    self._activation = validate_activation_ports(activation)
 end
 
 ---Raises one stable-category internal service failure.
@@ -207,7 +270,22 @@ function UserPromptService:_validate_handle(handle, consumer_namespace,
     return identity
 end
 
----Atomically admits one copied request into the process-wide pending slot.
+---Rolls back detached preparation without publishing prompt ownership.
+---@param resources table
+function UserPromptService:_rollback_preparation(resources)
+    local activation = self._activation
+    if resources.indicator ~= nil then
+        pcall(activation.rollback_indicator, resources.indicator)
+    end
+    if resources.render ~= nil then
+        pcall(activation.rollback_render, resources.render)
+    end
+    if resources.input ~= nil then
+        pcall(activation.rollback_input, resources.input)
+    end
+end
+
+---Transactionally admits one copied request into the process-wide pending slot.
 ---@param request dwarfuicore.MapLocationPromptRequest
 ---@param contract_major integer
 ---@return dwarfuicore.MapLocationPrompt handle
@@ -225,17 +303,67 @@ function UserPromptService:start(request, contract_major)
             'Another process-wide prompt is active or terminating.')
     end
 
-    local allocated = identities.get_process_allocator():allocate_identity(
-        state.runtime_generation, contracts.ServiceKind.USER_PROMPT,
-        contract_major, copied_request.namespace)
-    local handle = identities.create_prompt_handle(allocated)
     state.status = UserPromptState.ACTIVATING
-    state.pending = {
+    local activation = self._activation
+    local resolved, surface = xpcall(activation.resolve_surface,
+        debug.traceback)
+    if not resolved then
+        state.status = UserPromptState.IDLE
+        fail(contracts.ErrorCategory.INVALID_ARGUMENT,
+            'Prompt surface resolution failed: ' .. tostring(surface))
+    end
+    if surface == nil then
+        state.status = UserPromptState.IDLE
+        fail(contracts.ErrorCategory.INVALID_ARGUMENT,
+            'No supported current map surface is available.')
+    end
+
+    local resources = {surface=surface}
+    local prepared, preparation_failure = xpcall(function()
+        resources.input = activation.prepare_input(surface)
+        resources.render = activation.prepare_render(surface, copied_request)
+        resources.indicator = activation.prepare_indicator(
+            surface, copied_request, resources)
+    end, debug.traceback)
+    if not prepared then
+        self:_rollback_preparation(resources)
+        state.status = UserPromptState.IDLE
+        fail(contracts.ErrorCategory.INVALID_ARGUMENT,
+            'Prompt activation preparation failed: ' ..
+                tostring(preparation_failure))
+    end
+
+    local allocated_ok, allocated, handle = pcall(function()
+        local identity = identities.get_process_allocator():allocate_identity(
+            state.runtime_generation, contracts.ServiceKind.USER_PROMPT,
+            contract_major, copied_request.namespace)
+        return identity, identities.create_prompt_handle(identity)
+    end)
+    if not allocated_ok then
+        self:_rollback_preparation(resources)
+        state.status = UserPromptState.IDLE
+        fail(contracts.ErrorCategory.INVALID_ARGUMENT,
+            'Prompt identity preparation failed: ' .. tostring(allocated))
+    end
+    local pending = {
         identity=identities.CompositeIdentity.new(allocated),
         request=copied_request,
+        resources=resources,
     }
+    activation.close_menu()
+    state.pending = pending
     state.status = UserPromptState.ACTIVE
+    activation.commit(resources)
     state.admitted_count = state.admitted_count + 1
+
+    local invalidated, invalidation_failure =
+        pcall(activation.invalidate, resources)
+    if not invalidated then
+        self:_terminate(UserPromptTerminalCause.INTERNAL_FAILURE)
+        fail(contracts.ErrorCategory.INVALID_ARGUMENT,
+            'Prompt presentation invalidation failed: ' ..
+                tostring(invalidation_failure))
+    end
     return handle
 end
 
@@ -247,7 +375,8 @@ function UserPromptService:_run_cleanup(pending, cause)
     state.last_cleanup_failures = {}
     for _, name in ipairs(CLEANUP_ORDER) do
         local ok, failure = pcall(self._cleanup[name],
-            copy_identity(pending.identity), pending.request, cause)
+            copy_identity(pending.identity), pending.request, cause,
+            pending.resources)
         if not ok then
             state.cleanup_failure_count = state.cleanup_failure_count + 1
             table.insert(state.last_cleanup_failures, {
@@ -271,7 +400,7 @@ function UserPromptService:_terminate(cause, position)
 
     local selected_position = nil
     if cause == UserPromptTerminalCause.LEFT_RELEASE and position ~= nil then
-        selected_position = identities.MapTilePosition.new(position)
+        selected_position = {x=position.x, y=position.y, z=position.z}
     end
     state.pending = nil
     state.status = UserPromptState.TERMINATING

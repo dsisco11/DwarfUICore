@@ -381,4 +381,213 @@ describe('UserPrompt state model', function()
         assert.equals(2, diagnostics.admitted_count)
         assert.is_nil(diagnostics.queue)
     end)
+
+    it('admits in exact transactional order and clears committed ownership',
+            function()
+        local context = load_context()
+        local events = {}
+        local resources
+        local service
+        local cleanup = {
+            input=function(_, _, _, current)
+                table.insert(events, 'cleanup-input')
+                current.input_active = false
+            end,
+            render=function(_, _, _, current)
+                table.insert(events, 'cleanup-render')
+                current.render_active = false
+            end,
+            tooltip_suppression=function(_, _, _, current)
+                table.insert(events, 'cleanup-tooltip')
+                current.tooltip_suppressed = false
+            end,
+            indicator=function(_, _, _, current)
+                table.insert(events, 'cleanup-indicator')
+                current.indicator_active = false
+            end,
+            invalidation=function()
+                table.insert(events, 'cleanup-invalidate')
+            end,
+        }
+        local activation = {
+            resolve_surface=function()
+                table.insert(events, 'resolve')
+                return {name='surface'}
+            end,
+            prepare_input=function()
+                table.insert(events, 'prepare-input')
+                return {name='input'}
+            end,
+            prepare_render=function()
+                table.insert(events, 'prepare-render')
+                return {name='render'}
+            end,
+            prepare_indicator=function()
+                table.insert(events, 'prepare-indicator')
+                return {name='indicator'}
+            end,
+            rollback_input=function() table.insert(events, 'rollback-input') end,
+            rollback_render=function() table.insert(events, 'rollback-render') end,
+            rollback_indicator=function()
+                table.insert(events, 'rollback-indicator')
+            end,
+            close_menu=function() table.insert(events, 'close-menu') end,
+            commit=function(current)
+                table.insert(events, 'commit')
+                assert.is_true(service:has_active_prompt())
+                resources = current
+                current.input_active = true
+                current.render_active = true
+                current.tooltip_suppressed = true
+                current.indicator_active = true
+            end,
+            invalidate=function()
+                table.insert(events, 'activate-invalidate')
+            end,
+        }
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup, activation)
+
+        local handle = service:start(request(context), 1)
+        assert.same({'resolve', 'prepare-input', 'prepare-render',
+            'prepare-indicator', 'close-menu', 'commit',
+            'activate-invalidate'}, events)
+        assert.is_true(service:is_active(handle, 'owner', 1))
+        assert.is_true(resources.input_active)
+        assert.is_true(resources.render_active)
+        assert.is_true(resources.tooltip_suppressed)
+        assert.is_true(resources.indicator_active)
+
+        assert.is_true(service:cancel(handle, 'owner', 1))
+        assert.same({'cleanup-input', 'cleanup-render', 'cleanup-tooltip',
+            'cleanup-indicator', 'cleanup-invalidate'},
+            {table.unpack(events, 8)})
+        assert.is_false(resources.input_active)
+        assert.is_false(resources.render_active)
+        assert.is_false(resources.tooltip_suppressed)
+        assert.is_false(resources.indicator_active)
+    end)
+
+    it('rolls back every fallible preparation boundary before menu mutation',
+            function()
+        local context = load_context()
+        for _, failure_stage in ipairs{
+                'resolve', 'input', 'render', 'indicator',
+            } do
+            local events = {}
+            local activation = {
+                resolve_surface=function()
+                    table.insert(events, 'resolve')
+                    if failure_stage == 'resolve' then error('resolve failed') end
+                    return {}
+                end,
+                prepare_input=function()
+                    table.insert(events, 'input')
+                    if failure_stage == 'input' then error('input failed') end
+                    return {}
+                end,
+                prepare_render=function()
+                    table.insert(events, 'render')
+                    if failure_stage == 'render' then error('render failed') end
+                    return {}
+                end,
+                prepare_indicator=function()
+                    table.insert(events, 'indicator')
+                    if failure_stage == 'indicator' then
+                        error('indicator failed')
+                    end
+                    return {}
+                end,
+                rollback_input=function()
+                    table.insert(events, 'rollback-input')
+                end,
+                rollback_render=function()
+                    table.insert(events, 'rollback-render')
+                end,
+                rollback_indicator=function()
+                    table.insert(events, 'rollback-indicator')
+                end,
+                close_menu=function() table.insert(events, 'close-menu') end,
+                commit=function() table.insert(events, 'commit') end,
+                invalidate=function() table.insert(events, 'invalidate') end,
+            }
+            local service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}), activation)
+
+            assert_category(function()
+                service:start(request(context), 1)
+            end, 'INVALID_ARGUMENT')
+            assert.is_false(service:has_active_prompt(), failure_stage)
+            assert.equals(context.module.UserPromptState.IDLE,
+                service:get_diagnostics().state, failure_stage)
+            assert.is_nil((function()
+                for _, event in ipairs(events) do
+                    if event == 'close-menu' or event == 'commit' or
+                            event == 'invalidate' then return event end
+                end
+            end)(), failure_stage)
+            if failure_stage == 'render' then
+                assert.equals('rollback-input', events[#events])
+            elseif failure_stage == 'indicator' then
+                assert.same({'rollback-render', 'rollback-input'},
+                    {events[#events - 1], events[#events]})
+            end
+        end
+
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}), {
+                resolve_surface=function() return nil end,
+                prepare_input=function() error('not reached') end,
+                prepare_render=function() error('not reached') end,
+                prepare_indicator=function() error('not reached') end,
+                rollback_input=function() end,
+                rollback_render=function() end,
+                rollback_indicator=function() end,
+                close_menu=function() error('not reached') end,
+                commit=function() error('not reached') end,
+                invalidate=function() error('not reached') end,
+            })
+        assert_category(function()
+            service:start(request(context), 1)
+        end, 'INVALID_ARGUMENT')
+        assert.is_false(service:has_active_prompt())
+    end)
+
+    it('contains post-commit invalidation failure as prompt cancellation',
+            function()
+        local context = load_context()
+        local cancelled = 0
+        local events = {}
+        local activation = {
+            resolve_surface=function() return {} end,
+            prepare_input=function() return {} end,
+            prepare_render=function() return {} end,
+            prepare_indicator=function() return {} end,
+            rollback_input=function() end,
+            rollback_render=function() end,
+            rollback_indicator=function() end,
+            close_menu=function() table.insert(events, 'close-menu') end,
+            commit=function() table.insert(events, 'commit') end,
+            invalidate=function()
+                table.insert(events, 'activate-invalidate')
+                error('invalidate failed')
+            end,
+        }
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports(events), activation)
+
+        assert_category(function()
+            service:start(request(context, 'owner', nil, function()
+                cancelled = cancelled + 1
+                table.insert(events, 'cancel')
+            end), 1)
+        end, 'INVALID_ARGUMENT')
+        assert.is_false(service:has_active_prompt())
+        assert.equals(1, cancelled)
+        assert.equals(context.module.UserPromptTerminalCause.INTERNAL_FAILURE,
+            service:get_diagnostics().last_terminal_cause)
+        assert.same({'close-menu', 'commit', 'activate-invalidate',
+            'input', 'render', 'tooltip_suppression', 'indicator',
+            'invalidation', 'cancel'}, events)
+    end)
 end)

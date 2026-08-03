@@ -67,6 +67,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@field _presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field _printer fun(message: string)
 ---@field _started boolean
+---@field _opening_guard fun(): boolean
 ---@field _state_change_callback? function
 ContextMenuService = {}
 ContextMenuService.__index = ContextMenuService
@@ -135,13 +136,30 @@ function ContextMenuService.new(state, options)
         _presentation_factory=options.presentation_factory,
         _printer=options.printer or default_printer,
         _started=false,
+        _opening_guard=function() return false end,
     }, ContextMenuService)
+end
+
+---Sets the private process-wide guard consulted by every opening path.
+---@param guard fun(): boolean
+function ContextMenuService:set_opening_guard(guard)
+    assert(type(guard) == 'function',
+        'DwarfUICore context-menu opening guard must be a function.')
+    self._opening_guard = guard
 end
 
 ---Returns whether one menu session is currently authoritative.
 ---@return boolean
 function ContextMenuService:is_open()
     return self._state.session ~= nil
+end
+
+---Returns the underlying source root retained by the open menu session.
+---@return table|nil root
+function ContextMenuService:get_open_source_root()
+    local session = self._state.session
+    if session == nil then return nil end
+    return session:get_source_root()
 end
 
 ---Returns whether an internal failure disabled this service generation.
@@ -240,7 +258,9 @@ end
 ---@return boolean opened
 function ContextMenuService:_open_unprotected(detection)
     local state = self._state
-    if self:is_disabled() or state.session ~= nil then return false end
+    if self:is_disabled() or state.session ~= nil or self._opening_guard() then
+        return false
+    end
     local candidate = detection.candidate
     local contributions = {}
     for index, value in ipairs(detection.candidates or {candidate}) do
@@ -380,6 +400,7 @@ end
 ---@return boolean handled
 function ContextMenuService:handle_opening_input(keys, transport, owner)
     if self:is_disabled() or self._state.session or
+            self._opening_guard() or
             type(keys) ~= 'table' or not keys._MOUSE_R then
         return false
     end

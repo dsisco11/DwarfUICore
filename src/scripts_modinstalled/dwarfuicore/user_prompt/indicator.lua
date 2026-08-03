@@ -90,6 +90,15 @@ function NativeIndicatorAdapter:acquire()
     self._owns = true
 end
 
+---Commits an already prepared snapshot using only non-throwing assignments.
+---@return boolean acquired
+function NativeIndicatorAdapter:commit_prepared()
+    if not self._prepared or self._acquired then return false end
+    self._acquired = true
+    self._owns = true
+    return true
+end
+
 ---Relinquishes ownership when the native field differs from the last write.
 ---@return boolean owns
 function NativeIndicatorAdapter:_verify_ownership()

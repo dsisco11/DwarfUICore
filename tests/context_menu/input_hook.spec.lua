@@ -149,6 +149,34 @@ describe('context-menu input hook', function()
         assert.equals(0, diagnostics.screen_hook_count)
     end)
 
+    it('resolves the exact current tracked screen or native widget root',
+            function()
+        local native_root = {}
+        local native_viewscreen = {widgets=native_root}
+        local current = native_viewscreen
+        local process = {
+            dwarfuicore={},
+            gui={
+                getCurViewscreen=function() return current end,
+                getDFViewscreen=function() return native_viewscreen end,
+            },
+        }
+        local overlay = {feed_viewscreen_widgets=function() end}
+        local module = load_hook(process, overlay)
+
+        assert.is_equal(native_root,
+            module.manager:resolve_current_surface())
+
+        local screen_native = {}
+        local screen = {_native=screen_native, onInput=function() end}
+        module.manager:ensure_screen(screen)
+        current = screen_native
+        assert.is_equal(screen, module.manager:resolve_current_surface())
+
+        current = {}
+        assert.is_nil(module.manager:resolve_current_surface())
+    end)
+
     it('preserves its compatible owner and trampolines across module reload',
             function()
         local process = {dwarfuicore={}}

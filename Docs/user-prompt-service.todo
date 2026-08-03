@@ -672,64 +672,64 @@ installed mod, or sibling repository was changed.
 
 ## Phase 7 - Integrate transactional activation, input, and menu exclusion
 
-- [ ] Implement admission in the proposal's exact order: validate, reject busy,
+- [x] Implement admission in the proposal's exact order: validate, reject busy,
       resolve a supported map-capable surface, prepare every fallible dependency,
       snapshot the indicator, close any menu, and commit using only non-failing
       assignments.
-- [ ] Immediately after the atomic commit, invalidate the selected presentation
+- [x] Immediately after the atomic commit, invalidate the selected presentation
       owner so the newly published prompt appears without waiting for unrelated
       game redraw activity. Treat unexpected invalidation failure as a contained
       internal prompt failure while preserving owned-input consumption.
-- [ ] Fail absence of a supported current map surface with `INVALID_ARGUMENT`
+- [x] Fail absence of a supported current map surface with `INVALID_ARGUMENT`
       before closing a menu or publishing prompt ownership.
-- [ ] Roll back preparation failure with no prompt, consumer, render intent,
+- [x] Roll back preparation failure with no prompt, consumer, render intent,
       tooltip suppression, context-menu mutation, or indicator ownership.
-- [ ] Close an existing DwarfUICore context menu during successful activation
+- [x] Close an existing DwarfUICore context menu during successful activation
       without invoking a selection callback.
-- [ ] Add an internal context-menu opening guard covering every opening path,
+- [x] Add an internal context-menu opening guard covering every opening path,
       not only right-click dispatch, so no menu can open while a prompt is active.
-- [ ] Keep context-menu registrations unchanged and remove the guard immediately
+- [x] Keep context-menu registrations unchanged and remove the guard immediately
       when the prompt terminates.
-- [ ] Bind the completed-render owner's authoritative intent and
+- [x] Bind the completed-render owner's authoritative intent and
       ordinary-tooltip suppression flag to the committed active prompt, and
       clear both through the terminal cleanup order.
-- [ ] Activate the prompt input consumer exactly while the prompt is pending and
+- [x] Activate the prompt input consumer exactly while the prompt is pending and
       give it first refusal ahead of context-menu and predecessor handling.
-- [ ] `_MOUSE_L_DOWN`: always return true with no sample, terminal transition,
+- [x] `_MOUSE_L_DOWN`: always return true with no sample, terminal transition,
       callback, later-consumer call, or predecessor call.
-- [ ] `_MOUSE_L`: always sample `dfhack.gui.getMousePos()` exactly once in that
+- [x] `_MOUSE_L`: always sample `dfhack.gui.getMousePos()` exactly once in that
       handler, copy `{x, y, z}` or nil, consume, complete, clear ownership, and
       dispatch `on_select(position_or_nil)`.
-- [ ] Accept `_MOUSE_L` without a prior down event and perform no gesture latch,
+- [x] Accept `_MOUSE_L` without a prior down event and perform no gesture latch,
       hit test, map ownership/focus check, validity check, or nil rejection.
-- [ ] `_MOUSE_R_DOWN`: always consume without terminating.
-- [ ] `_MOUSE_R` and `LEAVESCREEN`: always consume, cancel, clear ownership, and
+- [x] `_MOUSE_R_DOWN`: always consume without terminating.
+- [x] `_MOUSE_R` and `LEAVESCREEN`: always consume, cancel, clear ownership, and
       dispatch `on_cancel()` when supplied without sampling a completion value.
-- [ ] For composite input tables, apply cancellation precedence
+- [x] For composite input tables, apply cancellation precedence
       (`LEAVESCREEN` or `_MOUSE_R`), then `_MOUSE_L`, then nonterminal down
       boundaries, with exactly one outcome.
-- [ ] Delegate wheel, movement, pause, and every other unowned input unchanged.
-- [ ] Keep owned events consumed when prompt dispatch or callback processing
+- [x] Delegate wheel, movement, pause, and every other unowned input unchanged.
+- [x] Keep owned events consumed when prompt dispatch or callback processing
       fails; never leak them to context-menu or base-game behavior.
-- [ ] Connect the shared dispatcher's protected-failure notification to internal
+- [x] Connect the shared dispatcher's protected-failure notification to internal
       prompt cancellation so the owned event remains consumed and the prompt
       cannot remain pending after handler failure.
 
 ### Phase 7 completion gate
 
-- [ ] Focused tests prove the complete input table, composite precedence, fresh
+- [x] Focused tests prove the complete input table, composite precedence, fresh
       one-sample completion including nil, no latching/validation, exact callback
       dispatch, and unchanged unowned delegation.
-- [ ] Tests prove existing menus close on activation, every opening path is
+- [x] Tests prove existing menus close on activation, every opening path is
       blocked while active across namespaces, and normal menu behavior resumes
       immediately after termination.
-- [ ] Tests prove atomic activation and rollback at every injected fallible
+- [x] Tests prove atomic activation and rollback at every injected fallible
       preparation point, with no failing operation between menu close and commit.
-- [ ] Tests prove committed prompt state alone controls authoritative render
+- [x] Tests prove committed prompt state alone controls authoritative render
       intent and tooltip suppression, activation requests an immediate redraw,
       and both clear on every user-input and explicit-API terminal path integrated
       through this phase. Phase 8 proves the remaining lifecycle paths.
-- [ ] The follow-up review searches for conditional left completion, cached
+- [x] The follow-up review searches for conditional left completion, cached
       indicator completion, owned-event delegation, context-menu bypass, and
       pending-but-inert state.
 
@@ -1036,6 +1036,10 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | | Indicator takeover acceptance | Installed-runtime native-value mutation after first prompt write | Pending | Prove relinquishment and skipped restoration; simulation alone is insufficient. |
 | 2026-08-03 | Context-menu live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/context_menu/map_interaction.ds.lua` | Pass | 1 success, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true`. |
 | 2026-08-03 | Tooltip live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/tooltip/tooltip_screen_final_render.ds.lua` | Pass | 1 success, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true`. |
+| 2026-08-03 | Phase 7 focused activation/input integration | `./tools/Run-UnitTests.ps1 tests/user_prompt/runtime.spec.lua tests/context_menu/service.spec.lua tests/context_menu/input_hook.spec.lua tests/user_prompt/service.spec.lua tests/tooltip/presenter.spec.lua tests/service_provider/user_prompt_provider.spec.lua` | Pass | Final source passed 73 successes, 0 failures, 0 errors, 0 pending. Tests cover transactional preparation and rollback, the exact input table and precedence, owned failure containment, menu exclusion, the open menu's underlying source root, immediate redraw, and concrete input/render/suppression/indicator cleanup. |
+| 2026-08-03 | Phase 7 complete non-live regression | `./tools/Run-UnitTests.ps1`; `./tools/Check-LuaSyntax.ps1 -IncludeTests`; `./tools/Build.ps1 -LiveReload:$false` | Pass | Final source passed 435 unit examples; Lua 5.4.6 syntax passed for 54 production and 68 test/support files; offline build passed with no live reload. These results make no installed-runtime claim. |
+| 2026-08-03 | Phase 7 follow-up review | Phase 7 contract, approved proposal, production call chains, current diff, focused/full validation, proposal hash, and repository/index state | Pass after correction | Review searched for conditional left completion, cached indicator completion, owned-event delegation, context-menu bypass, pending-but-inert state, unsupported-surface mutation, post-menu fallibility, and incomplete terminal cleanup. It strengthened direct right-click/Escape cleanup and presenter release evidence. The proposal remains unchanged at SHA-256 `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`; nothing is staged and `git diff --check` passes. |
+| 2026-08-03 | Phase 7 independent completion audit | Created goal, Phase 7 contract, proposal, complete diff including untracked files, production interactions, and final validation evidence | Pass after correction | The first fresh audit found that a visible context-menu screen hid its underlying map source from pre-close surface resolution. Runtime admission now uses the real open session's retained source root before ordinary current-surface resolution, preserving prepare, non-selecting close, and assignment-only commit order. The strengthened regression makes ordinary resolution fail while the menu is open and proves successful underlying-root activation. The final high-confidence re-audit found every task and gate satisfied with Phase 8 obligations correctly deferred. Markers were checked only after this audit passed. |
 | | UserPrompt live input | One focused UserPrompt input DwarfSpec run | Pending | Exact input/menu/callback behavior. |
 | | UserPrompt final render | One focused UserPrompt render DwarfSpec run | Pending | Namespace/title/message/indicator capture. |
 | | Complete units | `./tools/Run-UnitTests.ps1` | Pending | Do not infer live success. |

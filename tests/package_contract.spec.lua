@@ -77,8 +77,8 @@ describe('DwarfUICore package contract', function()
     it('owns the complete UserPrompt implementation under dwarfuicore',
             function()
         for _, relative_path in ipairs({
-                'value.lua', 'indicator.lua', 'renderer.lua', 'service.lua',
-                'runtime.lua'}) do
+                'value.lua', 'indicator.lua', 'input_consumer.lua',
+                'renderer.lua', 'service.lua', 'runtime.lua'}) do
             local source = read_source(
                 'src/scripts_modinstalled/dwarfuicore/user_prompt/' ..
                     relative_path)

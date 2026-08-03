@@ -5,6 +5,12 @@ local repo_root = require('support.repo_root')
 ---@return table context
 local function load_context()
     local process = {dwarfuicore={}}
+    process.isMapLoaded = function() return true end
+    process.gui = {getMousePos=function() return nil end}
+    process.screen = {
+        getMousePos=function() return nil end,
+        invalidate=function() end,
+    }
     local _, immutable_enum = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
     local _, contracts = module_loader.load(repo_root,
@@ -69,10 +75,53 @@ local function load_context()
                 ['dwarfuicore/utils/immutable_enum']=immutable_enum,
             },
         })
+    local context_service = {
+        close=function() return false end,
+        get_open_source_root=function() return nil end,
+        set_opening_guard=function() end,
+    }
+    local input_manager = {
+        resolve_current_surface=function() return {} end,
+        prepare_priority_consumer=function() return {} end,
+        release_priority_consumer=function() return true end,
+        activate_priority_consumer=function() return true end,
+    }
+    local presenter = {
+        prepare_authoritative_intent=function() return {} end,
+        release_authoritative_intent=function() return true end,
+        activate_authoritative_intent=function() return true end,
+        invalidate_authoritative_intent=function() return true end,
+        release_authoritative_render=function() return true end,
+        release_tooltip_suppression=function() return true end,
+    }
+    local renderer_class = setmetatable({}, {__call=function()
+        return {set_prompt=function() end, render=function() end}
+    end})
     local _, prompt_runtime = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/runtime.lua', {
+            globals={dfhack=process},
             reqscript={
+                ['dwarfuicore/context_menu/service']={service=context_service},
+                ['dwarfuicore/context_menu/screen']={},
+                ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/user_prompt/indicator']={
+                    NativeIndicatorAdapter={new=function()
+                        return {prepare=function() end,
+                            commit_prepared=function() return true end,
+                            update=function() end,
+                            release=function() return true end}
+                    end},
+                },
+                ['dwarfuicore/user_prompt/input_consumer']={
+                    UserPromptInputConsumer={new=function()
+                        return {callbacks=function() return {} end}
+                    end},
+                },
+                ['dwarfuicore/user_prompt/renderer']={
+                    UserPromptRenderer=renderer_class,
+                },
                 ['dwarfuicore/user_prompt/service']=service,
+                ['dwarfuicore/tooltip/runtime']={presenter=presenter},
             },
         })
     local _, adapter = module_loader.load(repo_root,

@@ -1,0 +1,647 @@
+# UserPrompt Service Implementation Checklist
+
+Status: Draft implementation contract derived from
+`Docs/user-prompt-service-proposal.md`. The proposal is authoritative. If this
+checklist conflicts with it, correct the checklist before continuing.
+
+No production implementation begins until the proposal's version 1 contract is
+approved. Once execution begins, checked items are completion claims and require
+the evidence specified by their phase gate.
+
+## Governing contract
+
+- [ ] Implement the typed `UserPromptServiceProvider` and one process-wide
+      `UserPrompt` runtime exactly as defined by the proposal.
+- [ ] Support only the action-specific `prompt_map_location(options)` operation
+      in contract major 1.
+- [ ] Preserve the completed provider, namespace, runtime-generation,
+      immutability, error, reload, and packaging conventions.
+- [ ] Preserve one authoritative input-hook chain and one authoritative
+      completed-render chain; do not add a fullscreen screen or parallel hooks.
+- [ ] Treat the proposal's public API, errors, input table, callback ordering,
+      context-menu exclusion, namespace attribution, tooltip suppression,
+      native indicator ownership, lifecycle behavior, and acceptance criteria
+      as mandatory.
+- [ ] Do not implement any rejected alternative or non-goal from the proposal.
+- [ ] Preserve unrelated worktree and index state. Do not stash or commit while
+      executing this checklist.
+- [ ] Start every production module with `--@ module=true`, load project modules
+      with `reqscript()`, and register reload-managed modules in dependency
+      order.
+- [ ] Add LuaDoc for every new or modified class and method. Define every closed
+      discriminator set as an immutable numeric enum.
+- [ ] Keep focused unit, complete unit, syntax, build, package, focused live,
+      complete live, rendered-screen, installed-runtime, reload, and cleanup
+      evidence separate.
+- [ ] Perform a follow-up implementation review at every phase gate before
+      marking that phase complete.
+
+## Phase 0 - Approve the contract and establish the baseline
+
+- [ ] Record explicit approval of
+      `Docs/user-prompt-service-proposal.md`, including the version 1 API,
+      `SERVICE_BUSY`, tooltip suppression, lifecycle callbacks, and namespace
+      border attribution.
+- [ ] Record the repository branch, revision, worktree/index state, package
+      version, module registry order, and configured installed-runtime
+      resolution before production edits.
+- [ ] Identify and preserve every pre-existing modified or untracked file,
+      including the proposal and this checklist.
+- [ ] Run `./tools/Run-UnitTests.ps1` and record complete baseline successes,
+      failures, errors, and pending counts.
+- [ ] Run `./tools/Check-UnitTestNaming.ps1` and record the baseline result.
+- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record production and
+      test/support file counts.
+- [ ] Run `./tools/Build.ps1 -LiveReload:$false` and record the offline build
+      result without making an installed-runtime claim.
+- [ ] Run `./tools/Publish.ps1`, which invokes the package verifier, then rerun
+      `./tools/VerifyPackage.ps1 -SourceDir src -ZipPath <published-zip>
+      -ExpandedPath <published-directory>` against the emitted paths; inspect
+      expanded and archive outputs independently.
+- [ ] Run one focused tooltip DwarfSpec baseline and one focused context-menu
+      DwarfSpec baseline with terminal results and `cleanup_confirmed`.
+- [ ] Record current native, overlay, and Lua-screen surface support and any
+      baseline limitation that affects UserPrompt acceptance.
+- [ ] Verify the proposal traceability table in this checklist maps every
+      acceptance criterion to at least one implementation phase and planned
+      evidence row; correct omissions before production work.
+
+### Phase 0 completion gate
+
+- [ ] The proposal is approved and no unresolved contract choice is hidden in
+      an implementation task.
+- [ ] Baseline failures and unrelated worktree changes are explicitly recorded
+      and are not attributed to UserPrompt.
+- [ ] The traceability table covers every proposal requirement and rejected
+      alternative.
+- [ ] The follow-up review confirms production work has not begun and the
+      recorded baseline is sufficient to distinguish regressions.
+
+## Phase 1 - Characterize existing seams and map the change
+
+- [ ] Map the current provider flow from `dwarfuicore/services` through provider,
+      acquisition, immutable API, adapter, service record, process state,
+      identity, reload, registry, and package ownership.
+- [ ] Map the current context-menu input path through native
+      `plugins.overlay.feed_viewscreen_widgets`, Lua-screen `onInput`, root
+      reconciliation, handler dispatch, predecessor delegation, and reload
+      adoption.
+- [ ] Map every internal context-menu opening and closing path, including the
+      service method needed to close an existing session without selecting an
+      entry.
+- [ ] Map the tooltip intent, presenter, renderer, completed-render hooks,
+      selected transport, redraw, motion, resize, and reload-adoption path.
+- [ ] Map current pointer and map sampling and prove where
+      `dfhack.gui.getMousePos()` can return nil.
+- [ ] Revalidate the sibling DwarfDirect evidence read-only: its input-owning
+      surface runs before competing dwarfmode handlers and consumes handled
+      input by returning true. Record why its fullscreen screen, validation,
+      and targeting state remain rejected here.
+- [ ] Map the identity and API validation code and record why the existing
+      map-registration handle registry and hard-coded API handle validation are
+      insufficient or sufficient for `MapLocationPrompt` handles.
+- [ ] Verify from the target DFHack source and installed bindings that
+      `gui.paint_frame()` centers a supplied title and determine its exact cell
+      capacity and clipping behavior.
+- [ ] Verify the target DFHack representation and inactive sentinel for
+      `df.global.game.main_interface.recenter_indicator_m` and prove direct
+      assignment does not pan, recenter, change z-level, or alter follow state.
+- [ ] Record the sibling DwarfUI mood-popover selection path and the underlying
+      DFHack implementation that establish `recenter_indicator_m` as the native
+      tile-selection indicator; do not edit either sibling checkout.
+- [ ] Add characterization tests for context-menu pre-delegation order, exact
+      predecessor arguments and returns, foreign wrappers, failure behavior,
+      root reconciliation, and Core reload adoption.
+- [ ] Add characterization tests for tooltip completed-render selection,
+      single-owner dispatch, draw order, motion, resize, clamping, suppression
+      feasibility, and Core reload adoption.
+- [ ] Record a concrete sufficiency verdict for the current input and render
+      seams. For each insufficient seam, name the smallest internal extension
+      required; do not authorize unrelated shared refactoring.
+- [ ] Produce the exact expected production, unit, DwarfSpec, documentation,
+      registry, reload, build, and package file map.
+
+### Phase 1 completion gate
+
+- [ ] Characterization tests fail under representative changes to input order,
+      predecessor preservation, completed-render owner selection, or reload
+      adoption.
+- [ ] The input/render sufficiency verdict is supported by current code and
+      tests, not by the removed implementation plan.
+- [ ] Every proposed shared-type change is tied to a specific version 1
+      requirement that cannot be implemented safely through the current API.
+- [ ] The follow-up review confirms the file map and smallest-change decisions
+      cover the proposal without expanding consumer scope.
+
+## Phase 2 - Establish prompt-first input ownership
+
+- [ ] If Phase 1 proves the current single-handler input seam sufficient, add
+      prompt-first arbitration through that owner without changing its public
+      shape and record why no generalization was needed.
+- [ ] If it is insufficient, generalize the existing context-menu input-hook
+      owner into the smallest reload-safe internal dispatcher that can host
+      UserPrompt first and context-menu opening second.
+- [ ] Retain exactly one authoritative native trampoline and weakly owned
+      Lua-screen trampolines; remove or reduce the old context-menu hook to one
+      intentional adapter instead of leaving a parallel owner.
+- [ ] Preserve native and Lua-screen root reconciliation, foreign outer-wrapper
+      adoption, current-generation checks, and reload-safe inert trampolines.
+- [ ] Dispatch consumers in deterministic private order, stop at the first
+      `true`, and skip every later consumer and predecessor after handling.
+- [ ] When every consumer returns false, invoke the predecessor exactly once
+      with unchanged arguments and preserve all returns including trailing nils.
+- [ ] Let the dispatcher identify prompt-owned boundaries before protected
+      prompt dispatch so an internal prompt failure still returns `true`.
+- [ ] Terminate a failing active prompt safely, record private diagnostics, and
+      prevent its owned event from leaking to context-menu or base-game input.
+- [ ] Preserve the characterized failure policy for events not owned by an
+      active prompt.
+- [ ] Prepare/reconcile the current map-capable input surface before prompt
+      state can be published; expose a rollback-safe internal activation seam.
+- [ ] Update process ownership, registry order, reload cleanup, package
+      inventory, diagnostics, and focused tests for the selected design.
+
+### Phase 2 completion gate
+
+- [ ] Tests prove prompt-first order, exact boolean handling, exact predecessor
+      preservation, failure consumption, inactive transparency, and no duplicate
+      dispatch after construction or reload.
+- [ ] Tests prove exactly one native input trampoline and no parallel live
+      context-menu/UserPrompt hook owner.
+- [ ] Existing focused context-menu input unit and live behavior remains green
+      when no prompt is active.
+- [ ] The follow-up review verifies every prompt-owned failure remains consumed
+      and every unowned path delegates according to the characterized contract.
+
+## Phase 3 - Establish completed-render composition and tooltip suppression
+
+- [ ] If Phase 1 proves the current render owner sufficient, add independent
+      prompt presentation and tooltip suppression through its existing private
+      extension points and record why no generalization was needed.
+- [ ] If it is insufficient, extend the current completed-render owner with the
+      smallest internal compositor/presenter arbitration needed for tooltip and
+      UserPrompt intents.
+- [ ] Retain exactly one authoritative completed-render hook chain for native,
+      overlay, and Lua-screen surfaces.
+- [ ] Preserve current tooltip registration, target selection, selected intent,
+      redraw, layout, renderer, and reload behavior while no prompt is active.
+- [ ] Suppress only ordinary tooltip presentation while a prompt is active;
+      retain tooltip registrations and selected intent unchanged.
+- [ ] Render UserPrompt only through its selected supported root and do not
+      transfer an active prompt to an unrelated root.
+- [ ] Keep the prompt renderer independent from tooltip registration and
+      context-menu presentation state.
+- [ ] Define rollback-safe preparation and non-failing publication/retirement
+      operations for the activation transaction.
+- [ ] Preserve reload-safe trampoline adoption and one completed render per
+      selected owner.
+- [ ] Update registry, reload, package, diagnostics, and focused tests for the
+      selected design.
+
+### Phase 3 completion gate
+
+- [ ] Existing tooltip unit and final-render DwarfSpec behavior is unchanged
+      while no prompt is active.
+- [ ] Tests prove prompt presentation suppresses only the ordinary tooltip
+      window and that normal presentation resumes with retained intent.
+- [ ] Tests prove one completed-render owner per surface with no duplicate or
+      stale prompt rendering across Core reload.
+- [ ] The follow-up review confirms no second tooltip backend, normal tooltip
+      registration, fullscreen screen, or parallel render hook was introduced.
+
+## Phase 4 - Implement prompt values, handles, and state transitions
+
+- [ ] Add `USER_PROMPT` to the existing immutable numeric `ServiceKind` enum and
+      update every exhaustive validator, count, prefix map, diagnostic, and test.
+- [ ] Add `SERVICE_BUSY` to the immutable numeric error contract with the exact
+      stable token and extend count/mapping tests without changing existing
+      category values or meanings.
+- [ ] Add immutable/copying value objects for
+      `MapLocationPromptOptions` and the internal request snapshot.
+- [ ] Validate that options contain only `title`, `message`, `on_select`, and
+      optional `on_cancel`; require their proposal-defined types and accept
+      empty strings and embedded newlines.
+- [ ] Copy the API-bound validated namespace into the request snapshot. Do not
+      accept a namespace display field or infer attribution from prompt text.
+- [ ] Add a dedicated immutable `MapLocationPrompt` handle registry backed by
+      an allocated composite identity unless Phase 1 proves a smaller safe use
+      of an existing generic handle facility.
+- [ ] Preserve handle validation precedence: malformed is `INVALID_ARGUMENT`,
+      recognized old generation is `STALE_HANDLE`, another current domain is
+      `FOREIGN_HANDLE`, and a terminal same-domain handle returns false.
+- [ ] Add immutable numeric internal enums for every closed prompt state and
+      terminal-cause set.
+- [ ] Implement one process-wide authoritative pending-request slot with atomic
+      busy rejection before menu, input, render, or indicator mutation.
+- [ ] Implement one idempotent terminal transition shared by completion,
+      cancellation, cleanup, failure, and reload.
+- [ ] Mark the old handle inactive and clear pending state before retiring
+      input, render, tooltip suppression, and indicator ownership.
+- [ ] Invoke at most one mutually exclusive callback after all owned resources
+      are clear; contain callback failure and record private diagnostics.
+- [ ] Retain request callbacks until termination. Dropping an API or handle must
+      not cancel an active prompt.
+- [ ] Add diagnostics for active identity/namespace, state, terminal cause and
+      counts, callback failures, and current generation without exposing
+      callback functions.
+
+### Phase 4 completion gate
+
+- [ ] Focused tests cover exact option validation/copying, immutable values,
+      handle identity and error precedence, busy rejection, terminal same-domain
+      behavior, garbage collection, and namespace isolation.
+- [ ] State tests cover every terminal cause, repeated terminal requests,
+      callback failure, mutual exclusion, and state-before-callback ordering.
+- [ ] Tests prove callback-visible positions are detached values and consumer
+      mutation cannot alter stored options or ownership.
+- [ ] The follow-up review confirms one process-wide prompt, no queue or
+      replacement path, exact error tokens, and no spoofable namespace label.
+
+## Phase 5 - Implement the prompt renderer and native indicator adapter
+
+- [ ] Add an input-transparent prompt renderer with distinct interior title and
+      message regions, wrapping, background/frame styling, preferred placement
+      below the pointer, and viewport clamping.
+- [ ] Pass the validated owning namespace as the title argument to
+      `gui.paint_frame()` so it appears centered in the top border.
+- [ ] Keep prompt title and namespace attribution as separate renderer fields
+      and visual roles.
+- [ ] Size the frame to the greater of wrapped content requirements and
+      `#namespace + 6` cells when the viewport permits.
+- [ ] When the namespace does not fit, pre-truncate it to the available label
+      cells: use the longest fitting prefix plus ASCII `...` when at least four
+      cells are available, otherwise use the fitting prefix without an ellipsis.
+- [ ] Center the already-truncated namespace and retain the complete namespace
+      in request and handle state.
+- [ ] Recompute layout on content, pointer, and viewport changes and invalidate
+      old/new screen cells so motion and disappearance do not leave artifacts.
+- [ ] Hide the prompt window and native indicator without terminating when no
+      screen-pointer coordinate is available; restore presentation when pointer
+      coordinates return.
+- [ ] Add an injected native-indicator adapter over
+      `df.global.game.main_interface.recenter_indicator_m`.
+- [ ] Snapshot a detached pre-prompt indicator value before the first write and
+      retain the exact last value written by the prompt.
+- [ ] Assign the current map hover directly while available and the verified
+      inactive representation while unavailable; never call
+      `dfhack.gui.revealInDwarfmodeMap()` or `renderMapOverlay()`.
+- [ ] Before every later write, compare the native value with the prompt's last
+      write. On mismatch, record external takeover, relinquish ownership for the
+      rest of the prompt, stop writing, and skip restoration.
+- [ ] On termination, restore the detached snapshot only if the prompt still
+      owns the current native value.
+- [ ] Keep visual hover sampling separate from the authoritative input-event
+      completion sample.
+
+### Phase 5 completion gate
+
+- [ ] Renderer tests cover distinct namespace/title/message content, full and
+      empty strings, wrapping, preferred below-pointer placement, every-edge
+      clamping, motion, resize, pointer absence, invalidation, and input
+      transparency.
+- [ ] Namespace tests cover exact centering, `#namespace + 6` sizing, all
+      truncation branches, narrow viewports, full-state retention, and absence
+      of any consumer override.
+- [ ] Indicator tests cover initial snapshot, hover motion, off-map hiding,
+      owned restore, external takeover before every write, and every terminal
+      path without pan, z-level, or follow-state changes.
+- [ ] The follow-up review confirms prompt completion never reads the indicator
+      cache and the renderer is not registered as a normal tooltip.
+
+## Phase 6 - Add the public provider and assemble the runtime
+
+- [ ] Add the private version 1 adapter using the existing provider acquisition
+      pattern and validate all public arguments before lazy initialization.
+- [ ] Add immutable `UserPromptServiceProvider` and
+      `UserPromptServiceApi` types with `get_contract_version()`,
+      `get_namespace()`, `prompt_map_location()`, `cancel()`, `is_active()`, and
+      `clear_namespace()`.
+- [ ] Extend the internal API factory with only the prompt-handle validation
+      capability proven necessary in Phase 1; preserve existing provider call
+      sites and current map-handle semantics.
+- [ ] Add the exact provider and API error prefixes from the proposal.
+- [ ] Build and validate one versioned facade over one healthy process-wide
+      UserPrompt runtime.
+- [ ] Ensure every `new()` returns a distinct immutable namespace-bound API and
+      repeated construction reuses the runtime without replacing services,
+      hooks, presentation owners, or active state.
+- [ ] Export `UserPromptServiceProvider` from
+      `reqscript('dwarfuicore/services')` alongside the existing providers and
+      keep `reqscript('dwarfuicore')` free of service APIs.
+- [ ] Implement `cancel`, `is_active`, and `clear_namespace` with exact handle,
+      namespace, callback, and return semantics.
+- [ ] Prevent same-namespace prompt reentry until `clear_namespace()` callback
+      dispatch finishes.
+- [ ] Add runtime service cache, initializer/validator, dependency order,
+      explicit teardown order, module registry, and package contract entries.
+- [ ] Preserve tooltip and context-menu API surfaces and namespace state.
+
+### Phase 6 completion gate
+
+- [ ] Provider tests prove constructor validation, lazy/transactional
+      acquisition, distinct immutable APIs, namespace binding, singleton reuse,
+      current-generation validation, and non-destructive construction.
+- [ ] API tests prove all methods, return values, prefixes, error tokens, handle
+      precedence, and namespace cleanup semantics match the proposal.
+- [ ] Tests prove tooltip and context-menu providers gain no methods and retain
+      healthy process state across UserPrompt construction.
+- [ ] The follow-up review compares every public LuaDoc type and operation with
+      the approved proposal and current provider conventions.
+
+## Phase 7 - Integrate transactional activation, input, and menu exclusion
+
+- [ ] Implement admission in the proposal's exact order: validate, reject busy,
+      resolve a supported map-capable surface, prepare every fallible dependency,
+      snapshot the indicator, close any menu, and commit using only non-failing
+      assignments.
+- [ ] Fail absence of a supported current map surface with `INVALID_ARGUMENT`
+      before closing a menu or publishing prompt ownership.
+- [ ] Roll back preparation failure with no prompt, consumer, render intent,
+      tooltip suppression, context-menu mutation, or indicator ownership.
+- [ ] Close an existing DwarfUICore context menu during successful activation
+      without invoking a selection callback.
+- [ ] Add an internal context-menu opening guard covering every opening path,
+      not only right-click dispatch, so no menu can open while a prompt is active.
+- [ ] Keep context-menu registrations unchanged and remove the guard immediately
+      when the prompt terminates.
+- [ ] Activate the prompt input consumer exactly while the prompt is pending and
+      give it first refusal ahead of context-menu and predecessor handling.
+- [ ] `_MOUSE_L_DOWN`: always return true with no sample, terminal transition,
+      callback, later-consumer call, or predecessor call.
+- [ ] `_MOUSE_L`: always sample `dfhack.gui.getMousePos()` exactly once in that
+      handler, copy `{x, y, z}` or nil, consume, complete, clear ownership, and
+      dispatch `on_select(position_or_nil)`.
+- [ ] Accept `_MOUSE_L` without a prior down event and perform no gesture latch,
+      hit test, map ownership/focus check, validity check, or nil rejection.
+- [ ] `_MOUSE_R_DOWN`: always consume without terminating.
+- [ ] `_MOUSE_R` and `LEAVESCREEN`: always consume, cancel, clear ownership, and
+      dispatch `on_cancel()` when supplied without sampling a completion value.
+- [ ] For composite input tables, apply cancellation precedence
+      (`LEAVESCREEN` or `_MOUSE_R`), then `_MOUSE_L`, then nonterminal down
+      boundaries, with exactly one outcome.
+- [ ] Delegate wheel, movement, pause, and every other unowned input unchanged.
+- [ ] Keep owned events consumed when prompt dispatch or callback processing
+      fails; never leak them to context-menu or base-game behavior.
+
+### Phase 7 completion gate
+
+- [ ] Focused tests prove the complete input table, composite precedence, fresh
+      one-sample completion including nil, no latching/validation, exact callback
+      dispatch, and unchanged unowned delegation.
+- [ ] Tests prove existing menus close on activation, every opening path is
+      blocked while active across namespaces, and normal menu behavior resumes
+      immediately after termination.
+- [ ] Tests prove atomic activation and rollback at every injected fallible
+      preparation point, with no failing operation between menu close and commit.
+- [ ] The follow-up review searches for conditional left completion, cached
+      indicator completion, owned-event delegation, context-menu bypass, and
+      pending-but-inert state.
+
+## Phase 8 - Complete lifecycle, failure, and reload integration
+
+- [ ] Implement the fixed terminal order: mark inactive/remove pending state,
+      release input, clear prompt render intent and tooltip suppression,
+      restore/relinquish indicator, invalidate presentation, then invoke one
+      callback behind failure containment.
+- [ ] Apply completion only to left release and cancellation to right release,
+      Escape, `cancel`, owning `clear_namespace`, root loss, world/map unload,
+      internal prompt failure, and explicit Core reload.
+- [ ] Invoke `on_cancel()` when supplied for every cancellation cause and never
+      invoke `on_select` for the same prompt.
+- [ ] Allow completion, right-click, Escape, and explicit-cancel callbacks to
+      synchronously open a replacement prompt after old ownership is clear.
+- [ ] Reject same-namespace reentry during `clear_namespace()` until cleanup
+      callback dispatch completes.
+- [ ] Reject reentry during root loss, world/map unload, service failure, and
+      Core retirement through the corresponding unavailable surface/runtime
+      state.
+- [ ] Mark Core runtime retirement before reload cancellation callbacks and
+      retire UserPrompt state before shared input/render owners.
+- [ ] Preserve reload-safe inert trampoline adoption for the next generation
+      and invalidate every old API and handle.
+- [ ] Ensure partial initialization, service disablement, callback failure, and
+      teardown failure leave tooltip/context-menu registrations and foreign
+      owners intact.
+- [ ] Add lifecycle and failure diagnostics without exposing consumer callbacks.
+
+### Phase 8 completion gate
+
+- [ ] Tests cover every lifecycle cause, exact callback choice/count, resource
+      cleanup order, eligible and rejected reentry, callback failure, partial
+      initialization, and old-generation invalidation.
+- [ ] Reload tests prove no hidden prompt, active consumer, tooltip suppression,
+      stale renderer, indicator damage, duplicate hook, or retired healthy
+      facade remains.
+- [ ] Existing tooltip and context-menu lifecycle/reload suites remain green.
+- [ ] The follow-up review verifies the terminal order and all reentry rules
+      directly against the proposal's state and sequence diagrams.
+
+## Phase 9 - Complete documentation, packaging, and automated qualification
+
+- [ ] Add public README documentation and examples for provider acquisition,
+      options, callbacks, nil completion, handle operations, busy behavior,
+      namespace border attribution, input consumption, cancellation, menu
+      exclusion, tooltip suppression, indicator behavior, lifecycle, and reload.
+- [ ] Update service-provider documentation only where required to list the new
+      established-pattern provider and `SERVICE_BUSY`; do not revive deleted
+      planning documents.
+- [ ] Ensure public docs distinguish the consumer-provided prompt title from the
+      automatically bound namespace border label.
+- [ ] Update rockspec/package version as required, expanded inventory, archive
+      inventory, module registry tests, package contract tests, reload command
+      tests, and installation-resolution checks.
+- [ ] Add or finish focused unit suites for shared input, shared render,
+      prompt values/handles/state, renderer, namespace label, indicator,
+      provider/facade, activation, menu exclusion, lifecycle, failure, and reload.
+- [ ] Add focused DwarfSpec scenarios for input consumption, menu exclusion,
+      tooltip suppression/resumption, prompt rendering, namespace attribution,
+      native indicator motion/restore, callbacks, lifecycle, and reload.
+- [ ] Run every focused unit suite and record exact totals.
+- [ ] Run focused tooltip and context-menu unit/live regressions after the shared
+      changes and record them separately from UserPrompt evidence.
+- [ ] Run `./tools/Run-UnitTests.ps1` and record complete totals.
+- [ ] Run `./tools/Check-UnitTestNaming.ps1`.
+- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record file counts.
+- [ ] Run `./tools/Build.ps1 -LiveReload:$false` without making a live claim.
+- [ ] Run `./tools/Publish.ps1`, then rerun
+      `./tools/VerifyPackage.ps1 -SourceDir src -ZipPath <published-zip>
+      -ExpandedPath <published-directory>` against the emitted paths; inspect
+      expanded and archive contents separately.
+- [ ] Run the complete DwarfSpec suite with a terminal structured result and
+      `cleanup_confirmed`.
+- [ ] Inspect the built and installed package for all UserPrompt/shared modules,
+      exact registry order, one owner per hook seam, and no obsolete file.
+- [ ] Run `git diff --check` after generated-artifact and temporary-state cleanup.
+
+### Phase 9 completion gate
+
+- [ ] Focused and complete automated results are green and recorded separately;
+      unit/model assertions are not promoted to live rendered success.
+- [ ] Public documentation, LuaDoc, proposal, implementation, registry/reload
+      order, expanded package, and archive package agree exactly.
+- [ ] The built and installed module resolution identifies the intended package
+      and contains no parallel hook owner or stale service name.
+- [ ] The follow-up review finds no debug code, unauthorized consumer migration,
+      missing package file, deleted-document reference, or unrecorded artifact.
+
+## Phase 10 - Perform live acceptance and independent final review
+
+- [ ] Install the exact verified package in the configured DFHack test
+      environment and start a fresh process whenever installed resolution
+      changes.
+- [ ] Open a prompt with distinctive namespace, title, and message values and
+      capture final-screen evidence of all three in their specified locations.
+- [ ] Prove the full namespace is centered in the top border when it fits and
+      the deterministic ASCII truncation rule is used on a constrained viewport.
+- [ ] Move the pointer across normal, edge, and unavailable screen positions;
+      prove preferred below-pointer placement, clamping, motion, temporary hide,
+      artifact-free redraw, and restoration.
+- [ ] Prove ordinary tooltip presentation is suppressed while active, its state
+      remains registered, and its presentation resumes afterward.
+- [ ] Prove `_MOUSE_L_DOWN` is consumed without sampling or base-game behavior
+      and leaves the prompt pending.
+- [ ] Prove `_MOUSE_L` is consumed, samples once, reports a detached position or
+      nil, removes prompt ownership before callback, and does not trigger the
+      corresponding base-game click.
+- [ ] Prove right down is consumed without termination and right release and
+      Escape each consume and cancel exactly once.
+- [ ] Open a context menu before activation and prove it closes without
+      selection; prove no namespace can open one while active and normal menu
+      behavior resumes afterward.
+- [ ] Prove representative unowned input delegates unchanged.
+- [ ] Capture the native map indicator following hover, hiding off-map, restoring
+      prior owned state, respecting simulated/observed external takeover, and
+      causing no pan, recenter, z-level, or follow-state change.
+- [ ] Prove completion uses the fresh event sample rather than the last visual
+      indicator position.
+- [ ] Exercise completion, right-click, Escape, and explicit-cancel callbacks
+      that synchronously create a replacement prompt.
+- [ ] Exercise namespace cleanup, root loss, world/map unload, internal failure,
+      and explicit Core reload; inspect service, input, render, tooltip, menu,
+      indicator, hook, API, and handle state after each.
+- [ ] Run a second independent review against every proposal requirement,
+      checklist item, diff, test result, rendered artifact, installed-runtime
+      observation, and cleanup record.
+- [ ] Remove temporary fixtures, installed test state, active prompts, screens,
+      hooks, disposable registrations, captures/logs requiring cleanup, and
+      generated artifacts that are not deliverables; record `cleanup_confirmed`.
+
+### Phase 10 completion gate
+
+- [ ] Final rendered-screen evidence proves namespace attribution, title/message
+      presentation, pointer behavior, tooltip suppression, and native indicator
+      behavior; unit layout assertions alone do not.
+- [ ] Installed-runtime evidence proves exact input consumption, completion,
+      both cancellation gestures, menu exclusion, unowned delegation, callback
+      reentry, lifecycle cleanup, reload safety, and owner restoration.
+- [ ] The independent review reports no unmet proposal or checklist item and no
+      unexplained divergence.
+- [ ] Cleanup is terminal and `cleanup_confirmed` is recorded.
+
+## Definition of done
+
+- [ ] `reqscript('dwarfuicore/services')` exports immutable
+      `UserPromptServiceProvider` alongside the unchanged existing providers.
+- [ ] `UserPromptServiceProvider:new(1, namespace)` returns a distinct immutable
+      namespace-bound API backed by one process-wide UserPrompt runtime.
+- [ ] `prompt_map_location(options)` accepts exactly `title`, `message`,
+      `on_select`, and optional `on_cancel`, copies all retained values, and
+      returns an opaque owned `MapLocationPrompt` handle.
+- [ ] The bound API namespace, never consumer prompt options, is the complete
+      authoritative owner and border-label source.
+- [ ] Only one prompt is active process-wide; concurrent requests fail with
+      `SERVICE_BUSY`, and admission cannot leave pending-but-inert state.
+- [ ] Left down always consumes without sampling; left release always consumes
+      and completes with one fresh copied `{x, y, z}|nil` sample without
+      validation or latching.
+- [ ] Right down always consumes without terminating; right release and Escape
+      always consume and cancel.
+- [ ] Prompt-owned input remains consumed on failure; every other input delegates
+      according to the preserved predecessor contract.
+- [ ] An existing context menu closes on activation, none can open while active,
+      registrations remain intact, and normal behavior resumes on termination.
+- [ ] The prompt window follows below the pointer where space permits, clamps,
+      hides when pointer coordinates are unavailable, remains input-transparent,
+      and suppresses only ordinary tooltip presentation.
+- [ ] The full owning namespace is centered in the top border when it fits;
+      sizing and ASCII truncation follow the proposal, and prompt title/message
+      remain distinct interior content.
+- [ ] The prompt directly drives `recenter_indicator_m`, hides it off-map,
+      respects external takeover, restores prior owned state, and never calls
+      `revealInDwarfmodeMap()` or `renderMapOverlay()`.
+- [ ] Completion always uses a fresh input-event sample rather than cached
+      presentation or indicator state.
+- [ ] Terminal state, input, render intent, tooltip suppression, and indicator
+      ownership clear in proposal order before exact-once callback dispatch.
+- [ ] User-terminal callbacks support replacement prompt reentry; cleanup and
+      unavailable-runtime boundaries reject reentry as specified.
+- [ ] Handles enforce service, contract-major, namespace, and generation
+      ownership with exact error precedence and no public internal diagnostics.
+- [ ] Root loss, world/map unload, failure, namespace cleanup, and Core reload
+      leave no hidden prompt, active consumer, suppression, stale renderer,
+      indicator damage, duplicate hook, or healthy retired facade.
+- [ ] Existing tooltip and context-menu unit, live, render, lifecycle, reload,
+      registry, and package contracts remain green.
+- [ ] Every new or modified class and method has LuaDoc, every closed
+      discriminator is an immutable numeric enum, and every production module
+      follows module/loading/registry conventions.
+- [ ] Focused unit, complete unit, naming, syntax, offline build, expanded
+      package, archive, focused live, complete live, rendered-screen,
+      installed-runtime, reload, cleanup, and diff evidence pass as distinct
+      gates.
+- [ ] All phase follow-up reviews and the final independent review confirm the
+      implementation fulfills the approved proposal before this checklist is
+      marked complete.
+
+## Traceability and execution evidence
+
+### Proposal traceability
+
+| Proposal requirement | Implementation phases | Primary evidence |
+| --- | --- | --- |
+| Established typed provider and one process runtime | 4, 6 | Prompt state/provider units; complete units |
+| Exact options, callbacks, namespace binding, and handles | 4, 6 | Prompt state/provider units |
+| One active prompt, `SERVICE_BUSY`, and transactional admission | 4, 7 | State units; activation fault-injection units; live input |
+| Exact left/right/Escape consumption and fresh nil-capable sample | 2, 7 | Shared input units; UserPrompt live input |
+| Owned-failure consumption and unchanged unowned delegation | 2, 7 | Shared input units; UserPrompt live input |
+| Context-menu closure, exclusion, and resumption | 2, 7 | Context-menu regression; UserPrompt live input |
+| Pointer-following presentation and tooltip suppression | 3, 5, 7 | Shared render units; final render capture |
+| Bound namespace border label, sizing, and truncation | 4, 5 | Renderer units; final render capture |
+| Native indicator motion, hiding, takeover, and restoration | 5, 7 | Indicator units; final render/live acceptance |
+| Terminal ordering, callbacks, reentry, and lifecycle cancellation | 4, 8 | State/lifecycle units; live input and lifecycle runs |
+| Reload, stale generations, hook adoption, and cleanup | 2, 3, 6, 8 | Reload units/live run; installed-runtime inspection |
+| Documentation, registry, package, and distinct evidence boundaries | 9, 10 | Docs/package audit; evidence table; final review |
+
+Every row remains pending until its referenced phase gates and evidence rows are
+complete. The proposal remains authoritative if this table omits finer detail.
+
+### Execution evidence
+
+| Date | Proposal requirement or scope | Command, spec, or artifact | Result | Notes |
+| --- | --- | --- | --- | --- |
+| | Proposal approval | `Docs/user-prompt-service-proposal.md` | Pending | Record approval and exact revision. |
+| | Baseline worktree and package | Read-only repository/package inspection | Pending | Preserve unrelated changes. |
+| | Baseline complete units | `./tools/Run-UnitTests.ps1` | Pending | Record exact totals. |
+| | Baseline unit naming | `./tools/Check-UnitTestNaming.ps1` | Pending | Record terminal result. |
+| | Baseline syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Record production/test counts. |
+| | Baseline offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | No live claim. |
+| | Baseline package | Publish, then verifier with emitted source/zip/expanded paths | Pending | Inspect expanded/archive separately. |
+| | Characterization units | Focused existing input/render/provider specs | Pending | Prove insufficiency before shared edits. |
+| | Shared input units | `./tools/Run-UnitTests.ps1 <focused input paths>` | Pending | Ownership, failure, delegation, reload. |
+| | Shared render units | `./tools/Run-UnitTests.ps1 <focused render paths>` | Pending | Suppression, selection, reload. |
+| | Prompt state/provider units | `./tools/Run-UnitTests.ps1 <focused prompt paths>` | Pending | Values, handles, API, lifecycle, errors. |
+| | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |
+| | Indicator units | `./tools/Run-UnitTests.ps1 <focused indicator paths>` | Pending | Hover, sentinel, takeover, restore. |
+| | Context-menu live regression | One focused context-menu DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
+| | Tooltip live regression | One focused tooltip DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
+| | UserPrompt live input | One focused UserPrompt input DwarfSpec run | Pending | Exact input/menu/callback behavior. |
+| | UserPrompt final render | One focused UserPrompt render DwarfSpec run | Pending | Namespace/title/message/indicator capture. |
+| | Complete units | `./tools/Run-UnitTests.ps1` | Pending | Do not infer live success. |
+| | Complete syntax/naming | Syntax and naming scripts | Pending | Record exact terminal results. |
+| | Complete offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | No installed-runtime claim. |
+| | Complete package | Publish and verify scripts | Pending | Expanded and archive evidence. |
+| | Complete DwarfSpec | `./tools/Run-AutomationTests.ps1` | Pending | Structured terminal result and cleanup. |
+| | Installed-runtime acceptance | Fresh DFHack process using verified package | Pending | Inspect exact resolution and hook owners. |
+| | Final independent review | Proposal/checklist/diff/evidence audit | Pending | Record every discrepancy or none. |
+| | Final diff validation | `git diff --check` | Pending | Run after cleanup. |
+| | Final cleanup | Live/process/package/test artifact inspection | Pending | Record `cleanup_confirmed`. |

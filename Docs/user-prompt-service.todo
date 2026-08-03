@@ -41,11 +41,9 @@ the evidence specified by their phase gate.
 - [ ] Record explicit approval of
       `Docs/user-prompt-service-proposal.md`, including the version 1 API,
       `SERVICE_BUSY`, tooltip suppression, lifecycle callbacks, and namespace
-      border attribution.
-- [ ] As part of that approval, update the proposal's Status section from
-      `Proposed` to `Approved` and record the approval date and exact revision;
-      do not begin production work while the authoritative document still says
-      implementation is unauthorized.
+      border attribution. Record the approval date, baseline Git HEAD, and the
+      approved proposal's SHA-256 content hash in this checklist's execution
+      evidence; completing this or any later phase must not modify the proposal.
 - [ ] Record the repository branch, revision, worktree/index state, package
       version, module registry order, and configured installed-runtime
       resolution before production edits.
@@ -73,9 +71,9 @@ the evidence specified by their phase gate.
 
 ### Phase 0 completion gate
 
-- [ ] The proposal is approved, its Status section records that approval and
-      exact revision, and no unresolved contract choice is hidden in an
-      implementation task.
+- [ ] Proposal approval is recorded in this checklist with its approval date,
+      baseline Git HEAD, and content hash, and no unresolved contract choice is
+      hidden in an implementation task.
 - [ ] Baseline failures and unrelated worktree changes are explicitly recorded
       and are not attributed to UserPrompt.
 - [ ] The traceability table covers every proposal requirement and rejected
@@ -163,8 +161,8 @@ the evidence specified by their phase gate.
 - [ ] Report protected-dispatch failure to the injected consumer owner without
       embedding UserPrompt lifecycle knowledge in the shared dispatcher. Defer
       actual prompt termination and diagnostics integration to Phases 7 and 8.
-- [ ] Preserve the characterized failure policy for events not owned by an
-      active prompt.
+- [ ] Preserve the characterized failure policy for events not owned by the
+      injected consumer.
 - [ ] Prepare/reconcile the current map-capable input surface before prompt
       state can be published; expose a rollback-safe internal activation seam.
 - [ ] Update process ownership, registry order, reload cleanup, package
@@ -180,8 +178,9 @@ the evidence specified by their phase gate.
       context-menu/UserPrompt hook owner.
 - [ ] Existing focused context-menu input unit and live behavior remains green
       when no prompt is active.
-- [ ] The follow-up review verifies every prompt-owned failure remains consumed
-      and every unowned path delegates according to the characterized contract.
+- [ ] The follow-up review verifies every stand-in-owned failure remains consumed
+      and every unowned path delegates according to the characterized contract;
+      integrated prompt-owned failure proof remains in Phase 7.
 
 ## Phase 3 - Establish completed-render composition and tooltip suppression
 
@@ -321,8 +320,10 @@ the evidence specified by their phase gate.
       truncation branches, narrow viewports, full-state retention, and absence
       of any consumer override.
 - [ ] Indicator tests cover initial snapshot, hover motion, off-map hiding,
-      owned restore, external takeover before every write, and every terminal
-      path without pan, z-level, or follow-state changes.
+      owned restore, external takeover before each write after the first and
+      before restoration, and modeled adapter termination invocations without
+      pan, z-level, or follow-state changes. These are not integrated lifecycle
+      claims.
 - [ ] The follow-up review confirms prompt completion never reads the indicator
       cache and the renderer is not registered as a normal tooltip.
 
@@ -372,6 +373,10 @@ the evidence specified by their phase gate.
       resolve a supported map-capable surface, prepare every fallible dependency,
       snapshot the indicator, close any menu, and commit using only non-failing
       assignments.
+- [ ] Immediately after the atomic commit, invalidate the selected presentation
+      owner so the newly published prompt appears without waiting for unrelated
+      game redraw activity. Treat unexpected invalidation failure as a contained
+      internal prompt failure while preserving owned-input consumption.
 - [ ] Fail absence of a supported current map surface with `INVALID_ARGUMENT`
       before closing a menu or publishing prompt ownership.
 - [ ] Roll back preparation failure with no prompt, consumer, render intent,
@@ -418,7 +423,9 @@ the evidence specified by their phase gate.
 - [ ] Tests prove atomic activation and rollback at every injected fallible
       preparation point, with no failing operation between menu close and commit.
 - [ ] Tests prove committed prompt state alone controls authoritative render
-      intent and tooltip suppression, and both clear on every terminal path.
+      intent and tooltip suppression, activation requests an immediate redraw,
+      and both clear on every user-input and explicit-API terminal path integrated
+      through this phase. Phase 8 proves the remaining lifecycle paths.
 - [ ] The follow-up review searches for conditional left completion, cached
       indicator completion, owned-event delegation, context-menu bypass, and
       pending-but-inert state.
@@ -430,17 +437,18 @@ the evidence specified by their phase gate.
       restore/relinquish indicator, invalidate presentation, then invoke one
       callback behind failure containment.
 - [ ] Apply completion only to left release and cancellation to right release,
-      Escape, `cancel`, owning `clear_namespace`, root loss, world/map unload,
-      internal prompt failure, and explicit Core reload.
+      Escape, `cancel`, owning `clear_namespace`, input-root loss,
+      presentation-root loss, world/map unload, internal prompt failure, and
+      explicit Core reload.
 - [ ] Invoke `on_cancel()` when supplied for every cancellation cause and never
       invoke `on_select` for the same prompt.
 - [ ] Allow completion, right-click, Escape, and explicit-cancel callbacks to
       synchronously open a replacement prompt after old ownership is clear.
 - [ ] Reject same-namespace reentry during `clear_namespace()` until cleanup
       callback dispatch completes.
-- [ ] Reject reentry during root loss, world/map unload, service failure, and
-      Core retirement through the corresponding unavailable surface/runtime
-      state.
+- [ ] Reject reentry during input-root loss, presentation-root loss, world/map
+      unload, service failure, and Core retirement through the corresponding
+      unavailable surface/runtime state.
 - [ ] Mark Core runtime retirement before reload cancellation callbacks and
       retire UserPrompt state before shared input/render owners.
 - [ ] Preserve reload-safe inert trampoline adoption for the next generation
@@ -448,6 +456,10 @@ the evidence specified by their phase gate.
 - [ ] Ensure partial initialization, service disablement, callback failure, and
       teardown failure leave tooltip/context-menu registrations and foreign
       owners intact.
+- [ ] Fault-inject every terminal cleanup operation. Prove prompt-owned state is
+      cleared or irrevocably relinquished before exact-once callback dispatch,
+      no prompt can revive or remain pending, foreign owners remain intact, and
+      every contained cleanup failure is diagnosed.
 - [ ] Add lifecycle and failure diagnostics without exposing consumer callbacks.
 
 ### Phase 8 completion gate
@@ -456,6 +468,11 @@ the evidence specified by their phase gate.
       real input/render/tooltip/indicator cleanup order, eligible and rejected
       reentry, callback failure, partial initialization, and old-generation
       invalidation; these replace the Phase 4 stand-ins with actual adapters.
+- [ ] Lifecycle tests exercise input-root and presentation-root loss separately,
+      including exact-once cancellation, rejected callback reentry, resource
+      cleanup, and retained foreign ownership for each.
+- [ ] Terminal fault-injection tests cover every cleanup operation and prove the
+      cleanup-failure guarantees without weakening callback ordering or count.
 - [ ] Reload tests prove no hidden prompt, active consumer, tooltip suppression,
       stale renderer, indicator damage, duplicate hook, or retired healthy
       facade remains.
@@ -555,9 +572,10 @@ the evidence specified by their phase gate.
       indicator position.
 - [ ] Exercise completion, right-click, Escape, and explicit-cancel callbacks
       that synchronously create a replacement prompt.
-- [ ] Exercise namespace cleanup, root loss, world/map unload, internal failure,
-      and explicit Core reload; inspect service, input, render, tooltip, menu,
-      indicator, hook, API, and handle state after each.
+- [ ] Exercise namespace cleanup, input-root loss, presentation-root loss,
+      world/map unload, internal failure, and explicit Core reload separately;
+      inspect service, input, render, tooltip, menu, indicator, hook, API, handle,
+      callback count, and rejected reentry state after each.
 - [ ] Run a second independent review against every proposal requirement,
       checklist item, diff, test result, rendered artifact, installed-runtime
       observation, and cleanup record.
@@ -617,9 +635,10 @@ the evidence specified by their phase gate.
       unavailable-runtime boundaries reject reentry as specified.
 - [ ] Handles enforce service, contract-major, namespace, and generation
       ownership with exact error precedence and no public internal diagnostics.
-- [ ] Root loss, world/map unload, failure, namespace cleanup, and Core reload
-      leave no hidden prompt, active consumer, suppression, stale renderer,
-      indicator damage, duplicate hook, or healthy retired facade.
+- [ ] Input-root loss, presentation-root loss, world/map unload, failure,
+      namespace cleanup, and Core reload each leave no hidden prompt, active
+      consumer, suppression, stale renderer, indicator damage, duplicate hook,
+      or healthy retired facade.
 - [ ] Existing tooltip and context-menu unit, live, render, lifecycle, reload,
       registry, and package contracts remain green.
 - [ ] Every new or modified class and method has LuaDoc, every closed
@@ -667,7 +686,7 @@ complete. The proposal remains authoritative if this table omits finer detail.
 
 | Date | Proposal requirement or scope | Command, spec, or artifact | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Proposal approval | `Docs/user-prompt-service-proposal.md` | Pending | Record approval and exact revision. |
+| | Proposal approval | `Docs/user-prompt-service-proposal.md` | Pending | Record approval date, baseline Git HEAD, and proposal SHA-256 here; do not edit the proposal. |
 | | Baseline worktree and package | Read-only repository/package inspection | Pending | Preserve unrelated changes. |
 | | Baseline complete units | `./tools/Run-UnitTests.ps1` | Pending | Record exact totals. |
 | | Baseline unit naming | `./tools/Check-UnitTestNaming.ps1` | Pending | Record terminal result. |

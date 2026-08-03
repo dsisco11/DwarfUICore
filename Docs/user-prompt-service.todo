@@ -38,47 +38,47 @@ the evidence specified by their phase gate.
 
 ## Phase 0 - Approve the contract and establish the baseline
 
-- [ ] Record explicit approval of
+- [x] Record explicit approval of
       `Docs/user-prompt-service-proposal.md`, including the version 1 API,
       `SERVICE_BUSY`, tooltip suppression, lifecycle callbacks, and namespace
       border attribution. Record the approval date, baseline Git HEAD, and the
       approved proposal's SHA-256 content hash in this checklist's execution
       evidence; completing this or any later phase must not modify the proposal.
-- [ ] Record the repository branch, revision, worktree/index state, package
+- [x] Record the repository branch, revision, worktree/index state, package
       version, module registry order, and configured installed-runtime
       resolution before production edits.
-- [ ] Identify and preserve every pre-existing modified or untracked file,
+- [x] Identify and preserve every pre-existing modified or untracked file,
       including the proposal and this checklist.
-- [ ] Run `./tools/Run-UnitTests.ps1` and record complete baseline successes,
+- [x] Run `./tools/Run-UnitTests.ps1` and record complete baseline successes,
       failures, errors, and pending counts.
-- [ ] Run `./tools/Check-UnitTestNaming.ps1` and record the baseline result.
-- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record production and
+- [x] Run `./tools/Check-UnitTestNaming.ps1` and record the baseline result.
+- [x] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record production and
       test/support file counts.
-- [ ] Run `./tools/Build.ps1 -LiveReload:$false` and record the offline build
+- [x] Run `./tools/Build.ps1 -LiveReload:$false` and record the offline build
       result without making an installed-runtime claim.
-- [ ] Run `./tools/Publish.ps1`, which invokes the package verifier, then rerun
+- [x] Run `./tools/Publish.ps1`, which invokes the package verifier, then rerun
       `./tools/VerifyPackage.ps1 -SourceDir src -ZipPath <published-zip>
       -ExpandedPath <published-directory>` against the emitted paths; inspect
       expanded and archive outputs independently.
-- [ ] Run one focused tooltip DwarfSpec baseline and one focused context-menu
+- [x] Run one focused tooltip DwarfSpec baseline and one focused context-menu
       DwarfSpec baseline with terminal results and `cleanup_confirmed`.
-- [ ] Record current native, overlay, and Lua-screen surface support and any
+- [x] Record current native, overlay, and Lua-screen surface support and any
       baseline limitation that affects UserPrompt acceptance.
-- [ ] Verify the proposal traceability table in this checklist maps every
+- [x] Verify the proposal traceability table in this checklist maps every
       acceptance criterion, non-goal, and rejected alternative to at least one
       implementation phase and planned evidence row; correct omissions before
       production work.
 
 ### Phase 0 completion gate
 
-- [ ] Proposal approval is recorded in this checklist with its approval date,
+- [x] Proposal approval is recorded in this checklist with its approval date,
       baseline Git HEAD, and content hash, and no unresolved contract choice is
       hidden in an implementation task.
-- [ ] Baseline failures and unrelated worktree changes are explicitly recorded
+- [x] Baseline failures and unrelated worktree changes are explicitly recorded
       and are not attributed to UserPrompt.
-- [ ] The traceability table covers every proposal requirement and rejected
+- [x] The traceability table covers every proposal requirement and rejected
       alternative.
-- [ ] The follow-up review confirms production work has not begun and the
+- [x] The follow-up review confirms production work has not begun and the
       recorded baseline is sufficient to distinguish regressions.
 
 ## Phase 1 - Characterize existing seams and map the change
@@ -686,13 +686,17 @@ complete. The proposal remains authoritative if this table omits finer detail.
 
 | Date | Proposal requirement or scope | Command, spec, or artifact | Result | Notes |
 | --- | --- | --- | --- | --- |
-| | Proposal approval | `Docs/user-prompt-service-proposal.md` | Pending | Record approval date, baseline Git HEAD, and proposal SHA-256 here; do not edit the proposal. |
-| | Baseline worktree and package | Read-only repository/package inspection | Pending | Preserve unrelated changes. |
-| | Baseline complete units | `./tools/Run-UnitTests.ps1` | Pending | Record exact totals. |
-| | Baseline unit naming | `./tools/Check-UnitTestNaming.ps1` | Pending | Record terminal result. |
-| | Baseline syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pending | Record production/test counts. |
-| | Baseline offline build | `./tools/Build.ps1 -LiveReload:$false` | Pending | No live claim. |
-| | Baseline package | Publish, then verifier with emitted source/zip/expanded paths | Pending | Inspect expanded/archive separately. |
+| 2026-08-03 | Proposal approval | `Docs/user-prompt-service-proposal.md` | Approved | Contract major 1 is approved in full, including the action-specific API, `SERVICE_BUSY`, tooltip suppression, lifecycle callbacks, and namespace border attribution. Baseline HEAD `7572fec8a36f98214e4f0c597a8167e3014a66a4`; proposal SHA-256 `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`. The proposal was not edited. |
+| 2026-08-03 | Baseline worktree and package | Read-only repository/package inspection | Pass | Branch `service-provider-api`; clean worktree and index with no pre-existing modified or untracked files; package `0.2.0`; 43-entry registry baseline recorded below; configured installed runner resolves to `G:\Steam\steamapps\common\Dwarf Fortress\hack\dfhack-run.exe`. |
+| 2026-08-03 | Baseline complete units | `./tools/Run-UnitTests.ps1` | Pass | 350 successes, 0 failures, 0 errors, 0 pending. |
+| 2026-08-03 | Baseline unit naming | `./tools/Check-UnitTestNaming.ps1` | Pass | Exit 0 with no naming violations. |
+| 2026-08-03 | Baseline syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pass | Lua 5.4.6 syntax passed for 46 production and 60 test/support files. |
+| 2026-08-03 | Baseline offline build | `./tools/Build.ps1 -LiveReload:$false` | Pass | Exit 0; this is offline build evidence only and makes no installed-runtime claim. |
+| 2026-08-03 | Baseline package | `./tools/Publish.ps1`; `./tools/VerifyPackage.ps1 -SourceDir src -ZipPath dist/DwarfUICore-0.2.0.zip -ExpandedPath dist/DwarfUICore` | Pass | Publish and explicit verification passed. Expanded: 47 files, 393,400 bytes. ZIP: 97,489 bytes, 47 non-directory entries, 393,400 uncompressed bytes. Expanded and archive inventories were inspected independently. |
+| 2026-08-03 | Baseline input/render surfaces | `context_menu/input_hook.lua`; `tooltip/render_hook.lua`; focused native-overlay and Lua-screen DwarfSpec fixtures | Characterized | Context-menu input owns `plugins.overlay.feed_viewscreen_widgets` and Lua-screen `onInput`, covered by `overlay_interaction.ds.lua` and `screen_interaction.ds.lua`. Tooltip completed-render owns `plugins.overlay.render_viewscreen_widgets` and Lua-screen `onRender`, covered by `tooltip_render_seams.ds.lua` and `tooltip_screen_final_render.ds.lua`. The native recenter indicator's exact inactive representation, copy semantics, and proof that direct assignment does not change view/follow state remain intentionally unverified until the installed-runtime characterization in Phase 1. |
+| 2026-08-03 | Proposal traceability | Acceptance criteria, non-goals, rejected alternatives, and traceability table | Pass | Every acceptance criterion and every non-goal/rejected alternative maps to at least one implementation phase and one planned evidence row. Finer details remain governed by the proposal. |
+| 2026-08-03 | Phase 0 follow-up review | Proposal, Phase 0 contract, current diff, repository status, and baseline evidence | Pass | Confirmed no production work began, the proposal hash is unchanged, the only tracked change is this checklist's baseline record, and the evidence distinguishes later regressions. The review strengthened surface evidence by naming exact seams and fixtures. |
+| 2026-08-03 | Phase 0 independent completion audit | Created goal, Phase 0 contract, proposal, current repository state, and recorded evidence | Pass | High-confidence audit found no confirmed issue, partial requirement, or evidence gap. The native-indicator characterization is explicitly required in Phase 1 and is expected pending work, not a Phase 0 defect. Phase 0 markers were checked only after this audit passed. |
 | | Characterization units | Focused existing input/render/provider specs | Pending | Prove insufficiency before shared edits. |
 | | Negative-scope audit | Public symbols, source search, file map, and diff | Pending | Prove every non-goal and rejected alternative remains absent. |
 | | Shared input units | `./tools/Run-UnitTests.ps1 <focused input paths>` | Pending | Ownership, failure, delegation, reload. |
@@ -701,8 +705,8 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |
 | | Indicator units | `./tools/Run-UnitTests.ps1 <focused indicator paths>` | Pending | Hover, sentinel, takeover, restore. |
 | | Indicator takeover acceptance | Installed-runtime native-value mutation after first prompt write | Pending | Prove relinquishment and skipped restoration; simulation alone is insufficient. |
-| | Context-menu live regression | One focused context-menu DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
-| | Tooltip live regression | One focused tooltip DwarfSpec run | Pending | Terminal result and `cleanup_confirmed`. |
+| 2026-08-03 | Context-menu live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/context_menu/map_interaction.ds.lua` | Pass | 1 success, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true`. |
+| 2026-08-03 | Tooltip live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/tooltip/tooltip_screen_final_render.ds.lua` | Pass | 1 success, 0 failures, 0 errors, 0 pending; `cleanup_confirmed=true`. |
 | | UserPrompt live input | One focused UserPrompt input DwarfSpec run | Pending | Exact input/menu/callback behavior. |
 | | UserPrompt final render | One focused UserPrompt render DwarfSpec run | Pending | Namespace/title/message/indicator capture. |
 | | Complete units | `./tools/Run-UnitTests.ps1` | Pending | Do not infer live success. |
@@ -714,3 +718,61 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | | Final independent review | Proposal/checklist/diff/evidence audit | Pending | Record every discrepancy or none. |
 | | Final diff validation | `git diff --check` | Pending | Run after cleanup. |
 | | Final cleanup | Live/process/package/test artifact inspection | Pending | Record `cleanup_confirmed`. |
+
+### Phase 0 baseline detail
+
+- Approval date: 2026-08-03.
+- Baseline Git HEAD: `7572fec8a36f98214e4f0c597a8167e3014a66a4`.
+- Approved proposal SHA-256:
+  `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`.
+- Package identity: numeric version 2, displayed version `0.2.0`, earliest
+  compatible numeric version 1, earliest compatible displayed version
+  `0.1.0`.
+- Configured runtime resolution: `.env` supplies
+  `DFHACK_ROOT=G:\Steam\steamapps\common\Dwarf Fortress\hack`, which resolves
+  to `G:\Steam\steamapps\common\Dwarf Fortress\hack\dfhack-run.exe`.
+- Worktree/index baseline: clean. There were no pre-existing modified or
+  untracked files to preserve. Publish outputs under ignored `dist/` are
+  generated baseline artifacts, not source changes.
+- Registry baseline: 43 entries, SHA-256
+  `B4815E276D3C1F8D62784EC3D74A908DC4290E5AE97EDDE727EDDDA26786A149`, in
+  this exact dependency order:
+  `dwarfuicore/utils/immutable_enum`, `dwarfuicore/utils/function_chain`,
+  `dwarfuicore/utils/numbers`, `dwarfuicore/service_provider/contracts`,
+  `dwarfuicore/service_provider/namespace`,
+  `dwarfuicore/service_provider/immutable_proxy`,
+  `dwarfuicore/service_provider/identity`,
+  `dwarfuicore/service_provider/runtime`,
+  `dwarfuicore/service_provider/acquisition`,
+  `dwarfuicore/service_provider/api`,
+  `dwarfuicore/service_provider/tooltip_adapter_v1`,
+  `dwarfuicore/service_provider/context_menu_adapter_v1`,
+  `dwarfuicore/service_provider/tooltip_provider`,
+  `dwarfuicore/service_provider/context_menu_provider`,
+  `dwarfuicore/services`, `dwarfuicore/service_provider/weak_store`,
+  `dwarfuicore/class`, `dwarfuicore/map_projection`,
+  `dwarfuicore/pointer_poller`, `dwarfuicore/pointer`, `dwarfuicore/text`,
+  `dwarfuicore/view_root_resolver`, `dwarfuicore/widget_extensions`,
+  `dwarfuicore/tooltip/target`, `dwarfuicore/tooltip/map_target`,
+  `dwarfuicore/tooltip/service`, `dwarfuicore/tooltip/target_detector`,
+  `dwarfuicore/tooltip/registration`, `dwarfuicore/tooltip/renderer`,
+  `dwarfuicore/tooltip/render_hook`, `dwarfuicore/tooltip/presenter`,
+  `dwarfuicore/tooltip/runtime`, `dwarfuicore/context_menu/definition`,
+  `dwarfuicore/context_menu/target`,
+  `dwarfuicore/context_menu/input_sample`,
+  `dwarfuicore/context_menu/root_discovery`,
+  `dwarfuicore/context_menu/map_target`,
+  `dwarfuicore/context_menu/registration`,
+  `dwarfuicore/context_menu/target_detector`,
+  `dwarfuicore/context_menu/input_hook`,
+  `dwarfuicore/context_menu/renderer`,
+  `dwarfuicore/context_menu/service`, and
+  `dwarfuicore/context_menu/screen`.
+- Discarded pre-baseline attempt: an earlier bare positional DwarfSpec path
+  bound to `$DFHackRunner` and caused a timeout. The corrected named
+  `-DwarfSpecArgs` invocations above passed; the invocation error is not a
+  UserPrompt or repository baseline failure.
+- Surface limitation carried into characterization: current shared seams cover
+  native/overlay and Lua-screen input/render ownership, but the exact native
+  inactive indicator representation and direct-assignment view/follow behavior
+  still require installed-runtime proof before implementation depends on them.

@@ -58,8 +58,10 @@ describe('DwarfUICore package contract', function()
             'service_provider/api.lua',
             'service_provider/tooltip_adapter_v1.lua',
             'service_provider/context_menu_adapter_v1.lua',
+            'service_provider/user_prompt_adapter_v1.lua',
             'service_provider/tooltip_provider.lua',
             'service_provider/context_menu_provider.lua',
+            'service_provider/user_prompt_provider.lua',
             'service_provider/weak_store.lua',
             'services.lua',
         }
@@ -69,6 +71,18 @@ describe('DwarfUICore package contract', function()
                 'src/scripts_modinstalled/dwarfuicore/' .. relative_path)
             assert.is_truthy(source:find('--@ module=true', 1, true))
             assert.is_nil(source:find("reqscript('dwarfui/", 1, true))
+        end
+    end)
+
+    it('owns the complete UserPrompt implementation under dwarfuicore',
+            function()
+        for _, relative_path in ipairs({
+                'value.lua', 'indicator.lua', 'renderer.lua', 'service.lua',
+                'runtime.lua'}) do
+            local source = read_source(
+                'src/scripts_modinstalled/dwarfuicore/user_prompt/' ..
+                    relative_path)
+            assert.is_truthy(source:find('--@ module=true', 1, true))
         end
     end)
 
@@ -220,6 +234,8 @@ describe('DwarfUICore package contract', function()
         assert.is_nil(root:find('ContextMenuServiceProvider', 1, true))
         assert.is_truthy(services:find('TooltipServiceProvider', 1, true))
         assert.is_truthy(services:find('ContextMenuServiceProvider', 1, true))
+        assert.is_truthy(services:find('UserPromptServiceProvider', 1, true))
+        assert.is_nil(root:find('UserPromptServiceProvider', 1, true))
         assert.is_nil(services:find('function get(', 1, true))
         assert.is_nil(services:find('get_diagnostics', 1, true))
     end)

@@ -97,9 +97,23 @@ local function load_provider(relative_path)
 end
 
 describe('service provider exports', function()
+    it('validates UserPrompt constructor arguments before adapter loading',
+            function()
+        local provider = load_provider_without_implementation(
+            'src/scripts_modinstalled/dwarfuicore/service_provider/' ..
+                'user_prompt_provider.lua').get_provider()
+        assert_provider_category(function() provider:new(0, 'consumer') end,
+            'UserPrompt', 'INVALID_VERSION')
+        assert_provider_category(function() provider:new(1, 'Bad Name') end,
+            'UserPrompt', 'INVALID_NAMESPACE')
+        assert_provider_category(function() provider:new(2, 'consumer') end,
+            'UserPrompt', 'UNSUPPORTED_VERSION')
+    end)
+
     for _, case in ipairs({
             {name='tooltip', path='src/scripts_modinstalled/dwarfuicore/service_provider/tooltip_provider.lua', kind=contracts.ServiceKind.TOOLTIP},
             {name='context menu', path='src/scripts_modinstalled/dwarfuicore/service_provider/context_menu_provider.lua', kind=contracts.ServiceKind.CONTEXT_MENU},
+            {name='UserPrompt', path='src/scripts_modinstalled/dwarfuicore/service_provider/user_prompt_provider.lua', kind=contracts.ServiceKind.USER_PROMPT},
         }) do
         it('creates immutable distinct ' .. case.name .. ' APIs lazily', function()
             local provider_module, calls = load_provider(case.path)
@@ -129,6 +143,8 @@ describe('service provider exports', function()
                 path='src/scripts_modinstalled/dwarfuicore/service_provider/tooltip_provider.lua'},
             {name='context menu', service='ContextMenu',
                 path='src/scripts_modinstalled/dwarfuicore/service_provider/context_menu_provider.lua'},
+            {name='UserPrompt', service='UserPrompt',
+                path='src/scripts_modinstalled/dwarfuicore/service_provider/user_prompt_provider.lua'},
         }) do
         it('reports a missing private ' .. case.name ..
                 ' implementation through its public provider', function()

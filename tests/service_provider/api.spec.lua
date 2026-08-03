@@ -61,7 +61,7 @@ end
 describe('namespace-bound service API proxy', function()
     it('binds private metadata, exposes only approved methods, and delegates',
             function()
-        local runtime = runtime_stub()
+        local runtime, state = runtime_stub()
         local api = load_api(runtime, {get_map_handle_identity=function() end})
         local calls = {}
         local factory = api.new_factory(contracts.ServiceKind.TOOLTIP,
@@ -187,6 +187,68 @@ describe('namespace-bound service API proxy', function()
 
         assert_category(function() object:clear_namespace() end,
             'UserPrompt', 'STALE_API')
+    end)
+
+    it('validates prompt handles in malformed, stale, foreign order',
+            function()
+        local runtime, state = runtime_stub()
+        local identities = {get_prompt_handle_identity=function(handle)
+            return handle.identity
+        end}
+        local api = load_api(runtime, identities)
+        local calls = 0
+        local factory = api.new_factory(contracts.ServiceKind.USER_PROMPT,
+            'UserPromptServiceApi', {'cancel', 'is_active'})
+        local object = factory:create({facade={
+            cancel=function() calls = calls + 1 return true end,
+            is_active=function() calls = calls + 1 return true end,
+        }, contract_major=1, namespace='consumer', generation=7,
+            service_kind=contracts.ServiceKind.USER_PROMPT})
+        local function handle(identity) return {identity=identity} end
+
+        state.generation = 8
+        assert_category(function() object:cancel({}) end,
+            'UserPrompt', 'STALE_API')
+        state.generation = 7
+        state.service_healthy = false
+        assert_category(function() object:cancel({}) end,
+            'UserPrompt', 'SERVICE_UNHEALTHY')
+        state.service_healthy = true
+        assert_category(function() object:cancel({}) end,
+            'UserPrompt', 'INVALID_ARGUMENT')
+        assert_category(function() object:is_active(handle({
+            runtime_generation=6,
+            service_kind=contracts.ServiceKind.USER_PROMPT,
+            contract_major=1, namespace='consumer'})) end,
+            'UserPrompt', 'STALE_HANDLE')
+        assert_category(function() object:cancel(handle({
+            runtime_generation=7,
+            service_kind=contracts.ServiceKind.USER_PROMPT,
+            contract_major=1, namespace='other'})) end,
+            'UserPrompt', 'FOREIGN_HANDLE')
+        assert.is_true(object:is_active(handle({runtime_generation=7,
+            service_kind=contracts.ServiceKind.USER_PROMPT,
+            contract_major=1, namespace='consumer'})))
+        assert.equals(1, calls)
+    end)
+
+    it('preserves the stable UserPrompt busy category from delegation',
+            function()
+        local runtime = runtime_stub()
+        local api = load_api(runtime, {
+            get_prompt_handle_identity=function() end,
+        })
+        local factory = api.new_factory(contracts.ServiceKind.USER_PROMPT,
+            'UserPromptServiceApi', {'prompt_map_location'})
+        local object = factory:create({facade={
+            prompt_map_location=function()
+                error('DwarfUICore UserPromptService: [SERVICE_BUSY] active', 0)
+            end,
+        }, contract_major=1, namespace='consumer', generation=7,
+            service_kind=contracts.ServiceKind.USER_PROMPT})
+
+        assert_category(function() object:prompt_map_location({}) end,
+            'UserPrompt', 'SERVICE_BUSY')
     end)
 
     it('uses the complete API failure precedence matrix without delegation',

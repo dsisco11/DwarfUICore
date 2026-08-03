@@ -3,6 +3,7 @@
 -- Short-lived interactive ZScreen presentation for one open menu session.
 
 local gui = require('gui')
+local overlay = require('plugins.overlay')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local renderers = reqscript('dwarfuicore/context_menu/renderer')
 local identities = reqscript('dwarfuicore/service_provider/identity')
@@ -72,6 +73,10 @@ end
 function ContextMenuScreen:source_root_is_presented(root)
     if not root then return false end
     if not self._native then return true end
+    if type(root.instanceof) == 'function' and
+            root:instanceof(overlay.OverlayWidget) then
+        return true
+    end
     local root_native = rawget(root, '_native')
     local current = self._native.parent
     while current do

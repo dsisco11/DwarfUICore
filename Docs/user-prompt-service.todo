@@ -632,42 +632,42 @@ installed mod, or sibling repository was changed.
 
 ## Phase 6 - Add the public provider and assemble the runtime
 
-- [ ] Add the private version 1 adapter using the existing provider acquisition
+- [x] Add the private version 1 adapter using the existing provider acquisition
       pattern and validate all public arguments before lazy initialization.
-- [ ] Add immutable `UserPromptServiceProvider` and
+- [x] Add immutable `UserPromptServiceProvider` and
       `UserPromptServiceApi` types with `get_contract_version()`,
       `get_namespace()`, `prompt_map_location()`, `cancel()`, `is_active()`, and
       `clear_namespace()`.
-- [ ] Extend the internal API factory with only the prompt-handle validation
+- [x] Extend the internal API factory with only the prompt-handle validation
       capability proven necessary in Phase 1; preserve existing provider call
       sites and current map-handle semantics.
-- [ ] Add the exact provider and API error prefixes from the proposal.
-- [ ] Build and validate one versioned facade over one healthy process-wide
+- [x] Add the exact provider and API error prefixes from the proposal.
+- [x] Build and validate one versioned facade over one healthy process-wide
       UserPrompt runtime.
-- [ ] Ensure every `new()` returns a distinct immutable namespace-bound API and
+- [x] Ensure every `new()` returns a distinct immutable namespace-bound API and
       repeated construction reuses the runtime without replacing services,
       hooks, presentation owners, or active state.
-- [ ] Export `UserPromptServiceProvider` from
+- [x] Export `UserPromptServiceProvider` from
       `reqscript('dwarfuicore/services')` alongside the existing providers and
       keep `reqscript('dwarfuicore')` free of service APIs.
-- [ ] Implement `cancel`, `is_active`, and `clear_namespace` with exact handle,
+- [x] Implement `cancel`, `is_active`, and `clear_namespace` with exact handle,
       namespace, callback, and return semantics.
-- [ ] Prevent same-namespace prompt reentry until `clear_namespace()` callback
+- [x] Prevent same-namespace prompt reentry until `clear_namespace()` callback
       dispatch finishes.
-- [ ] Add runtime service cache, initializer/validator, dependency order,
+- [x] Add runtime service cache, initializer/validator, dependency order,
       explicit teardown order, module registry, and package contract entries.
-- [ ] Preserve tooltip and context-menu API surfaces and namespace state.
+- [x] Preserve tooltip and context-menu API surfaces and namespace state.
 
 ### Phase 6 completion gate
 
-- [ ] Provider tests prove constructor validation, lazy/transactional
+- [x] Provider tests prove constructor validation, lazy/transactional
       acquisition, distinct immutable APIs, namespace binding, singleton reuse,
       current-generation validation, and non-destructive construction.
-- [ ] API tests prove all methods, return values, prefixes, error tokens, handle
+- [x] API tests prove all methods, return values, prefixes, error tokens, handle
       precedence, and namespace cleanup semantics match the proposal.
-- [ ] Tests prove tooltip and context-menu providers gain no methods and retain
+- [x] Tests prove tooltip and context-menu providers gain no methods and retain
       healthy process state across UserPrompt construction.
-- [ ] The follow-up review compares every public LuaDoc type and operation with
+- [x] The follow-up review compares every public LuaDoc type and operation with
       the approved proposal and current provider conventions.
 
 ## Phase 7 - Integrate transactional activation, input, and menu exclusion

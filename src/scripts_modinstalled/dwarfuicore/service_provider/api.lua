@@ -10,6 +10,8 @@ local PREFIX_BY_SERVICE_KIND = {
     [contracts.ServiceKind.CONTEXT_MENU]='DwarfUICore ContextMenuServiceApi:',
     [contracts.ServiceKind.USER_PROMPT]='DwarfUICore UserPromptServiceApi:',
 }
+local USER_PROMPT_BUSY_PREFIX =
+    'DwarfUICore UserPromptService: [SERVICE_BUSY] '
 
 ---Provides namespace-scoped access to the shared tooltip runtime.
 ---@class dwarfuicore.TooltipServiceApi
@@ -33,6 +35,25 @@ local PREFIX_BY_SERVICE_KIND = {
 ---@field update_map_tile fun(self: dwarfuicore.ContextMenuServiceApi, handle: dwarfuicore.ContextMenuMapRegistration, update: dwarfuicore.ContextMenuMapRegistrationUpdate): boolean updated
 ---@field unregister_map_tile fun(self: dwarfuicore.ContextMenuServiceApi, handle: dwarfuicore.ContextMenuMapRegistration): boolean removed
 ---@field clear_namespace fun(self: dwarfuicore.ContextMenuServiceApi): boolean changed
+
+---Options for one map-location input prompt.
+---@class dwarfuicore.MapLocationPromptOptions
+---@field title string
+---@field message string
+---@field on_select fun(position: dwarfuicore.MapTilePosition|nil)
+---@field on_cancel? fun()
+
+---Opaque identity and lifetime handle for one map-location prompt.
+---@class dwarfuicore.MapLocationPrompt
+
+---Provides namespace-scoped access to the shared UserPrompt runtime.
+---@class dwarfuicore.UserPromptServiceApi
+---@field get_contract_version fun(self: dwarfuicore.UserPromptServiceApi): integer
+---@field get_namespace fun(self: dwarfuicore.UserPromptServiceApi): string
+---@field prompt_map_location fun(self: dwarfuicore.UserPromptServiceApi, options: dwarfuicore.MapLocationPromptOptions): dwarfuicore.MapLocationPrompt
+---@field cancel fun(self: dwarfuicore.UserPromptServiceApi, handle: dwarfuicore.MapLocationPrompt): boolean cancelled
+---@field is_active fun(self: dwarfuicore.UserPromptServiceApi, handle: dwarfuicore.MapLocationPrompt): boolean active
+---@field clear_namespace fun(self: dwarfuicore.UserPromptServiceApi): boolean changed
 
 ---An exact fortress-map coordinate copied at an API boundary.
 ---@class dwarfuicore.MapTilePosition
@@ -171,6 +192,27 @@ function new_factory(service_kind, label, operation_names)
         end
     end
 
+    ---Classifies a prompt handle before any delegate can observe it.
+    ---@param backing dwarfuicore.ServiceAcquisitionMetadata
+    ---@param handle any
+    local function validate_prompt_handle(backing, handle)
+        local identity = identities.get_prompt_handle_identity(handle)
+        if identity == nil then
+            fail(service_kind, contracts.ErrorCategory.INVALID_ARGUMENT,
+                'Map-location prompt handle is malformed.')
+        end
+        if identity.runtime_generation ~= backing.generation then
+            fail(service_kind, contracts.ErrorCategory.STALE_HANDLE,
+                'Map-location prompt handle belongs to another runtime generation.')
+        end
+        if identity.service_kind ~= service_kind or
+                identity.contract_major ~= backing.contract_major or
+                identity.namespace ~= backing.namespace then
+            fail(service_kind, contracts.ErrorCategory.FOREIGN_HANDLE,
+                'Map-location prompt handle belongs to another service domain.')
+        end
+    end
+
     local factory
     local methods = {}
 
@@ -218,12 +260,22 @@ function new_factory(service_kind, label, operation_names)
             end
             if name == 'update_map_tile' or name == 'unregister_map_tile' then
                 validate_handle(backing, select(1, ...))
+            elseif service_kind == contracts.ServiceKind.USER_PROMPT and
+                    (name == 'cancel' or name == 'is_active') then
+                validate_prompt_handle(backing, select(1, ...))
             end
             local result = table.pack(pcall(operation, backing.namespace,
                 backing.contract_major, ...))
             if not result[1] then
+                local delegate_failure = tostring(result[2])
+                if service_kind == contracts.ServiceKind.USER_PROMPT and
+                        delegate_failure:sub(1, #USER_PROMPT_BUSY_PREFIX) ==
+                            USER_PROMPT_BUSY_PREFIX then
+                    fail(service_kind, contracts.ErrorCategory.SERVICE_BUSY,
+                        delegate_failure)
+                end
                 fail(service_kind, contracts.ErrorCategory.INVALID_ARGUMENT,
-                    tostring(result[2]))
+                    delegate_failure)
             end
             return table.unpack(result, 2, result.n)
         end

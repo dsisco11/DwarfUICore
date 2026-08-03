@@ -173,10 +173,11 @@ describe('dwarfuicore command lifecycle', function()
     end)
 
     it('exposes typed providers from the dedicated services module', function()
-        local calls = {tooltip=0, context_menu=0}
+        local calls = {tooltip=0, context_menu=0, user_prompt=0}
         local providers = {
             TooltipServiceProvider={new=function() end},
             ContextMenuServiceProvider={new=function() end},
+            UserPromptServiceProvider={new=function() end},
         }
         local _, services = module_loader.load(repo_root, SERVICES_PATH, {
             reqscript={
@@ -207,6 +208,12 @@ describe('dwarfuicore command lifecycle', function()
                         return providers.ContextMenuServiceProvider
                     end,
                 },
+                ['dwarfuicore/service_provider/user_prompt_provider']={
+                    get_provider=function()
+                        calls.user_prompt = calls.user_prompt + 1
+                        return providers.UserPromptServiceProvider
+                    end,
+                },
             },
         })
         assert.is_not_equal(providers.TooltipServiceProvider,
@@ -214,7 +221,14 @@ describe('dwarfuicore command lifecycle', function()
         services.TooltipServiceProvider:new(1, 'plugin')
         assert.is_nil(services.get)
         assert.is_nil(services.get_diagnostics)
-        assert.same({tooltip=1, context_menu=0}, calls)
+        services.UserPromptServiceProvider:new(1, 'plugin')
+        assert.is_nil(services.TooltipServiceProvider.prompt_map_location)
+        assert.is_nil(services.TooltipServiceProvider.cancel)
+        assert.is_nil(services.ContextMenuServiceProvider.prompt_map_location)
+        assert.is_nil(services.ContextMenuServiceProvider.cancel)
+        assert.is_nil(services.UserPromptServiceProvider.register)
+        assert.is_nil(services.UserPromptServiceProvider.register_map_tile)
+        assert.same({tooltip=1, context_menu=0, user_prompt=1}, calls)
     end)
 
     it('exports validation, teardown, and explicit reload as a module',
@@ -275,14 +289,18 @@ describe('dwarfuicore command lifecycle', function()
             ['dwarfuicore/tooltip/runtime']=true,
             ['dwarfuicore/context_menu/service']=true,
             ['dwarfuicore/context_menu/input_hook']=true,
+            ['dwarfuicore/user_prompt/service']=true,
+            ['dwarfuicore/user_prompt/runtime']=true,
             ['dwarfuicore/alpha']=true,
             ['dwarfuicore/beta']=true,
         }
         local dfhack, calls = dfhack_stub(loaded)
         local tooltip_namespace_registry = {}
+        local user_prompt_service = {}
         local unrelated_state = {}
         dfhack.dwarfuicore = {
             tooltip_namespace_registry=tooltip_namespace_registry,
+            user_prompt_service=user_prompt_service,
             unrelated_state=unrelated_state,
         }
         local events = {}
@@ -315,6 +333,18 @@ describe('dwarfuicore command lifecycle', function()
                     table.insert(events, 'unexpected-input-shutdown')
                 end},
             },
+            ['dwarfuicore/user_prompt/service']={
+                UserPromptTerminalCause={CORE_RELOAD=10},
+                service={cancel_active=function(_, cause)
+                    assert.equals(10, cause)
+                    table.insert(events, 'user-prompt')
+                end},
+            },
+            ['dwarfuicore/user_prompt/runtime']={
+                retire_for_reload=function()
+                    table.insert(events, 'user-prompt')
+                end,
+            },
         }
         local _, reloaded_root = module_loader.load(repo_root, ROOT_PATH, {
             globals={
@@ -330,8 +360,9 @@ describe('dwarfuicore command lifecycle', function()
         })
 
         assert.same({}, reloaded_root.reload())
-        assert.same({'context-menu', 'tooltip'}, events)
+        assert.same({'user-prompt', 'context-menu', 'tooltip'}, events)
         assert.is_nil(dfhack.dwarfuicore.tooltip_namespace_registry)
+        assert.is_nil(dfhack.dwarfuicore.user_prompt_service)
         assert.is_equal(unrelated_state,
             dfhack.dwarfuicore.unrelated_state)
         assert.same({REGISTRY_NAME, 'dwarfuicore/alpha',
@@ -351,6 +382,7 @@ describe('dwarfuicore command lifecycle', function()
             ['dwarfuicore/tooltip/render_hook']=true,
             ['dwarfuicore/context_menu/registration']=true,
             ['dwarfuicore/context_menu/input_hook']=true,
+            ['dwarfuicore/user_prompt/service']=true,
         }
         local dfhack = dfhack_stub(loaded)
         local events = {}
@@ -381,6 +413,12 @@ describe('dwarfuicore command lifecycle', function()
                         table.insert(events, 'input-partial')
                     end},
                 },
+                ['dwarfuicore/user_prompt/service']={
+                    UserPromptTerminalCause={CORE_RELOAD=10},
+                    service={cancel_active=function()
+                        table.insert(events, 'user-prompt-partial')
+                    end},
+                },
                 ['dwarfuicore/service_provider/immutable_proxy']={
                     new_factory=function(_, _, properties)
                         return {create=function() return properties or {} end}
@@ -396,7 +434,8 @@ describe('dwarfuicore command lifecycle', function()
         })
 
         root.teardown()
-        assert.same({'context-menu-partial', 'input-partial',
+        assert.same({'user-prompt-partial', 'context-menu-partial',
+            'input-partial',
             'tooltip-partial'}, events)
     end)
 

@@ -36,3 +36,8 @@ TooltipServiceProvider = create_provider('TooltipServiceProvider',
 ---@type dwarfuicore.ContextMenuServiceProvider
 ContextMenuServiceProvider = create_provider('ContextMenuServiceProvider',
     'dwarfuicore/service_provider/context_menu_provider')
+
+---Typed public UserPrompt service provider.
+---@type dwarfuicore.UserPromptServiceProvider
+UserPromptServiceProvider = create_provider('UserPromptServiceProvider',
+    'dwarfuicore/service_provider/user_prompt_provider')

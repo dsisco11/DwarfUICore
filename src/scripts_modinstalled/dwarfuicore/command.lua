@@ -9,10 +9,12 @@ local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
 local CONTEXT_MENU_INPUT_HOOK_SCRIPT =
     'dwarfuicore/context_menu/input_hook'
+local USER_PROMPT_SERVICE_SCRIPT = 'dwarfuicore/user_prompt/service'
+local USER_PROMPT_RUNTIME_SCRIPT = 'dwarfuicore/user_prompt/runtime'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',
     'tooltip_namespace_registry', 'tooltip_registration_runtime', 'tooltip_runtime',
     'context_menu_registration_manager', 'context_menu_input_hook',
-    'context_menu_service'}
+    'context_menu_service', 'user_prompt_service'}
 
 ---Returns a loaded script environment without loading an absent script.
 ---@param script_name string
@@ -93,6 +95,20 @@ local function retire_context_menu()
     end
 end
 
+---Retires an active prompt before shared input and render owners.
+local function retire_user_prompt()
+    local runtime = find_loaded_script_environment(USER_PROMPT_RUNTIME_SCRIPT)
+    if runtime and type(runtime.retire_for_reload) == 'function' then
+        runtime.retire_for_reload()
+        return
+    end
+    local module = find_loaded_script_environment(USER_PROMPT_SERVICE_SCRIPT)
+    if module and module.service and module.UserPromptTerminalCause and
+            type(module.service.cancel_active) == 'function' then
+        module.service:cancel_active(module.UserPromptTerminalCause.CORE_RELOAD)
+    end
+end
+
 ---Loads and validates the current DwarfUICore module generation.
 ---@return table<string, table>
 function initialize()
@@ -111,6 +127,7 @@ end
 
 ---Retires Core-owned runtime owners before an explicit development reload.
 function teardown()
+    retire_user_prompt()
     retire_context_menu()
     retire_tooltip()
 end

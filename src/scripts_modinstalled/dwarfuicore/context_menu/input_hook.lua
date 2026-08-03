@@ -1,11 +1,11 @@
 --@ module=true
 
--- Reload-safe pre-delegation input trampolines for native and Lua screens.
+-- Reload-safe prompt-first input dispatch for native and Lua screens.
 
 local function_chain = reqscript('dwarfuicore/utils/function_chain')
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
-local API_VERSION = 1
+local API_VERSION = 2
 local STATE_SLOT = 'context_menu_input_hook'
 local NATIVE_METHOD = 'feed_viewscreen_widgets'
 local SCREEN_METHOD = 'onInput'
@@ -15,6 +15,18 @@ ContextMenuInputTransport = immutable_enum.define({
     NATIVE=1,
     SCREEN=2,
 }, 'ContextMenuInputTransport')
+
+---@enum dwarfuicore.InputConsumerKind
+InputConsumerKind = immutable_enum.define({
+    PRIORITY=1,
+    CONTEXT_MENU=2,
+}, 'InputConsumerKind')
+
+local PRIORITY_CONSUMER_FIELDS = {
+    owns=true,
+    handle=true,
+    on_failure=true,
+}
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[STATE_SLOT]
@@ -35,8 +47,11 @@ if not process_state then
         api_version=API_VERSION,
         runtime_generation=runtime_generation,
         generation=1,
-        handler=nil,
-        failure_handler=nil,
+        context_handler=nil,
+        context_failure_handler=nil,
+        prepared_consumer=nil,
+        priority_consumer=nil,
+        context_roots=setmetatable({}, {__mode='k'}),
         native_module=nil,
         native_hook=nil,
         screen_hooks=setmetatable({}, {__mode='k'}),
@@ -45,8 +60,13 @@ if not process_state then
         handled_count=0,
         delegated_count=0,
         failure_count=0,
+        priority_dispatch_count=0,
+        priority_handled_count=0,
+        priority_delegated_count=0,
+        priority_failure_count=0,
         last_error=nil,
         last_failure=nil,
+        last_cleanup_error=nil,
         disabled_generation=nil,
     }
     publish_process_state = true
@@ -68,8 +88,11 @@ end
 ---@field api_version integer
 ---@field runtime_generation integer
 ---@field generation integer
----@field handler function|nil
----@field failure_handler function|nil
+---@field context_handler function|nil
+---@field context_failure_handler function|nil
+---@field prepared_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
+---@field priority_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
+---@field context_roots table<table, boolean>
 ---@field native_module table|nil
 ---@field native_hook dwarfuicore.ContextMenuInputHookRecord|nil
 ---@field screen_hooks table<table, dwarfuicore.ContextMenuInputHookRecord>
@@ -78,10 +101,25 @@ end
 ---@field handled_count integer
 ---@field delegated_count integer
 ---@field failure_count integer
+---@field priority_dispatch_count integer
+---@field priority_handled_count integer
+---@field priority_delegated_count integer
+---@field priority_failure_count integer
 ---@field last_error string|nil
 ---@field last_failure table|nil
+---@field last_cleanup_error string|nil
 ---@field disabled_generation integer|nil
 ---@field manager? dwarfuicore.ContextMenuInputHookManager
+
+---@class dwarfuicore.PriorityInputConsumer
+---@field owns fun(keys: table, transport: dwarfuicore.ContextMenuInputTransport, owner: table): boolean
+---@field handle fun(keys: table, transport: dwarfuicore.ContextMenuInputTransport, owner: table): boolean
+---@field on_failure? fun(message: string)
+
+---@class dwarfuicore.PreparedPriorityInputConsumer: dwarfuicore.PriorityInputConsumer
+---@field root table
+---@field active boolean
+---@field released boolean
 
 ---@class dwarfuicore.ContextMenuInputHookManager
 ---@field _state dwarfuicore.ContextMenuInputHookState
@@ -101,7 +139,7 @@ local function unpack_returns(packed)
     return table.unpack(packed, 1, packed.n)
 end
 
----Records one unexpected trampoline failure before delegating unchanged.
+---Records one context-menu failure before delegating unchanged.
 ---@param state dwarfuicore.ContextMenuInputHookState
 ---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
@@ -112,6 +150,8 @@ local function fail_dispatch(state, transport, owner, failure)
     state.last_error = rendered
     state.last_failure = {
         generation=state.generation,
+        consumer_kind=InputConsumerKind.CONTEXT_MENU,
+        owned=false,
         transport=transport,
         owner=transport == ContextMenuInputTransport.NATIVE and owner or nil,
         owner_ref=transport == ContextMenuInputTransport.SCREEN and
@@ -119,8 +159,8 @@ local function fail_dispatch(state, transport, owner, failure)
         error=rendered,
     }
     state.disabled_generation = state.generation
-    local callback = state.failure_handler
-    state.handler = nil
+    local callback = state.context_failure_handler
+    state.context_handler = nil
     if dfhack.printerr then
         pcall(dfhack.printerr,
             'DwarfUICore context-menu input hook failed:\n' .. rendered)
@@ -130,22 +170,103 @@ local function fail_dispatch(state, transport, owner, failure)
     end
 end
 
----Runs the current opening handler behind the hook's traceback boundary.
+---Records an injected-consumer failure and notifies its owner.
+---@param state dwarfuicore.ContextMenuInputHookState
+---@param consumer dwarfuicore.PreparedPriorityInputConsumer
+---@param transport dwarfuicore.ContextMenuInputTransport
+---@param owner table
+---@param failure any
+---@param owned boolean
+local function fail_priority_dispatch(state, consumer, transport, owner,
+        failure, owned)
+    local rendered = tostring(failure)
+    state.priority_failure_count = state.priority_failure_count + 1
+    state.last_error = rendered
+    state.last_failure = {
+        generation=state.generation,
+        consumer_kind=InputConsumerKind.PRIORITY,
+        owned=owned,
+        transport=transport,
+        owner=transport == ContextMenuInputTransport.NATIVE and owner or nil,
+        owner_ref=transport == ContextMenuInputTransport.SCREEN and
+            setmetatable({owner}, {__mode='v'}) or nil,
+        error=rendered,
+    }
+    if state.priority_consumer == consumer then
+        state.priority_consumer = nil
+        consumer.active = false
+    end
+    if dfhack.printerr then
+        pcall(dfhack.printerr,
+            'DwarfUICore priority input consumer failed:\n' .. rendered)
+    end
+    if consumer.on_failure then pcall(consumer.on_failure, rendered) end
+end
+
+---Runs one callback and requires an exact boolean result.
+---@param callback function
+---@param message string
+---@param keys table
+---@param transport dwarfuicore.ContextMenuInputTransport
+---@param owner table
+---@return boolean ok
+---@return boolean|string result
+local function call_boolean(callback, message, keys, transport, owner)
+    return xpcall(function()
+        local result = callback(keys, transport, owner)
+        assert(type(result) == 'boolean', message)
+        return result
+    end, debug.traceback)
+end
+
+---Runs the priority consumer before the context-menu opening adapter.
 ---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
 ---@param keys table
 ---@return boolean handled
 local function dispatch(transport, owner, keys)
     local state = get_process_state()
-    if not state or
-            state.disabled_generation == state.generation or
-            type(state.handler) ~= 'function' then
-        return false
+    if not state then return false end
+
+    local consumer = state.priority_consumer
+    if consumer then
+        state.priority_dispatch_count = state.priority_dispatch_count + 1
+        local owns_ok, owned = call_boolean(consumer.owns,
+            'DwarfUICore priority input ownership must return a boolean.',
+            keys, transport, owner)
+        if not owns_ok then
+            state.priority_delegated_count =
+                state.priority_delegated_count + 1
+            fail_priority_dispatch(
+                state, consumer, transport, owner, owned, false)
+        elseif owned then
+            local handled_ok, handled = call_boolean(consumer.handle,
+                'DwarfUICore priority input handler must return a boolean.',
+                keys, transport, owner)
+            if not handled_ok then
+                fail_priority_dispatch(
+                    state, consumer, transport, owner, handled, true)
+                return true
+            end
+            if handled then
+                state.priority_handled_count =
+                    state.priority_handled_count + 1
+                return true
+            end
+            state.priority_delegated_count =
+                state.priority_delegated_count + 1
+        else
+            state.priority_delegated_count =
+                state.priority_delegated_count + 1
+        end
     end
+
+    if state.disabled_generation == state.generation or
+            type(state.context_handler) ~= 'function' then return false end
     state.dispatch_count = state.dispatch_count + 1
-    local ok, handled = xpcall(function()
-        return not not state.handler(keys, transport, owner)
-    end, debug.traceback)
+    local ok, handled = call_boolean(state.context_handler,
+        'DwarfUICore context-menu input handler must return a boolean.',
+        keys, transport, owner)
     if not ok then
         fail_dispatch(state, transport, owner, handled)
         return false
@@ -207,20 +328,110 @@ function ContextMenuInputHookManager.new(state)
     return setmetatable({_state=state}, ContextMenuInputHookManager)
 end
 
----Installs the sole opening handler for this hook generation.
+---Installs the context-menu consumer adapter and its failure observer.
 ---@param handler function|nil
-function ContextMenuInputHookManager:set_handler(handler)
+---@param failure_handler? fun(message: string)
+function ContextMenuInputHookManager:set_context_consumer(
+        handler, failure_handler)
     assert(handler == nil or type(handler) == 'function',
         'DwarfUICore context-menu input handler must be a function.')
-    self._state.handler = handler
+    assert(failure_handler == nil or type(failure_handler) == 'function',
+        'DwarfUICore context-menu hook failure handler must be a function.')
+    self._state.context_handler = handler
+    self._state.context_failure_handler = failure_handler
 end
 
----Installs the protected service failure observer.
----@param handler fun(message: string)|nil
-function ContextMenuInputHookManager:set_failure_handler(handler)
-    assert(handler == nil or type(handler) == 'function',
-        'DwarfUICore context-menu hook failure handler must be a function.')
-    self._state.failure_handler = handler
+---Ensures the input seam required by one supported root.
+---@param root table
+---@return boolean changed
+function ContextMenuInputHookManager:_ensure_root(root)
+    assert(type(root) == 'table',
+        'DwarfUICore priority input root must be a table.')
+    if root._native ~= nil then
+        assert(type(root[SCREEN_METHOD]) == 'function',
+            'DwarfUICore priority screen root must provide onInput.')
+        return self:ensure_screen(root)
+    end
+    return self:ensure_native()
+end
+
+---Prepares every fallible dependency for one priority consumer.
+---The returned value is inactive until activate_priority_consumer() commits it.
+---@param root table
+---@param consumer dwarfuicore.PriorityInputConsumer
+---@return dwarfuicore.PreparedPriorityInputConsumer prepared
+function ContextMenuInputHookManager:prepare_priority_consumer(root, consumer)
+    assert(self._state.priority_consumer == nil and
+            self._state.prepared_consumer == nil,
+        'DwarfUICore priority input consumer is already prepared or active.')
+    assert(type(consumer) == 'table' and getmetatable(consumer) == nil,
+        'DwarfUICore priority input consumer must be a plain table.')
+    for key in pairs(consumer) do
+        assert(PRIORITY_CONSUMER_FIELDS[key],
+            'DwarfUICore priority input consumer contains an unknown field.')
+    end
+    assert(type(consumer.owns) == 'function',
+        'DwarfUICore priority input consumer requires owns().')
+    assert(type(consumer.handle) == 'function',
+        'DwarfUICore priority input consumer requires handle().')
+    assert(consumer.on_failure == nil or
+            type(consumer.on_failure) == 'function',
+        'DwarfUICore priority input consumer on_failure must be a function.')
+    self:_ensure_root(root)
+    local prepared = {
+        root=root,
+        owns=consumer.owns,
+        handle=consumer.handle,
+        on_failure=consumer.on_failure,
+        active=false,
+        released=false,
+    }
+    self._state.prepared_consumer = prepared
+    return prepared
+end
+
+---Activates one prepared consumer using only non-throwing assignments.
+---@param prepared any
+---@return boolean activated
+function ContextMenuInputHookManager:activate_priority_consumer(prepared)
+    if self._state.prepared_consumer ~= prepared or
+            type(prepared) ~= 'table' or prepared.released or prepared.active or
+            self._state.priority_consumer ~= nil then return false end
+    self._state.prepared_consumer = nil
+    self._state.priority_consumer = prepared
+    prepared.active = true
+    return true
+end
+
+---Releases an active or merely prepared consumer as idempotent rollback.
+---Hook cleanup is best effort so ownership always clears even if repair fails.
+---@param prepared any
+---@return boolean changed
+function ContextMenuInputHookManager:release_priority_consumer(prepared)
+    if type(prepared) ~= 'table' then return false end
+    local changed = false
+    if self._state.prepared_consumer == prepared then
+        self._state.prepared_consumer = nil
+        changed = true
+    end
+    if self._state.priority_consumer == prepared then
+        self._state.priority_consumer = nil
+        changed = true
+    end
+    prepared.active = false
+    if prepared.released then return changed end
+    prepared.released = true
+    local ok, reconciled = xpcall(function()
+        return self:_reconcile_effective_roots()
+    end, debug.traceback)
+    if ok then return reconciled or changed end
+    self._state.last_cleanup_error = tostring(reconciled)
+    if dfhack.printerr then
+        pcall(dfhack.printerr,
+            'DwarfUICore priority input cleanup failed:\n' ..
+                tostring(reconciled))
+    end
+    return changed
 end
 
 ---Installs or adopts the native overlay input seam.
@@ -334,13 +545,32 @@ function ContextMenuInputHookManager:_retire_screen(owner, record)
     return restored
 end
 
----Reconciles native and Lua hooks with structurally attached registration roots.
+---Stores context-menu roots and reconciles them with priority-consumer demand.
 ---@param roots table<any, boolean>
 ---@return boolean changed
 function ContextMenuInputHookManager:reconcile_roots(roots)
     assert(type(roots) == 'table',
         'DwarfUICore context-menu hook reconciliation requires a root set.')
+    local copied = setmetatable({}, {__mode='k'})
+    for root, attached in pairs(roots) do
+        assert(attached == true,
+            'DwarfUICore context-menu root membership must be true.')
+        assert(type(root) == 'table',
+            'DwarfUICore context-menu roots must be tables.')
+        copied[root] = true
+    end
+    self._state.context_roots = copied
+    return self:_reconcile_effective_roots()
+end
+
+---Reconciles the sole hook chain with every current internal root demand.
+---@return boolean changed
+function ContextMenuInputHookManager:_reconcile_effective_roots()
     local state = self._state
+    local roots = setmetatable({}, {__mode='k'})
+    for root in pairs(state.context_roots) do roots[root] = true end
+    local priority = state.priority_consumer or state.prepared_consumer
+    if priority and priority.root then roots[priority.root] = true end
     local screen_roots = setmetatable({}, {__mode='k'})
     local needs_native = false
     for root in pairs(roots) do
@@ -389,8 +619,20 @@ end
 function ContextMenuInputHookManager:shutdown()
     local state = self._state
     local changed = false
-    state.handler = nil
-    state.failure_handler = nil
+    if state.priority_consumer then
+        state.priority_consumer.active = false
+        state.priority_consumer.released = true
+        state.priority_consumer = nil
+        changed = true
+    end
+    if state.prepared_consumer then
+        state.prepared_consumer.released = true
+        state.prepared_consumer = nil
+        changed = true
+    end
+    state.context_handler = nil
+    state.context_failure_handler = nil
+    state.context_roots = setmetatable({}, {__mode='k'})
     state.disabled_generation = state.generation
     if state.native_hook then
         local record = state.native_hook
@@ -432,22 +674,37 @@ function ContextMenuInputHookManager:get_diagnostics()
     return {
         api_version=state.api_version,
         generation=state.generation,
-        handler_installed=type(state.handler) == 'function',
+        consumer_order={
+            InputConsumerKind.PRIORITY,
+            InputConsumerKind.CONTEXT_MENU,
+        },
+        priority_consumer_active=state.priority_consumer ~= nil,
+        priority_consumer_prepared=state.prepared_consumer ~= nil,
+        context_consumer_installed=
+            type(state.context_handler) == 'function',
+        handler_installed=type(state.context_handler) == 'function',
         disabled=state.disabled_generation == state.generation,
         disabled_generation=state.disabled_generation,
         dispatch_count=state.dispatch_count,
         handled_count=state.handled_count,
         delegated_count=state.delegated_count,
         failure_count=state.failure_count,
+        priority_dispatch_count=state.priority_dispatch_count,
+        priority_handled_count=state.priority_handled_count,
+        priority_delegated_count=state.priority_delegated_count,
+        priority_failure_count=state.priority_failure_count,
         last_error=state.last_error,
         last_failure=state.last_failure and {
             generation=state.last_failure.generation,
+            consumer_kind=state.last_failure.consumer_kind,
+            owned=state.last_failure.owned,
             transport=state.last_failure.transport,
             owner=state.last_failure.owner or
                 (state.last_failure.owner_ref and
                     state.last_failure.owner_ref[1]) or nil,
             error=state.last_failure.error,
         } or nil,
+        last_cleanup_error=state.last_cleanup_error,
         native_tracked=native ~= nil,
         native_outermost=native ~= nil and
             native.owner[NATIVE_METHOD] == native.active_trampoline,

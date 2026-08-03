@@ -114,6 +114,7 @@ local function load_root(registry, dfhack)
             ['dwarfuicore/tooltip/render_hook']={},
             ['dwarfuicore/context_menu/service']={},
             ['dwarfuicore/context_menu/registration']={},
+            ['dwarfuicore/context_menu/input_hook']={},
             ['dwarfuicore/service_provider/immutable_proxy']={
                 new_factory=function(_, _, properties)
                     return {create=function() return properties or {} end}
@@ -273,6 +274,7 @@ describe('dwarfuicore command lifecycle', function()
         local loaded = {
             ['dwarfuicore/tooltip/runtime']=true,
             ['dwarfuicore/context_menu/service']=true,
+            ['dwarfuicore/context_menu/input_hook']=true,
             ['dwarfuicore/alpha']=true,
             ['dwarfuicore/beta']=true,
         }
@@ -306,6 +308,11 @@ describe('dwarfuicore command lifecycle', function()
             ['dwarfuicore/context_menu/service']={
                 service={shutdown=function()
                     table.insert(events, 'context-menu')
+                end},
+            },
+            ['dwarfuicore/context_menu/input_hook']={
+                manager={shutdown=function()
+                    table.insert(events, 'unexpected-input-shutdown')
                 end},
             },
         }
@@ -343,6 +350,7 @@ describe('dwarfuicore command lifecycle', function()
         local loaded = {
             ['dwarfuicore/tooltip/render_hook']=true,
             ['dwarfuicore/context_menu/registration']=true,
+            ['dwarfuicore/context_menu/input_hook']=true,
         }
         local dfhack = dfhack_stub(loaded)
         local events = {}
@@ -368,6 +376,11 @@ describe('dwarfuicore command lifecycle', function()
                         table.insert(events, 'context-menu-partial')
                     end},
                 },
+                ['dwarfuicore/context_menu/input_hook']={
+                    manager={shutdown=function()
+                        table.insert(events, 'input-partial')
+                    end},
+                },
                 ['dwarfuicore/service_provider/immutable_proxy']={
                     new_factory=function(_, _, properties)
                         return {create=function() return properties or {} end}
@@ -383,7 +396,8 @@ describe('dwarfuicore command lifecycle', function()
         })
 
         root.teardown()
-        assert.same({'context-menu-partial', 'tooltip-partial'}, events)
+        assert.same({'context-menu-partial', 'input-partial',
+            'tooltip-partial'}, events)
     end)
 
     it('reports the module that fails during explicit reconstruction',

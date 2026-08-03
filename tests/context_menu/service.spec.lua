@@ -107,16 +107,12 @@ end
 local function hook_double()
     local manager = {root_sets={}, shutdown_count=0}
 
-    ---Stores the opening handler.
+    ---Stores the context-menu consumer and failure observer.
     ---@param callback function|nil
-    function manager:set_handler(callback)
+    ---@param failure_handler? function
+    function manager:set_context_consumer(callback, failure_handler)
         self.handler = callback
-    end
-
-    ---Stores the hook-failure handler.
-    ---@param callback function|nil
-    function manager:set_failure_handler(callback)
-        self.failure_handler = callback
+        self.failure_handler = failure_handler
     end
 
     ---Records one root-set reconciliation.

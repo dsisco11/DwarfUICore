@@ -444,9 +444,13 @@ end
 function ContextMenuService:start()
     if self._started then return false end
     self._started = true
-    self._input_hook:set_failure_handler(function(message)
-        self:_disable('input hook', message, false)
-    end)
+    self._input_hook:set_context_consumer(
+        function(keys, transport, owner)
+            return self:handle_opening_input(keys, transport, owner)
+        end,
+        function(message)
+            self:_disable('input hook', message, false)
+        end)
     self._registrations:set_failure_observer(function(message)
         self:_disable('root discovery', message, false)
     end)
@@ -458,9 +462,6 @@ function ContextMenuService:start()
     end
     self._registrations:set_menu_open_predicate(function()
         return self:is_open()
-    end)
-    self._input_hook:set_handler(function(keys, transport, owner)
-        return self:handle_opening_input(keys, transport, owner)
     end)
     self:_install_state_change_callback()
     -- Installing the root observer can immediately replay a discovered set,

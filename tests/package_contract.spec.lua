@@ -159,6 +159,20 @@ describe('DwarfUICore package contract', function()
         end
     end)
 
+    it('ships one authoritative native input-hook owner', function()
+        local owners = {}
+        for _, spec in ipairs(registry.MODULES) do
+            local source = read_source(
+                'src/scripts_modinstalled/' .. spec.name .. '.lua')
+            if source:find('feed_viewscreen_widgets', 1, true) then
+                table.insert(owners, spec.name)
+            end
+        end
+        assert.same({'dwarfuicore/context_menu/input_hook'}, owners)
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/user_prompt/input_hook.lua'))
+    end)
+
     it('ships every registered Core module and no DwarfUI feature module',
             function()
         assert.is_true(source_exists('src/info.txt'))

@@ -7,6 +7,8 @@ local TOOLTIP_RENDER_HOOK_SCRIPT = 'dwarfuicore/tooltip/render_hook'
 local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
+local CONTEXT_MENU_INPUT_HOOK_SCRIPT =
+    'dwarfuicore/context_menu/input_hook'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',
     'tooltip_namespace_registry', 'tooltip_registration_runtime', 'tooltip_runtime',
     'context_menu_registration_manager', 'context_menu_input_hook',
@@ -82,6 +84,12 @@ local function retire_context_menu()
     local registration = find_loaded_script_environment(CONTEXT_MENU_REGISTRATION_SCRIPT)
     if registration and registration.manager and type(registration.manager.shutdown) == 'function' then
         registration.manager:shutdown()
+    end
+    local input_hook = find_loaded_script_environment(
+        CONTEXT_MENU_INPUT_HOOK_SCRIPT)
+    if input_hook and input_hook.manager and
+            type(input_hook.manager.shutdown) == 'function' then
+        input_hook.manager:shutdown()
     end
 end
 

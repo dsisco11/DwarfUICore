@@ -313,48 +313,103 @@ every other path is repository-relative.
 
 ## Phase 2 - Establish prompt-first input ownership
 
-- [ ] If Phase 1 proves the current single-handler input seam sufficient, add
+- [x] If Phase 1 proves the current single-handler input seam sufficient, add
       prompt-first arbitration through that owner without changing its public
       shape and record why no generalization was needed.
-- [ ] If it is insufficient, generalize the existing context-menu input-hook
+- [x] If it is insufficient, generalize the existing context-menu input-hook
       owner into the smallest reload-safe internal dispatcher that can host
       UserPrompt first and context-menu opening second.
-- [ ] Retain exactly one authoritative native trampoline and weakly owned
+- [x] Retain exactly one authoritative native trampoline and weakly owned
       Lua-screen trampolines; remove or reduce the old context-menu hook to one
       intentional adapter instead of leaving a parallel owner.
-- [ ] Preserve native and Lua-screen root reconciliation, foreign outer-wrapper
+- [x] Preserve native and Lua-screen root reconciliation, foreign outer-wrapper
       adoption, current-generation checks, and reload-safe inert trampolines.
-- [ ] Dispatch consumers in deterministic private order, stop at the first
+- [x] Dispatch consumers in deterministic private order, stop at the first
       `true`, and skip every later consumer and predecessor after handling.
-- [ ] When every consumer returns false, invoke the predecessor exactly once
+- [x] When every consumer returns false, invoke the predecessor exactly once
       with unchanged arguments and preserve all returns including trailing nils.
-- [ ] Let the dispatcher identify an injected consumer's owned boundaries before
+- [x] Let the dispatcher identify an injected consumer's owned boundaries before
       protected dispatch so consumer failure still returns `true`; prove this
       infrastructure behavior with a stand-in consumer before UserPrompt state
       exists.
-- [ ] Report protected-dispatch failure to the injected consumer owner without
+- [x] Report protected-dispatch failure to the injected consumer owner without
       embedding UserPrompt lifecycle knowledge in the shared dispatcher. Defer
       actual prompt termination and diagnostics integration to Phases 7 and 8.
-- [ ] Preserve the characterized failure policy for events not owned by the
+- [x] Preserve the characterized failure policy for events not owned by the
       injected consumer.
-- [ ] Prepare/reconcile the current map-capable input surface before prompt
+- [x] Prepare/reconcile the current map-capable input surface before prompt
       state can be published; expose a rollback-safe internal activation seam.
-- [ ] Update process ownership, registry order, reload cleanup, package
+- [x] Update process ownership, registry order, reload cleanup, package
       inventory, diagnostics, and focused tests for the selected design.
 
 ### Phase 2 completion gate
 
-- [ ] Stand-in consumer tests prove priority order, exact boolean handling, exact
+- [x] Stand-in consumer tests prove priority order, exact boolean handling, exact
       predecessor preservation, owned-failure consumption, inactive
       transparency, failure notification, and no duplicate dispatch after
       construction or reload.
-- [ ] Tests prove exactly one native input trampoline and no parallel live
+- [x] Tests prove exactly one native input trampoline and no parallel live
       context-menu/UserPrompt hook owner.
-- [ ] Existing focused context-menu input unit and live behavior remains green
+- [x] Existing focused context-menu input unit and live behavior remains green
       when no prompt is active.
-- [ ] The follow-up review verifies every stand-in-owned failure remains consumed
+- [x] The follow-up review verifies every stand-in-owned failure remains consumed
       and every unowned path delegates according to the characterized contract;
       integrated prompt-owned failure proof remains in Phase 7.
+
+### Phase 2 implementation record
+
+Phase 1 proved the original single context-menu handler insufficient, so the
+conditional no-generalization branch was intentionally not selected. The
+implementation follows the required smallest-generalization branch:
+
+- `dwarfuicore/context_menu/input_hook.lua` remains the sole native and
+  Lua-screen trampoline owner. It now has a fixed private order represented by
+  the immutable numeric `InputConsumerKind`: one injected priority consumer,
+  followed by one context-menu adapter, followed by the exact predecessor.
+  There is no registration API, arbitrary priority list, fullscreen screen, or
+  UserPrompt-specific lifecycle code.
+- `prepare_priority_consumer(root, consumer)` validates and copies the stand-in
+  callbacks and performs the fallible native or Lua-screen seam preparation.
+  It publishes one exact prepared token. `activate_priority_consumer(token)`
+  accepts only that token and commits through non-throwing assignments without
+  rewrapping. `release_priority_consumer(token)` clears prepared or active
+  ownership first and performs idempotent best-effort root rollback.
+- Priority ownership classification occurs before protected handling. Once an
+  event is classified as owned, handler failure or a non-boolean result is
+  reported to the injected `on_failure` observer and returns true without
+  calling context-menu or base-game code. Failure before ownership is known is
+  reported and delegates. Exact false continues to the next consumer; exact
+  true stops dispatch. Context-menu failure retains its characterized
+  transparent delegation and generation disablement.
+- Context-menu root demand is copied into a weak set and reconciled with an
+  active priority root, retaining one native trampoline and weak Lua-screen
+  records. Foreign outer wrappers, exact predecessor returns, root retirement,
+  same-generation module adoption, and inert retired trampolines retain their
+  established behavior.
+- `context_menu/service.lua` is reduced to the intentional
+  `set_context_consumer(handler, failure_handler)` adapter. It still owns normal
+  right-click opening behavior while no priority consumer handles the event.
+- Explicit reload still retires the full context-menu service first. If only a
+  partial registration/input graph was loaded, `dwarfuicore/command.lua` now
+  retires both the registration manager and the input dispatcher; a fully
+  loaded service prevents duplicate input shutdown.
+- Registry order and package inventory remain unchanged because no module was
+  added or moved. The registry still loads the one input owner before the
+  renderer and context-menu service. Package tests inspect every registered
+  production module and prove only `context_menu/input_hook.lua` references the
+  native input seam and no `user_prompt/input_hook.lua` exists.
+
+Actual Phase 2 files are limited to:
+
+- production: `dwarfuicore/context_menu/input_hook.lua`,
+  `dwarfuicore/context_menu/service.lua`, and `dwarfuicore/command.lua`;
+- focused units: `tests/context_menu/input_hook.spec.lua`,
+  `tests/context_menu/service.spec.lua`, `tests/dwarfuicore_command.spec.lua`,
+  and `tests/package_contract.spec.lua`; and
+- this execution record.
+
+No proposal, installed mod, sibling repository, provider API, tooltip module,
+new UserPrompt module, or context-menu registration/definition was changed.
 
 ## Phase 3 - Establish completed-render composition and tooltip suppression
 
@@ -880,7 +935,14 @@ complete. The proposal remains authoritative if this table omits finer detail.
 | 2026-08-03 | Phase 1 post-mutation follow-up review | Phase 1 contract, final characterization diff, mutation results, restored-source hashes, and repository/index status | Pass | The previously missing direct mutation evidence now covers all four named invariants. The behavior-preserving single-branch reload mutation is disclosed rather than misreported. Both temporarily touched production files have worktree hashes equal to their index blobs and no staged or unstaged diff. Final scope remains the todo plus three characterization tests; the proposal and sibling repositories remain unchanged. |
 | 2026-08-03 | Phase 1 independent completion audit | Created goal, Phase 1 contract, proposal, final diff, source/test mappings, terminal results, mutation evidence, and restored repository state | Pass | High-confidence fresh audit found all fourteen tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. Phase 1 markers were checked only after this audit passed. |
 | | Negative-scope audit | Public symbols, source search, file map, and diff | Pending | Prove every non-goal and rejected alternative remains absent. |
-| | Shared input units | `./tools/Run-UnitTests.ps1 <focused input paths>` | Pending | Ownership, failure, delegation, reload. |
+| 2026-08-03 | Phase 2 shared input units | `./tools/Run-UnitTests.ps1 tests/context_menu/input_hook.spec.lua tests/context_menu/service.spec.lua tests/dwarfuicore_command.spec.lua tests/module_registry.spec.lua tests/package_contract.spec.lua` | Pass | 51 successes, 0 failures, 0 errors, 0 pending. Stand-ins cover native and Lua-screen priority, exact booleans, exact predecessor returns, owned and pre-ownership failures, context failure isolation, preparation rollback, one trampoline, and reload adoption. |
+| 2026-08-03 | Phase 2 complete units and naming | `./tools/Run-UnitTests.ps1` | Pass | 360 successes, 0 failures, 0 errors, 0 pending; the wrapper's naming precondition also passed. |
+| 2026-08-03 | Phase 2 syntax | `./tools/Check-LuaSyntax.ps1 -IncludeTests` | Pass | Lua 5.4.6 syntax passed for 46 production and 61 test/support files. |
+| 2026-08-03 | Phase 2 offline build and package | `./tools/Build.ps1 -LiveReload:$false`; `./tools/Publish.ps1`; explicit `./tools/VerifyPackage.ps1` | Pass | Final-source offline build, expanded verification, and ZIP verification passed. Source/expanded inventory: 47 files and 404,015 bytes. ZIP: 47 entries, 404,015 uncompressed bytes, 99,438 archive bytes. No installed-runtime claim. |
+| 2026-08-03 | Phase 2 native-overlay live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/context_menu/overlay_interaction.ds.lua` | Pass | Final-source protocol-2 run passed 1 success, 0 failures, 0 errors, 0 pending with terminal status and `cleanup_confirmed=true`. An earlier pre-review run cleanly reported a stale protocol-1 process and was not counted as success. |
+| 2026-08-03 | Phase 2 Lua-screen live regression | `./tools/Run-AutomationTests.ps1 -DwarfSpecArgs tests/context_menu/screen_interaction.ds.lua` | Pass | Final-source protocol-2 run passed 1 success, 0 failures, 0 errors, 0 pending with terminal status and `cleanup_confirmed=true`; the exact instance seam remained functional. |
+| 2026-08-03 | Phase 2 follow-up review | Phase 2 contract, proposal input transaction, final source/tests, validation evidence, proposal hash, and repository/index status | Pass after correction | Review found that an intervening context-root reconciliation could retire a merely prepared priority root before activation. Effective-root reconciliation now reserves either the active or prepared priority root, and the focused test directly proves prepared-but-inactive transparency, reconciliation survival, non-rewrapping activation, and rollback. Final focused units passed 51/51, full units 360/360, syntax, live regressions, build, and package checks passed; proposal SHA-256 remains `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`. |
+| 2026-08-03 | Phase 2 independent completion audit | Created goal, Phase 2 contract, proposal, final diff, implementation/test mappings, validation records, proposal hash, and repository/index state | Pass | High-confidence fresh read-only audit found all eleven tasks and all four completion gates satisfied, with no confirmed issue, partial requirement, or evidence gap. The inactive conditional branch was explicitly resolved as inapplicable; concrete UserPrompt lifecycle and integrated prompt-owned failure coverage remain intentionally deferred. Phase 2 markers were checked only after this audit passed. |
 | | Shared render units | `./tools/Run-UnitTests.ps1 <focused render paths>` | Pending | Suppression, selection, reload. |
 | | Prompt state/provider units | `./tools/Run-UnitTests.ps1 <focused prompt paths>` | Pending | Values, handles, API, lifecycle, errors. |
 | | Prompt renderer units | `./tools/Run-UnitTests.ps1 <focused renderer paths>` | Pending | Namespace, content, layout, truncation. |

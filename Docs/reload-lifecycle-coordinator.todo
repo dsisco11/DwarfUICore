@@ -33,17 +33,11 @@ implementation and evidence are complete.
 - [ ] Keep the first-activation restart operator-controlled and do not perform
   live coordinator activation before that restart is confirmed.
 
-## Assumptions and open questions
+## Assumptions and resolved decisions
 
-- [ ] Resolve the proposal's remaining quiescence wording conflict before code
-  implementation begins.
-  - [ ] Decide whether the intended invariant is the detailed lifecycle rule:
-    attempt the complete quiescence pass first, then retire every eligible
-    owner whose own quiescence succeeded even if another owner failed.
-  - [ ] Amend or explicitly approve the proposal wording so the goal and
-    acceptance criterion no longer require every owner to quiesce successfully
-    before any retirement begins.
-  - [ ] Treat this decision as blocking all production implementation below.
+- [ ] Enforce the approved per-owner quiescence invariant: complete the ordered
+  quiescence pass first, then retire every eligible owner whose own quiescence
+  succeeded even if another owner failed.
 - [ ] Treat `Docs/reload-lifecycle-coordinator-proposal.md` as authoritative for
   all other lifecycle, generation, failure, retry, restart, and validation
   behavior.
@@ -88,7 +82,8 @@ Completion criteria:
   reconstruction failures, stale objects, and trampoline identity are covered
   by focused tests with recorded terminal results.
 - [ ] Every initial lifecycle owner is mapped to an explicit proposed policy.
-- [ ] The quiescence wording decision is resolved and recorded in the proposal.
+- [ ] The approved per-owner quiescence invariant remains recorded consistently
+  in the proposal and characterization tests.
 
 ## Phase 2: Add lifecycle contracts and process-stable coordinator state
 
@@ -129,6 +124,19 @@ registration exist without yet replacing command orchestration.
   - [ ] Prove registration failure can be paired with exact publication
     rollback and leaves no untracked process state.
 - [ ] Register the new focused suite in `tests/run.lua`.
+- [ ] Add `reload_contracts` and `reload_coordinator` to
+  `src/scripts_modinstalled/dwarfuicore/module_registry.lua` before every owner
+  module that can register lifecycle state.
+  - [ ] Update `tests/module_registry.spec.lua` to prove the exact dependency
+    order before coordinator-aware owner integration begins.
+- [ ] Preserve service-provider identity and weak handle-identity stores as
+  process-stable metadata across module-environment replacement.
+  - [ ] Keep these stores outside coordinator generation-owned records and
+    never make an old identity current again.
+  - [ ] Add focused tests proving preserved identities still classify old APIs
+    and handles as stale after generation advancement.
+- [ ] Keep `service_provider_runtime` as command transaction authority and
+  explicitly exclude it from coordinator owner registration.
 - [ ] Perform a follow-up review of the contracts and tests against this phase
   before marking it complete.
 
@@ -182,8 +190,7 @@ remaining lifecycle operations and produce complete aggregate diagnostics.
 - [ ] Add focused failure-injection tests around every inactive-gate
   transition and callback boundary.
   - [ ] Prove deterministic order and complete best-effort aggregation.
-  - [ ] Prove the per-owner quiescence prerequisite selected in the proposal
-    decision gate.
+  - [ ] Prove the proposal's approved per-owner quiescence prerequisite.
   - [ ] Prove exactly-once successful retirement and discard-only retry.
   - [ ] Prove current/older and future-generation selection differences.
   - [ ] Prove `QUIESCE_FAILED` is diagnostic-only and restart-blocking.
@@ -307,56 +314,14 @@ Completion criteria:
   explicit coordinator status.
 - [ ] Focused UserPrompt lifecycle and coordinator integration tests pass.
 
-## Phase 7: Replace command-specific recovery with generic orchestration
-
-Outcome: `command.lua` owns only the proposal's transaction sequence and has no
-knowledge of service-specific process state or owner shapes.
-
-- [ ] Refactor `src/scripts_modinstalled/dwarfuicore/command.lua` to:
-  - [ ] load only the module registry, service runtime, and coordinator needed
-    for transaction orchestration;
-  - [ ] place the runtime in retiring state before cross-generation recovery;
-  - [ ] invoke pre-advancement recovery and consume its aggregate result;
-  - [ ] disable without advancing when any future-generation record remains;
-  - [ ] otherwise publish exactly one initializing successor generation;
-  - [ ] invoke post-advancement discard for remaining `RETIRED` records;
-  - [ ] publish a disabled successor and stop before reconstruction after any
-    current/older recovery failure, discard failure, malformed record, or
-    restart blocker;
-  - [ ] clear/reconstruct module environments only after safe cleanup;
-  - [ ] validate registry contracts before publishing healthy state; and
-  - [ ] aggregate and report lifecycle, reconstruction, and cleanup failures.
-- [ ] Remove every tooltip, context-menu, UserPrompt, presenter,
-  registration-manager, and hook-manager process slot or owner-shape reference
-  from `command.lua`.
-- [ ] Remove command-local generation comparisons for service owners; keep
-  generation comparison inside the coordinator and service-runtime contracts.
-- [ ] Preserve old public object failure behavior.
-  - [ ] Advanced-generation APIs return `STALE_API` and handles return
-    `STALE_HANDLE`.
-  - [ ] Same-generation APIs and handles return `SERVICE_UNHEALTHY` when a
-    future-record failure disables the runtime without advancement.
-- [ ] Extend command and service-runtime tests for all successful, disabled,
-  malformed, retryable, restart-required, current/older, and future-record
-  branches.
-- [ ] Perform a follow-up review proving `command.lua` contains orchestration
-  only before marking this phase complete.
-
-Completion criteria:
-
-- [ ] `command.lua` names no service-specific process slot, owner shape, or
-  owner-generation comparison.
-- [ ] Successful reload advances exactly once and reconstructs only after all
-  required cleanup gates pass.
-- [ ] Current/older failure advances to disabled; future failure disables
-  without advancement.
-- [ ] Command and service-runtime focused suites pass.
-
-## Phase 8: Add reconstruction-failure recovery
+## Phase 7: Add reconstruction-failure recovery
 
 Outcome: A failed successor construction cannot leak untracked active behavior;
-every published partial owner is cleaned, retryable, or diagnostic-only.
+every published partial owner is cleaned, retryable, or diagnostic-only before
+command-level recovery is removed.
 
+- [ ] Add coordinator-driven reconstruction-failure cleanup while the existing
+  command-level recovery remains available.
 - [ ] On reconstruction failure, use coordinator operations to attempt
   quiescence and retirement of every successfully registered successor owner.
 - [ ] Attempt every eligible callback despite individual failures.
@@ -386,15 +351,62 @@ Completion criteria:
 - [ ] Retryable and restart-required states remain distinguishable.
 - [ ] Focused reconstruction-failure and corrected-retry tests pass.
 
+## Phase 8: Replace command-specific recovery with generic orchestration
+
+Outcome: `command.lua` owns only the proposal's transaction sequence and has no
+knowledge of service-specific process state or owner shapes.
+
+- [ ] Refactor `src/scripts_modinstalled/dwarfuicore/command.lua` to:
+  - [ ] load only the module registry, service runtime, and coordinator needed
+    for transaction orchestration;
+  - [ ] place the runtime in retiring state before cross-generation recovery;
+  - [ ] invoke pre-advancement recovery and consume its aggregate result;
+  - [ ] disable without advancing when any future-generation record remains;
+  - [ ] otherwise publish exactly one initializing successor generation;
+  - [ ] invoke post-advancement discard for remaining `RETIRED` records;
+  - [ ] publish a disabled successor and stop before reconstruction after any
+    current/older recovery failure, discard failure, malformed record, or
+    restart blocker;
+  - [ ] clear/reconstruct module environments only after safe cleanup;
+  - [ ] validate registry contracts before publishing healthy state; and
+  - [ ] aggregate and report lifecycle, reconstruction, and cleanup failures.
+- [ ] Remove every tooltip, context-menu, UserPrompt, presenter,
+  registration-manager, and hook-manager process slot or owner-shape reference
+  from `command.lua`.
+- [ ] Remove command-local generation comparisons for service owners; keep
+  generation comparison inside the coordinator and service-runtime contracts.
+- [ ] Keep `service_provider_runtime` outside coordinator records and use it
+  only as the transaction authority for retiring, advancement, initialization,
+  health publication, and disabled-state publication.
+- [ ] Preserve old public object failure behavior.
+  - [ ] Advanced-generation APIs return `STALE_API` and handles return
+    `STALE_HANDLE`.
+  - [ ] Same-generation APIs and handles return `SERVICE_UNHEALTHY` when a
+    future-record failure disables the runtime without advancement.
+- [ ] Extend command and service-runtime tests for all successful, disabled,
+  malformed, retryable, restart-required, current/older, and future-record
+  branches.
+- [ ] Perform a follow-up review proving `command.lua` contains orchestration
+  only before marking this phase complete.
+
+Completion criteria:
+
+- [ ] `command.lua` names no service-specific process slot, owner shape, or
+  owner-generation comparison.
+- [ ] Successful reload advances exactly once and reconstructs only after all
+  required cleanup gates pass.
+- [ ] Current/older failure advances to disabled; future failure disables
+  without advancement.
+- [ ] Command and service-runtime focused suites pass.
+
 ## Phase 9: Registry, syntax, and package integration
 
 Outcome: Every private coordinator artifact and test is included in dependency
 order and distributed without expanding the public service surface.
 
-- [ ] Add `reload_contracts` and `reload_coordinator` to
-  `src/scripts_modinstalled/dwarfuicore/module_registry.lua` before every owner
-  module that registers lifecycle state.
-- [ ] Update `tests/module_registry.spec.lua` for exact dependency order.
+- [ ] Reconfirm the previously established `reload_contracts` and
+  `reload_coordinator` registry order after all lifecycle-registering consumers
+  have been integrated.
 - [ ] Update `tests/run.lua` for every new focused suite.
 - [ ] Update `tests/package_contract.spec.lua` and
   `tools/VerifyPackage.ps1` so expanded and ZIP packages require the new private
@@ -478,7 +490,7 @@ Completion criteria:
 
 ## Execution evidence ledger
 
-- [ ] Record the resolved quiescence invariant and proposal amendment/approval.
+- [ ] Record the approved quiescence invariant and its proposal amendment.
 - [ ] Record focused characterization commands and terminal results.
 - [ ] Record focused coordinator/state-machine commands and terminal results.
 - [ ] Record focused tooltip, context-menu, UserPrompt, command, API, and
@@ -494,7 +506,7 @@ Completion criteria:
 
 ## Final acceptance
 
-- [ ] The proposal's quiescence wording conflict is resolved explicitly.
+- [ ] The approved per-owner quiescence invariant is implemented exactly.
 - [ ] Every proposal requirement is implemented or explicitly deferred with an
   approved rationale.
 - [ ] Every generation-owned tooltip, context-menu, and UserPrompt state has a

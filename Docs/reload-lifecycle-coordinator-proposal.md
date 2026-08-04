@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed on 2026-08-04. This document defines an internal reload-lifecycle
-architecture for review. It does not authorize implementation until the
-proposal is approved and converted into an implementation checklist.
+Approved on 2026-08-04 and converted into
+`Docs/reload-lifecycle-coordinator.todo`. Implementation remains governed by
+that checklist and its evidence requirements.
 
 The current Reload Recovery implementation remains the behavioral baseline:
 explicit source reload can recover from split-generation tooltip state,
@@ -60,8 +60,8 @@ should declare how their own process state is retired and discarded.
   environments.
 - Preserve deterministic retirement ordering across UserPrompt, context-menu,
   tooltip, input, and presentation owners.
-- Quiesce every externally callable owner before invoking fallible retirement
-  cleanup.
+- Complete the ordered quiescence pass before invoking fallible retirement
+  cleanup, and retire only those owners whose own quiescence has succeeded.
 - Attempt all eligible retirements even when one action fails.
 - Make successful retirement exactly-once while allowing failed, idempotent
   retirement actions to be retried by a later explicit reload.
@@ -590,9 +590,10 @@ The proposal is satisfied only when all of the following are proven:
   process-stable adoption contract.
 - Retirement runs in deterministic order and attempts all eligible records
   after an individual failure.
-- Every externally callable owner is demonstrably quiescent before fallible
-  retirement begins; a disabled runtime is never treated as a substitute for
-  revoking stale callback dispatch.
+- The complete ordered quiescence pass finishes before fallible retirement
+  begins, and each retired owner is demonstrably quiescent even if a different
+  owner failed quiescence; a disabled runtime is never treated as a substitute
+  for revoking stale callback dispatch.
 - Successful records retire exactly once; failed idempotent records can be
   retried only when they are `RETIRE_FAILED`, while `RETIRED` records whose
   discard failed retry discard without repeating retirement.

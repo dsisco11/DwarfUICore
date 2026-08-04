@@ -40,13 +40,15 @@ local function runtime_stub()
 end
 
 ---Creates a reload runtime seam whose final state remains inspectable.
+---@param initial_state? table
 ---@return table runtime
 ---@return fun(): table state
-local function reload_runtime_stub()
-    local state = {generation=1, status='healthy'}
+local function reload_runtime_stub(initial_state)
+    local state = initial_state or {generation=1, status='healthy'}
     local runtime = {
         begin_reload=function()
-            assert.equals('healthy', state.status)
+            assert.is_true(state.status == 'healthy' or
+                state.status == 'disabled')
             state.status = 'retiring'
             return state
         end,
@@ -482,6 +484,111 @@ describe('dwarfuicore command lifecycle', function()
         assert.has_error(root.reload)
         failed = false
         assert.same({}, root.reload())
+    end)
+
+    it('recovers split-generation tooltip owners after a failed reload',
+            function()
+        local registry = registry_stub()
+        local dfhack, calls = dfhack_stub({
+            ['dwarfuicore/tooltip/runtime']=true,
+        })
+        local stale_runtime = {generation=2, status='disabled'}
+        local runtime, get_state = reload_runtime_stub(stale_runtime)
+        local retired = 0
+        local presenter = {retire_for_reload=function()
+            retired = retired + 1
+            return true
+        end}
+        local trampoline = {}
+        dfhack.dwarfuicore = {
+            service_provider_runtime=stale_runtime,
+            tooltip_service={runtime_generation=1},
+            tooltip_runtime={runtime_generation=1, presenter=presenter},
+            tooltip_render_hook={trampoline=trampoline},
+        }
+        local environments = {
+            [REGISTRY_NAME]=registry,
+            [RUNTIME_NAME]=runtime,
+            ['dwarfuicore/tooltip/render_hook']={},
+            ['dwarfuicore/context_menu/service']={},
+            ['dwarfuicore/context_menu/registration']={},
+            ['dwarfuicore/context_menu/input_hook']={},
+            ['dwarfuicore/user_prompt/service']={},
+            ['dwarfuicore/user_prompt/runtime']={},
+        }
+        local _, root = module_loader.load(repo_root, ROOT_PATH, {
+            globals={
+                dfhack=dfhack,
+                dfhack_flags={module=true},
+                qerror=function(message) error(message, 0) end,
+            },
+            reqscript=setmetatable(environments, {
+                __index=function(_, name)
+                    if name == 'dwarfuicore/tooltip/runtime' then
+                        error('DwarfUICore tooltip service belongs to ' ..
+                            'another runtime generation.')
+                    end
+                    error('unexpected reqscript: ' .. tostring(name))
+                end,
+            }),
+        })
+
+        assert.same({}, root.reload())
+        assert.equals(1, retired)
+        assert.same({generation=3, status='healthy'}, get_state())
+        assert.is_nil(dfhack.dwarfuicore.tooltip_service)
+        assert.is_nil(dfhack.dwarfuicore.tooltip_runtime)
+        assert.is_equal(trampoline,
+            dfhack.dwarfuicore.tooltip_render_hook.trampoline)
+        assert.same({REGISTRY_NAME}, calls.scripts)
+    end)
+
+    it('clears a stale tooltip service without loading a missing presenter',
+            function()
+        local registry = registry_stub()
+        local dfhack = dfhack_stub({
+            ['dwarfuicore/tooltip/runtime']=true,
+        })
+        local stale_runtime = {generation=2, status='disabled'}
+        local runtime, get_state = reload_runtime_stub(stale_runtime)
+        local trampoline = {}
+        dfhack.dwarfuicore = {
+            service_provider_runtime=stale_runtime,
+            tooltip_service={runtime_generation=1},
+            tooltip_render_hook={trampoline=trampoline},
+        }
+        local environments = {
+            [REGISTRY_NAME]=registry,
+            [RUNTIME_NAME]=runtime,
+            ['dwarfuicore/tooltip/render_hook']={},
+            ['dwarfuicore/context_menu/service']={},
+            ['dwarfuicore/context_menu/registration']={},
+            ['dwarfuicore/context_menu/input_hook']={},
+            ['dwarfuicore/user_prompt/service']={},
+            ['dwarfuicore/user_prompt/runtime']={},
+        }
+        local _, root = module_loader.load(repo_root, ROOT_PATH, {
+            globals={
+                dfhack=dfhack,
+                dfhack_flags={module=true},
+                qerror=function(message) error(message, 0) end,
+            },
+            reqscript=setmetatable(environments, {
+                __index=function(_, name)
+                    if name == 'dwarfuicore/tooltip/runtime' then
+                        error('DwarfUICore tooltip service belongs to ' ..
+                            'another runtime generation.')
+                    end
+                    error('unexpected reqscript: ' .. tostring(name))
+                end,
+            }),
+        })
+
+        assert.same({}, root.reload())
+        assert.same({generation=3, status='healthy'}, get_state())
+        assert.is_nil(dfhack.dwarfuicore.tooltip_service)
+        assert.is_equal(trampoline,
+            dfhack.dwarfuicore.tooltip_render_hook.trampoline)
     end)
 
     it('retires old APIs even when owner teardown fails', function()

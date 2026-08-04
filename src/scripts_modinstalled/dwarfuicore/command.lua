@@ -37,6 +37,30 @@ local function load_service_runtime()
     return reqscript(SERVICE_RUNTIME_SCRIPT)
 end
 
+---Returns one surviving process-owned field without loading its script.
+---@param slot string
+---@param field string
+---@return any value
+local function get_process_owner_field(slot, field)
+    if type(dfhack.dwarfuicore) ~= 'table' then return nil end
+    local state = dfhack.dwarfuicore[slot]
+    if type(state) ~= 'table' then return nil end
+    return state[field]
+end
+
+---Returns whether a process owner predates the current runtime generation.
+---@param slot string
+---@return boolean stale
+local function is_stale_process_owner(slot)
+    if type(dfhack.dwarfuicore) ~= 'table' then return false end
+    local runtime = dfhack.dwarfuicore.service_provider_runtime
+    local owner = dfhack.dwarfuicore[slot]
+    if type(runtime) ~= 'table' or type(owner) ~= 'table' then return false end
+    local generation = runtime.generation
+    return math.type(generation) == 'integer' and generation > 0 and
+        owner.runtime_generation ~= generation
+end
+
 ---Clears retired owner records only during explicit Core reload.
 local function clear_process_owner_slots()
     if type(dfhack.dwarfuicore) ~= 'table' then return end
@@ -67,6 +91,15 @@ end
 
 ---Retires the current tooltip presenter or partial render-hook owner.
 local function retire_tooltip()
+    local presenter = get_process_owner_field('tooltip_runtime', 'presenter')
+    if presenter and type(presenter.retire_for_reload) == 'function' then
+        presenter:retire_for_reload()
+        return
+    end
+    if is_stale_process_owner('tooltip_runtime') or
+            is_stale_process_owner('tooltip_service') then
+        return
+    end
     local runtime = find_loaded_script_environment(TOOLTIP_RUNTIME_SCRIPT)
     if runtime and runtime.presenter and type(runtime.presenter.retire_for_reload) == 'function' then
         runtime.presenter:retire_for_reload()

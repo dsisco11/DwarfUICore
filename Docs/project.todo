@@ -1,0 +1,5 @@
+☐ [Reload Recovery] Make explicit DwarfUICore reload recover from surviving process-owned service state that belongs to an older runtime generation.
+    ☐ Add a focused unit regression that constructs split-generation tooltip state and proves reload currently fails during teardown with `DwarfUICore tooltip service belongs to another runtime generation.` before stale owner slots can be cleared.
+    ☐ After the reproduction test fails for the expected reason, fix reload teardown so it can retire or clear stale-generation owners without weakening generation validation during ordinary service use.
+    ☐ Cover successful reconstruction after the stale state is removed, including runtime generation advancement, tooltip presenter retirement, render-trampoline adoption, and stale API/handle rejection.
+    ☐ Verify the focused regression, existing reload and failure-recovery suites, the full unit suite, Lua syntax, package contents, and a live source reload without modifying installed packages.

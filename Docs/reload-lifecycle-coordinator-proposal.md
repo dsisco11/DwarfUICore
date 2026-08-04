@@ -97,13 +97,18 @@ should declare how their own process state is retired and discarded.
 1. load the module registry, service runtime, and reload coordinator;
 2. ask the service runtime to enter retiring state;
 3. ask the coordinator to recover every structurally valid tracked lifecycle
-   owner;
-4. advance to an initializing successor generation;
-5. discard successfully retired generation-owned state;
-6. clear and reconstruct registered module environments;
-7. publish the successor runtime as healthy; and
-8. on failure, retire and discard eligible partial successor state before publishing a
-   disabled runtime.
+   owner in an executable status, discard retired future-generation records,
+   and report every non-executable restart blocker;
+4. if any future-generation record remains, disable the current runtime without
+   advancing and stop;
+5. otherwise advance to an initializing successor generation;
+6. ask the coordinator to discard remaining retired generation-owned state;
+7. if recovery or discard reported any failure or restart blocker, publish the
+   successor runtime as disabled and stop;
+8. clear and reconstruct registered module environments;
+9. publish the successor runtime as healthy; and
+10. on reconstruction failure, retire and discard eligible partial successor
+    state before publishing a disabled runtime.
 
 The command must not name tooltip, context-menu, UserPrompt, presenter,
 registration-manager, or hook-manager process slots. It must not inspect an
@@ -146,6 +151,7 @@ The coordinator uses one process slot, conceptually:
 dfhack.dwarfuicore.reload_coordinator = {
     schema_version=1,
     sequence=0,
+    recovery_active=false,
     records={},
 }
 ```
@@ -175,6 +181,14 @@ numeric enum tables. Suggested statuses are `ACTIVE`, `QUIESCING`, `QUIESCED`,
 `QUIESCE_FAILED`, `RETIRING`, `RETIRED`, and `RETIRE_FAILED`. The precise
 integer values are internal contracts but must remain deterministic within the
 package.
+
+`QUIESCING` and `RETIRING` are coordinator-internal transient statuses. The
+coordinator sets the applicable transient status immediately before invoking
+its callback under `xpcall`, then sets the corresponding success or failure
+status before the recovery operation returns. A process-wide `recovery_active`
+guard rejects nested recovery with a deterministic `RECOVERY_BUSY` failure, so
+a second recovery operation can never observe or act on a transient record.
+The guard is cleared under protected finalization after every recovery outcome.
 
 Records are keyed by the composite identity of runtime generation and owner
 identifier. A partial successor must not overwrite a previous generation's
@@ -224,8 +238,8 @@ Registration requirements:
   construction rollback or private diagnostics.
 
 Registration validates the current generation because it occurs during
-ordinary construction. Cross-generation tolerance belongs only to retirement
-selection inside explicit reload.
+ordinary construction. Cross-generation tolerance belongs only to explicit
+coordinator recovery.
 
 If coordinator registration fails, the constructing module must undo its
 publication before returning the failure. It must not leave untracked process
@@ -233,16 +247,31 @@ state behind.
 
 ## Quiescence and retirement contract
 
-The coordinator exposes a private operation equivalent to
-`recover_tracked_owners(runtime_generation)`.
+The coordinator exposes two private operations:
 
-It selects every `ACTIVE`, `QUIESCED`, `RETIRE_FAILED`, or `RETIRED` record
-with a structurally valid owner identity, positive generation, and trusted
-captured callbacks. Selection is not capped at the retiring runtime generation.
-A later-generation record is anomalous and must be reported in the recovery
-result, but it is still advanced through its remaining quiescence, retirement,
-and discard operations using its exact captured state before reconstruction
-begins.
+- `recover_tracked_owners(runtime_generation)` performs quiescence and
+  retirement, then attempts pre-advancement discard only for retired records
+  whose generation is later than `runtime_generation`; and
+- `discard_retired_owners()` performs post-advancement discard for every
+  remaining `RETIRED` record.
+
+Recovery selects every `ACTIVE`, `QUIESCED`, or `RETIRE_FAILED` record with a
+structurally valid owner identity, positive generation, and trusted captured
+callbacks. Quiescence and retirement selection is not capped at the retiring
+runtime generation. A later-generation record is anomalous and must be reported
+in the recovery result, but it is still advanced through its remaining
+quiescence and retirement operations using its exact captured state.
+
+After retirement, recovery selects every `RETIRED` record whose generation is
+later than `runtime_generation` for pre-advancement discard. The coordinator,
+not the command, owns that generation comparison. Advancement is allowed only
+after every future-generation record has been removed. The separate
+`discard_retired_owners()` operation selects all `RETIRED` records that remain
+after advancement and never invokes quiescence or retirement callbacks.
+
+Structurally valid `QUIESCE_FAILED` records are not executable recovery
+targets. They are reported as restart blockers and remain available only for
+diagnostics until process restart.
 
 A malformed record whose identity, generation, callbacks, or state-machine
 status cannot be validated is not invoked. It is reported as unrecoverable
@@ -251,15 +280,15 @@ untrusted value as cleanup code. This is distinct from a structurally valid
 owner carrying an unexpected generation label. Any malformed record is an
 unsafe cleanup failure: it blocks reconstruction and requires process restart.
 
-Selected records are ordered by immutable retirement order, then registration
+Recovery records are ordered by immutable retirement order, then registration
 sequence. The coordinator first runs the complete quiescence pass for `ACTIVE`
 records in that order. Records already in `QUIESCED`, `RETIRE_FAILED`, or
 `RETIRED` do not repeat quiescence. It then runs retirement for every record in
 `QUIESCED` or `RETIRE_FAILED`, even if another owner failed to quiesce, so one
 unsafe owner does not prevent safe owners from cleaning up. `RETIRED` records
-proceed only to discard, preserving exactly-once retirement. Reconstruction
-requires every applicable owner to have quiesced successfully. The initial
-order must preserve the established behavior:
+proceed only through the applicable discard operation, preserving exactly-once
+retirement. Reconstruction requires every applicable owner to have quiesced
+successfully. The initial order must preserve the established behavior:
 
 1. active UserPrompt interaction;
 2. context-menu session and service;
@@ -311,8 +340,10 @@ under protection and removes the record only after the action succeeds.
 Discard actions must use exact captured-state identity. They must not clear a
 new owner that has already replaced the retired state. A discard failure is
 reported and the record remains available for another explicit recovery
-attempt. On that attempt, the `RETIRED` record is selected for discard only;
-its successful quiescence and retirement are not repeated.
+attempt. On that attempt, a future-generation `RETIRED` record is selected by
+pre-advancement recovery, while any other `RETIRED` record is selected by the
+post-advancement `discard_retired_owners()` operation. Both paths retry discard
+only; successful quiescence and retirement are not repeated.
 
 `QUIESCE_FAILED` and `RETIRE_FAILED` state is never discarded merely to make
 reconstruction proceed. Failed retirement is safe to retry only because the
@@ -372,30 +403,36 @@ healthy or disabled runtime
     -> coordinator reports generation anomalies
     -> coordinator advances all structurally valid tracked owners through
        remaining quiescence and retirement operations
+    -> coordinator discards retired future-generation records
     -> runtime publishes initializing successor
-    -> coordinator discards retired generation-owned state
+    -> coordinator discards remaining retired generation-owned state
     -> old module environments are cleared
     -> new modules construct and register successor owners
     -> registry contracts are validated
     -> successor runtime becomes healthy
 ```
 
-If safe retirement or discard fails, the command still advances the retiring
-runtime to a successor so old APIs become stale. The successor is marked
-disabled, the aggregate lifecycle failure is reported, and failed coordinator
-records remain available for a later recovery attempt. Module reconstruction
-does not start after a cleanup failure. An owner that cannot be proven
-quiescent is an unsafe failure and requires process restart; generation
-advancement is not presented as sufficient protection from its callbacks.
+If safe retirement or discard of a current- or older-generation record fails,
+the command still advances the retiring runtime to a successor so old APIs
+become stale. The successor is marked disabled, the aggregate lifecycle
+failure is reported, and failed coordinator records remain available for a
+later recovery attempt. Module reconstruction does not start after a cleanup
+failure. An owner that cannot be proven quiescent is an unsafe failure and
+requires process restart; generation advancement is not presented as
+sufficient protection from its callbacks.
 
-Reconstruction also does not start while a later-generation record remains in
-any lifecycle state. It must be successfully quiesced, retired, and discarded
-first. Once removed, the service runtime advances by its normal single
-generation step; the anomalous generation label never determines or skips the
-successor generation.
+Neither advancement nor reconstruction starts while a later-generation record
+remains in any lifecycle state. It must be successfully quiesced, retired, and
+discarded first. If that cleanup fails, the command marks the current runtime
+disabled without advancing and reports the aggregate failure. Once every such
+record is removed, the service runtime advances by its normal single generation
+step; the anomalous generation label never determines or skips the successor
+generation.
 
 This preserves the existing rule that teardown failure cannot leave the old
-public generation current.
+public generation usable. Ordinary cleanup failure makes it stale by advancing
+to a disabled successor; future-generation cleanup failure disables the current
+runtime without advancing.
 
 ## Reconstruction failure recovery
 
@@ -542,8 +579,8 @@ The proposal is satisfied only when all of the following are proven:
 - Every generation-owned process state published by tooltip, context-menu, and
   UserPrompt is covered by a coordinator record or an explicitly documented
   process-stable adoption contract.
-- Retirement runs in deterministic order and attempts all records after an
-  individual failure.
+- Retirement runs in deterministic order and attempts all eligible records
+  after an individual failure.
 - Every externally callable owner is demonstrably quiescent before fallible
   retirement begins; a disabled runtime is never treated as a substitute for
   revoking stale callback dispatch.
@@ -553,14 +590,22 @@ The proposal is satisfied only when all of the following are proven:
 - Discard cannot clear replacement state.
 - First activation and live validation occur only after the required process
   restart; no in-process pre-coordinator migration is attempted.
-- Every structurally valid future-labeled owner is reported as anomalous,
-  quiesced, retired, and exactly discarded before normal single-step runtime
-  advancement and reconstruction.
+- Every structurally valid future-labeled owner in an executable status is
+  reported as anomalous and advanced through its remaining quiescence,
+  retirement, and exact discard operations before normal single-step runtime
+  advancement and reconstruction. A future-labeled `QUIESCE_FAILED` record is
+  instead reported as a restart blocker.
+- Nested recovery is rejected as `RECOVERY_BUSY`, and no completed recovery
+  operation leaves a record in `QUIESCING` or `RETIRING`.
 - Malformed coordinator records are never invoked as cleanup callbacks.
 - Any malformed coordinator record blocks reconstruction and requires process
   restart.
-- A failed retirement advances the runtime generation, leaves the successor
-  disabled, preserves retry records, and rejects old APIs and handles.
+- Failed retirement or discard of a current- or older-generation record
+  advances the runtime generation, leaves the successor disabled, preserves
+  retry records, and rejects old APIs and handles as stale.
+- Failed cleanup of a future-generation record leaves the current generation
+  disabled without advancement, preserves the record for retry when safe, and
+  blocks reconstruction.
 - A failed reconstruction attempts quiescence and retirement of every
   successfully published successor owner, discards every successfully retired
   owner, and retains each safely inactive failed record before returning.

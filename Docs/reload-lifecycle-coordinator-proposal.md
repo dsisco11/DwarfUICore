@@ -185,10 +185,14 @@ package.
 `QUIESCING` and `RETIRING` are coordinator-internal transient statuses. The
 coordinator sets the applicable transient status immediately before invoking
 its callback under `xpcall`, then sets the corresponding success or failure
-status before the recovery operation returns. A process-wide `recovery_active`
-guard rejects nested recovery with a deterministic `RECOVERY_BUSY` failure, so
-a second recovery operation can never observe or act on a transient record.
-The guard is cleared under protected finalization after every recovery outcome.
+status before the recovery operation returns. Both
+`recover_tracked_owners(runtime_generation)` and `discard_retired_owners()`
+independently acquire the same process-wide `recovery_active` guard. Either
+operation rejects entry while the guard is set with a deterministic
+`RECOVERY_BUSY` failure, so nested reload cannot observe or act on a transient
+record. Each operation clears the guard through protected finalization after
+every outcome; the command does not hold it across runtime advancement between
+the two operations.
 
 Records are keyed by the composite identity of runtime generation and owner
 identifier. A partial successor must not overwrite a previous generation's
@@ -468,6 +472,8 @@ has placed the service runtime in retiring state.
 The following behavior remains unchanged:
 
 - service acquisition requires the healthy current generation;
+- public API invocation and handle validation require a healthy runtime, so
+  same-generation objects reject a disabled runtime as `SERVICE_UNHEALTHY`;
 - service records must match their owning runtime generation;
 - public API objects reject generation advancement as `STALE_API`;
 - old handles reject generation advancement as `STALE_HANDLE`;
@@ -595,8 +601,9 @@ The proposal is satisfied only when all of the following are proven:
   retirement, and exact discard operations before normal single-step runtime
   advancement and reconstruction. A future-labeled `QUIESCE_FAILED` record is
   instead reported as a restart blocker.
-- Nested recovery is rejected as `RECOVERY_BUSY`, and no completed recovery
-  operation leaves a record in `QUIESCING` or `RETIRING`.
+- Both coordinator recovery operations reject nested entry as `RECOVERY_BUSY`,
+  clear their shared guard after every outcome, and leave no record in
+  `QUIESCING` or `RETIRING` when they return.
 - Malformed coordinator records are never invoked as cleanup callbacks.
 - Any malformed coordinator record blocks reconstruction and requires process
   restart.
@@ -605,7 +612,8 @@ The proposal is satisfied only when all of the following are proven:
   retry records, and rejects old APIs and handles as stale.
 - Failed cleanup of a future-generation record leaves the current generation
   disabled without advancement, preserves the record for retry when safe, and
-  blocks reconstruction.
+  blocks reconstruction. Existing same-generation APIs and handles reject that
+  disabled runtime as `SERVICE_UNHEALTHY`.
 - A failed reconstruction attempts quiescence and retirement of every
   successfully published successor owner, discards every successfully retired
   owner, and retains each safely inactive failed record before returning.

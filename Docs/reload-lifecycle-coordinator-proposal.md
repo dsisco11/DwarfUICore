@@ -236,26 +236,30 @@ state behind.
 The coordinator exposes a private operation equivalent to
 `recover_tracked_owners(runtime_generation)`.
 
-It selects every `ACTIVE`, `QUIESCE_FAILED`, `QUIESCED`, or `RETIRE_FAILED`
-record with a structurally valid owner identity, positive generation, and
-trusted captured callbacks. Selection is not capped at the retiring runtime
-generation. A later-generation record is anomalous and must be reported in the
-recovery result, but it is still quiesced, retired, and discarded through its
-exact captured state before reconstruction begins.
+It selects every `ACTIVE`, `QUIESCED`, `RETIRE_FAILED`, or `RETIRED` record
+with a structurally valid owner identity, positive generation, and trusted
+captured callbacks. Selection is not capped at the retiring runtime generation.
+A later-generation record is anomalous and must be reported in the recovery
+result, but it is still advanced through its remaining quiescence, retirement,
+and discard operations using its exact captured state before reconstruction
+begins.
 
 A malformed record whose identity, generation, callbacks, or state-machine
 status cannot be validated is not invoked. It is reported as unrecoverable
 coordinator corruption because the coordinator cannot safely execute an
 untrusted value as cleanup code. This is distinct from a structurally valid
-owner carrying an unexpected generation label.
+owner carrying an unexpected generation label. Any malformed record is an
+unsafe cleanup failure: it blocks reconstruction and requires process restart.
 
 Selected records are ordered by immutable retirement order, then registration
-sequence. The coordinator first runs the complete quiescence pass in that
-order. It then runs retirement for every record that reached `QUIESCED`, even
-if another owner failed to quiesce, so one unsafe owner does not prevent safe
-owners from cleaning up. Reconstruction requires every selected owner to have
-quiesced successfully. The initial order must preserve the established
-behavior:
+sequence. The coordinator first runs the complete quiescence pass for `ACTIVE`
+records in that order. Records already in `QUIESCED`, `RETIRE_FAILED`, or
+`RETIRED` do not repeat quiescence. It then runs retirement for every record in
+`QUIESCED` or `RETIRE_FAILED`, even if another owner failed to quiesce, so one
+unsafe owner does not prevent safe owners from cleaning up. `RETIRED` records
+proceed only to discard, preserving exactly-once retirement. Reconstruction
+requires every applicable owner to have quiesced successfully. The initial
+order must preserve the established behavior:
 
 1. active UserPrompt interaction;
 2. context-menu session and service;
@@ -280,10 +284,12 @@ A quiescence callback that throws transitions the record to
 coordinator cannot treat a partial callback as proof that external dispatch is
 inactive. Reconstruction is prohibited and the failure requires process
 restart instead of claiming that a disabled successor makes stale callbacks
-safe. Focused tests must inject failures immediately around every
-inactive-gate transition to prove this boundary.
+safe. A `QUIESCE_FAILED` record remains available for diagnostics but is never
+selected for callback execution or retried in-process. Focused tests must
+inject failures immediately around every inactive-gate transition to prove
+this boundary.
 
-Every selected quiescence and retirement is attempted under `xpcall`. One
+Every eligible quiescence and retirement callback is attempted under `xpcall`. One
 failure does not prevent later eligible owners from becoming inert or
 retiring. The result is an aggregate report with owner identity, generation,
 operation, and traceback for every failure.
@@ -305,7 +311,8 @@ under protection and removes the record only after the action succeeds.
 Discard actions must use exact captured-state identity. They must not clear a
 new owner that has already replaced the retired state. A discard failure is
 reported and the record remains available for another explicit recovery
-attempt.
+attempt. On that attempt, the `RETIRED` record is selected for discard only;
+its successful quiescence and retirement are not repeated.
 
 `QUIESCE_FAILED` and `RETIRE_FAILED` state is never discarded merely to make
 reconstruction proceed. Failed retirement is safe to retry only because the
@@ -363,8 +370,8 @@ The successful transaction is:
 healthy or disabled runtime
     -> runtime begins retiring
     -> coordinator reports generation anomalies
-    -> coordinator quiesces all structurally valid tracked owners
-    -> coordinator retires all quiesced owners
+    -> coordinator advances all structurally valid tracked owners through
+       remaining quiescence and retirement operations
     -> runtime publishes initializing successor
     -> coordinator discards retired generation-owned state
     -> old module environments are cleared
@@ -541,7 +548,8 @@ The proposal is satisfied only when all of the following are proven:
   retirement begins; a disabled runtime is never treated as a substitute for
   revoking stale callback dispatch.
 - Successful records retire exactly once; failed idempotent records can be
-  retried.
+  retried only when they are `RETIRE_FAILED`, while `RETIRED` records whose
+  discard failed retry discard without repeating retirement.
 - Discard cannot clear replacement state.
 - First activation and live validation occur only after the required process
   restart; no in-process pre-coordinator migration is attempted.
@@ -549,6 +557,8 @@ The proposal is satisfied only when all of the following are proven:
   quiesced, retired, and exactly discarded before normal single-step runtime
   advancement and reconstruction.
 - Malformed coordinator records are never invoked as cleanup callbacks.
+- Any malformed coordinator record blocks reconstruction and requires process
+  restart.
 - A failed retirement advances the runtime generation, leaves the successor
   disabled, preserves retry records, and rejects old APIs and handles.
 - A failed reconstruction attempts quiescence and retirement of every

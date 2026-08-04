@@ -809,55 +809,94 @@ installed mod, or sibling repository was changed.
 
 ## Phase 9 - Complete documentation, packaging, and automated qualification
 
-- [ ] Add public README documentation and examples for provider acquisition,
+- [x] Add public README documentation and examples for provider acquisition,
       options, callbacks, nil completion, handle operations, busy behavior,
       namespace border attribution, input consumption, cancellation, menu
       exclusion, tooltip suppression, indicator behavior, lifecycle, and reload.
-- [ ] Update service-provider documentation only where required to list the new
+- [x] Update service-provider documentation only where required to list the new
       established-pattern provider and `SERVICE_BUSY`; do not revive deleted
       planning documents.
-- [ ] Ensure public docs distinguish the consumer-provided prompt title from the
+- [x] Ensure public docs distinguish the consumer-provided prompt title from the
       automatically bound namespace border label.
-- [ ] Update rockspec/package version as required, expanded inventory, archive
+- [x] Update rockspec/package version as required, expanded inventory, archive
       inventory, module registry tests, package contract tests, reload command
       tests, and installation-resolution checks.
-- [ ] Add or finish focused unit suites for shared input, shared render,
+- [x] Add or finish focused unit suites for shared input, shared render,
       prompt values/handles/state, renderer, namespace label, indicator,
       provider/facade, activation, menu exclusion, lifecycle, failure, and reload.
-- [ ] Add focused DwarfSpec scenarios for input consumption, menu exclusion,
+- [x] Add focused DwarfSpec scenarios for input consumption, menu exclusion,
       tooltip suppression/resumption, prompt rendering, namespace attribution,
       native indicator motion/restore, callbacks, lifecycle, and reload.
-- [ ] Run every focused unit suite and record exact totals.
-- [ ] Run focused tooltip and context-menu unit/live regressions after the shared
+- [x] Run every focused unit suite and record exact totals.
+- [x] Run focused tooltip and context-menu unit/live regressions after the shared
       changes and record them separately from UserPrompt evidence.
-- [ ] Run `./tools/Run-UnitTests.ps1` and record complete totals.
-- [ ] Run `./tools/Check-UnitTestNaming.ps1`.
-- [ ] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record file counts.
-- [ ] Run `./tools/Build.ps1 -LiveReload:$false` without making a live claim.
-- [ ] Run `./tools/Publish.ps1`, then rerun
+- [x] Run `./tools/Run-UnitTests.ps1` and record complete totals.
+- [x] Run `./tools/Check-UnitTestNaming.ps1`.
+- [x] Run `./tools/Check-LuaSyntax.ps1 -IncludeTests` and record file counts.
+- [x] Run `./tools/Build.ps1 -LiveReload:$false` without making a live claim.
+- [x] Run `./tools/Publish.ps1`, then rerun
       `./tools/VerifyPackage.ps1 -SourceDir src -ZipPath <published-zip>
       -ExpandedPath <published-directory>` against the emitted paths; inspect
       expanded and archive contents separately.
-- [ ] Run the complete DwarfSpec suite with a terminal structured result and
+- [x] Run the complete DwarfSpec suite with a terminal structured result and
       `cleanup_confirmed`.
-- [ ] Inspect the built and installed package for all UserPrompt/shared modules,
+- [x] Inspect the built and installed package for all UserPrompt/shared modules,
       exact registry order, one owner per hook seam, and no obsolete file.
-- [ ] Audit public symbols, production source, package contents, and the complete
+- [x] Audit public symbols, production source, package contents, and the complete
       diff against every proposal non-goal and rejected alternative; record that
       no prohibited prompt operation, lifecycle mechanism, consumer migration,
       UI owner, tooltip exposure, marker path, or completion source was added.
-- [ ] Run `git diff --check` after generated-artifact and temporary-state cleanup.
+- [x] Run `git diff --check` after generated-artifact and temporary-state cleanup.
 
 ### Phase 9 completion gate
 
-- [ ] Focused and complete automated results are green and recorded separately;
+- [x] Focused and complete automated results are green and recorded separately;
       unit/model assertions are not promoted to live rendered success.
-- [ ] Public documentation, LuaDoc, proposal, implementation, registry/reload
+- [x] Public documentation, LuaDoc, proposal, implementation, registry/reload
       order, expanded package, and archive package agree exactly.
-- [ ] The built and installed module resolution identifies the intended package
+- [x] The built and installed module resolution identifies the intended package
       and contains no parallel hook owner or stale service name.
-- [ ] The follow-up review finds no debug code, unauthorized consumer migration,
+- [x] The follow-up review finds no debug code, unauthorized consumer migration,
       missing package file, deleted-document reference, or unrecorded artifact.
+
+### Phase 9 implementation record
+
+- Public documentation now covers provider acquisition, the complete map-location
+  prompt contract, namespace attribution, input consumption, cancellation,
+  context-menu exclusion, tooltip suppression, native indicator ownership,
+  lifecycle, handles, busy behavior, and reload. The provider proposal received
+  only the required provider inventory, prefix, link, and `SERVICE_BUSY` updates;
+  the approved UserPrompt proposal remains byte-for-byte unchanged.
+- Live qualification exposed and corrected native userdata root handling, the
+  framed-window inset needed to keep the prompt title below the namespace
+  border, and a stale context-menu failure-injection field. The completed input,
+  render, lifecycle, reload, tooltip, and indicator scenarios all use the
+  package-backed runtime and report terminal cleanup.
+- Final automated evidence: focused units `183/183`, tooltip units `111/111`,
+  context-menu units `120/120`, and complete units `452/452`. Naming passed;
+  Lua 5.4.6 syntax and the offline build passed for 54 production and 72
+  test/support files.
+- Focused UserPrompt map-input, final-render, lifecycle, runtime-reload, and
+  indicator-characterization scenarios each passed `1/1`. Separate tooltip
+  final-render and context-menu map/lifecycle regressions passed, and the full
+  DwarfSpec run discovered 15 files and passed all 19 scenarios with terminal
+  `cleanup_confirmed=true`.
+- Publish and explicit verification passed for DwarfUICore 0.3.0. The expanded
+  package and ZIP contain the same 55 files and 493,067 uncompressed bytes with
+  no missing, extra, length-different, or hash-different entries. The final ZIP
+  is 120,497 bytes.
+- An isolated installed-package inspection matched all 55 expanded files,
+  confirmed the exact 51-entry registry order, six UserPrompt modules, one
+  shared input-hook owner, one shared completed-render owner, and no stale
+  service name, prompt screen, or parallel prompt hook. Its temporary tree was
+  removed; the real configured mod installation was not changed.
+- `git diff --check` passed after temporary package directories were removed.
+  The follow-up review corrected public indicator documentation and native-root
+  LuaDoc, found no prohibited alternative or consumer migration, and preserved
+  proposal SHA-256
+  `6E88D6EBCD1F5F571C1FE2E3EE0870BAACED501DF90E380EFB2FA0C34E7E44C1`.
+  The fresh independent completion audit returned PASS with no remaining issue,
+  partial requirement, or evidence gap.
 
 ## Phase 10 - Perform live acceptance and independent final review
 

@@ -607,6 +607,26 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.is_false(diagnostics.tooltip_suppressed)
     end)
 
+    it('classifies the native userdata widget container as an overlay root',
+            function()
+        local env = load_environment()
+        local native_root = io.stdout
+        env.state.df_viewscreen = {widgets=native_root}
+        local renders = 0
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                native_root, function() renders = renders + 1 end)
+
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(1, renders)
+        assert.is_equal(env.overlay,
+            env.tooltip.presenter:get_diagnostics().authoritative_owner)
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+    end)
+
     it('invalidates and releases render before restoring tooltip suppression',
             function()
         local env = load_environment()

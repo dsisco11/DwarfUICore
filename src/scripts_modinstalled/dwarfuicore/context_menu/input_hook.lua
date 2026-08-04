@@ -92,7 +92,7 @@ end
 ---@field context_failure_handler function|nil
 ---@field prepared_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
 ---@field priority_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
----@field context_roots table<table, boolean>
+---@field context_roots table<any, boolean>
 ---@field native_module table|nil
 ---@field native_hook dwarfuicore.ContextMenuInputHookRecord|nil
 ---@field screen_hooks table<table, dwarfuicore.ContextMenuInputHookRecord>
@@ -117,7 +117,7 @@ end
 ---@field on_failure? fun(message: string)
 
 ---@class dwarfuicore.PreparedPriorityInputConsumer: dwarfuicore.PriorityInputConsumer
----@field root table
+---@field root any
 ---@field active boolean
 ---@field released boolean
 
@@ -342,12 +342,13 @@ function ContextMenuInputHookManager:set_context_consumer(
 end
 
 ---Ensures the input seam required by one supported root.
----@param root table
+---@param root any
 ---@return boolean changed
 function ContextMenuInputHookManager:_ensure_root(root)
-    assert(type(root) == 'table',
-        'DwarfUICore priority input root must be a table.')
-    if root._native ~= nil then
+    local root_type = type(root)
+    assert(root_type == 'table' or root_type == 'userdata',
+        'DwarfUICore priority input root must be a table or native widget container.')
+    if root_type == 'table' and root._native ~= nil then
         assert(type(root[SCREEN_METHOD]) == 'function',
             'DwarfUICore priority screen root must provide onInput.')
         return self:ensure_screen(root)
@@ -358,7 +359,7 @@ end
 ---Resolves the exact current root that can share the existing input seam.
 ---A tracked Lua screen wins; otherwise the current native map viewscreen lends
 ---its widget root to the native overlay transport.
----@return table|nil root
+---@return any|nil root
 function ContextMenuInputHookManager:resolve_current_surface()
     local gui_api = dfhack.gui
     if type(gui_api) ~= 'table' or
@@ -380,8 +381,7 @@ function ContextMenuInputHookManager:resolve_current_surface()
         end
     end
     local native = gui_api.getDFViewscreen(true)
-    if native ~= nil and current == native and
-            type(native.widgets) == 'table' then
+    if native ~= nil and current == native and native.widgets ~= nil then
         return native.widgets
     end
     return nil
@@ -389,7 +389,7 @@ end
 
 ---Prepares every fallible dependency for one priority consumer.
 ---The returned value is inactive until activate_priority_consumer() commits it.
----@param root table
+---@param root any
 ---@param consumer dwarfuicore.PriorityInputConsumer
 ---@return dwarfuicore.PreparedPriorityInputConsumer prepared
 function ContextMenuInputHookManager:prepare_priority_consumer(root, consumer)
@@ -587,8 +587,9 @@ function ContextMenuInputHookManager:reconcile_roots(roots)
     for root, attached in pairs(roots) do
         assert(attached == true,
             'DwarfUICore context-menu root membership must be true.')
-        assert(type(root) == 'table',
-            'DwarfUICore context-menu roots must be tables.')
+        local root_type = type(root)
+        assert(root_type == 'table' or root_type == 'userdata',
+            'DwarfUICore context-menu roots must be tables or native widget containers.')
         copied[root] = true
     end
     self._state.context_roots = copied

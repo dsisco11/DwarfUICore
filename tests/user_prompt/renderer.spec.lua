@@ -96,6 +96,7 @@ describe('UserPrompt renderer', function()
             renderer.title_label.pointer_policy)
         assert.equals(context.pointer.PointerPolicy.NONE,
             renderer.message_label.pointer_policy)
+        assert.equals(1, renderer.frame_inset)
         assert.is_nil(renderer.onInput)
         assert.equals('owner.plugin', renderer.namespace)
         assert.equals('Choose tile', renderer.title)

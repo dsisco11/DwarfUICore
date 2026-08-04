@@ -148,8 +148,8 @@ describe('live context-menu failure lifecycle', function()
                     return service():get_diagnostics().hook.native_tracked
                 end)
             hook_state = service()._input_hook._state
-            original_hook_handler = hook_state.handler
-            hook_state.handler = function()
+            original_hook_handler = hook_state.context_handler
+            hook_state.context_handler = function()
                 error('expected input-hook dispatch failure')
             end
             local hook_backing_before = #probe().inputs
@@ -166,7 +166,7 @@ describe('live context-menu failure lifecycle', function()
                 service():get_diagnostics().last_failure.stage)
             assert.equals(1,
                 service():get_diagnostics().hook.failure_count)
-            hook_state.handler = original_hook_handler
+            hook_state.context_handler = original_hook_handler
             original_hook_handler = nil
 
             target = reload_clean()
@@ -257,7 +257,7 @@ describe('live context-menu failure lifecycle', function()
             sampler.capture = original_capture
         end
         if hook_state and original_hook_handler then
-            hook_state.handler = original_hook_handler
+            hook_state.context_handler = original_hook_handler
         end
         if original_discover then
             registrations()._discover_attachment_roots =

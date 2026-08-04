@@ -120,7 +120,7 @@ UserPromptRenderer.ATTRS{
     frame={l=0, t=0, w=1, h=1},
     frame_style=gui.FRAME_INTERIOR,
     frame_background=BACKGROUND,
-    frame_inset=0,
+    frame_inset=1,
     draggable=false,
     no_force_pause_badge=true,
     pointer_policy=PointerPolicy.NONE,

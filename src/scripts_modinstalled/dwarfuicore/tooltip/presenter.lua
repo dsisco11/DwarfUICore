@@ -42,7 +42,7 @@ local class_helpers = reqscript('dwarfuicore/class')
 ---@field last_authoritative_cleanup_error string|nil
 
 ---@class dwarfuicore.PreparedAuthoritativePresentationIntent
----@field source_root table
+---@field source_root any
 ---@field transport dwarfuicore.TooltipRenderTransport
 ---@field owner table
 ---@field present fun(painter: gui.Painter, transport: dwarfuicore.TooltipRenderTransport, owner: table)
@@ -132,11 +132,16 @@ function TooltipPresenter.new(options)
 end
 
 ---Classifies one opaque source root without consulting the input system.
----@param root table
+---@param root any
 ---@return dwarfuicore.TooltipRenderTransport|nil
 ---@return table|nil owner
 ---@return string reason
 function TooltipPresenter:_classify_root(root)
+    local native = self._get_df_viewscreen()
+    if native and native.widgets == root then
+        return self._transport.OVERLAY,
+            self._get_overlay_module(), 'native-root'
+    end
     if type(root) ~= 'table' then
         return nil, nil, 'unsupported-root'
     end
@@ -152,11 +157,6 @@ function TooltipPresenter:_classify_root(root)
                 root, overlay_module.OverlayWidget) then
         return self._transport.OVERLAY,
             overlay_module, 'overlay-widget'
-    end
-    local native = self._get_df_viewscreen()
-    if native and native.widgets == root then
-        return self._transport.OVERLAY,
-            overlay_module, 'native-root'
     end
     return nil, nil, 'unsupported-root'
 end
@@ -204,7 +204,7 @@ function TooltipPresenter:_select_current_intent()
 end
 
 ---Prepares one supported authoritative intent without publishing it.
----@param source_root table
+---@param source_root any
 ---@param present fun(painter: gui.Painter, transport: dwarfuicore.TooltipRenderTransport, owner: table)
 ---@return dwarfuicore.PreparedAuthoritativePresentationIntent prepared
 function TooltipPresenter:prepare_authoritative_intent(source_root, present)

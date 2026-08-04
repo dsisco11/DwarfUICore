@@ -32,9 +32,34 @@ describe('DwarfUICore package contract', function()
     it('declares the DwarfUICore mod identity and root module', function()
         local info = read_source('src/info.txt')
         local root = read_source('src/scripts_modinstalled/dwarfuicore.lua')
+        local rockspec = read_source('dwarfuicore.rockspec')
 
         assert.is_truthy(info:find('[ID:dwarfuicore]', 1, true))
+        assert.is_truthy(info:find('[NUMERIC_VERSION:3]', 1, true))
+        assert.is_truthy(info:find('[DISPLAYED_VERSION:0.3.0]', 1, true))
+        assert.is_truthy(rockspec:find('version = "0.3.0-1"', 1, true))
+        assert.is_truthy(rockspec:find('tag = "v0.3.0"', 1, true))
         assert.is_truthy(root:find('--@ module=true', 1, true))
+    end)
+
+    it('documents the complete public UserPrompt contract', function()
+        local readme = read_source('README.md')
+        for _, required in ipairs({
+                'UserPromptServiceProvider:new(1, \'my-plugin\')',
+                'prompt_map_location',
+                'position_or_nil',
+                'SERVICE_BUSY',
+                'top center of the window border',
+                'consumer-provided line inside the window',
+                'left and right mouse-down events are consumed',
+                'No context menu can open',
+                'Ordinary tooltip state remains',
+                'native map-tile indicator',
+                'surface or world loss',
+                'Prompt handles and APIs become stale',
+            }) do
+            assert.is_truthy(readme:find(required, 1, true), required)
+        end
     end)
 
     it('owns shared infrastructure under the dwarfuicore namespace', function()

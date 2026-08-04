@@ -2,6 +2,7 @@
 
 -- Generation-bound assembly for the process-wide UserPrompt interaction.
 
+local guidm = require('gui.dwarfmode')
 local context_service_module =
     reqscript('dwarfuicore/context_menu/service')
 reqscript('dwarfuicore/context_menu/screen')
@@ -12,6 +13,8 @@ local input_consumer_module =
 local renderer_module = reqscript('dwarfuicore/user_prompt/renderer')
 local service_module = reqscript('dwarfuicore/user_prompt/service')
 local tooltip_runtime = reqscript('dwarfuicore/tooltip/runtime')
+local view_root_resolver =
+    reqscript('dwarfuicore/view_root_resolver').resolver
 
 local prompt_service = service_module.service
 local input_manager = input_hook_module.manager
@@ -19,7 +22,7 @@ local presenter = tooltip_runtime.presenter
 local context_service = context_service_module.service
 local renderer = renderer_module.UserPromptRenderer{}
 local causes = service_module.UserPromptTerminalCause
-local STATE_CHANGE_SLOT = 'dwarfuicore-user-prompt'
+local STATE_CHANGE_SLOT = 'dwarfuicore_user_prompt'
 local active_surface = nil
 local state_change_callback = nil
 
@@ -55,12 +58,14 @@ local function ensure_active_surface(root_loss_cause)
         prompt_service:cancel_active(causes.WORLD_UNLOAD)
         return false
     end
-    local ok, current = xpcall(resolve_surface, debug.traceback)
+    local ok, presented = xpcall(function()
+        return view_root_resolver:is_presented(active_surface)
+    end, debug.traceback)
     if not ok then
-        prompt_service:fail_active(current)
+        prompt_service:fail_active(presented)
         return false
     end
-    if current ~= active_surface then
+    if not presented then
         prompt_service:cancel_active(root_loss_cause)
         return false
     end
@@ -68,6 +73,23 @@ local function ensure_active_surface(root_loss_cause)
 end
 
 local input_callbacks = input_consumer:callbacks()
+
+---Samples a map tile only while the screen pointer is inside the map panel.
+---@param pointer_x integer|nil
+---@param pointer_y integer|nil
+---@return df.coord|nil position
+local function sample_indicator_position(pointer_x, pointer_y)
+    if pointer_x == nil or pointer_y == nil then return nil end
+    local layout = guidm.getPanelLayout()
+    local viewport = layout and guidm.Viewport.get(layout) or nil
+    local map = layout and layout.map or nil
+    if not viewport or not map or
+            pointer_x < map.x1 or pointer_x >= map.x1 + viewport.width or
+            pointer_y < map.y1 or pointer_y >= map.y1 + viewport.height then
+        return nil
+    end
+    return dfhack.gui.getMousePos()
+end
 
 ---@type dwarfuicore.PriorityInputConsumer
 local guarded_input_callbacks = {
@@ -93,10 +115,8 @@ local function build_presenter(request, indicator, surface)
         end
         local ok, failure = xpcall(function()
             local pointer_x, pointer_y = dfhack.screen.getMousePos()
-            local map_position = nil
-            if pointer_x ~= nil and pointer_y ~= nil then
-                map_position = dfhack.gui.getMousePos()
-            end
+            local map_position =
+                sample_indicator_position(pointer_x, pointer_y)
             indicator:update(map_position)
             renderer:set_prompt(request, pointer_x, pointer_y, painter)
             renderer:render(painter)
@@ -215,14 +235,14 @@ end
 
 ---Installs the generation-owned world lifecycle callback when available.
 local function install_state_change_callback()
-    if type(dfhack.onStateChange) ~= 'table' then return end
+    if dfhack.onStateChange == nil then return end
     state_change_callback = handle_state_change
     dfhack.onStateChange[STATE_CHANGE_SLOT] = state_change_callback
 end
 
 ---Removes only the world lifecycle callback still owned by this generation.
 local function remove_state_change_callback()
-    if type(dfhack.onStateChange) == 'table' and
+    if dfhack.onStateChange ~= nil and
             dfhack.onStateChange[STATE_CHANGE_SLOT] == state_change_callback then
         dfhack.onStateChange[STATE_CHANGE_SLOT] = nil
     end

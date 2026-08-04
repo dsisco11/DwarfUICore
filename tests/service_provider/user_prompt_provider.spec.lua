@@ -143,10 +143,23 @@ local function load_context(settings)
     local _, prompt_runtime = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/runtime.lua', {
             globals={dfhack=process},
+            require_modules={
+                ['gui.dwarfmode']={
+                    getPanelLayout=function()
+                        return {map={x1=0, y1=0}}
+                    end,
+                    Viewport={get=function()
+                        return {width=80, height=25}
+                    end},
+                },
+            },
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/view_root_resolver']={
+                    resolver={is_presented=function() return true end},
+                },
                 ['dwarfuicore/user_prompt/indicator']={
                     NativeIndicatorAdapter={new=function()
                         local indicator = {released=false}
@@ -399,7 +412,7 @@ describe('UserPrompt provider runtime', function()
         local old_handle = old_api:prompt_map_location(options())
         local old_indicator = first.ui.indicator
         local old_state_callback = first.process.onStateChange[
-            'dwarfuicore-user-prompt']
+            'dwarfuicore_user_prompt']
         assert.is_not_nil(first.ui.active_input)
         assert.is_not_nil(first.ui.active_render)
         assert.is_true(first.ui.tooltip_suppressed)
@@ -408,7 +421,7 @@ describe('UserPrompt provider runtime', function()
         first.runtime.begin_reload()
         assert.is_true(first.prompt_runtime.retire_for_reload())
         assert.is_nil(first.process.onStateChange[
-            'dwarfuicore-user-prompt'])
+            'dwarfuicore_user_prompt'])
         assert.is_nil(first.ui.active_input)
         assert.is_nil(first.ui.active_render)
         assert.is_false(first.ui.tooltip_suppressed)
@@ -431,12 +444,12 @@ describe('UserPrompt provider runtime', function()
         assert_category(function() fresh_api:is_active(old_handle) end,
             'ServiceApi', 'STALE_HANDLE')
         local new_callback = second.process.onStateChange[
-            'dwarfuicore-user-prompt']
+            'dwarfuicore_user_prompt']
         assert.is_not_nil(new_callback)
         assert.is_not_equal(old_state_callback, new_callback)
         local callback_count = 0
         for key, callback in pairs(second.process.onStateChange) do
-            if key == 'dwarfuicore-user-prompt' and callback ~= nil then
+            if key == 'dwarfuicore_user_prompt' and callback ~= nil then
                 callback_count = callback_count + 1
             end
         end

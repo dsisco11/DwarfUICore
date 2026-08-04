@@ -151,7 +151,7 @@ describe('context-menu input hook', function()
 
     it('resolves the exact current tracked screen or native widget root',
             function()
-        local native_root = {}
+        local native_root = io.stdout
         local native_viewscreen = {widgets=native_root}
         local current = native_viewscreen
         local process = {
@@ -166,6 +166,12 @@ describe('context-menu input hook', function()
 
         assert.is_equal(native_root,
             module.manager:resolve_current_surface())
+        local prepared = module.manager:prepare_priority_consumer(
+            native_root, {
+                owns=function() return false end,
+                handle=function() return false end,
+            })
+        assert.is_true(module.manager:release_priority_consumer(prepared))
 
         local screen_native = {}
         local screen = {_native=screen_native, onInput=function() end}

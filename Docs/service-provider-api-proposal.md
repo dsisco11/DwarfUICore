@@ -40,6 +40,18 @@ local contextMenuService =
 contextMenuService:register(widget, definition)
 ```
 
+Map-location prompts use the same established provider pattern:
+
+```lua
+local services = reqscript('dwarfuicore/services')
+
+local userPromptService =
+    services.UserPromptServiceProvider:new(1, 'dwarfdirect')
+```
+
+The UserPrompt version 1 operation and interaction contract are defined in
+[the UserPrompt service proposal](user-prompt-service-proposal.md).
+
 The returned object is a namespace-bound service API. Consumers never pass a
 namespace to individual service methods and cannot use the object to operate on
 another namespace.
@@ -118,13 +130,14 @@ from the `dwarfuicore` command entrypoint. Consumers import it through
 `reqscript('dwarfuicore/services')`, following DFHack's supported mechanism for
 sharing Lua script APIs. Importing the command script is not a dependency API.
 
-The services module exports exactly the two typed providers:
+The services module exports exactly the three typed providers:
 
 ```lua
 local services = reqscript('dwarfuicore/services')
 
 local tooltipProvider = services.TooltipServiceProvider
 local contextMenuProvider = services.ContextMenuServiceProvider
+local userPromptProvider = services.UserPromptServiceProvider
 ```
 
 The provider names are public compatibility contracts. Internal module paths,
@@ -223,6 +236,7 @@ Construction raises a Lua error with a stable prefix:
 ```text
 DwarfUICore TooltipServiceProvider: [CATEGORY] <detail>
 DwarfUICore ContextMenuServiceProvider: [CATEGORY] <detail>
+DwarfUICore UserPromptServiceProvider: [CATEGORY] <detail>
 ```
 
 Consumers that want recoverable dependency handling use `pcall`. Constructors
@@ -236,8 +250,10 @@ and one stable category token:
 ```text
 DwarfUICore TooltipServiceProvider: [CATEGORY] <detail>
 DwarfUICore ContextMenuServiceProvider: [CATEGORY] <detail>
+DwarfUICore UserPromptServiceProvider: [CATEGORY] <detail>
 DwarfUICore TooltipServiceApi: [CATEGORY] <detail>
 DwarfUICore ContextMenuServiceApi: [CATEGORY] <detail>
+DwarfUICore UserPromptServiceApi: [CATEGORY] <detail>
 ```
 
 The prefix and category are public versioned contracts. The human-readable
@@ -265,6 +281,7 @@ Namespace-bound APIs use these categories:
 | `FOREIGN_HANDLE` | A recognized handle belongs to another namespace, service, or contract major. |
 | `STALE_HANDLE` | A recognized handle belongs to another runtime generation. |
 | `SERVICE_UNHEALTHY` | The bound runtime, facade, or service is malformed, disabled, retiring, retired, or otherwise unhealthy. |
+| `SERVICE_BUSY` | A valid UserPrompt request cannot start because another process-wide prompt is active or terminating. |
 
 Every API method validates its bound generation before delegating, so a retired
 object reports `STALE_API`. Handle mutation validates a current API, handle

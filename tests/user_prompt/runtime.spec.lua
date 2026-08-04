@@ -74,13 +74,23 @@ local function load_runtime(generation, settings)
             invalidate=function() end},
     }
     settings.process = process
+    local dwarfmode = {
+        getPanelLayout=function()
+            return {map={x1=0, y1=0}}
+        end,
+        Viewport={get=function() return {width=80, height=25} end},
+    }
     local _, runtime_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/runtime.lua', {
             globals={dfhack=process, SC_WORLD_UNLOADED=77},
+            require_modules={['gui.dwarfmode']=dwarfmode},
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/view_root_resolver']={
+                    resolver={is_presented=function() return true end},
+                },
                 ['dwarfuicore/user_prompt/indicator']={
                     NativeIndicatorAdapter={new=function()
                         return {prepare=function() end,
@@ -180,10 +190,17 @@ local function load_integrated_runtime()
         })
     local _, consumer_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/input_consumer.lua')
+    local dwarfmode = {
+        getPanelLayout=function()
+            return {map={x1=0, y1=0}}
+        end,
+        Viewport={get=function() return {width=80, height=25} end},
+    }
 
     local root = {}
     state.root = root
     state.current_surface = root
+    state.presented_surface = root
     local input_manager = {
         resolve_current_surface=function()
             assert.is_false(state.menu_open,
@@ -309,10 +326,16 @@ local function load_integrated_runtime()
     local _, runtime_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/user_prompt/runtime.lua', {
             globals={dfhack=process, SC_WORLD_UNLOADED=77},
+            require_modules={['gui.dwarfmode']=dwarfmode},
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/view_root_resolver']={
+                    resolver={is_presented=function(_, surface)
+                        return state.presented_surface == surface
+                    end},
+                },
                 ['dwarfuicore/user_prompt/indicator']={
                     NativeIndicatorAdapter=indicator_class,
                 },
@@ -372,7 +395,7 @@ describe('UserPrompt runtime assembly', function()
             'controlled configuration failure', 1, true))
         assert.is_nil(settings.state.opening_guard)
         assert.is_nil(settings.process.onStateChange[
-            'dwarfuicore-user-prompt'])
+            'dwarfuicore_user_prompt'])
         assert.is_nil(settings.state.cleanup)
         assert.is_nil(settings.state.activation)
     end)
@@ -411,7 +434,13 @@ describe('UserPrompt runtime assembly', function()
             context.state.renderer.y})
         assert.is_equal(painter, context.state.renderer.painter)
 
+        context.state.pointer_x = 80
+        context.state.render_active.present(painter)
+        assert.equals('<nil>', context.state.indicator.updates[2])
+        context.state.pointer_x = 5
+
         local callbacks = context.state.input_active.callbacks
+        context.state.current_surface = {}
         assert.is_true(callbacks.owns({_MOUSE_L_DOWN=true}))
         assert.is_true(callbacks.handle({_MOUSE_L_DOWN=true}))
         assert.equals(1, context.state.map_sample_count)
@@ -550,7 +579,7 @@ describe('UserPrompt runtime assembly', function()
             context.service:start(request, 1)
             local foreign_tooltip = context.state.foreign_tooltip_registration
             local foreign_context = context.state.foreign_context_registration
-            context.state.current_surface = {}
+            context.state.presented_surface = {}
 
             assert.equals(example.consumed or false,
                 example.trigger(context) or false)
@@ -568,7 +597,7 @@ describe('UserPrompt runtime assembly', function()
             assert.is_equal(foreign_context,
                 context.state.foreign_context_registration)
 
-            context.state.current_surface = context.state.root
+            context.state.presented_surface = context.state.root
             local later = context.service:start(
                 context.values.MapLocationPromptRequest.new('later', {
                     title='Later', message='Later', on_select=function() end,
@@ -596,7 +625,7 @@ describe('UserPrompt runtime assembly', function()
                     reentry_failure = tostring(failure)
                 end}), 1)
         local callback = context.process.onStateChange[
-            'dwarfuicore-user-prompt']
+            'dwarfuicore_user_prompt']
         assert.is_function(callback)
         context.state.map_loaded = false
 
@@ -774,7 +803,7 @@ describe('UserPrompt runtime assembly', function()
                 on_cancel=function()
                     cancelled = cancelled + 1
                     assert.is_nil(context.process.onStateChange[
-                        'dwarfuicore-user-prompt'])
+                        'dwarfuicore_user_prompt'])
                     local ok, failure = pcall(function()
                         context.service:start(
                             context.values.MapLocationPromptRequest.new(

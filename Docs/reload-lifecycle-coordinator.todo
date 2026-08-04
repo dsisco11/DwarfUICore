@@ -1,0 +1,524 @@
+# Reload Lifecycle Coordinator Implementation Plan
+
+Source proposal: `Docs/reload-lifecycle-coordinator-proposal.md`
+
+## Goal
+
+Replace service-specific recovery logic in `dwarfuicore/command.lua` with a
+private, generation-neutral lifecycle coordinator. Generation-owned subsystems
+must register exact quiescence, retirement, and discard callbacks; explicit
+reload must recover tracked state deterministically without loading stale
+module environments; ordinary API generation and health validation must remain
+strict; partial reconstruction must be cleaned or retained under the proposal's
+retry/restart rules; and process-stable tooltip render trampolines must retain
+their exact adoptable identity.
+
+This plan is planning-only. Every task remains unchecked until its stated
+implementation and evidence are complete.
+
+## Locked scope and non-goals
+
+- [ ] Preserve `reqscript('dwarfuicore/services')` and every public provider
+  API; do not expose coordinator lifecycle operations to consumers.
+- [ ] Preserve destructive Core-reload semantics for registrations, active
+  context menus, UserPrompt work, tooltip intent, APIs, and handles.
+- [ ] Do not make ordinary loading or service use tolerant of stale, malformed,
+  or split-generation state.
+- [ ] Do not automatically reload DwarfUI or introduce a general lifecycle
+  framework for other plugins.
+- [ ] Do not consolidate every process-owned slot into the service runtime.
+- [ ] Do not implement pre-coordinator adoption, legacy-state inspection, or an
+  upgrade-in-place adapter.
+- [ ] Do not install packages or automatically restart Dwarf Fortress.
+- [ ] Keep the first-activation restart operator-controlled and do not perform
+  live coordinator activation before that restart is confirmed.
+
+## Assumptions and open questions
+
+- [ ] Resolve the proposal's remaining quiescence wording conflict before code
+  implementation begins.
+  - [ ] Decide whether the intended invariant is the detailed lifecycle rule:
+    attempt the complete quiescence pass first, then retire every eligible
+    owner whose own quiescence succeeded even if another owner failed.
+  - [ ] Amend or explicitly approve the proposal wording so the goal and
+    acceptance criterion no longer require every owner to quiesce successfully
+    before any retirement begins.
+  - [ ] Treat this decision as blocking all production implementation below.
+- [ ] Treat `Docs/reload-lifecycle-coordinator-proposal.md` as authoritative for
+  all other lifecycle, generation, failure, retry, restart, and validation
+  behavior.
+- [ ] Use `SERVICE_UNHEALTHY` for same-generation API or handle access to a
+  disabled runtime; generation mismatch continues to take stale-error
+  precedence (`STALE_API` or `STALE_HANDLE`).
+- [ ] Require explicit operator confirmation that Dwarf Fortress was restarted
+  before the first live activation of coordinator-bearing code.
+
+## Phase 1: Characterize and freeze the current reload contract
+
+Outcome: Existing successful and failed reload behavior is captured by focused
+tests before coordinator production code changes.
+
+- [ ] Inventory the current reload transaction and all process-owned slots in
+  `src/scripts_modinstalled/dwarfuicore/command.lua`.
+  - [ ] Map each tooltip, context-menu, UserPrompt, input-hook, registration,
+    presenter, and service-runtime owner to its current construction, teardown,
+    slot-discard, and successor behavior.
+  - [ ] Record which callbacks can remain externally callable during teardown.
+- [ ] Extend `tests/dwarfuicore_command.spec.lua` with characterization for:
+  - [ ] successful reload and normal single-step generation advancement;
+  - [ ] disabled-runtime retry;
+  - [ ] split-generation tooltip recovery;
+  - [ ] teardown failure and disabled-successor publication;
+  - [ ] reconstruction failure and later corrected retry;
+  - [ ] stale API and handle rejection after advancement; and
+  - [ ] exact tooltip render-trampoline preservation and adoption.
+- [ ] Add or extend focused owner tests in the existing tooltip, context-menu,
+  service-provider, and UserPrompt suites for their current quiescence and
+  retirement boundaries.
+- [ ] Identify the existing live source-reload route that produces terminal
+  status and cleanup evidence without modifying installed package files.
+- [ ] Run the focused characterization suites before production changes and
+  record their terminal results in the execution evidence ledger.
+- [ ] Perform a follow-up review mapping every characterization test to the
+  proposal behavior it freezes before marking this phase complete.
+
+Completion criteria:
+
+- [ ] The existing happy path, split-generation path, teardown failures,
+  reconstruction failures, stale objects, and trampoline identity are covered
+  by focused tests with recorded terminal results.
+- [ ] Every initial lifecycle owner is mapped to an explicit proposed policy.
+- [ ] The quiescence wording decision is resolved and recorded in the proposal.
+
+## Phase 2: Add lifecycle contracts and process-stable coordinator state
+
+Outcome: Private coordinator contracts, persistent state, validation, and
+registration exist without yet replacing command orchestration.
+
+- [ ] Add `src/scripts_modinstalled/dwarfuicore/reload_contracts.lua`.
+  - [ ] Start the module with `--@ module=true` and load project modules through
+    `reqscript()`.
+  - [ ] Define immutable numeric enums for owner status and retirement order.
+  - [ ] Include `ACTIVE`, `QUIESCING`, `QUIESCED`, `QUIESCE_FAILED`,
+    `RETIRING`, `RETIRED`, and `RETIRE_FAILED`.
+  - [ ] Assign deterministic retirement order for UserPrompt, context-menu,
+    tooltip presentation, remaining input/registration owners, and discard-only
+    owners.
+- [ ] Add `src/scripts_modinstalled/dwarfuicore/reload_coordinator.lua`.
+  - [ ] Start the module with `--@ module=true` and keep all operations private
+    from `dwarfuicore/services`.
+  - [ ] Adopt or create the process-stable coordinator state containing schema
+    version, registration sequence, shared recovery guard, and records.
+  - [ ] Validate schema and record structure without requiring coordinator state
+    to match the service runtime generation.
+  - [ ] Key records by runtime generation plus owner identifier so a partial
+    successor cannot overwrite an older owner.
+  - [ ] Implement registration validation for identifiers, positive matching
+    generation, recognized order, callbacks, uniqueness, and exact captured
+    state.
+  - [ ] Return an opaque internal token for construction rollback and private
+    diagnostics.
+  - [ ] Reject malformed or untrusted records without invoking callbacks and
+    report them as restart-requiring corruption.
+  - [ ] Add LuaDoc for every new class and method.
+- [ ] Add focused coordinator contract tests in
+  `tests/reload_coordinator.spec.lua`.
+  - [ ] Cover state creation/adoption, schema validation, uniqueness,
+    generation validation, callback validation, sequence ordering, token
+    opacity, and malformed-record diagnostics.
+  - [ ] Prove registration failure can be paired with exact publication
+    rollback and leaves no untracked process state.
+- [ ] Register the new focused suite in `tests/run.lua`.
+- [ ] Perform a follow-up review of the contracts and tests against this phase
+  before marking it complete.
+
+Completion criteria:
+
+- [ ] Coordinator state survives module-environment replacement and accepts
+  valid records from multiple runtime generations.
+- [ ] Ordinary registration still requires the current service generation.
+- [ ] Malformed records are never executed and are classified as restart
+  blockers.
+- [ ] Focused coordinator registration/state tests pass.
+
+## Phase 3: Implement quiescence, retirement, discard, and retry semantics
+
+Outcome: The coordinator can safely recover every trusted record through its
+remaining lifecycle operations and produce complete aggregate diagnostics.
+
+- [ ] Implement `recover_tracked_owners(runtime_generation)`.
+  - [ ] Acquire the shared process-wide recovery guard and return deterministic
+    `RECOVERY_BUSY` for nested entry.
+  - [ ] Set `QUIESCING` immediately before each active owner's protected
+    quiescence callback and resolve it to `QUIESCED` or `QUIESCE_FAILED` before
+    returning.
+  - [ ] Attempt the complete ordered quiescence pass before retirement.
+  - [ ] Retire only owners that are already demonstrably `QUIESCED` or
+    `RETIRE_FAILED`, using `RETIRING` as the protected transient state.
+  - [ ] Attempt every eligible owner after individual failures.
+  - [ ] Never retry or execute `QUIESCE_FAILED`; retain it for diagnostics and
+    report process restart as required.
+  - [ ] Retry `RETIRE_FAILED` without repeating successful quiescence.
+  - [ ] Never repeat successful retirement.
+  - [ ] Report every failure with owner identity, generation, operation, and
+    traceback.
+  - [ ] Detect and report future-generation records without allowing their
+    labels to determine successor generation.
+  - [ ] Pre-discard only successfully retired future-generation records before
+    advancement.
+  - [ ] Clear the recovery guard through protected finalization on every
+    outcome.
+- [ ] Implement `discard_retired_owners()`.
+  - [ ] Acquire the same guard and reject nested entry as `RECOVERY_BUSY`.
+  - [ ] Select only remaining `RETIRED` records and never repeat quiescence or
+    retirement.
+  - [ ] Invoke discard under protection and remove a record only after success.
+  - [ ] Retain discard-failed `RETIRED` records for an explicit later retry.
+  - [ ] Clear the guard through protected finalization on every outcome.
+- [ ] Require discard callbacks to compare exact captured-state identity so
+  they cannot clear a replacement owner.
+- [ ] Use explicit idempotent no-op quiescence and retirement callbacks for
+  discard-only records.
+- [ ] Add focused failure-injection tests around every inactive-gate
+  transition and callback boundary.
+  - [ ] Prove deterministic order and complete best-effort aggregation.
+  - [ ] Prove the per-owner quiescence prerequisite selected in the proposal
+    decision gate.
+  - [ ] Prove exactly-once successful retirement and discard-only retry.
+  - [ ] Prove current/older and future-generation selection differences.
+  - [ ] Prove `QUIESCE_FAILED` is diagnostic-only and restart-blocking.
+  - [ ] Prove malformed callbacks are never invoked.
+  - [ ] Prove both operations reject nested entry and never return with a
+    transient record status or a stuck guard.
+- [ ] Perform a follow-up review of every state transition and failure branch
+  before marking this phase complete.
+
+Completion criteria:
+
+- [ ] Every valid status has one deterministic executable, retryable,
+  diagnostic-only, or removable outcome.
+- [ ] One owner failure cannot prevent later eligible owners from quiescing or
+  retiring.
+- [ ] Future records are removed before advancement or block advancement.
+- [ ] Focused lifecycle, reentrancy, corruption, and retry tests pass.
+
+## Phase 4: Register tooltip owners and preserve render-hook adoption
+
+Outcome: All tooltip generation-owned state is coordinator-tracked while the
+existing render trampoline remains process-stable and adoptable.
+
+- [ ] Integrate coordinator registration into tooltip runtime, service,
+  registration, map-target, presenter, and related namespace state publication.
+  - [ ] Register only after each captured process state is fully publishable.
+  - [ ] Roll back publication and any successful registration when construction
+    cannot complete.
+  - [ ] Use discard-only records for state with no active behavior.
+- [ ] Split tooltip presenter shutdown into the proposal's quiescence and
+  fallible retirement responsibilities.
+  - [ ] Quiescence synchronously detaches intent observation and presenter
+    dispatch, clears selected transport/owner dispatch, and gates the renderer
+    inactive without invoking consumer code.
+  - [ ] Retirement performs remaining fallible cleanup without reactivating
+    dispatch.
+- [ ] Preserve the exact `tooltip_render_hook` trampoline record across reload.
+  - [ ] Keep its installed function identity stable for foreign wrapper chains
+    and exact-identity cleanup.
+  - [ ] Let the successor hook manager adopt the preserved record and advance
+    its internal generation before accepting new ownership.
+  - [ ] Prevent double presentation during retirement or adoption.
+- [ ] Extend tooltip runtime, service, registration, presenter, and render-hook
+  tests for complete and partial publication topologies.
+- [ ] Prove old tooltip APIs and handles remain stale after advancement and are
+  never made current by coordinator recovery.
+- [ ] Perform a follow-up review of tooltip owner coverage and exact trampoline
+  identity before marking this phase complete.
+
+Completion criteria:
+
+- [ ] Every tooltip generation-owned process state has a coordinator record or
+  an explicit process-stable adoption contract.
+- [ ] Presenter dispatch is inert before its fallible retirement begins.
+- [ ] The successor adopts the exact existing render trampoline without double
+  presentation.
+- [ ] Focused tooltip and coordinator integration tests pass.
+
+## Phase 5: Register context-menu and input owners
+
+Outcome: Context-menu sessions, registration state, and destructive input-hook
+ownership participate in generic coordinator recovery.
+
+- [ ] Integrate coordinator registration into context-menu service and
+  registration-manager publication.
+  - [ ] Quiesce active sessions and externally callable registration callbacks
+    before fallible cleanup.
+  - [ ] Close sessions, release registrations, and discard slots by exact
+    captured-state identity.
+- [ ] Register `context_menu_input_hook` as generation-owned and destructively
+  retired.
+  - [ ] Quiesce priority consumers and externally callable dispatch first.
+  - [ ] Use `shutdown()` during retirement to restore/remove owned native and
+    screen hooks.
+  - [ ] Do not make this hook adoptable.
+- [ ] Cover failure before and after each context-menu publication/registration
+  boundary and prove rollback or retained tracking.
+- [ ] Extend context-menu service, registration, input-hook, command reload,
+  and failure-lifecycle tests.
+- [ ] Preserve the required ordering after UserPrompt cancellation and before
+  later tooltip/input cleanup.
+- [ ] Perform a follow-up review of context-menu owner coverage and destructive
+  hook cleanup before marking this phase complete.
+
+Completion criteria:
+
+- [ ] Every context-menu generation-owned owner is tracked and discarded by
+  exact identity.
+- [ ] Active sessions and dispatch are revoked before fallible retirement.
+- [ ] The input hook is destructively removed/restored and never adopted.
+- [ ] Focused context-menu lifecycle and recovery tests pass.
+
+## Phase 6: Register UserPrompt and shared input/render ownership
+
+Outcome: UserPrompt cancellation and shared-seam release occur first in the
+deterministic recovery order without invoking consumer callbacks unsafely.
+
+- [ ] Integrate coordinator registration into UserPrompt runtime and service
+  publication.
+  - [ ] Remove the state-change callback during quiescence.
+  - [ ] Cancel active work with the Core-reload cause under the established
+    callback-safety contract.
+  - [ ] Release shared context-menu input and tooltip render ownership in the
+    proposal's deterministic order.
+  - [ ] Discard the exact captured service/runtime state only after retirement.
+- [ ] Prove quiescence never invokes consumer code and revokes externally
+  callable dispatch before fallible retirement.
+- [ ] Add failure injection around state-change callback removal, active-work
+  cancellation, shared-owner release, retirement, and discard.
+- [ ] Extend UserPrompt runtime, service, input-consumer, lifecycle, and command
+  reload tests.
+- [ ] Perform a follow-up review of UserPrompt-first ordering and shared-owner
+  release before marking this phase complete.
+
+Completion criteria:
+
+- [ ] Active UserPrompt work cannot dispatch after successful quiescence.
+- [ ] UserPrompt releases shared ownership before context-menu, tooltip, and
+  remaining input owners retire.
+- [ ] UserPrompt partial publication is rolled back or retained under an
+  explicit coordinator status.
+- [ ] Focused UserPrompt lifecycle and coordinator integration tests pass.
+
+## Phase 7: Replace command-specific recovery with generic orchestration
+
+Outcome: `command.lua` owns only the proposal's transaction sequence and has no
+knowledge of service-specific process state or owner shapes.
+
+- [ ] Refactor `src/scripts_modinstalled/dwarfuicore/command.lua` to:
+  - [ ] load only the module registry, service runtime, and coordinator needed
+    for transaction orchestration;
+  - [ ] place the runtime in retiring state before cross-generation recovery;
+  - [ ] invoke pre-advancement recovery and consume its aggregate result;
+  - [ ] disable without advancing when any future-generation record remains;
+  - [ ] otherwise publish exactly one initializing successor generation;
+  - [ ] invoke post-advancement discard for remaining `RETIRED` records;
+  - [ ] publish a disabled successor and stop before reconstruction after any
+    current/older recovery failure, discard failure, malformed record, or
+    restart blocker;
+  - [ ] clear/reconstruct module environments only after safe cleanup;
+  - [ ] validate registry contracts before publishing healthy state; and
+  - [ ] aggregate and report lifecycle, reconstruction, and cleanup failures.
+- [ ] Remove every tooltip, context-menu, UserPrompt, presenter,
+  registration-manager, and hook-manager process slot or owner-shape reference
+  from `command.lua`.
+- [ ] Remove command-local generation comparisons for service owners; keep
+  generation comparison inside the coordinator and service-runtime contracts.
+- [ ] Preserve old public object failure behavior.
+  - [ ] Advanced-generation APIs return `STALE_API` and handles return
+    `STALE_HANDLE`.
+  - [ ] Same-generation APIs and handles return `SERVICE_UNHEALTHY` when a
+    future-record failure disables the runtime without advancement.
+- [ ] Extend command and service-runtime tests for all successful, disabled,
+  malformed, retryable, restart-required, current/older, and future-record
+  branches.
+- [ ] Perform a follow-up review proving `command.lua` contains orchestration
+  only before marking this phase complete.
+
+Completion criteria:
+
+- [ ] `command.lua` names no service-specific process slot, owner shape, or
+  owner-generation comparison.
+- [ ] Successful reload advances exactly once and reconstructs only after all
+  required cleanup gates pass.
+- [ ] Current/older failure advances to disabled; future failure disables
+  without advancement.
+- [ ] Command and service-runtime focused suites pass.
+
+## Phase 8: Add reconstruction-failure recovery
+
+Outcome: A failed successor construction cannot leak untracked active behavior;
+every published partial owner is cleaned, retryable, or diagnostic-only.
+
+- [ ] On reconstruction failure, use coordinator operations to attempt
+  quiescence and retirement of every successfully registered successor owner.
+- [ ] Attempt every eligible callback despite individual failures.
+- [ ] Attempt discard of every successfully retired successor record.
+- [ ] Retain `RETIRE_FAILED` and discard-failed `RETIRED` records for explicit
+  in-process retry.
+- [ ] Retain `QUIESCE_FAILED` records for diagnostics, block reconstruction,
+  and require process restart.
+- [ ] Clear partial service and facade caches without discarding coordinator
+  records that still own retained state.
+- [ ] Publish the successor runtime disabled before returning the combined
+  reconstruction and cleanup report.
+- [ ] Add failure injection after every publication boundary across tooltip,
+  context-menu, and UserPrompt construction.
+- [ ] Prove each partial topology is cleaned immediately, retained for retry,
+  or retained diagnostic-only pending restart.
+- [ ] Prove a corrected retry of retirement/discard failure reaches a healthy
+  later generation without loading failed-generation owner scripts.
+- [ ] Perform a follow-up review of every injected partial topology before
+  marking this phase complete.
+
+Completion criteria:
+
+- [ ] No reconstruction failure leaves untracked process-owned state.
+- [ ] Successfully retired records are discarded or retained as `RETIRED` when
+  discard fails.
+- [ ] Retryable and restart-required states remain distinguishable.
+- [ ] Focused reconstruction-failure and corrected-retry tests pass.
+
+## Phase 9: Registry, syntax, and package integration
+
+Outcome: Every private coordinator artifact and test is included in dependency
+order and distributed without expanding the public service surface.
+
+- [ ] Add `reload_contracts` and `reload_coordinator` to
+  `src/scripts_modinstalled/dwarfuicore/module_registry.lua` before every owner
+  module that registers lifecycle state.
+- [ ] Update `tests/module_registry.spec.lua` for exact dependency order.
+- [ ] Update `tests/run.lua` for every new focused suite.
+- [ ] Update `tests/package_contract.spec.lua` and
+  `tools/VerifyPackage.ps1` so expanded and ZIP packages require the new private
+  modules.
+- [ ] Prove `dwarfuicore/services` exports no coordinator, lifecycle enum,
+  diagnostic, quiescence, retirement, discard, or recovery API.
+- [ ] Run focused registry, package-contract, public-export, and naming checks.
+- [ ] Run `tools/Check-LuaSyntax.ps1` across production and test/support Lua.
+- [ ] Perform a follow-up review of registry order, suite registration, package
+  manifests, and public exports before marking this phase complete.
+
+Completion criteria:
+
+- [ ] New modules load before all lifecycle-registering consumers.
+- [ ] Syntax and package contracts include every new file exactly.
+- [ ] The public provider surface is unchanged.
+- [ ] Focused registry, package, export, naming, and syntax checks pass.
+
+## Phase 10: Full source and package qualification
+
+Outcome: Repository-local automated evidence proves the complete proposal
+contract before live activation.
+
+- [ ] Run all focused coordinator, command, service-runtime, tooltip,
+  render-hook, context-menu, UserPrompt, API, and failure-recovery suites.
+- [ ] Run the complete unit suite with `tools/Run-UnitTests.ps1` and record the
+  exact terminal counts.
+- [ ] Run Lua syntax validation and record the exact production and test/support
+  file counts.
+- [ ] Run repository build/package preparation through the existing project
+  tools without installing the package.
+- [ ] Run expanded package verification and ZIP verification separately and
+  record their exact outcomes.
+- [ ] Run `git diff --check` and inspect `git status --short` without altering
+  unrelated worktree or index state.
+- [ ] Perform the required implementation follow-up review against every task
+  and acceptance criterion in this plan.
+- [ ] Perform an independent completion audit before checking this phase or any
+  final acceptance item.
+
+Completion criteria:
+
+- [ ] Focused suites, full units, syntax, expanded package, ZIP package, and
+  whitespace checks all pass with recorded evidence.
+- [ ] No required result is inferred from a different evidence class.
+- [ ] The completion audit reports no unresolved implementation or evidence
+  discrepancy.
+
+## Phase 11: Operator restart and terminal live source-reload acceptance
+
+Outcome: Coordinator-bearing code is activated only in a fresh process, then a
+terminal live source reload proves successor reconstruction without modifying
+installed package files.
+
+- [ ] Document the first-activation restart prerequisite and the unsupported
+  pre-coordinator source-reload path.
+- [ ] Wait for explicit operator confirmation that Dwarf Fortress was restarted
+  before loading coordinator-bearing code.
+- [ ] Do not restart Dwarf Fortress automatically or discard unsaved game
+  state.
+- [ ] Run the established live source-reload route against the current source
+  registry without installing or modifying package files.
+- [ ] Capture terminal live evidence for:
+  - [ ] coordinator-aware owner registration from first publication;
+  - [ ] successful explicit Core reload;
+  - [ ] normal one-step generation advancement;
+  - [ ] exact tooltip render-trampoline adoption without double presentation;
+  - [ ] stale API/handle rejection; and
+  - [ ] terminal cleanup confirmation.
+- [ ] If the live route does not produce terminal status and cleanup evidence,
+  record it as inconclusive or failed rather than complete.
+- [ ] Perform a final follow-up review of live evidence and cleanup before
+  marking this phase complete.
+
+Completion criteria:
+
+- [ ] The operator-controlled restart occurred before first activation.
+- [ ] The live source reload completed terminally without package installation
+  or installed-file modification.
+- [ ] Required runtime behavior and cleanup were directly evidenced.
+
+## Execution evidence ledger
+
+- [ ] Record the resolved quiescence invariant and proposal amendment/approval.
+- [ ] Record focused characterization commands and terminal results.
+- [ ] Record focused coordinator/state-machine commands and terminal results.
+- [ ] Record focused tooltip, context-menu, UserPrompt, command, API, and
+  reconstruction-recovery commands and terminal results.
+- [ ] Record the full unit command and exact success/failure/error/pending
+  counts.
+- [ ] Record syntax command and exact production/test-support file counts.
+- [ ] Record expanded and ZIP package verification commands and results
+  separately.
+- [ ] Record `git diff --check` and final scoped worktree status.
+- [ ] Record operator restart confirmation, live command, terminal result, and
+  cleanup confirmation.
+
+## Final acceptance
+
+- [ ] The proposal's quiescence wording conflict is resolved explicitly.
+- [ ] Every proposal requirement is implemented or explicitly deferred with an
+  approved rationale.
+- [ ] Every generation-owned tooltip, context-menu, and UserPrompt state has a
+  coordinator record or explicit process-stable adoption contract.
+- [ ] The complete quiescence pass and per-owner retirement eligibility follow
+  the resolved proposal invariant.
+- [ ] Successful retirement is exactly once; failed retirement and discard are
+  retryable under their defined states; `QUIESCE_FAILED` remains diagnostic-only
+  and requires restart.
+- [ ] Future records are reported and removed before advancement or disable the
+  current runtime without advancement.
+- [ ] Malformed records are never invoked and require restart.
+- [ ] Existing APIs and handles return stale errors after advancement and
+  `SERVICE_UNHEALTHY` for a same-generation disabled runtime.
+- [ ] Failed reconstruction cleans or retains every published partial owner
+  under an explicit lifecycle state.
+- [ ] Tooltip render-trampoline identity survives and is adopted exactly once.
+- [ ] `command.lua` is generic transaction orchestration with no service slot,
+  owner-shape, or owner-generation knowledge.
+- [ ] New modules obey project module, `reqscript()`, LuaDoc, immutable-enum,
+  registry-order, test-registration, and package rules.
+- [ ] Focused, full-unit, syntax, expanded-package, ZIP-package, and terminal
+  live evidence all satisfy their distinct claims.
+- [ ] The first live activation follows an operator-controlled process restart;
+  no in-process pre-coordinator migration is attempted.
+- [ ] A follow-up implementation review and independent completion audit find
+  no unresolved requirement or evidence gap.

@@ -74,7 +74,8 @@ function world_to_interface(pos, viewport)
     }
 end
 
----Projects an exact tile only when it is visible on the displayed z-level.
+---Projects an exact tile when either the interface or map-overlay viewport
+---considers it visible on the displayed z-level.
 ---@param pos {x: integer, y: integer, z: integer}
 ---@param viewport? gui.dwarfmode.Viewport
 ---@return dwarfuicore.MapProjectionResult|nil
@@ -85,11 +86,10 @@ function project_visible(pos, viewport)
     local projected = world_to_interface(pos, viewport)
     if not projected then return nil end
 
-    if not dfhack.screen.inGraphicsMode() then
-        if not viewport:isVisible(pos) then return nil end
-    elseif projected.z ~= 0 or projected.x < 0 or projected.y < 0 or
-            projected.x >= viewport.width or
-            projected.y >= viewport.height then
+    local map_visible = viewport:isVisible(pos)
+    local interface_visible = projected.x >= 0 and projected.y >= 0 and
+        projected.x < viewport.width and projected.y < viewport.height
+    if projected.z ~= 0 or (not map_visible and not interface_visible) then
         return nil
     end
     return MapProjectionResult.new{

@@ -120,6 +120,21 @@ describe('DwarfUICore map projection', function()
         assert.is_nil(projection.project_visible({x=10, y=20, z=3}))
     end)
 
+    it('accepts Premium tiles rendered through the logical map viewport',
+            function()
+        local projection, state = fixture()
+        state.graphics = true
+        state.corner.x, state.corner.y, state.corner.z = 13, 34, 132
+        state.gps.viewport_zoom_factor = 192
+        state.gps.tile_pixel_x, state.gps.tile_pixel_y = 13, 19
+        state.active_viewport = viewport(13, 34, 132, 72, 30)
+
+        assert.same({x=133, y=38, z=0},
+            projection.project_visible({x=49, y=49, z=132}))
+        state.corner.z = 131
+        assert.is_nil(projection.project_visible({x=49, y=49, z=132}))
+    end)
+
     it('recomputes after Premium camera and zoom changes', function()
         local projection, state = fixture()
         state.graphics = true

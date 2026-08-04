@@ -37,9 +37,27 @@ end
 ---Loads an isolated exact-map registry with dynamic root eligibility.
 ---@return table harness
 local function load_harness()
+    local dfhack = {dwarfuicore={service_provider_runtime={generation=1}}}
     local _, numbers = module_loader.load(repo_root, NUMBERS_PATH)
     local _, immutable_enum =
         module_loader.load(repo_root, IMMUTABLE_ENUM_PATH)
+    local _, immutable_proxy = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+    local _, contracts = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+            reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+        })
+    local _, namespaces = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+    local _, identities = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+            globals={dfhack=dfhack},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/namespace']=namespaces,
+                ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+            },
+        })
     local _, definitions = module_loader.load(
         repo_root, DEFINITION_PATH, {
             reqscript={['dwarfuicore/utils/numbers']=numbers},
@@ -47,6 +65,7 @@ local function load_harness()
     local _, targets = module_loader.load(repo_root, TARGET_PATH, {
         reqscript={
             ['dwarfuicore/context_menu/definition']=definitions,
+            ['dwarfuicore/service_provider/identity']=identities,
             ['dwarfuicore/utils/immutable_enum']=immutable_enum,
             ['dwarfuicore/utils/numbers']=numbers,
         },
@@ -65,18 +84,22 @@ local function load_harness()
         end,
     }
     local _, module = module_loader.load(repo_root, MAP_TARGET_PATH, {
+        globals={dfhack=dfhack},
         reqscript={
             ['dwarfuicore/context_menu/definition']=definitions,
             ['dwarfuicore/context_menu/target']=targets,
             ['dwarfuicore/utils/numbers']=numbers,
+            ['dwarfuicore/service_provider/contracts']=contracts,
+            ['dwarfuicore/service_provider/identity']=identities,
+            ['dwarfuicore/service_provider/namespace']=namespaces,
             ['dwarfuicore/view_root_resolver']={
                 ViewRootResolver={new=function() return resolver end},
             },
         },
     })
     local registry = module.ContextMenuMapTargetRegistry.new{
-        identity_allocator=
-            targets.ContextMenuRegistrationIdentityAllocator.new(),
+        allocator=identities.get_process_allocator(),
+        runtime_generation=1,
         root_resolver=resolver,
         find_attachment_root=function(owner)
             return state.attachments[owner]
@@ -119,7 +142,7 @@ describe('context-menu exact map targets', function()
 
         local candidate = assert(
             harness.registry:detect{x=1, y=2, z=3})
-        assert.equals(1, candidate.identity)
+        assert.equals(1, candidate.identity.local_identity)
         assert.equals(1, candidate.sequence)
         assert.equals(handle, candidate.source)
         assert.equals(owner, candidate.owner)
@@ -197,7 +220,7 @@ describe('context-menu exact map targets', function()
             {x=0, y=0, z=32768},
         } do
             assert_fails_with(
-                'requires signed 16-bit integer x, y, and z', function()
+                'requires signed 16-bit x, y, and z', function()
                 harness.registry:register{
                     owner=owner,
                     pos=position,
@@ -205,7 +228,7 @@ describe('context-menu exact map targets', function()
                 }
             end)
             assert_fails_with(
-                'requires signed 16-bit integer x, y, and z', function()
+                'requires signed 16-bit x, y, and z', function()
                 harness.registry:detect(position)
             end)
         end
@@ -254,6 +277,47 @@ describe('context-menu exact map targets', function()
         assert.equals(first_identity, winner.identity)
         assert.equals('First moved',
             winner:get_definition_snapshot().entries[1].label)
+    end)
+
+    it('composes same-tile namespaces and clears only the requested one',
+            function()
+        local harness = load_harness()
+        local first_owner, second_owner, root = {}, {}, {}
+        harness.present(first_owner, root)
+        harness.present(second_owner, root)
+        local first = harness.registry:register('alpha', {
+            owner=first_owner,
+            pos={x=7, y=8, z=9},
+            definition=definition('Alpha'),
+        }, 1)
+        local second = harness.registry:register('beta', {
+            owner=second_owner,
+            pos={x=7, y=8, z=9},
+            definition=definition('Beta'),
+        }, 1)
+
+        local contributions = harness.registry:detect_contributions{
+            x=7, y=8, z=9}
+        assert.equals(2, #contributions)
+        assert.equals('alpha', contributions[1].identity.namespace)
+        assert.equals('Alpha',
+            contributions[1]:get_definition_snapshot().entries[1].label)
+        assert.equals('beta', contributions[2].identity.namespace)
+        assert.equals('Beta',
+            contributions[2]:get_definition_snapshot().entries[1].label)
+        assert.has_error(function()
+            harness.registry:unregister('alpha', second, 1)
+        end, 'DwarfUICore context-menu map handle belongs to another service domain.')
+
+        local removed = harness.registry:clear_namespace('alpha', 1)
+        assert.equals(1, #removed)
+        assert.is_false(harness.registry:contains(first))
+        assert.is_true(harness.registry:contains(second))
+        contributions = harness.registry:detect_contributions{x=7, y=8, z=9}
+        assert.equals(1, #contributions)
+        assert.equals('beta', contributions[1].identity.namespace)
+        assert.equals('Beta',
+            contributions[1]:get_definition_snapshot().entries[1].label)
     end)
 
     it('leaves prior state intact after any failed atomic update', function()
@@ -386,11 +450,26 @@ describe('context-menu exact map targets', function()
             definition=definition(),
         }
 
-        assert.is_true(harness.registry:clear())
+        assert.equals(1, #harness.registry:clear())
         local diagnostics = harness.registry:get_diagnostics()
         assert.equals(0, diagnostics.registration_count)
         assert.equals(0, diagnostics.coordinate_count)
         assert.equals(0, diagnostics.registration_sequence)
-        assert.is_false(harness.registry:clear())
+        assert.equals(0, #harness.registry:clear())
+    end)
+
+    it('returns isolated canonical identity copies in diagnostics', function()
+        local harness = load_harness()
+        local owner, root = {}, {}
+        harness.present(owner, root)
+        harness.registry:register{
+            owner=owner, pos={x=1, y=2, z=3}, definition=definition(),
+        }
+        local first = harness.registry:get_diagnostics().contributions[1]
+        first.identity.namespace = 'mutated'
+        local second = harness.registry:get_diagnostics().contributions[1]
+
+        assert.equals('dwarfuicore', second.identity.namespace)
+        assert.is_not_equal(first.identity, second.identity)
     end)
 end)

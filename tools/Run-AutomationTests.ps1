@@ -1,9 +1,6 @@
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding=$false)]
 param(
-    [string] $DFHackRunner = $env:DFHACK_RUNNER,
-    [string] $DFHackRoot = $env:DFHACK_ROOT,
-    [string] $EnvFile = '.env.local',
-    [Parameter(ValueFromRemainingArguments)]
+    [Parameter(Position=0, ValueFromRemainingArguments)]
     [string[]] $DwarfSpecArgs
 )
 
@@ -17,20 +14,13 @@ if (-not (Test-Path -LiteralPath $commonTools -PathType Leaf)) {
 }
 . $commonTools
 
-$resolvedEnvFile = $EnvFile
-if (-not [IO.Path]::IsPathRooted($resolvedEnvFile)) {
-    $resolvedEnvFile = Join-Path $projectRoot $resolvedEnvFile
-}
+$resolvedEnvFile = Join-Path $projectRoot '.env'
 Import-EnvironmentFile -Path $resolvedEnvFile -AllowMissing
 
-if (-not $DFHackRunner) {
-    $DFHackRunner = [Environment]::GetEnvironmentVariable(
-        'DFHACK_RUNNER', 'Process')
-}
-if (-not $DFHackRoot) {
-    $DFHackRoot = [Environment]::GetEnvironmentVariable(
-        'DFHACK_ROOT', 'Process')
-}
+$DFHackRunner = [Environment]::GetEnvironmentVariable(
+    'DFHACK_RUNNER', 'Process')
+$DFHackRoot = [Environment]::GetEnvironmentVariable(
+    'DFHACK_ROOT', 'Process')
 $resolvedRunner = Resolve-DFHackRunner -RunnerPath $DFHackRunner `
     -DFHackRoot $DFHackRoot
 $env:DFHACK_RUNNER = $resolvedRunner

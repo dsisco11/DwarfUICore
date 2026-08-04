@@ -1,13 +1,10 @@
 --@ module=true
 
--- Generic process-wide pointer sampling with reload-safe callback invalidation.
-
-local MODULE_GENERATION_SLOT = 'pointer_poller_module_generation'
+-- Generic process-wide pointer sampling with runtime-generation invalidation.
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
-dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
-local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
 ---@class dwarfuicore.PointerSample
 ---@field sequence integer
@@ -48,7 +45,7 @@ local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 ---@field _observer dwarfuicore.PointerPollerObserver
 ---@field _has_demand dwarfuicore.PointerPollerDemand
 ---@field _has_map_demand dwarfuicore.PointerPollerDemand
----@field _module_generation integer
+---@field _runtime_generation integer
 ---@field _generation integer
 ---@field _sequence integer
 ---@field _running boolean
@@ -139,7 +136,7 @@ function PointerPoller.new(options)
         _observer=options.observer,
         _has_demand=options.has_demand,
         _has_map_demand=options.has_map_demand or no_map_demand,
-        _module_generation=module_generation,
+        _runtime_generation=runtime_generation,
         _generation=0,
         _sequence=0,
         _running=false,
@@ -147,11 +144,12 @@ function PointerPoller.new(options)
     }, PointerPoller)
 end
 
----Returns whether this instance belongs to the active module generation.
+---Returns whether this instance belongs to the active runtime generation.
 ---@return boolean
 function PointerPoller:_module_is_current()
-    return self._module_generation ==
-        dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
+    local current = dfhack.dwarfuicore.service_provider_runtime
+    local generation = current and current.generation or 0
+    return self._runtime_generation == generation
 end
 
 ---Stops logical ownership of the current callback chain.
@@ -195,22 +193,24 @@ end
 ---Queues the sole callback for the current instance generation.
 function PointerPoller:_schedule_next()
     local instance_generation = self._generation
-    local expected_module_generation = self._module_generation
+    local expected_runtime_generation = self._runtime_generation
     self._scheduled = true
     self:_call('scheduler', function()
         self._scheduler(function()
-            self:_tick(instance_generation, expected_module_generation)
+            self:_tick(instance_generation, expected_runtime_generation)
         end)
     end)
 end
 
 ---Executes one current callback and conditionally queues its successor.
 ---@param expected_generation integer
----@param expected_module_generation integer
+---@param expected_runtime_generation integer
 function PointerPoller:_tick(expected_generation,
-        expected_module_generation)
-    if expected_module_generation ~=
-            dfhack.dwarfuicore[MODULE_GENERATION_SLOT] then
+        expected_runtime_generation)
+    local current_runtime = dfhack.dwarfuicore.service_provider_runtime
+    local current_runtime_generation =
+        current_runtime and current_runtime.generation or 0
+    if expected_runtime_generation ~= current_runtime_generation then
         self._running = false
         self._scheduled = false
         return
@@ -249,8 +249,8 @@ function PointerPoller:_tick(expected_generation,
     self:_call('observer', function() self._observer(sample) end)
 
     if expected_generation ~= self._generation or
-            expected_module_generation ~=
-                dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or
+            expected_runtime_generation ~=
+                current_runtime_generation or
             not self._running then
         return
     end
@@ -284,7 +284,7 @@ end
 ---@return table diagnostics
 function PointerPoller:get_diagnostics()
     return {
-        module_generation=self._module_generation,
+        runtime_generation=self._runtime_generation,
         generation=self._generation,
         running=self._running,
         scheduled=self._scheduled,

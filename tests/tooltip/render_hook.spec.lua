@@ -6,12 +6,15 @@ local MODULE_PATH =
 
 local _, function_chain = module_loader.load(
     repo_root, 'src/scripts_modinstalled/dwarfuicore/utils/function_chain.lua')
+local _, immutable_enum = module_loader.load(
+    repo_root, 'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
 
 local function load_hook(process, overlay_provider)
     local _, module = module_loader.load(repo_root, MODULE_PATH, {
         globals={dfhack=process},
         reqscript={
             ['dwarfuicore/utils/function_chain']=function_chain,
+            ['dwarfuicore/utils/immutable_enum']=immutable_enum,
         },
         require_modules=setmetatable({}, {
             __index=function(_, name)
@@ -108,8 +111,11 @@ describe('DwarfUICore tooltip render-hook manager', function()
         assert.is_false(first.manager:ensure_overlay())
 
         local second = load_hook(process, function() return overlay end)
-        assert.equals(first_generation + 1,
+        assert.equals(first_generation,
             second.manager:get_diagnostics().generation)
+        assert.is_equal(first.manager, second.manager)
+        assert.is_equal(second.TooltipRenderHookManager,
+            getmetatable(second.manager))
         second.manager:set_presenter(function() calls = calls + 1 end)
         assert.is_false(second.manager:ensure_overlay())
         assert.is_equal(trampoline, overlay.render_viewscreen_widgets)
@@ -133,14 +139,45 @@ describe('DwarfUICore tooltip render-hook manager', function()
         local first_generation = first.manager:get_diagnostics().generation
 
         local second = load_hook(process, provider)
-        second.manager:set_presenter(function() calls = calls + 1 end)
         assert.is_false(second.manager:ensure_screen(screen))
         assert.is_equal(trampoline, screen.onRender)
-        assert.equals(first_generation + 1,
+        assert.equals(first_generation,
             second.manager:get_diagnostics().generation)
+        assert.is_equal(first.manager, second.manager)
 
         screen:onRender()
         assert.equals(1, calls)
+    end)
+
+    it('prepares a screen seam without changing the selected owner', function()
+        local overlay = overlay_with(function() end)
+        local screen = {onRender=function() end}
+        local calls = {}
+        local module = load_hook({dwarfuicore={}}, function() return overlay end)
+        module.manager:set_presenter(function(_, owner)
+            table.insert(calls, owner)
+            return #calls
+        end)
+        module.manager:ensure_overlay()
+        local selected = module.manager:get_diagnostics()
+        assert.equals(module.TooltipRenderTransport.OVERLAY,
+            selected.selected_transport)
+        assert.is_equal(overlay, selected.selected_owner)
+
+        assert.is_true(module.manager:ensure_screen(screen, false))
+        selected = module.manager:get_diagnostics()
+        assert.equals(module.TooltipRenderTransport.OVERLAY,
+            selected.selected_transport)
+        assert.is_equal(overlay, selected.selected_owner)
+        screen:onRender()
+        assert.same({}, calls)
+
+        module.manager:select_owner(
+            module.TooltipRenderTransport.SCREEN, screen)
+        overlay.render_viewscreen_widgets()
+        assert.same({}, calls)
+        screen:onRender()
+        assert.same({screen}, calls)
     end)
 
     it('preserves owning overlay wrappers and repairs true replacement',

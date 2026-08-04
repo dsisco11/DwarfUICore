@@ -185,14 +185,18 @@ describe('context-menu root discovery', function()
             'must return a root set', 1, true))
     end)
 
-    it('invalidates scheduled callbacks from an older module generation',
+    it('invalidates scheduled callbacks from an older runtime generation',
             function()
         local state = {}
+        state.dwarfuicore = {
+            service_provider_runtime={generation=1},
+        }
         local first = load_harness(state)
         local stale = first.create()
         stale:start()
         assert.equals(1, #state.callbacks)
 
+        state.dwarfuicore.service_provider_runtime = {generation=2}
         local second = load_harness(state)
         local current = second.create()
         assert.is_true(first.run_next())

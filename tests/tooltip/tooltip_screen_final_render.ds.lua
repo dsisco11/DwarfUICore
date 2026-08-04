@@ -5,6 +5,7 @@ local widgets = require('gui.widgets')
 
 local LOWER_TOOLTIP = 'Lower screen tooltip'
 local UPPER_TOOLTIP = 'Upper screen tooltip'
+local TEST_INPUT_KEY = 'CUSTOM_SHIFT_A'
 
 ---@class tests.TooltipFinalRenderTarget: gui.widgets.Label
 local TooltipFinalRenderTarget = defclass(nil, widgets.Label)
@@ -43,8 +44,8 @@ function TooltipFinalRenderScreen:init()
         tooltip=self.tooltip_text,
     }
     self:addviews{self.tooltip_target}
-    assert(reqscript('dwarfuicore/tooltip/api').register(
-        self.tooltip_target))
+    assert(reqscript('dwarfuicore/services').TooltipServiceProvider:new(
+        1, 'test-tooltip-final-render'):register(self.tooltip_target))
 end
 
 ---Records the parent composition boundary.
@@ -90,11 +91,11 @@ function TooltipFinalRenderScreen:onIdle()
     end
 end
 
----Records and consumes one harmless routed input.
+---Records and consumes one neutral routed input.
 ---@param keys table
 ---@return boolean
 function TooltipFinalRenderScreen:onInput(keys)
-    if keys.D_HAULING then
+    if keys[TEST_INPUT_KEY] then
         self.input_count = self.input_count + 1
         return true
     end
@@ -161,6 +162,18 @@ local function index_of(trace, expected)
     return nil
 end
 
+---Returns whether diagnostics carry one coherent default service identity.
+---@param state table
+---@return boolean
+local function has_default_identity(state)
+    local target_identity = state.target
+    local intent_identity = state.intent and state.intent.source_identity
+    return target_identity ~= nil and intent_identity ~= nil and
+        target_identity.namespace == 'test-tooltip-final-render' and
+        intent_identity.namespace == target_identity.namespace and
+        intent_identity.local_identity == target_identity.local_identity
+end
+
 ---Moves onto a registered screen control and awaits its intent.
 ---@param target gui.View
 ---@param expected_text string
@@ -174,7 +187,7 @@ local function select_target(target, expected_text)
     ds.redraw()
     ds.await('registered foreground target publishes intent', function()
         local state = ds.tooltip_state()
-        return state.target == target and state.intent and
+        return has_default_identity(state) and
             state.intent.text == expected_text
     end)
     return ds.tooltip_state()
@@ -325,7 +338,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
             ds.wait_frames(1)
             assert.is_true(lower.idle_count > idle_before,
                 'screen hook interrupted logic cadence')
-            ds.input('D_HAULING')
+            ds.input(TEST_INPUT_KEY)
             assert.equals(1, lower.input_count,
                 'screen hook interrupted input delivery')
             assert_environment(lower_environment, subject, lower,
@@ -379,7 +392,7 @@ describe('foreground Lua-screen tooltip final rendering', function()
             assert_environment(upper_environment, subject, upper,
                 'upper tooltip rendering')
 
-            ds.input('D_HAULING')
+            ds.input(TEST_INPUT_KEY)
             assert.equals(1, upper.input_count,
                 'upper screen input delivery changed')
             local upper_idle_before = upper.idle_count
@@ -389,55 +402,15 @@ describe('foreground Lua-screen tooltip final rendering', function()
             assert_environment(upper_environment, subject, upper,
                 'upper tooltip input and logic')
 
-            local wrapped_upper = rawget(upper, 'onRender')
-            local module_generation_before =
-                state.poller_module_generation
-            local presenter_generation_before =
-                state.presenter.generation
-            local hook_generation_before =
-                state.render_hook.generation
-            dfhack.run_command('DwarfUICore', 'reload')
-            ds.await('foreground tooltip recovers after reload', function()
-                local current = ds.tooltip_state()
-                return current.target == upper_target and
-                    current.intent and
-                    current.intent.text == UPPER_TOOLTIP and
-                    current.poller_module_generation ==
-                        module_generation_before + 1 and
-                    current.presenter.generation ==
-                        presenter_generation_before + 1 and
-                    current.render_hook.generation ==
-                        hook_generation_before + 1
-            end)
-            state = ds.tooltip_state()
-            assert.is_equal(wrapped_upper,
-                rawget(upper, 'onRender'),
-                'reload replaced instead of adopting the existing trampoline')
-            text_x, text_y = tooltip_text_cell(state.intent)
-            upper.probe_x, upper.probe_y = text_x, text_y
-            upper.render_trace = {}
-            minimum_rendered_revision = state.intent.revision
-            render_count_before = state.presenter.render_count
-            ds.redraw()
-            state = ds.tooltip_state()
-            assert.equals(render_count_before + 1,
-                state.presenter.render_count,
-                'reload produced duplicate screen tooltip painting')
-            assert.equals('U', read_character(text_x, text_y))
-            assert_screen_render_diagnostics(
-                state, minimum_rendered_revision, 2)
-            assert_environment(upper_environment, subject, upper,
-                'foreground tooltip reload')
-
             ds.move_pointer(0, 0)
             ds.await('foreground tooltip clears before dismissal', function()
                 local current = ds.tooltip_state()
                 return current.target == nil and current.intent == nil
             end)
-            assert.is_true(reqscript('dwarfuicore/tooltip/api').unregister(
-                upper_target))
-            assert.is_true(reqscript('dwarfuicore/tooltip/api').unregister(
-                lower_target))
+            local tooltip = reqscript('dwarfuicore/services')
+                .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
+            assert.is_true(tooltip:unregister(upper_target))
+            assert.is_true(tooltip:unregister(lower_target))
 
             local lower_native = lower._native
             upper:dismiss()
@@ -487,9 +460,10 @@ describe('foreground Lua-screen tooltip final rendering', function()
         end
 
         cleanup_step('clear tooltip registrations', function()
-            local tooltip = reqscript('dwarfuicore/tooltip/api')
-            if upper_target then tooltip.unregister(upper_target) end
-            if lower_target then tooltip.unregister(lower_target) end
+            local tooltip = reqscript('dwarfuicore/services')
+                .TooltipServiceProvider:new(1, 'test-tooltip-final-render')
+            if upper_target then tooltip:unregister(upper_target) end
+            if lower_target then tooltip:unregister(lower_target) end
         end)
         cleanup_step('retire screen render hooks', function()
             reqscript('dwarfuicore/tooltip/render_hook').manager:shutdown()

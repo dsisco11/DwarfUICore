@@ -1,7 +1,8 @@
 -- Native registered-overlay context-menu interaction acceptance.
 
 local gui = require('gui')
-local context_menu = reqscript('dwarfuicore/context_menu/api')
+local context_menu = reqscript('dwarfuicore/services')
+    .ContextMenuServiceProvider:new(1, 'test-context-overlay')
 local services = reqscript('dwarfuicore/context_menu/service')
 
 local OVERLAY_SOURCE =
@@ -132,7 +133,7 @@ describe('native registered-overlay context menu', function()
             }):raw()
             overlay_widget = assert(target.parent_view,
                 'context-menu target has no overlay parent')
-            assert.is_true(context_menu.register(
+            assert.is_true(context_menu:register(
                 target, overlay_widget.definition))
             ds.await('native context-menu input hook is ready', function()
                 local diagnostics = service():get_diagnostics()
@@ -322,7 +323,7 @@ describe('native registered-overlay context menu', function()
         end, debug.traceback)
 
         if service():is_open() then service():close() end
-        if target then context_menu.unregister(target) end
+        if target then context_menu:unregister(target) end
         service():clear_world_state()
         if initial_pause ~= nil and ds.isGamePaused() ~= initial_pause then
             ds.input('D_PAUSE')

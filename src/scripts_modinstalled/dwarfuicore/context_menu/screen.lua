@@ -3,8 +3,10 @@
 -- Short-lived interactive ZScreen presentation for one open menu session.
 
 local gui = require('gui')
+local overlay = require('plugins.overlay')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local renderers = reqscript('dwarfuicore/context_menu/renderer')
+local identities = reqscript('dwarfuicore/service_provider/identity')
 local services = reqscript('dwarfuicore/context_menu/service')
 local targets = reqscript('dwarfuicore/context_menu/target')
 
@@ -71,6 +73,10 @@ end
 function ContextMenuScreen:source_root_is_presented(root)
     if not root then return false end
     if not self._native then return true end
+    if type(root.instanceof) == 'function' and
+            root:instanceof(overlay.OverlayWidget) then
+        return true
+    end
     local root_native = rawget(root, '_native')
     local current = self._native.parent
     while current do
@@ -83,17 +89,23 @@ end
 ---Resolves the current placement anchor without mutating native map state.
 ---@return {x: integer, y: integer}|nil
 function ContextMenuScreen:resolve_anchor()
+    if self.actions.session_is_valid and not self.actions.session_is_valid() then
+        return nil
+    end
     if self.anchor.kind == AnchorKind.SCREEN_POSITION then
         return self.anchor.screen_position
     end
     local root = self.session:get_source_root()
-    if not self.actions.map_session_is_valid() or
-            not self:source_root_is_presented(root) then
+    if self.actions.map_session_is_valid and
+            not self.actions.map_session_is_valid() then
+        return nil
+    end
+    if not self:source_root_is_presented(root) then
         return nil
     end
     local projected = map_projection.project_visible(
         self.anchor.map_position)
-    return projected and {x=projected.x, y=projected.y} or nil
+    return projected and identities.ScreenPosition.new(projected) or nil
 end
 
 ---Returns whether the current pointer lies in the complete Window frame.
@@ -120,7 +132,7 @@ end
 function ContextMenuScreen:onDismiss()
     if self._presentation_closed then return end
     self._presentation_closed = true
-    self.actions.close()
+    self.actions.close('presentation dismissed')
 end
 
 ---Dismisses the native screen exactly once without creating a second close.
@@ -182,7 +194,7 @@ function ContextMenuScreen:onInput(keys)
     local handled = false
     local owned = keys._MOUSE_L or (wheel and inside) or list_owned
     local ok, failure = xpcall(function()
-        handled = not not self.menu_window:onInput(keys)
+        handled = self:inputToSubviews(keys)
     end, debug.traceback)
     if not ok then
         if not owned then self:sendInputToParent(keys) end
@@ -202,11 +214,11 @@ end
 function ContextMenuScreen:render(dc)
     local ok, failure = xpcall(function()
         if not self.session:is_valid() then
-            self.actions.close()
+            self.actions.close('weak source invalidation')
             return
         end
         if not self:relayout() then
-            self.actions.close()
+            self.actions.close('anchor invalidation')
             return
         end
         ContextMenuScreen.super.render(self, dc)

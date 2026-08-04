@@ -111,12 +111,25 @@ local function screen_fixture()
         end,
     }
     local projection = {position=nil}
+    local ScreenPosition = {}
+    ScreenPosition.__index = ScreenPosition
+    local identities = {
+        ScreenPosition={
+            new=function(position)
+                assert.equals('number', type(position.x))
+                assert.equals('number', type(position.y))
+                return setmetatable({x=position.x, y=position.y},
+                    ScreenPosition)
+            end,
+        },
+    }
     local dfhack = {
         pen=pen,
         screen={
             getMousePos=function() return mouse.x, mouse.y end,
         },
     }
+    local OverlayWidget = {}
     local _, screen_module = module_loader.load(repo_root, SCREEN_PATH, {
         globals={
             defclass=widget_harness.defclass,
@@ -127,12 +140,16 @@ local function screen_fixture()
                 project_visible=function() return projection.position end,
             },
             ['dwarfuicore/context_menu/renderer']=renderer,
+            ['dwarfuicore/service_provider/identity']=identities,
             ['dwarfuicore/context_menu/service']={service=service},
             ['dwarfuicore/context_menu/target']={
                 ContextMenuAnchorKind={SCREEN_POSITION=1, MAP_TILE=2},
             },
         },
-        require_modules={gui=gui},
+        require_modules={
+            gui=gui,
+            ['plugins.overlay']={OverlayWidget=OverlayWidget},
+        },
     })
     local session = {
         valid=true,
@@ -173,6 +190,8 @@ local function screen_fixture()
         mouse=mouse,
         parent_inputs=parent_inputs,
         projection=projection,
+        ScreenPosition=ScreenPosition,
+        OverlayWidget=OverlayWidget,
     }
 end
 
@@ -243,6 +262,23 @@ describe('DwarfUICore context-menu screen', function()
         fixture.screen:onInput{_MOUSE_L=true}
 
         assert.equals(0, fixture.calls.close)
+        assert.equals(0, #fixture.parent_inputs)
+    end)
+
+    it('uses normal child routing for menu-owned input', function()
+        local fixture = screen_fixture()
+        local routed
+        fixture.screen.inputToSubviews = function(_, keys)
+            routed = keys
+            return true
+        end
+        fixture.screen.menu_window.onInput = function()
+            error('menu dispatch bypassed screen child routing')
+        end
+
+        fixture.screen:onInput{SELECT=true}
+
+        assert.same({SELECT=true}, routed)
         assert.equals(0, #fixture.parent_inputs)
     end)
 
@@ -378,6 +414,22 @@ describe('DwarfUICore context-menu screen', function()
         assert.same({x=5, y=3}, fixture.screen.menu_window.anchor)
     end)
 
+    it('copies projected anchors through the screen-position constructor',
+            function()
+        local fixture = screen_fixture()
+        fixture.screen.anchor = {
+            kind=2, screen_position={x=2, y=2},
+            map_position={x=10, y=20, z=3},
+        }
+        fixture.projection.position = {x=7, y=4, z=0}
+
+        local anchor = fixture.screen:resolve_anchor()
+        fixture.projection.position.x, fixture.projection.position.y = 9, 8
+
+        assert.equals(fixture.ScreenPosition, getmetatable(anchor))
+        assert.same({x=7, y=4}, anchor)
+    end)
+
     it('closes a map menu when projection becomes invalid', function()
         local fixture = screen_fixture()
         fixture.screen.anchor = {
@@ -407,7 +459,7 @@ describe('DwarfUICore context-menu screen', function()
         assert.equals(1, fixture.calls.close)
     end)
 
-    it('recognizes only roots in its native parent chain', function()
+    it('recognizes overlay roots and roots in its native parent chain', function()
         local fixture = screen_fixture()
         local root = {_native={}}
         local parent = root._native
@@ -418,6 +470,13 @@ describe('DwarfUICore context-menu screen', function()
         assert.is_false(fixture.screen:source_root_is_presented(root))
         fixture.screen._native.parent = {widgets=root}
         root._native = nil
+        assert.is_true(fixture.screen:source_root_is_presented(root))
+
+        root._native = {}
+        root.instanceof=function(_, class)
+            return class == fixture.OverlayWidget
+        end
+        fixture.screen._native.parent = {}
         assert.is_true(fixture.screen:source_root_is_presented(root))
     end)
 end)

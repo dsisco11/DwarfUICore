@@ -6,19 +6,48 @@ local definitions = reqscript('dwarfuicore/context_menu/definition')
 local map_targets = reqscript('dwarfuicore/context_menu/map_target')
 local root_discovery = reqscript('dwarfuicore/context_menu/root_discovery')
 local targets = reqscript('dwarfuicore/context_menu/target')
+local contracts = reqscript('dwarfuicore/service_provider/contracts')
+local identities = reqscript('dwarfuicore/service_provider/identity')
+local namespaces = reqscript('dwarfuicore/service_provider/namespace')
+local WidgetTargetStore =
+    reqscript('dwarfuicore/service_provider/weak_store').WidgetTargetStore
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
 local MODULE_GENERATION_SLOT = 'context_menu_registration_generation'
 local MANAGER_SLOT = 'context_menu_registration_manager'
+local DEFAULT_NAMESPACE = 'dwarfuicore'
+local DEFAULT_CONTRACT_MAJOR = 1
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
-dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
-    (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+local existing_manager = dfhack.dwarfuicore[MANAGER_SLOT]
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+if existing_manager and runtime_generation > 0 then
+    assert(existing_manager._runtime_generation == runtime_generation,
+        'DwarfUICore context-menu registrations belong to another runtime generation.')
+end
+if not existing_manager then
+    dfhack.dwarfuicore[MODULE_GENERATION_SLOT] =
+        (dfhack.dwarfuicore[MODULE_GENERATION_SLOT] or 0) + 1
+end
 local module_generation = dfhack.dwarfuicore[MODULE_GENERATION_SLOT]
 
+---Validates one namespace-bound context-menu ownership domain.
+---@param consumer_namespace any
+---@param contract_major? any
+---@return string consumer_namespace
+---@return integer contract_major
+local function validate_domain(consumer_namespace, contract_major)
+    namespaces.validate(consumer_namespace)
+    contract_major = contract_major or DEFAULT_CONTRACT_MAJOR
+    assert(math.type(contract_major) == 'integer' and contract_major > 0,
+        'DwarfUICore context-menu contract major must be positive.')
+    return consumer_namespace, contract_major
+end
+
 ---@class dwarfuicore.ContextMenuWidgetCandidate
----@field identity integer
+---@field identity table
 ---@field sequence integer
 ---@field source any
 ---@field root any
@@ -36,14 +65,15 @@ ContextMenuWidgetCandidate.__index = ContextMenuWidgetCandidate
 
 ---@class dwarfuicore.ContextMenuRegistrationManager
 ---@field _module_generation integer
+---@field _runtime_generation integer
 ---@field _root_resolver dwarfuicore.ViewRootResolver
----@field _identity_allocator dwarfuicore.ContextMenuRegistrationIdentityAllocator
----@field _widget_registrations table<any, table>
----@field _widget_registration_sequence integer
+---@field _allocator dwarfuicore.ProcessIdentityAllocator
+---@field _widget_store dwarfuicore.WidgetTargetStore
 ---@field _map_targets dwarfuicore.ContextMenuMapTargetRegistry
 ---@field _root_discovery dwarfuicore.ContextMenuRootDiscovery
 ---@field _root_observer fun(roots: table<any, boolean>)|nil
 ---@field _failure_observer fun(message: string)|nil
+---@field _removal_observer fun(identity: table)|nil
 ---@field _menu_open_predicate fun(): boolean
 ---@field _disabled boolean
 ---@field _failure string|nil
@@ -93,7 +123,7 @@ function ContextMenuWidgetCandidate:get_definition_snapshot()
     return self._definition:snapshot()
 end
 
----Creates one weak, destructive-reload registration manager.
+---Creates one weak registration manager for the active runtime generation.
 ---@param options? dwarfuicore.ContextMenuRegistrationManagerOptions
 ---@return dwarfuicore.ContextMenuRegistrationManager
 function ContextMenuRegistrationManager.new(options)
@@ -113,24 +143,25 @@ function ContextMenuRegistrationManager.new(options)
             type(options.is_menu_open) == 'function',
         'DwarfUICore context-menu open predicate must be a function.')
 
-    local identity_allocator =
-        targets.ContextMenuRegistrationIdentityAllocator.new()
+    local allocator = identities.get_process_allocator()
     local resolver = options.root_resolver or ViewRootResolver.new()
     local manager = setmetatable({
         _module_generation=module_generation,
+        _runtime_generation=runtime_generation,
         _root_resolver=resolver,
-        _identity_allocator=identity_allocator,
-        _widget_registrations=setmetatable({}, {__mode='k'}),
-        _widget_registration_sequence=0,
+        _allocator=allocator,
+        _widget_store=WidgetTargetStore.new(allocator),
         _root_observer=options.on_roots_changed,
         _failure_observer=options.on_failure,
+        _removal_observer=nil,
         _menu_open_predicate=options.is_menu_open or function() return false end,
         _disabled=false,
         _failure=nil,
         _retired=false,
     }, ContextMenuRegistrationManager)
     manager._map_targets = map_targets.ContextMenuMapTargetRegistry.new{
-        identity_allocator=identity_allocator,
+        allocator=allocator,
+        runtime_generation=runtime_generation > 0 and runtime_generation or 1,
         root_resolver=resolver,
         find_attachment_root=find_attachment_root,
     }
@@ -172,9 +203,7 @@ end
 ---Returns the count of currently live weak widget registrations.
 ---@return integer
 function ContextMenuRegistrationManager:widget_registration_count()
-    local count = 0
-    for _ in pairs(self._widget_registrations) do count = count + 1 end
-    return count
+    return self._widget_store:contribution_count()
 end
 
 ---Returns the count of all currently live widget and map registrations.
@@ -202,10 +231,10 @@ end
 ---@return table<any, boolean>
 function ContextMenuRegistrationManager:_discover_attachment_roots()
     local roots = setmetatable({}, {__mode='k'})
-    for widget in pairs(self._widget_registrations) do
+    self._widget_store:for_each_contribution(function(widget)
         local root = find_attachment_root(widget, false)
         if root then roots[root] = true end
-    end
+    end)
     for root in pairs(self._map_targets:get_attachment_roots()) do
         roots[root] = true
     end
@@ -250,10 +279,11 @@ end
 ---@param root any
 ---@return dwarfuicore.ContextMenuWidgetCandidate
 function ContextMenuRegistrationManager:_widget_candidate(
-        widget, record, root)
+        widget, record, root, target_sequence, contribution_sequence)
     return setmetatable({
         identity=record.identity,
-        sequence=record.sequence,
+        sequence=target_sequence,
+        contribution_sequence=contribution_sequence,
         source=widget,
         root=root,
         _definition=record.definition,
@@ -266,27 +296,41 @@ end
 ---@param widget any
 ---@param definition dwarfuicore.ContextMenuDefinition
 ---@return boolean created
-function ContextMenuRegistrationManager:register(widget, definition)
+function ContextMenuRegistrationManager:register(consumer_namespace, widget,
+        definition, contract_major)
+    if definition == nil and type(consumer_namespace) == 'table' then
+        definition, widget, consumer_namespace = widget, consumer_namespace,
+            DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
     assert(type(widget) == 'table',
         'DwarfUICore context-menu widget registration requires a widget.')
     local replacement =
         definitions.ContextMenuDefinitionSlot.new(definition)
-    local existing = self._widget_registrations[widget]
+    local existing = self._widget_store:get_contribution(
+        widget, consumer_namespace)
     if existing then
+        assert(existing.contract_major == contract_major,
+            'DwarfUICore context-menu widget belongs to another contract major.')
         existing.definition = replacement
         self:_refresh_discovery()
         return false
     end
 
-    self._widget_registration_sequence =
-        self._widget_registration_sequence + 1
-    self._widget_registrations[widget] = {
-        identity=self._identity_allocator:allocate(),
-        sequence=self._widget_registration_sequence,
-        definition=replacement,
-    }
+    local identity = self._allocator:allocate_identity(
+        self._runtime_generation > 0 and self._runtime_generation or 1,
+        contracts.ServiceKind.CONTEXT_MENU, contract_major, consumer_namespace)
+    local _, contribution_sequence, created = self._widget_store:register(
+        widget, consumer_namespace, {identity=identity,
+            namespace=consumer_namespace, contract_major=contract_major,
+            definition=replacement})
+    assert(created, 'DwarfUICore context-menu widget publication conflicted.')
+    local record = self._widget_store:get_contribution(widget,
+        consumer_namespace)
+    record.contribution_sequence = contribution_sequence
     self:_refresh_discovery()
     return true
 end
@@ -295,11 +339,19 @@ end
 ---@param widget any
 ---@param definition dwarfuicore.ContextMenuDefinition
 ---@return boolean updated
-function ContextMenuRegistrationManager:update(widget, definition)
+function ContextMenuRegistrationManager:update(consumer_namespace, widget,
+        definition, contract_major)
+    if definition == nil and type(consumer_namespace) == 'table' then
+        definition, widget, consumer_namespace = widget, consumer_namespace,
+            DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
-    local record = self._widget_registrations[widget]
-    if not record then return false end
+    local record = self._widget_store:get_contribution(widget,
+        consumer_namespace)
+    if not record or record.contract_major ~= contract_major then return false end
     local replacement =
         definitions.ContextMenuDefinitionSlot.new(definition)
     record.definition = replacement
@@ -309,11 +361,20 @@ end
 ---Explicitly unregisters one widget and updates discovery demand.
 ---@param widget any
 ---@return boolean removed
-function ContextMenuRegistrationManager:unregister(widget)
+function ContextMenuRegistrationManager:unregister(consumer_namespace, widget,
+        contract_major)
+    if widget == nil and type(consumer_namespace) == 'table' then
+        widget, consumer_namespace = consumer_namespace, DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
-    if not self._widget_registrations[widget] then return false end
-    self._widget_registrations[widget] = nil
+    local record = self._widget_store:get_contribution(widget,
+        consumer_namespace)
+    if not record or record.contract_major ~= contract_major then return false end
+    self._widget_store:remove(widget, consumer_namespace)
+    if self._removal_observer then self._removal_observer(record.identity) end
     self:_refresh_discovery()
     return true
 end
@@ -323,37 +384,72 @@ end
 ---@return dwarfuicore.ContextMenuWidgetCandidate|nil
 function ContextMenuRegistrationManager:resolve_widget(widget)
     if self._disabled or not self:_module_is_current() then return nil end
-    local record = self._widget_registrations[widget]
+    local record, contribution_sequence = self._widget_store:get_winner(widget)
     if not record then return nil end
     local root = self._root_resolver:resolve(widget, false)
     if not root then return nil end
-    return self:_widget_candidate(widget, record, root)
+    local target_sequence = self._widget_store:get_sequences(widget,
+        record.namespace)
+    return self:_widget_candidate(widget, record, root, target_sequence,
+        contribution_sequence)
 end
 
----Resolves one numeric widget identity through strict current eligibility.
----@param identity integer
+---Returns all eligible namespace contributions for one physical widget target.
+---@param widget any
+---@return dwarfuicore.ContextMenuWidgetCandidate[] candidates
+function ContextMenuRegistrationManager:resolve_widget_contributions(widget)
+    if self._disabled or not self:_module_is_current() then return {} end
+    local root = self._root_resolver:resolve(widget, false)
+    if not root then return {} end
+    local candidates = {}
+    self._widget_store:for_each_contribution(function(candidate_widget,
+            _, record, target_sequence, contribution_sequence)
+        if candidate_widget == widget then
+            table.insert(candidates, self:_widget_candidate(candidate_widget,
+                record, root, target_sequence, contribution_sequence))
+        end
+    end)
+    table.sort(candidates, function(left, right)
+        return left.contribution_sequence < right.contribution_sequence
+    end)
+    return candidates
+end
+
+---Resolves one composite widget identity through strict current eligibility.
+---@param identity table
 ---@return dwarfuicore.ContextMenuWidgetCandidate|nil
 function ContextMenuRegistrationManager:resolve_widget_identity(identity)
     if self._disabled or not self:_module_is_current() then return nil end
-    for widget, record in pairs(self._widget_registrations) do
-        if record.identity == identity then
+    local resolved
+    self._widget_store:for_each_contribution(function(widget, _, record)
+        if resolved == nil and identities.CompositeIdentity.equals(
+                record.identity, identity) then
             local root = self._root_resolver:resolve(widget, false)
             if root then
-                return self:_widget_candidate(widget, record, root)
+                local target_sequence, contribution_sequence =
+                    self._widget_store:get_sequences(widget, record.namespace)
+                resolved = self:_widget_candidate(widget, record, root,
+                    target_sequence, contribution_sequence)
             end
-            return nil
         end
-    end
-    return nil
+    end)
+    return resolved
 end
 
 ---Registers one exact map tile and refreshes shared discovery demand.
 ---@param options dwarfuicore.ContextMenuMapRegistrationOptions
 ---@return any handle
-function ContextMenuRegistrationManager:register_map_tile(options)
+function ContextMenuRegistrationManager:register_map_tile(consumer_namespace,
+        options, contract_major)
+    if options == nil and type(consumer_namespace) == 'table' then
+        options, consumer_namespace = consumer_namespace, DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
-    local handle = self._map_targets:register(options)
+    local handle = self._map_targets:register(
+        consumer_namespace, options, contract_major)
     self:_refresh_discovery()
     return handle
 end
@@ -362,21 +458,102 @@ end
 ---@param handle any
 ---@param update dwarfuicore.ContextMenuMapRegistrationUpdate
 ---@return boolean updated
-function ContextMenuRegistrationManager:update_map_tile(handle, update)
+function ContextMenuRegistrationManager:update_map_tile(consumer_namespace,
+        handle, update, contract_major)
+    if identities.is_map_handle(consumer_namespace) then
+        update, handle, consumer_namespace = handle, consumer_namespace,
+            DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
-    return self._map_targets:update(handle, update)
+    return self._map_targets:update(consumer_namespace, handle, update,
+        contract_major)
 end
 
 ---Explicitly unregisters one map handle and updates discovery demand.
 ---@param handle any
 ---@return boolean removed
-function ContextMenuRegistrationManager:unregister_map_tile(handle)
+function ContextMenuRegistrationManager:unregister_map_tile(consumer_namespace,
+        handle, contract_major)
+    if identities.is_map_handle(consumer_namespace) then
+        handle, consumer_namespace = consumer_namespace, DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(self:_module_is_current(),
         'DwarfUICore context-menu registration manager is stale.')
-    local removed = self._map_targets:unregister(handle)
-    if removed then self:_refresh_discovery() end
+    local identity = self._map_targets:get_identity(handle)
+    local removed = self._map_targets:unregister(consumer_namespace, handle,
+        contract_major)
+    if removed then
+        if self._removal_observer and identity then
+            self._removal_observer(identity)
+        end
+        self:_refresh_discovery()
+    end
     return removed
+end
+
+---Resolves one widget identity while requiring its original attached root.
+---This deliberately omits only the current-presentation check because an
+---open context-menu screen temporarily covers a valid Lua-screen source.
+---@param identity table
+---@param expected_root any
+---@return dwarfuicore.ContextMenuWidgetCandidate|nil
+function ContextMenuRegistrationManager:resolve_widget_identity_attached(
+        identity, expected_root)
+    if self._disabled or not self:_module_is_current() then return nil end
+    local resolved
+    self._widget_store:for_each_contribution(function(widget, _, record,
+            target_sequence, contribution_sequence)
+        if resolved == nil and identities.CompositeIdentity.equals(
+                record.identity, identity) then
+            local root = find_attachment_root(widget, false)
+            if root == expected_root then
+                resolved = self:_widget_candidate(widget, record, root,
+                    target_sequence, contribution_sequence)
+            end
+        end
+    end)
+    return resolved
+end
+
+---Removes every widget and map contribution owned by one namespace.
+---@param consumer_namespace string
+---@param contract_major? integer
+---@return boolean changed
+function ContextMenuRegistrationManager:clear_namespace(consumer_namespace,
+        contract_major)
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
+    local removals = {}
+    self._widget_store:for_each_contribution(function(widget, namespace,
+            record)
+        if namespace == consumer_namespace and
+                record.contract_major == contract_major then
+            table.insert(removals, widget)
+        end
+    end)
+    local changed = false
+    for _, widget in ipairs(removals) do
+        local record = self._widget_store:get_contribution(widget,
+            consumer_namespace)
+        local removed = self._widget_store:remove(widget, consumer_namespace)
+        if removed and record and self._removal_observer then
+            self._removal_observer(record.identity)
+        end
+        changed = removed or changed
+    end
+    local maps = self._map_targets:clear_namespace(consumer_namespace,
+        contract_major)
+    changed = #maps > 0 or changed
+    if self._removal_observer then
+        for _, record in ipairs(maps) do self._removal_observer(record.identity) end
+    end
+    if changed then self:_refresh_discovery() end
+    return changed
 end
 
 ---Resolves one map handle through strict current target eligibility.
@@ -387,8 +564,8 @@ function ContextMenuRegistrationManager:resolve_map_tile(handle)
     return self._map_targets:resolve(handle)
 end
 
----Resolves one numeric map identity through strict current eligibility.
----@param identity integer
+---Resolves one composite map identity through strict current eligibility.
+---@param identity table
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuRegistrationManager:resolve_map_identity(identity)
     if self._disabled or not self:_module_is_current() then return nil end
@@ -396,7 +573,7 @@ function ContextMenuRegistrationManager:resolve_map_identity(identity)
 end
 
 ---Resolves an open map session against its original still-attached root.
----@param identity integer
+---@param identity table
 ---@param expected_root any
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuRegistrationManager:resolve_open_map_identity(
@@ -426,10 +603,10 @@ end
 function ContextMenuRegistrationManager:get_detection_roots()
     local roots = setmetatable({}, {__mode='k'})
     if self._disabled or not self:_module_is_current() then return roots end
-    for widget in pairs(self._widget_registrations) do
+    self._widget_store:for_each_contribution(function(widget)
         local root = self._root_resolver:resolve(widget, false)
         if root then roots[root] = true end
-    end
+    end)
     for root in pairs(self._map_targets:get_eligible_roots()) do
         roots[root] = true
     end
@@ -453,6 +630,30 @@ function ContextMenuRegistrationManager:set_failure_observer(observer)
     self._failure_observer = observer
 end
 
+---Replaces the service observer called before explicit contribution removal.
+---@param observer fun(identity: table)|nil
+function ContextMenuRegistrationManager:set_removal_observer(observer)
+    assert(observer == nil or type(observer) == 'function',
+        'DwarfUICore context-menu removal observer must be a function.')
+    self._removal_observer = observer
+end
+
+---Returns whether an open snapshot still has every contribution at its root.
+---@param session dwarfuicore.ContextMenuOpenSession
+---@return boolean valid
+function ContextMenuRegistrationManager:validate_open_session(session)
+    if self._disabled or not self:_module_is_current() or not session:is_valid() then
+        return false
+    end
+    local root = session:get_source_root()
+    for _, identity in ipairs(session:get_contribution_identities()) do
+        local candidate = self:resolve_widget_identity_attached(identity, root) or
+            self:resolve_open_map_identity(identity, root)
+        if not candidate or candidate.root ~= root then return false end
+    end
+    return true
+end
+
 ---Replaces the predicate that keeps discovery alive for an open menu.
 ---@param predicate fun(): boolean
 function ContextMenuRegistrationManager:set_menu_open_predicate(predicate)
@@ -466,9 +667,17 @@ end
 ---@return boolean changed
 function ContextMenuRegistrationManager:clear()
     local changed = self:registration_count() > 0
-    self._widget_registrations = setmetatable({}, {__mode='k'})
-    self._widget_registration_sequence = 0
-    changed = self._map_targets:clear() or changed
+    if self._removal_observer then
+        self._widget_store:for_each_contribution(function(_, _, record)
+            self._removal_observer(record.identity)
+        end)
+    end
+    self._widget_store = WidgetTargetStore.new(self._allocator)
+    local maps = self._map_targets:clear()
+    if self._removal_observer then
+        for _, record in ipairs(maps or {}) do self._removal_observer(record.identity) end
+    end
+    changed = #maps > 0 or changed
     changed = self._root_discovery:stop() or changed
     return changed
 end
@@ -487,6 +696,19 @@ end
 ---Returns registration, discovery, reload, and failure diagnostics.
 ---@return table
 function ContextMenuRegistrationManager:get_diagnostics()
+    local widget_contributions = {}
+    self._widget_store:for_each_contribution(function(_, namespace, record,
+            target_sequence, contribution_sequence)
+        local identity = identities.CompositeIdentity.new(record.identity)
+        assert(identity.namespace == namespace,
+            'DwarfUICore widget contribution namespace is inconsistent.')
+        table.insert(widget_contributions, {identity=identity,
+            target_sequence=target_sequence,
+            contribution_sequence=contribution_sequence})
+    end)
+    table.sort(widget_contributions, function(left, right)
+        return left.contribution_sequence < right.contribution_sequence
+    end)
     return {
         module_generation=self._module_generation,
         current=self:_module_is_current(),
@@ -494,60 +716,78 @@ function ContextMenuRegistrationManager:get_diagnostics()
         failure=self._failure,
         widget_registration_count=self:widget_registration_count(),
         map_registration_count=self._map_targets:registration_count(),
-        widget_registration_sequence=self._widget_registration_sequence,
+        widget_registration_sequence=self._allocator:snapshot().next_sequence,
+        widget_contributions=widget_contributions,
         map=self._map_targets:get_diagnostics(),
         discovery=self._root_discovery:get_diagnostics(),
     }
 end
 
-local previous_manager = dfhack.dwarfuicore[MANAGER_SLOT]
-if previous_manager and type(previous_manager.shutdown) == 'function' then
-    previous_manager:shutdown()
-end
-manager = ContextMenuRegistrationManager.new()
+manager = existing_manager or ContextMenuRegistrationManager.new()
 dfhack.dwarfuicore[MANAGER_SLOT] = manager
 
 ---Registers or re-registers one widget through the process singleton.
 ---@param widget any
 ---@param definition dwarfuicore.ContextMenuDefinition
 ---@return boolean created
-function register(widget, definition)
-    return manager:register(widget, definition)
+function register(consumer_namespace, widget, definition, contract_major)
+    return manager:register(consumer_namespace, widget, definition,
+        contract_major)
 end
 
 ---Updates one singleton widget registration.
 ---@param widget any
 ---@param definition dwarfuicore.ContextMenuDefinition
 ---@return boolean updated
-function update(widget, definition)
-    return manager:update(widget, definition)
+function update(consumer_namespace, widget, definition, contract_major)
+    return manager:update(consumer_namespace, widget, definition,
+        contract_major)
 end
 
 ---Unregisters one singleton widget registration.
 ---@param widget any
 ---@return boolean removed
-function unregister(widget)
-    return manager:unregister(widget)
+function unregister(consumer_namespace, widget, contract_major)
+    return manager:unregister(consumer_namespace, widget, contract_major)
 end
 
 ---Registers one singleton exact map-tile target.
 ---@param options dwarfuicore.ContextMenuMapRegistrationOptions
 ---@return any handle
-function register_map_tile(options)
-    return manager:register_map_tile(options)
+function register_map_tile(consumer_namespace, options, contract_major)
+    return manager:register_map_tile(consumer_namespace, options,
+        contract_major)
 end
 
 ---Updates one singleton exact map-tile target.
 ---@param handle any
 ---@param update dwarfuicore.ContextMenuMapRegistrationUpdate
 ---@return boolean updated
-function update_map_tile(handle, update)
-    return manager:update_map_tile(handle, update)
+function update_map_tile(consumer_namespace, handle, update, contract_major)
+    return manager:update_map_tile(consumer_namespace, handle, update,
+        contract_major)
 end
 
 ---Unregisters one singleton exact map-tile target.
 ---@param handle any
 ---@return boolean removed
-function unregister_map_tile(handle)
-    return manager:unregister_map_tile(handle)
+function unregister_map_tile(consumer_namespace, handle, contract_major)
+    return manager:unregister_map_tile(consumer_namespace, handle,
+        contract_major)
+end
+
+---Returns all eligible exact-tile contributions in deterministic order.
+---@param position {x: integer, y: integer, z: integer}
+---@return dwarfuicore.ContextMenuMapCandidate[] candidates
+function ContextMenuRegistrationManager:detect_map_contributions(position)
+    if self._disabled or not self:_module_is_current() then return {} end
+    return self._map_targets:detect_contributions(position)
+end
+
+---Removes every registration owned by one context-menu namespace.
+---@param consumer_namespace string
+---@param contract_major? integer
+---@return boolean changed
+function clear_namespace(consumer_namespace, contract_major)
+    return manager:clear_namespace(consumer_namespace, contract_major)
 end

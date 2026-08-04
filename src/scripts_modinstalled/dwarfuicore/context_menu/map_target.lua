@@ -4,13 +4,15 @@
 
 local definitions = reqscript('dwarfuicore/context_menu/definition')
 local targets = reqscript('dwarfuicore/context_menu/target')
-local numbers = reqscript('dwarfuicore/utils/numbers')
+local contracts = reqscript('dwarfuicore/service_provider/contracts')
+local identities = reqscript('dwarfuicore/service_provider/identity')
+local namespaces = reqscript('dwarfuicore/service_provider/namespace')
 local ViewRootResolver =
     reqscript('dwarfuicore/view_root_resolver').ViewRootResolver
 
-local COORDINATE_MIN = -0x8000
-local COORDINATE_MAX = 0x7fff
 local COORDINATE_MASK = 0xffff
+local DEFAULT_NAMESPACE = 'dwarfuicore'
+local DEFAULT_CONTRACT_MAJOR = 1
 
 ---@class dwarfuicore.ContextMenuMapRegistrationOptions
 ---@field owner any
@@ -22,7 +24,9 @@ local COORDINATE_MASK = 0xffff
 ---@field definition dwarfuicore.ContextMenuDefinition
 
 ---@class dwarfuicore.ContextMenuMapCandidate
----@field identity integer
+---@field identity table
+---@field namespace string
+---@field contract_major integer
 ---@field sequence integer
 ---@field source any
 ---@field owner any
@@ -33,12 +37,14 @@ ContextMenuMapCandidate = {}
 ContextMenuMapCandidate.__index = ContextMenuMapCandidate
 
 ---@class dwarfuicore.ContextMenuMapTargetRegistryOptions
----@field identity_allocator? dwarfuicore.ContextMenuRegistrationIdentityAllocator
+---@field allocator? dwarfuicore.ProcessIdentityAllocator
+---@field runtime_generation? integer
 ---@field root_resolver? dwarfuicore.ViewRootResolver
 ---@field find_attachment_root? fun(owner: any, allow_owner_root: boolean): any|nil
 
 ---@class dwarfuicore.ContextMenuMapTargetRegistry
----@field _identity_allocator dwarfuicore.ContextMenuRegistrationIdentityAllocator
+---@field _allocator dwarfuicore.ProcessIdentityAllocator
+---@field _runtime_generation integer
 ---@field _root_resolver dwarfuicore.ViewRootResolver
 ---@field _find_attachment_root fun(owner: any, allow_owner_root: boolean): any|nil
 ---@field _registrations table<any, table>
@@ -69,28 +75,6 @@ local function validate_fields(value, fields, label)
     end
 end
 
----Copies and validates one exact map position.
----@param position any
----@param label string
----@return {x: integer, y: integer, z: integer}
-local function copy_position(position, label)
-    local position_type = type(position)
-    assert(position_type == 'table' or position_type == 'userdata',
-        ('DwarfUICore %s requires an exact map position.'):format(label))
-    assert(numbers.is_integer(position.x) and
-            position.x >= COORDINATE_MIN and
-            position.x <= COORDINATE_MAX and
-            numbers.is_integer(position.y) and
-            position.y >= COORDINATE_MIN and
-            position.y <= COORDINATE_MAX and
-            numbers.is_integer(position.z) and
-            position.z >= COORDINATE_MIN and
-            position.z <= COORDINATE_MAX,
-        ('DwarfUICore %s requires signed 16-bit integer x, y, and z.'):format(
-            label))
-    return {x=position.x, y=position.y, z=position.z}
-end
-
 ---Packs one signed-16-bit DF coordinate into a collision-free 48-bit key.
 ---@param position {x: integer, y: integer, z: integer}
 ---@return integer
@@ -113,6 +97,39 @@ local function weak_bucket()
     return setmetatable({}, {__mode='k'})
 end
 
+---Validates one namespace-bound context-menu ownership domain.
+---@param consumer_namespace any
+---@param contract_major? any
+---@return string consumer_namespace
+---@return integer contract_major
+local function validate_domain(consumer_namespace, contract_major)
+    namespaces.validate(consumer_namespace)
+    contract_major = contract_major or DEFAULT_CONTRACT_MAJOR
+    assert(math.type(contract_major) == 'integer' and contract_major > 0,
+        'DwarfUICore context-menu contract major must be positive.')
+    return consumer_namespace, contract_major
+end
+
+---Validates that an opaque handle belongs to the requested active domain.
+---@param handle any
+---@param consumer_namespace string
+---@param contract_major integer
+---@param runtime_generation integer
+---@return table identity
+local function validate_handle(handle, consumer_namespace, contract_major,
+        runtime_generation)
+    local identity = identities.get_map_handle_identity(handle)
+    assert(identity ~= nil,
+        'DwarfUICore context-menu map handle is invalid.')
+    assert(identity.runtime_generation == runtime_generation,
+        'DwarfUICore context-menu map handle is stale.')
+    assert(identity.service_kind == contracts.ServiceKind.CONTEXT_MENU and
+            identity.contract_major == contract_major and
+            identity.namespace == consumer_namespace,
+        'DwarfUICore context-menu map handle belongs to another service domain.')
+    return identity
+end
+
 ---Returns an isolated opening definition for this candidate.
 ---@return dwarfuicore.ContextMenuDefinitionSnapshot
 function ContextMenuMapCandidate:get_definition_snapshot()
@@ -126,9 +143,13 @@ function ContextMenuMapTargetRegistry.new(options)
     options = options or {}
     assert(type(options) == 'table',
         'DwarfUICore map-target registry options must be a table.')
-    assert(options.identity_allocator == nil or
-            type(options.identity_allocator.allocate) == 'function',
-        'DwarfUICore map-target identity allocator must allocate identities.')
+    assert(options.allocator == nil or
+            type(options.allocator.allocate_identity) == 'function',
+        'DwarfUICore map-target allocator must allocate identities.')
+    assert(options.runtime_generation == nil or
+            (math.type(options.runtime_generation) == 'integer' and
+                options.runtime_generation > 0),
+        'DwarfUICore map-target runtime generation must be positive.')
     assert(options.root_resolver == nil or
             type(options.root_resolver.resolve) == 'function',
         'DwarfUICore map-target root resolver must resolve owners.')
@@ -136,8 +157,8 @@ function ContextMenuMapTargetRegistry.new(options)
             type(options.find_attachment_root) == 'function',
         'DwarfUICore map-target attachment resolver must be a function.')
     return setmetatable({
-        _identity_allocator=options.identity_allocator or
-            targets.ContextMenuRegistrationIdentityAllocator.new(),
+        _allocator=options.allocator or identities.get_process_allocator(),
+        _runtime_generation=options.runtime_generation or 1,
         _root_resolver=options.root_resolver or ViewRootResolver.new(),
         _find_attachment_root=options.find_attachment_root or
             function() return nil end,
@@ -183,25 +204,37 @@ function ContextMenuMapTargetRegistry:_prune()
     end
 end
 
----Registers one weak-owner exact map tile and returns its disposable handle.
----@param options dwarfuicore.ContextMenuMapRegistrationOptions
+---Registers one weak-owner exact map tile and returns its opaque handle.
+---@param consumer_namespace string|dwarfuicore.ContextMenuMapRegistrationOptions
+---@param options? dwarfuicore.ContextMenuMapRegistrationOptions
+---@param contract_major? integer
 ---@return any handle
-function ContextMenuMapTargetRegistry:register(options)
+function ContextMenuMapTargetRegistry:register(consumer_namespace, options,
+        contract_major)
+    if options == nil and type(consumer_namespace) == 'table' then
+        options, consumer_namespace = consumer_namespace, DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
     assert(type(options) == 'table',
         'DwarfUICore map-tile registration options must be a table.')
     validate_fields(options, REGISTRATION_FIELDS, 'map-tile registration')
     assert(type(options.owner) == 'table',
         'DwarfUICore map-tile registration requires an owner.')
-    local position = copy_position(options.pos, 'map-tile registration')
+    local position = identities.MapTilePosition.new(options.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         options.definition)
 
-    self._registration_sequence = self._registration_sequence + 1
     local key = pack_coordinate(position)
-    local handle = setmetatable({}, {__metatable=false})
+    local registration_identity = self._allocator:allocate_identity(
+        self._runtime_generation, contracts.ServiceKind.CONTEXT_MENU,
+        contract_major, consumer_namespace)
+    local handle = identities.create_map_handle(registration_identity)
     local record = {
-        identity=self._identity_allocator:allocate(),
-        sequence=self._registration_sequence,
+        identity=registration_identity,
+        namespace=consumer_namespace,
+        contract_major=contract_major,
+        sequence=self._allocator:allocate_sequence(),
         owner_ref=weak_owner(options.owner),
         pos=position,
         packed_coordinate=key,
@@ -212,11 +245,22 @@ function ContextMenuMapTargetRegistry:register(options)
     return handle
 end
 
----Atomically replaces one handle's copied position and definition.
----@param handle any
----@param update dwarfuicore.ContextMenuMapRegistrationUpdate
+---Atomically replaces one owned handle's copied position and definition.
+---@param consumer_namespace string|any
+---@param handle any|dwarfuicore.ContextMenuMapRegistrationUpdate
+---@param update? dwarfuicore.ContextMenuMapRegistrationUpdate
+---@param contract_major? integer
 ---@return boolean updated
-function ContextMenuMapTargetRegistry:update(handle, update)
+function ContextMenuMapTargetRegistry:update(consumer_namespace, handle, update,
+        contract_major)
+    if identities.is_map_handle(consumer_namespace) then
+        update, handle, consumer_namespace = handle, consumer_namespace,
+            DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
+    local handle_identity = validate_handle(handle, consumer_namespace,
+        contract_major, self._runtime_generation)
     local record = self._registrations[handle]
     if not record or record.owner_ref.owner == nil then
         if record then
@@ -225,10 +269,12 @@ function ContextMenuMapTargetRegistry:update(handle, update)
         end
         return false
     end
+    assert(record.identity.local_identity == handle_identity.local_identity,
+        'DwarfUICore context-menu map handle identity is inconsistent.')
     assert(type(update) == 'table',
         'DwarfUICore map-tile update must be a table.')
     validate_fields(update, UPDATE_FIELDS, 'map-tile update')
-    local position = copy_position(update.pos, 'map-tile update')
+    local position = identities.MapTilePosition.new(update.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         update.definition)
 
@@ -243,12 +289,24 @@ function ContextMenuMapTargetRegistry:update(handle, update)
     return true
 end
 
----Explicitly unregisters one live map handle.
----@param handle any
+---Explicitly unregisters one live owned map handle.
+---@param consumer_namespace string|any
+---@param handle? any
+---@param contract_major? integer
 ---@return boolean removed
-function ContextMenuMapTargetRegistry:unregister(handle)
+function ContextMenuMapTargetRegistry:unregister(consumer_namespace, handle,
+        contract_major)
+    if identities.is_map_handle(consumer_namespace) then
+        handle, consumer_namespace = consumer_namespace, DEFAULT_NAMESPACE
+    end
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
+    local handle_identity = validate_handle(handle, consumer_namespace,
+        contract_major, self._runtime_generation)
     local record = self._registrations[handle]
     if not record then return false end
+    assert(record.identity.local_identity == handle_identity.local_identity,
+        'DwarfUICore context-menu map handle identity is inconsistent.')
     self:_remove_from_bucket(handle, record)
     self._registrations[handle] = nil
     return true
@@ -269,6 +327,27 @@ end
 function ContextMenuMapTargetRegistry:contains(handle)
     self:_prune()
     return self._registrations[handle] ~= nil
+end
+
+---Returns whether a handle still owns one exact composite identity.
+---@param handle any
+---@param expected_identity table
+---@return boolean current
+function ContextMenuMapTargetRegistry:contains_identity(handle, expected_identity)
+    self:_prune()
+    local record = self._registrations[handle]
+    return record ~= nil and identities.CompositeIdentity.equals(
+        record.identity, expected_identity)
+end
+
+---Returns a copied identity snapshot for one currently live handle.
+---@param handle any
+---@return table|nil identity
+function ContextMenuMapTargetRegistry:get_identity(handle)
+    self:_prune()
+    local record = self._registrations[handle]
+    if not record then return nil end
+    return identities.CompositeIdentity.new(record.identity)
 end
 
 ---Builds one eligible candidate without retaining it in registry state.
@@ -308,13 +387,13 @@ function ContextMenuMapTargetRegistry:resolve(handle)
     return self:_candidate(handle, record, owner, root)
 end
 
----Resolves one numeric registration identity through current eligibility.
----@param identity integer
+---Resolves one composite registration identity through current eligibility.
+---@param identity table
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve_identity(identity)
     self:_prune()
     for handle, record in pairs(self._registrations) do
-        if record.identity == identity then
+        if identities.CompositeIdentity.equals(record.identity, identity) then
             local owner = record.owner_ref.owner
             local root = owner and self._root_resolver:resolve(owner, true)
             if root then
@@ -329,14 +408,14 @@ end
 ---Resolves an identity while requiring attachment to one already-presented root.
 ---This omits only the global presentation test, which an open ZScreen would
 ---otherwise make self-invalidating for Lua-screen roots.
----@param identity integer
+---@param identity table
 ---@param expected_root any
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:resolve_identity_attached(
         identity, expected_root)
     self:_prune()
     for handle, record in pairs(self._registrations) do
-        if record.identity == identity then
+        if identities.CompositeIdentity.equals(record.identity, identity) then
             local owner = record.owner_ref.owner
             local root = owner and
                 self._root_resolver:find_root(owner, true)
@@ -353,7 +432,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:detect(position)
-    local copied = copy_position(position, 'map-tile target sample')
+    local copied = identities.MapTilePosition.new(position)
     self:_prune()
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     if not bucket then return nil end
@@ -366,6 +445,48 @@ function ContextMenuMapTargetRegistry:detect(position)
         end
     end
     return winner
+end
+
+---Returns all eligible contributions at one exact tile in registration order.
+---@param position {x: integer, y: integer, z: integer}
+---@return dwarfuicore.ContextMenuMapCandidate[] candidates
+function ContextMenuMapTargetRegistry:detect_contributions(position)
+    local copied = identities.MapTilePosition.new(position)
+    self:_prune()
+    local bucket = self._coordinate_index[pack_coordinate(copied)]
+    local candidates = {}
+    if not bucket then return candidates end
+    for handle, record in pairs(bucket) do
+        local owner = record.owner_ref.owner
+        local root = owner and self._root_resolver:resolve(owner, true)
+        if root then
+            table.insert(candidates, self:_candidate(handle, record, owner, root))
+        end
+    end
+    table.sort(candidates, function(left, right)
+        return left.sequence < right.sequence
+    end)
+    return candidates
+end
+
+---Removes every map registration in one namespace and contract major.
+---@param consumer_namespace string
+---@param contract_major? integer
+---@return table[] removed
+function ContextMenuMapTargetRegistry:clear_namespace(consumer_namespace,
+        contract_major)
+    consumer_namespace, contract_major = validate_domain(
+        consumer_namespace, contract_major)
+    local removed = {}
+    for handle, record in pairs(self._registrations) do
+        if record.namespace == consumer_namespace and
+                record.contract_major == contract_major then
+            self:_remove_from_bucket(handle, record)
+            self._registrations[handle] = nil
+            table.insert(removed, record)
+        end
+    end
+    return removed
 end
 
 ---Returns attachment roots without applying visibility or presentation rules.
@@ -395,13 +516,14 @@ function ContextMenuMapTargetRegistry:get_eligible_roots()
 end
 
 ---Drops every registration for destructive development reload or shutdown.
----@return boolean changed
+---@return table[] removed
 function ContextMenuMapTargetRegistry:clear()
-    local changed = next(self._registrations) ~= nil
+    local removed = {}
+    for _, record in pairs(self._registrations) do table.insert(removed, record) end
     self._registrations = setmetatable({}, {__mode='k'})
     self._coordinate_index = {}
     self._registration_sequence = 0
-    return changed
+    return removed
 end
 
 ---Returns registration, sequence, and coordinate-index diagnostics.
@@ -410,9 +532,20 @@ function ContextMenuMapTargetRegistry:get_diagnostics()
     local registrations = self:registration_count()
     local coordinates = 0
     for _ in pairs(self._coordinate_index) do coordinates = coordinates + 1 end
+    local contributions = {}
+    for _, record in pairs(self._registrations) do
+        local identity = record.identity
+        table.insert(contributions, {identity=
+            identities.CompositeIdentity.new(identity),
+            contribution_sequence=record.sequence})
+    end
+    table.sort(contributions, function(left, right)
+        return left.contribution_sequence < right.contribution_sequence
+    end)
     return {
         registration_count=registrations,
         coordinate_count=coordinates,
         registration_sequence=self._registration_sequence,
+        contributions=contributions,
     }
 end

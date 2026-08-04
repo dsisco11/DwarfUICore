@@ -75,9 +75,32 @@ local function load_environment(state)
             table.insert(state.callbacks, callback)
         end,
     }
+    dfhack.dwarfuicore.service_provider_runtime =
+        dfhack.dwarfuicore.service_provider_runtime or {generation=1}
     state.dwarfuicore = dfhack.dwarfuicore
 
     local _, immutable_enum = module_loader.load(repo_root, ENUM_PATH)
+    local _, immutable_proxy = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+    local _, contracts = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+            reqscript={
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+            },
+        })
+    local _, namespaces = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+    local _, identities = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+            globals={dfhack=dfhack},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/namespace']=namespaces,
+                ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+            },
+        })
+    local _, weak_store = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/weak_store.lua')
     local _, pointer = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/pointer.lua', {
             globals={dfhack=dfhack},
@@ -113,12 +136,16 @@ local function load_environment(state)
                 reqscript={
                     ['dwarfuicore/view_root_resolver']=root_resolver,
                     ['dwarfuicore/tooltip/target']=target_adapter,
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/identity']=identities,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
                 },
             })
         local _, service = module_loader.load(repo_root, SERVICE_PATH, {
             globals={dfhack=dfhack},
             reqscript={
                 ['dwarfuicore/tooltip/target']=target_adapter,
+                ['dwarfuicore/service_provider/identity']=identities,
             },
         })
         local _, registration = module_loader.load(
@@ -131,6 +158,10 @@ local function load_environment(state)
                     ['dwarfuicore/tooltip/map_target']=map_target,
                     ['dwarfuicore/tooltip/service']=service,
                     ['dwarfuicore/tooltip/target']=target_adapter,
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/identity']=identities,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
+                    ['dwarfuicore/service_provider/weak_store']=weak_store,
                 },
             })
         return registration
@@ -147,6 +178,8 @@ local function load_environment(state)
 
     return {
         dfhack=dfhack,
+        contracts=contracts,
+        identities=identities,
         load_generation=load_generation,
         overlay=overlay,
         OverlayWidget=OverlayWidget,
@@ -255,10 +288,12 @@ describe('singleton tooltip registration polling', function()
             pos={x=11, y=21, z=4},
             tooltip=nil,
         }))
-        assert.is_false(registration.update_map_tile({}, {
-            pos={x=11, y=21, z=4},
-            tooltip='Unknown',
-        }))
+        assert.has_error(function()
+            registration.update_map_tile({}, {
+                pos={x=11, y=21, z=4},
+                tooltip='Unknown',
+            })
+        end)
 
         assert.is_true(registration.unregister_map_tile(first))
         assert.is_false(registration.unregister_map_tile(first))
@@ -369,7 +404,18 @@ describe('singleton tooltip registration polling', function()
         assert.is_true(env.run_next())
 
         local diagnostics = registration.get_diagnostics()
-        assert.is_equal(child, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
+        assert.equals(diagnostics.target.local_identity,
+            diagnostics.intent.source_identity.local_identity)
+        assert.has_error(function()
+            diagnostics.intent.source_identity.namespace = 'changed'
+        end, 'DwarfUICore tooltip source identities are immutable.')
+        diagnostics.target.namespace = 'changed'
+        diagnostics.widget_contributions[1].identity.namespace = 'changed'
+        local fresh_diagnostics = registration.get_diagnostics()
+        assert.equals('dwarfuicore', fresh_diagnostics.target.namespace)
+        assert.equals('dwarfuicore',
+            fresh_diagnostics.widget_contributions[1].identity.namespace)
         assert.equals('Dynamic 2,1', diagnostics.intent.text)
         assert.equals(3, diagnostics.intent.anchor_x)
         assert.equals(2, diagnostics.intent.anchor_y)
@@ -413,7 +459,7 @@ describe('singleton tooltip registration polling', function()
         assert.equals(2, diagnostics.registration_count)
         assert.equals(1, diagnostics.widget_registration_count)
         assert.equals(1, diagnostics.map_registration_count)
-        assert.is_equal(child, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Widget', diagnostics.intent.text)
         assert.same({'widget-enter', 'widget-update'}, events)
 
@@ -421,7 +467,7 @@ describe('singleton tooltip registration polling', function()
         env.state.mouse_y = 15
         assert.is_true(env.run_next())
         diagnostics = registration.get_diagnostics()
-        assert.is_equal(map, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Map', diagnostics.intent.text)
         assert.same({
             'widget-enter',
@@ -433,7 +479,7 @@ describe('singleton tooltip registration polling', function()
         env.state.mouse_y = 2
         assert.is_true(env.run_next())
         diagnostics = registration.get_diagnostics()
-        assert.is_equal(child, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Widget', diagnostics.intent.text)
         assert.same({
             'widget-enter',
@@ -475,7 +521,7 @@ describe('singleton tooltip registration polling', function()
         blocker.pointer_policy = env.pointer.PointerPolicy.NONE
         assert.is_true(env.run_next())
         local diagnostics = registration.get_diagnostics()
-        assert.is_equal(map, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Map', diagnostics.intent.text)
     end)
 
@@ -502,7 +548,7 @@ describe('singleton tooltip registration polling', function()
 
         assert.is_true(env.run_next())
         local diagnostics = registration.get_diagnostics()
-        assert.is_equal(second, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Second', diagnostics.intent.text)
 
         assert.is_true(registration.unregister_map_tile(second))
@@ -510,7 +556,7 @@ describe('singleton tooltip registration polling', function()
         assert.is_nil(registration.get_diagnostics().intent)
         assert.is_true(env.run_next())
         diagnostics = registration.get_diagnostics()
-        assert.is_equal(first, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('First', diagnostics.intent.text)
 
         assert.is_true(registration.update_map_tile(first, {
@@ -565,7 +611,7 @@ describe('singleton tooltip registration polling', function()
         assert.is_true(env.run_next())
 
         local diagnostics = registration.get_diagnostics()
-        assert.is_equal(child, diagnostics.target)
+        assert.equals('dwarfuicore', diagnostics.target.namespace)
         assert.equals('Independent', diagnostics.intent.text)
         assert.is_true(diagnostics.poller_running)
         assert.equals(1, diagnostics.sample_sequence)
@@ -615,7 +661,7 @@ describe('singleton tooltip registration polling', function()
         assert.equals(0, env.state.mouse_reads or 0)
     end)
 
-    it('retires old callbacks and starts one new chain on repeated reload',
+    it('preserves one active polling chain across repeated module loads',
             function()
         local env = load_environment{mouse_x=2, mouse_y=2}
         local first = env.load_generation()
@@ -625,32 +671,277 @@ describe('singleton tooltip registration polling', function()
         layout(root, env.state)
         first.register(child)
         local first_generation =
-            first.get_diagnostics().poller_module_generation
+            first.get_diagnostics().poller_runtime_generation
 
         local second = env.load_generation()
         local second_generation =
-            second.get_diagnostics().poller_module_generation
-        assert.equals(first_generation + 1, second_generation)
-        assert.equals(2, #env.state.callbacks)
-
-        assert.is_true(env.run_next())
-        assert.equals(0, env.state.mouse_reads or 0)
+            second.get_diagnostics().poller_runtime_generation
+        assert.equals(first_generation, second_generation)
         assert.equals(1, #env.state.callbacks)
+
         assert.is_true(env.run_next())
         assert.equals(1, env.state.mouse_reads)
         assert.equals(1, #env.state.callbacks)
 
         local third = env.load_generation()
-        assert.equals(second_generation + 1,
-            third.get_diagnostics().poller_module_generation)
-        assert.equals(2, #env.state.callbacks)
-        assert.is_true(env.run_next())
-        assert.equals(1, env.state.mouse_reads)
+        assert.equals(second_generation,
+            third.get_diagnostics().poller_runtime_generation)
+        assert.equals(1, #env.state.callbacks)
         assert.is_true(env.run_next())
         assert.equals(2, env.state.mouse_reads)
         assert.equals(1, #env.state.callbacks)
         assert.is_true(third.get_diagnostics().poller_current)
         assert.is_true(third.get_diagnostics().poller_running)
+    end)
+
+    it('migrates widget contributions across runtime reconstruction',
+            function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local first = env.load_generation()
+        local child = target(env.widgets,
+            {l=1, t=1, w=4, h=2}, 'Migrated')
+        local root = env.widgets.Panel{subviews={child}}
+        layout(root, env.state)
+        assert.is_true(first.bind('alpha'):register(child))
+        local before = first.get_diagnostics('alpha')
+            .widget_contributions[1]
+        local namespace_registry =
+            env.dfhack.dwarfuicore.tooltip_namespace_registry
+
+        env.state.callbacks = {}
+        env.dfhack.dwarfuicore.service_provider_runtime = {generation=2}
+        env.dfhack.dwarfuicore.tooltip_map_target_registry = nil
+        env.dfhack.dwarfuicore.tooltip_service = nil
+        env.dfhack.dwarfuicore.tooltip_registration_runtime = nil
+        local second = env.load_generation()
+        local after = second.get_diagnostics('alpha')
+            .widget_contributions[1]
+
+        assert.is_equal(namespace_registry,
+            env.dfhack.dwarfuicore.tooltip_namespace_registry)
+        assert.equals(before.target_sequence, after.target_sequence)
+        assert.equals(before.contribution_sequence,
+            after.contribution_sequence)
+        assert.equals(2, after.identity.runtime_generation)
+        assert.is_not_equal(before.identity.local_identity,
+            after.identity.local_identity)
+        assert.equals(1, second.get_diagnostics().registration_count)
+        assert.equals(1, #env.state.callbacks)
+        assert.is_true(env.run_next())
+        assert.equals(2,
+            second.get_diagnostics().target.runtime_generation)
+        assert.equals('alpha', second.get_diagnostics().target.namespace)
+    end)
+
+    it('isolates same-widget contributions and reveals the prior winner',
+            function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local registration = env.load_generation()
+        local widget = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Shared')
+        local root = env.widgets.Panel{subviews={widget}}
+        layout(root, env.state)
+        local alpha = registration.bind('alpha')
+        local beta = registration.bind('beta')
+
+        assert.is_true(alpha:register(widget))
+        assert.is_false(alpha:register(widget))
+        local alpha_before = registration.get_diagnostics('alpha')
+        assert.is_true(beta:register(widget))
+        local alpha_after = registration.get_diagnostics('alpha')
+        local beta_state = registration.get_diagnostics('beta')
+        assert.equals(1, alpha_after.widget_registration_count)
+        assert.equals(1, beta_state.widget_registration_count)
+        assert.equals(alpha_before.widget_contributions[1].target_sequence,
+            alpha_after.widget_contributions[1].target_sequence)
+        assert.equals(alpha_after.widget_contributions[1].target_sequence,
+            beta_state.widget_contributions[1].target_sequence)
+        assert.is_true(
+            beta_state.widget_contributions[1].contribution_sequence >
+            alpha_after.widget_contributions[1].contribution_sequence)
+
+        assert.is_true(env.run_next())
+        assert.equals('beta',
+            registration.get_diagnostics().target.namespace)
+        assert.is_true(beta:unregister(widget))
+        assert.is_true(env.run_next())
+        assert.equals('alpha',
+            registration.get_diagnostics().target.namespace)
+        widget.visible = false
+        assert.is_true(env.run_next())
+        assert.is_nil(registration.get_diagnostics().target)
+        widget.visible = true
+        assert.is_true(env.run_next())
+        assert.equals('alpha',
+            registration.get_diagnostics().target.namespace)
+    end)
+
+    it('keeps physical target order independent of namespace changes',
+            function()
+        local env = load_environment{mouse_x=2, mouse_y=2}
+        local registration = env.load_generation()
+        local first = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'First')
+        local second = target(env.widgets,
+            {l=1, t=1, w=6, h=3}, 'Second')
+        local root = env.widgets.Panel{subviews={first, second}}
+        layout(root, env.state)
+        local alpha = registration.bind('alpha')
+        local beta = registration.bind('beta')
+        assert.is_true(alpha:register(first))
+        assert.is_true(alpha:register(second))
+        local second_identity = registration.get_diagnostics('alpha')
+            .widget_contributions[2].identity.local_identity
+        assert.is_true(beta:register(first))
+
+        assert.is_true(env.run_next())
+        assert.equals(second_identity,
+            registration.get_diagnostics().target.local_identity)
+        assert.is_true(beta:unregister(first))
+        assert.is_true(env.run_next())
+        assert.equals(second_identity,
+            registration.get_diagnostics().target.local_identity)
+        assert.is_true(alpha:clear_namespace())
+        assert.equals(0, registration.get_diagnostics().registration_count)
+        assert.is_false(registration.get_diagnostics().poller_running)
+        assert.is_false(alpha:clear_namespace())
+    end)
+
+    it('isolates map ownership and preserves identity across atomic update',
+            function()
+        local env = load_environment{
+            mouse_x=2, mouse_y=2, map_pos={x=1, y=2, z=3}}
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+        layout(owner, env.state)
+        local alpha = registration.bind('alpha')
+        local beta = registration.bind('beta')
+        local first = alpha:register_map_tile{
+            owner=owner, pos={x=1, y=2, z=3}, tooltip='Alpha'}
+        local second = beta:register_map_tile{
+            owner=owner, pos={x=1, y=2, z=3}, tooltip='Beta'}
+        local before = registration.get_diagnostics('alpha')
+            .map_contributions[1]
+
+        assert.has_error(function()
+            beta:update_map_tile(first, {
+                pos={x=4, y=5, z=6}, tooltip='Foreign'})
+        end, 'DwarfUICore tooltip map handle belongs to another service domain.')
+        assert.has_error(function()
+            registration.update_map_tile('alpha', first, {
+                pos={x=4, y=5, z=6}, tooltip='Wrong major'}, 2)
+        end, 'DwarfUICore tooltip map handle belongs to another service domain.')
+        local context_identity = env.identities.get_process_allocator()
+            :allocate_identity(1, env.contracts.ServiceKind.CONTEXT_MENU,
+                1, 'alpha')
+        local context_handle =
+            env.identities.create_map_handle(context_identity)
+        assert.has_error(function()
+            alpha:update_map_tile(context_handle, {
+                pos={x=4, y=5, z=6}, tooltip='Wrong service'})
+        end, 'DwarfUICore tooltip map handle belongs to another service domain.')
+        assert.has_error(function()
+            alpha:update_map_tile(first, {
+                pos={x=4, y=5}, tooltip='Invalid'})
+        end)
+        assert.same({x=1, y=2, z=3},
+            registration.get_diagnostics('alpha')
+                .map_contributions[1].map_position)
+
+        assert.is_true(env.run_next())
+        assert.equals('beta',
+            registration.get_diagnostics().target.namespace)
+        assert.is_true(beta:unregister_map_tile(second))
+        assert.is_true(env.run_next())
+        assert.equals('alpha',
+            registration.get_diagnostics().target.namespace)
+        assert.is_true(alpha:update_map_tile(first, {
+            pos={x=4, y=5, z=6}, tooltip='Moved'}))
+        local after = registration.get_diagnostics('alpha')
+            .map_contributions[1]
+        assert.same(before.identity, after.identity)
+        assert.equals(before.contribution_sequence,
+            after.contribution_sequence)
+        assert.same({x=4, y=5, z=6}, after.map_position)
+    end)
+
+    it('keeps registrations after binding collection and filters diagnostics',
+            function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local first = target(env.widgets,
+            {l=1, t=1, w=4, h=2}, 'First')
+        local second = target(env.widgets,
+            {l=6, t=1, w=4, h=2}, 'Second')
+        local root = env.widgets.Panel{subviews={first, second}}
+        layout(root, env.state)
+        local binding = registration.bind('alpha')
+        assert.is_nil(binding.get_diagnostics)
+        assert.is_true(binding:register(first))
+        assert.is_true(registration.bind('beta'):register(second))
+        binding = nil
+        collectgarbage('collect')
+        collectgarbage('collect')
+
+        local alpha = registration.get_diagnostics('alpha')
+        local beta = registration.get_diagnostics('beta')
+        assert.equals(1, alpha.registration_count)
+        assert.equals(1, beta.registration_count)
+        assert.equals('alpha',
+            alpha.widget_contributions[1].identity.namespace)
+        assert.equals('beta',
+            beta.widget_contributions[1].identity.namespace)
+        assert.is_nil(alpha.widget_contributions[2])
+        assert.is_nil(beta.widget_contributions[2])
+        assert.is_true(alpha.poller_running)
+        assert.is_true(beta.poller_running)
+    end)
+
+    it('collects only an abandoned map contribution and preserves demand',
+            function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local owner = env.widgets.Panel{}
+        local alpha_handle = registration.bind('alpha'):register_map_tile{
+            owner=owner, pos={x=1, y=2, z=3}, tooltip='Alpha'}
+        local beta_handle = registration.bind('beta'):register_map_tile{
+            owner=owner, pos={x=1, y=2, z=3}, tooltip='Beta'}
+        local weak = setmetatable({alpha_handle}, {__mode='v'})
+        alpha_handle = nil
+        collectgarbage('collect')
+        collectgarbage('collect')
+
+        assert.is_nil(weak[1])
+        assert.equals(0,
+            registration.get_diagnostics('alpha').map_registration_count)
+        assert.equals(1,
+            registration.get_diagnostics('beta').map_registration_count)
+        assert.is_true(registration.get_diagnostics().poller_running)
+        assert.is_not_nil(beta_handle)
+    end)
+
+    it('collects a shared widget without retaining either namespace',
+            function()
+        local env = load_environment()
+        local registration = env.load_generation()
+        local weak = setmetatable({}, {__mode='v'})
+        do
+            local widget = target(env.widgets,
+                {l=1, t=1, w=4, h=2}, 'Transient')
+            weak[1] = widget
+            assert.is_true(registration.bind('alpha'):register(widget))
+            assert.is_true(registration.bind('beta'):register(widget))
+        end
+        collectgarbage('collect')
+        collectgarbage('collect')
+
+        assert.is_nil(weak[1])
+        assert.equals(0,
+            registration.get_diagnostics('alpha').registration_count)
+        assert.equals(0,
+            registration.get_diagnostics('beta').registration_count)
+        assert.is_true(env.run_next())
+        assert.is_false(registration.get_diagnostics().poller_running)
     end)
 
 end)

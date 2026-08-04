@@ -5,6 +5,7 @@
 -- has no presentation implementation or UI-host dependency.
 
 local target_adapters = reqscript('dwarfuicore/tooltip/target')
+local identities = reqscript('dwarfuicore/service_provider/identity')
 local ObservationKind = target_adapters.TooltipPointerObservationKind
 
 API_VERSION = 2
@@ -12,8 +13,16 @@ local SERVICE_SLOT = 'tooltip_service'
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[SERVICE_SLOT]
+local publish_process_state = false
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
-if not process_state or process_state.api_version ~= API_VERSION then
+if process_state and process_state.api_version ~= API_VERSION then
+    error(('Conflicting DwarfUICore tooltip service versions: process has ' ..
+        '%s, requested %s.'):format(tostring(process_state.api_version),
+            tostring(API_VERSION)))
+end
+if not process_state then
     process_state = {
         api_version=API_VERSION,
         registrations=setmetatable({}, {__mode='k'}),
@@ -24,9 +33,13 @@ if not process_state or process_state.api_version ~= API_VERSION then
         revision=0,
         last_sequence=0,
         intent_observer=nil,
-        generation=0,
+        generation=1,
+        runtime_generation=runtime_generation,
     }
-    dfhack.dwarfuicore[SERVICE_SLOT] = process_state
+    publish_process_state = true
+elseif runtime_generation > 0 then
+    assert(process_state.runtime_generation == runtime_generation,
+        'DwarfUICore tooltip service belongs to another runtime generation.')
 end
 
 ---@class dwarfuicore.TooltipIntent
@@ -37,6 +50,7 @@ end
 ---@field anchor_y integer
 ---@field coordinate_space '"screen-cells"'
 ---@field source_root gui.View
+---@field source_identity table
 
 ---Receives each changed immutable intent, or nil when intent is cleared.
 ---@alias dwarfuicore.TooltipIntentObserver fun(intent: dwarfuicore.TooltipIntent|nil, revision: integer)
@@ -52,6 +66,8 @@ end
 ---@field last_sequence integer
 ---@field intent_observer dwarfuicore.TooltipIntentObserver|nil
 ---@field generation integer
+---@field runtime_generation integer
+---@field service? dwarfuicore.TooltipService
 
 ---@class dwarfuicore.TooltipService
 ---@field _state dwarfuicore.TooltipServiceState
@@ -80,6 +96,36 @@ local function get_tooltip(target)
     return value
 end
 
+---Creates an immutable copy of a composite identity for published intent.
+---@param value any
+---@return any
+local function snapshot_identity(value)
+    local copied
+    local recognized = pcall(function()
+        copied = identities.CompositeIdentity.new(value)
+    end)
+    if not recognized then return value end
+    return setmetatable({}, {
+        __index=copied,
+        __newindex=function()
+            error('DwarfUICore tooltip source identities are immutable.', 2)
+        end,
+        __pairs=function()
+            return next, copied, nil
+        end,
+        __metatable=false,
+    })
+end
+
+---Returns whether two opaque or composite target identities are equivalent.
+---@param left any
+---@param right any
+---@return boolean
+local function identities_equal(left, right)
+    if left == right then return true end
+    return identities.CompositeIdentity.equals(left, right)
+end
+
 ---Creates one immutable tooltip-intent snapshot.
 ---@param observation dwarfuicore.TooltipPointerObservation
 ---@param text string
@@ -94,6 +140,7 @@ local function make_intent(observation, text, revision)
         anchor_y=observation.pointer_y,
         coordinate_space='screen-cells',
         source_root=observation.root,
+        source_identity=snapshot_identity(observation.identity),
     }
     return setmetatable({}, {
         __index=values,
@@ -171,15 +218,24 @@ end
 
 ---Registers one tooltip target with deterministic cross-root sequence.
 ---@param widget gui.View
+---@param target_sequence? integer
 ---@return boolean created
-function TooltipService:register(widget)
+function TooltipService:register(widget, target_sequence)
     assert(type(widget) == 'table',
         'DwarfUICore tooltip registration requires a widget table.')
     local state = self._state
     if state.registrations[widget] then return false end
-    state.registration_sequence = state.registration_sequence + 1
+    if target_sequence == nil then
+        state.registration_sequence = state.registration_sequence + 1
+        target_sequence = state.registration_sequence
+    else
+        assert(math.type(target_sequence) == 'integer' and target_sequence > 0,
+            'DwarfUICore tooltip target sequence must be a positive integer.')
+        state.registration_sequence = math.max(
+            state.registration_sequence, target_sequence)
+    end
     state.registrations[widget] = {
-        sequence=state.registration_sequence,
+        sequence=target_sequence,
     }
     return true
 end
@@ -199,7 +255,7 @@ end
 ---@param identity any
 ---@return boolean changed
 function TooltipService:release_target(identity)
-    if self._state.target ~= identity then return false end
+    if not identities_equal(self._state.target, identity) then return false end
     return self:_clear_target()
 end
 
@@ -241,6 +297,7 @@ function TooltipService:accept_pointer_observation(observation)
     if target and not target:is_current() then target = nil end
 
     local identity = target and target:get_identity() or nil
+    observation.identity = identity
     local previous_identity = state.target
     local previous_adapter = state.target_adapter
     if previous_identity ~= identity then
@@ -289,13 +346,8 @@ function TooltipService:get_diagnostics()
     }
 end
 
-service = TooltipService.new(process_state)
-
--- A same-version module reload preserves weak registrations but retires every
--- target, intent, observer closure, and sequence from the previous generation.
-if process_state.generation > 0 or process_state.target or process_state.intent then
-    service:shutdown()
+service = process_state.service or TooltipService.new(process_state)
+process_state.service = service
+if publish_process_state then
+    dfhack.dwarfuicore[SERVICE_SLOT] = process_state
 end
-process_state.intent_observer = nil
-process_state.last_sequence = 0
-process_state.generation = process_state.generation + 1

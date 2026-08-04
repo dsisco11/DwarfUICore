@@ -9,7 +9,8 @@ local PROCESS_STATE_SLOT = 'context_menu_component_probe'
 ---Returns the current-generation public API.
 ---@return table
 local function api()
-    return reqscript('dwarfuicore/context_menu/api')
+    return reqscript('dwarfuicore/services').ContextMenuServiceProvider:new(
+        1, 'test-context-failure')
 end
 
 ---Returns the current-generation service.
@@ -97,7 +98,7 @@ describe('live context-menu failure lifecycle', function()
                 source='overlay',
                 overlay=overlay_name,
             }):raw()
-            assert.is_true(api().register(target, definition()))
+            assert.is_true(api():register(target, definition()))
             ds.await('failure probe context-menu input hook is ready',
                 function()
                     local diagnostics = service():get_diagnostics()
@@ -140,15 +141,15 @@ describe('live context-menu failure lifecycle', function()
             original_capture = nil
 
             target = reload_clean()
-            assert.is_true(api().register(target, definition()))
+            assert.is_true(api():register(target, definition()))
             ds.redraw()
             ds.await('native hook is installed for hook-failure coverage',
                 function()
                     return service():get_diagnostics().hook.native_tracked
                 end)
             hook_state = service()._input_hook._state
-            original_hook_handler = hook_state.handler
-            hook_state.handler = function()
+            original_hook_handler = hook_state.context_handler
+            hook_state.context_handler = function()
                 error('expected input-hook dispatch failure')
             end
             local hook_backing_before = #probe().inputs
@@ -165,11 +166,11 @@ describe('live context-menu failure lifecycle', function()
                 service():get_diagnostics().last_failure.stage)
             assert.equals(1,
                 service():get_diagnostics().hook.failure_count)
-            hook_state.handler = original_hook_handler
+            hook_state.context_handler = original_hook_handler
             original_hook_handler = nil
 
             target = reload_clean()
-            assert.is_true(api().register(target, definition()))
+            assert.is_true(api():register(target, definition()))
             ds.redraw()
             ds.move_pointer(x, y)
             ds.input({_MOUSE_R=true})
@@ -196,7 +197,7 @@ describe('live context-menu failure lifecycle', function()
             screen.menu_window.onInput = original_on_input
 
             target = reload_clean()
-            assert.is_true(api().register(target, definition()))
+            assert.is_true(api():register(target, definition()))
             ds.redraw()
             ds.move_pointer(x, y)
             ds.input({_MOUSE_R=true})
@@ -222,7 +223,7 @@ describe('live context-menu failure lifecycle', function()
             manager._discover_attachment_roots = function()
                 error('expected discovery failure')
             end
-            assert.is_true(api().register(target, definition()))
+            assert.is_true(api():register(target, definition()))
             ds.await('discovery failure disables context handling',
                 function() return service():is_disabled() end)
             local diagnostics = service():get_diagnostics()
@@ -256,7 +257,7 @@ describe('live context-menu failure lifecycle', function()
             sampler.capture = original_capture
         end
         if hook_state and original_hook_handler then
-            hook_state.handler = original_hook_handler
+            hook_state.context_handler = original_hook_handler
         end
         if original_discover then
             registrations()._discover_attachment_roots =

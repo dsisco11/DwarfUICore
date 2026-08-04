@@ -32,9 +32,34 @@ describe('DwarfUICore package contract', function()
     it('declares the DwarfUICore mod identity and root module', function()
         local info = read_source('src/info.txt')
         local root = read_source('src/scripts_modinstalled/dwarfuicore.lua')
+        local rockspec = read_source('dwarfuicore.rockspec')
 
         assert.is_truthy(info:find('[ID:dwarfuicore]', 1, true))
+        assert.is_truthy(info:find('[NUMERIC_VERSION:3]', 1, true))
+        assert.is_truthy(info:find('[DISPLAYED_VERSION:0.3.0]', 1, true))
+        assert.is_truthy(rockspec:find('version = "0.3.0-1"', 1, true))
+        assert.is_truthy(rockspec:find('tag = "v0.3.0"', 1, true))
         assert.is_truthy(root:find('--@ module=true', 1, true))
+    end)
+
+    it('documents the complete public UserPrompt contract', function()
+        local readme = read_source('README.md')
+        for _, required in ipairs({
+                'UserPromptServiceProvider:new(1, \'my-plugin\')',
+                'prompt_map_location',
+                'position_or_nil',
+                'SERVICE_BUSY',
+                'top center of the window border',
+                'consumer-provided line inside the window',
+                'left and right mouse-down events are consumed',
+                'No context menu can open',
+                'Ordinary tooltip state remains',
+                'native map-tile indicator',
+                'surface or world loss',
+                'Prompt handles and APIs become stale',
+            }) do
+            assert.is_truthy(readme:find(required, 1, true), required)
+        end
     end)
 
     it('owns shared infrastructure under the dwarfuicore namespace', function()
@@ -49,6 +74,21 @@ describe('DwarfUICore package contract', function()
             'utils/function_chain.lua',
             'utils/immutable_enum.lua',
             'utils/numbers.lua',
+            'service_provider/contracts.lua',
+            'service_provider/namespace.lua',
+            'service_provider/immutable_proxy.lua',
+            'service_provider/identity.lua',
+            'service_provider/runtime.lua',
+            'service_provider/acquisition.lua',
+            'service_provider/api.lua',
+            'service_provider/tooltip_adapter_v1.lua',
+            'service_provider/context_menu_adapter_v1.lua',
+            'service_provider/user_prompt_adapter_v1.lua',
+            'service_provider/tooltip_provider.lua',
+            'service_provider/context_menu_provider.lua',
+            'service_provider/user_prompt_provider.lua',
+            'service_provider/weak_store.lua',
+            'services.lua',
         }
 
         for _, relative_path in ipairs(shared_modules) do
@@ -56,6 +96,18 @@ describe('DwarfUICore package contract', function()
                 'src/scripts_modinstalled/dwarfuicore/' .. relative_path)
             assert.is_truthy(source:find('--@ module=true', 1, true))
             assert.is_nil(source:find("reqscript('dwarfui/", 1, true))
+        end
+    end)
+
+    it('owns the complete UserPrompt implementation under dwarfuicore',
+            function()
+        for _, relative_path in ipairs({
+                'value.lua', 'indicator.lua', 'input_consumer.lua',
+                'renderer.lua', 'service.lua', 'runtime.lua'}) do
+            local source = read_source(
+                'src/scripts_modinstalled/dwarfuicore/user_prompt/' ..
+                    relative_path)
+            assert.is_truthy(source:find('--@ module=true', 1, true))
         end
     end)
 
@@ -86,7 +138,6 @@ describe('DwarfUICore package contract', function()
 
     it('owns the current tooltip implementation under dwarfuicore', function()
         local tooltip_modules = {
-            'api.lua',
             'map_target.lua',
             'presenter.lua',
             'registration.lua',
@@ -117,7 +168,6 @@ describe('DwarfUICore package contract', function()
     it('owns the current context-menu implementation under dwarfuicore',
             function()
         local context_menu_modules = {
-            'api.lua',
             'definition.lua',
             'input_hook.lua',
             'input_sample.lua',
@@ -148,6 +198,34 @@ describe('DwarfUICore package contract', function()
         end
     end)
 
+    it('ships one authoritative native input-hook owner', function()
+        local owners = {}
+        for _, spec in ipairs(registry.MODULES) do
+            local source = read_source(
+                'src/scripts_modinstalled/' .. spec.name .. '.lua')
+            if source:find('feed_viewscreen_widgets', 1, true) then
+                table.insert(owners, spec.name)
+            end
+        end
+        assert.same({'dwarfuicore/context_menu/input_hook'}, owners)
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/user_prompt/input_hook.lua'))
+    end)
+
+    it('ships one authoritative completed-render hook owner', function()
+        local owners = {}
+        for _, spec in ipairs(registry.MODULES) do
+            local source = read_source(
+                'src/scripts_modinstalled/' .. spec.name .. '.lua')
+            if source:find('render_viewscreen_widgets', 1, true) then
+                table.insert(owners, spec.name)
+            end
+        end
+        assert.same({'dwarfuicore/tooltip/render_hook'}, owners)
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/user_prompt/render_hook.lua'))
+    end)
+
     it('ships every registered Core module and no DwarfUI feature module',
             function()
         assert.is_true(source_exists('src/info.txt'))
@@ -171,5 +249,38 @@ describe('DwarfUICore package contract', function()
             assert.is_false(source_exists(
                 'src/scripts_modinstalled/' .. feature))
         end
+    end)
+
+    it('separates the command root from the public services module', function()
+        local root = read_source('src/scripts_modinstalled/dwarfuicore.lua')
+        local services = read_source(
+            'src/scripts_modinstalled/dwarfuicore/services.lua')
+        assert.is_nil(root:find('TooltipServiceProvider', 1, true))
+        assert.is_nil(root:find('ContextMenuServiceProvider', 1, true))
+        assert.is_truthy(services:find('TooltipServiceProvider', 1, true))
+        assert.is_truthy(services:find('ContextMenuServiceProvider', 1, true))
+        assert.is_truthy(services:find('UserPromptServiceProvider', 1, true))
+        assert.is_nil(root:find('UserPromptServiceProvider', 1, true))
+        assert.is_nil(services:find('function get(', 1, true))
+        assert.is_nil(services:find('get_diagnostics', 1, true))
+    end)
+
+    it('does not ship replaced direct APIs or a compatibility namespace',
+            function()
+        for _, relative_path in ipairs({
+                'dwarfuicore/tooltip/api.lua',
+                'dwarfuicore/context_menu/api.lua',
+            }) do
+            assert.is_false(source_exists('src/scripts_modinstalled/' ..
+                relative_path))
+        end
+
+        local readme = read_source('README.md')
+        local proposal = read_source('Docs/service-provider-api-proposal.md')
+        assert.is_nil(readme:find('dwarfuicore/tooltip/api', 1, true))
+        assert.is_nil(readme:find('dwarfuicore/context_menu/api', 1, true))
+        assert.is_truthy(proposal:find(
+            'No compatibility adapter or legacy namespace is shipped.',
+            1, true))
     end)
 end)

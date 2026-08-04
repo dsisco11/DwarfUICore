@@ -6,7 +6,7 @@ param(
     [string] $DFHackRunner = $env:MOD_COMMAND_RUNNER,
     [string] $DFHackRoot = $env:DFHACK_ROOT,
     [string] $ReloadOutputPath,
-    [string] $EnvFile = '.env.local'
+    [string] $EnvFile = '.env'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -89,8 +89,8 @@ end
 function ContextMenuRegistrationOverlay.overlay_ondisable()
     local state = process_state()
     if state.context_target then
-        reqscript('dwarfuicore/context_menu/api').unregister(
-            state.context_target)
+        reqscript('dwarfuicore/services').ContextMenuServiceProvider:new(
+            1, 'test-context-overlay'):unregister(state.context_target)
         state.context_target = nil
     end
 end

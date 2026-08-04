@@ -62,14 +62,17 @@ local function overlay_root_is_presented(root)
 end
 
 ---Recognizes a current Lua screen or the root borrowed by the native screen.
----@param root gui.View
+---@param root any
 ---@return boolean
 local function default_non_overlay_root_is_presented(root)
+    local native = dfhack.gui.getDFViewscreen(true)
+    if type(root) == 'userdata' and native and
+            native.widgets == root then return true end
+    if type(root) ~= 'table' then return false end
     local screen_native = rawget(root, '_native')
     if screen_native ~= nil then
         return dfhack.gui.getCurViewscreen(true) == screen_native
     end
-    local native = dfhack.gui.getDFViewscreen(true)
     if not native then return false end
     -- Older/custom hosts do not always expose widgets. They retain the
     -- established attached-root behavior, while native DwarfSpec roots use
@@ -121,9 +124,12 @@ function ViewRootResolver:find_root(owner, allow_owner_root)
 end
 
 ---Returns whether a discovered root is laid out and currently presented.
----@param root gui.View
+---@param root any
 ---@return boolean
 function ViewRootResolver:is_presented(root)
+    local native = dfhack.gui.getDFViewscreen(true)
+    if type(root) == 'userdata' and native and
+            native.widgets == root then return true end
     if type(root) ~= 'table' or not root.frame_body then return false end
     if class_helpers.is_instance_of(root, overlay.OverlayWidget) then
         return overlay_root_is_presented(root)

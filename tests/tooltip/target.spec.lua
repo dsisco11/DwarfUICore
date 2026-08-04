@@ -69,11 +69,13 @@ describe('DwarfUICore normalized tooltip targets', function()
             function()
         local root = {}
         local handle = {}
+        local composite_identity = {namespace='plugin', local_identity=1}
         local current = true
         local text = 'Map'
         local registry = {
-            contains=function(_, candidate)
-                return current and candidate == handle
+            contains_identity=function(_, candidate, candidate_identity)
+                return current and candidate == handle and
+                    candidate_identity == composite_identity
             end,
             get_tooltip=function(_, candidate)
                 return candidate == handle and text or nil
@@ -81,11 +83,12 @@ describe('DwarfUICore normalized tooltip targets', function()
         }
         local target = adapters.adapt_map_tile({
             kind=adapters.TooltipPointerObservationKind.TARGET,
-            identity=handle,
+            target=handle,
+            identity=composite_identity,
             source_root=root,
         }, registry)
 
-        assert.is_equal(handle, target:get_identity())
+        assert.is_equal(composite_identity, target:get_identity())
         assert.equals(adapters.TooltipTargetKind.MAP_TILE,
             target:get_kind())
         assert.is_equal(root, target:get_source_root())

@@ -25,7 +25,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@class dwarfuicore.ContextMenuPresentationActions
 ---@field close fun(): boolean
 ---@field select fun(entry_index: integer): boolean
----@field map_session_is_valid fun(): boolean
+---@field session_is_valid fun(): boolean
 ---@field fail fun(stage: string, failure: any)
 
 ---Creates a hidden controller; visible side effects begin only in `show()`.
@@ -42,6 +42,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@class dwarfuicore.ContextMenuServiceState
 ---@field api_version integer
 ---@field generation integer
+---@field runtime_generation integer
 ---@field session dwarfuicore.ContextMenuOpenSession|nil
 ---@field presentation dwarfuicore.ContextMenuPresentationController|nil
 ---@field disabled_generation integer|nil
@@ -49,6 +50,8 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@field last_failure table|nil
 ---@field failure_count integer
 ---@field last_handler_error string|nil
+---@field last_invalid_reason string|nil
+---@field last_close_reason string|nil
 ---@field handler_failure_count integer
 ---@field open_count integer
 ---@field close_count integer
@@ -64,6 +67,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@field _presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field _printer fun(message: string)
 ---@field _started boolean
+---@field _opening_guard fun(): boolean
 ---@field _state_change_callback? function
 ContextMenuService = {}
 ContextMenuService.__index = ContextMenuService
@@ -78,13 +82,15 @@ local function default_printer(message)
     end
 end
 
----Creates a fresh destructively reloadable service state.
+---Creates a fresh service state for the active runtime generation.
 ---@param generation integer
+---@param runtime_generation integer
 ---@return dwarfuicore.ContextMenuServiceState
-local function new_state(generation)
+local function new_state(generation, runtime_generation)
     return {
         api_version=API_VERSION,
         generation=generation,
+        runtime_generation=runtime_generation,
         session=nil,
         presentation=nil,
         disabled_generation=nil,
@@ -92,6 +98,8 @@ local function new_state(generation)
         last_failure=nil,
         failure_count=0,
         last_handler_error=nil,
+        last_invalid_reason=nil,
+        last_close_reason=nil,
         handler_failure_count=0,
         open_count=0,
         close_count=0,
@@ -128,13 +136,30 @@ function ContextMenuService.new(state, options)
         _presentation_factory=options.presentation_factory,
         _printer=options.printer or default_printer,
         _started=false,
+        _opening_guard=function() return false end,
     }, ContextMenuService)
+end
+
+---Sets the private process-wide guard consulted by every opening path.
+---@param guard fun(): boolean
+function ContextMenuService:set_opening_guard(guard)
+    assert(type(guard) == 'function',
+        'DwarfUICore context-menu opening guard must be a function.')
+    self._opening_guard = guard
 end
 
 ---Returns whether one menu session is currently authoritative.
 ---@return boolean
 function ContextMenuService:is_open()
     return self._state.session ~= nil
+end
+
+---Returns the underlying source root retained by the open menu session.
+---@return table|nil root
+function ContextMenuService:get_open_source_root()
+    local session = self._state.session
+    if session == nil then return nil end
+    return session:get_source_root()
 end
 
 ---Returns whether an internal failure disabled this service generation.
@@ -155,13 +180,14 @@ end
 
 ---Closes authoritative state before invoking presentation cleanup.
 ---@return boolean changed
-function ContextMenuService:_close_unprotected()
+function ContextMenuService:_close_unprotected(reason)
     local state = self._state
     local session = state.session
     local presentation = state.presentation
     if not session and not presentation then return false end
     state.session = nil
     state.presentation = nil
+    state.last_close_reason = reason
     local failures = {}
     if presentation then
         local ok, failure = xpcall(function()
@@ -170,6 +196,8 @@ function ContextMenuService:_close_unprotected()
         if not ok then table.insert(failures, tostring(failure)) end
     end
     if session then
+        state.last_invalid_reason = session.get_invalid_reason and
+            session:get_invalid_reason() or nil
         local ok, failure = xpcall(function()
             session:close()
         end, debug.traceback)
@@ -230,8 +258,20 @@ end
 ---@return boolean opened
 function ContextMenuService:_open_unprotected(detection)
     local state = self._state
-    if self:is_disabled() or state.session ~= nil then return false end
+    if self:is_disabled() or state.session ~= nil or self._opening_guard() then
+        return false
+    end
     local candidate = detection.candidate
+    local contributions = {}
+    for index, value in ipairs(detection.candidates or {candidate}) do
+        contributions[index] = {
+            identity=value.identity,
+            definition=value:get_definition_snapshot(),
+            source=value.source,
+            owner=detection.target.kind == TargetKind.MAP_TILE and
+                value.owner or nil,
+        }
+    end
     local session = targets.ContextMenuOpenSession.new{
         definition=candidate:get_definition_snapshot(),
         target=detection.target,
@@ -240,25 +280,35 @@ function ContextMenuService:_open_unprotected(detection)
         source_root=detection.root,
         owner=detection.target.kind == TargetKind.MAP_TILE and
             candidate.owner or nil,
+        contributions=contributions,
     }
     state.session = session
+    local function session_is_valid()
+        if session.is_valid and not session:is_valid() then
+            self:close()
+            return false
+        end
+        local target = session:get_target_descriptor()
+        if target.kind == TargetKind.WIDGET then return true end
+        if self._registrations.validate_open_session then
+            if self._registrations:validate_open_session(session) then return true end
+            self:close()
+            return false
+        end
+        local root = session:get_source_root()
+        local anchor = session:get_anchor_descriptor()
+        local current = root and self._registrations:resolve_open_map_identity(
+            target.registration_identity, root)
+        local pos = current and current.pos
+        local expected = anchor.map_position
+        return pos ~= nil and expected ~= nil and pos.x == expected.x and
+            pos.y == expected.y and pos.z == expected.z
+    end
     local actions = {
-        close=function() return self:close() end,
+        close=function(reason) return self:close(reason) end,
         select=function(entry_index) return self:select(entry_index) end,
-        map_session_is_valid=function()
-            local target = session:get_target_descriptor()
-            if target.kind ~= TargetKind.MAP_TILE then return true end
-            local root = session:get_source_root()
-            local anchor = session:get_anchor_descriptor()
-            local candidate = root and
-                self._registrations:resolve_open_map_identity(
-                    target.registration_identity, root)
-            local pos = candidate and candidate.pos
-            local expected = anchor.map_position
-            return pos ~= nil and expected ~= nil and
-                pos.x == expected.x and pos.y == expected.y and
-                pos.z == expected.z
-        end,
+        session_is_valid=session_is_valid,
+        map_session_is_valid=session_is_valid,
         fail=function(stage, failure)
             self:_disable(stage, failure, true)
         end,
@@ -295,10 +345,10 @@ end
 
 ---Closes the active session through the sole service transition.
 ---@return boolean changed
-function ContextMenuService:close()
+function ContextMenuService:close(reason)
     if self:is_disabled() then return false end
     local ok, changed = xpcall(function()
-        return self:_close_unprotected()
+        return self:_close_unprotected(reason)
     end, debug.traceback)
     if not ok then
         self:_disable('close transition', changed, true)
@@ -318,7 +368,12 @@ function ContextMenuService:select(entry_index)
     assert(numbers.is_integer(entry_index) and
             definition.entries[entry_index] ~= nil,
         'DwarfUICore context-menu selection requires a valid entry index.')
-    local context = session:create_selection_context()
+    if self._registrations.validate_open_session and
+            not self._registrations:validate_open_session(session) then
+        self:close()
+        return false
+    end
+    local context = session:create_selection_context(entry_index)
     if not context then
         self:close()
         return false
@@ -345,6 +400,7 @@ end
 ---@return boolean handled
 function ContextMenuService:handle_opening_input(keys, transport, owner)
     if self:is_disabled() or self._state.session or
+            self._opening_guard() or
             type(keys) ~= 'table' or not keys._MOUSE_R then
         return false
     end
@@ -409,17 +465,24 @@ end
 function ContextMenuService:start()
     if self._started then return false end
     self._started = true
-    self._input_hook:set_failure_handler(function(message)
-        self:_disable('input hook', message, false)
-    end)
+    self._input_hook:set_context_consumer(
+        function(keys, transport, owner)
+            return self:handle_opening_input(keys, transport, owner)
+        end,
+        function(message)
+            self:_disable('input hook', message, false)
+        end)
     self._registrations:set_failure_observer(function(message)
         self:_disable('root discovery', message, false)
     end)
+    if self._registrations.set_removal_observer then
+        self._registrations:set_removal_observer(function(identity)
+            local session = self._state.session
+            if session and session:contains_identity(identity) then self:close() end
+        end)
+    end
     self._registrations:set_menu_open_predicate(function()
         return self:is_open()
-    end)
-    self._input_hook:set_handler(function(keys, transport, owner)
-        return self:handle_opening_input(keys, transport, owner)
     end)
     self:_install_state_change_callback()
     -- Installing the root observer can immediately replay a discovered set,
@@ -440,6 +503,9 @@ function ContextMenuService:shutdown()
     changed = (ok and closed) or changed
     self._registrations:set_root_observer(nil)
     self._registrations:set_failure_observer(nil)
+    if self._registrations.set_removal_observer then
+        self._registrations:set_removal_observer(nil)
+    end
     self._registrations:set_menu_open_predicate(function() return false end)
     changed = self._registrations:shutdown() or changed
     changed = self._input_hook:shutdown() or changed
@@ -463,6 +529,8 @@ function ContextMenuService:get_diagnostics()
         last_failure=state.last_failure,
         failure_count=state.failure_count,
         last_handler_error=state.last_handler_error,
+        last_invalid_reason=state.last_invalid_reason,
+        last_close_reason=state.last_close_reason,
         handler_failure_count=state.handler_failure_count,
         open_count=state.open_count,
         close_count=state.close_count,
@@ -473,25 +541,17 @@ function ContextMenuService:get_diagnostics()
 end
 
 local previous = dfhack.dwarfuicore[SERVICE_SLOT]
-local generation = previous and previous.generation + 1 or 1
-if previous and previous.service and
-        type(previous.service.shutdown) == 'function' then
-    previous.service:shutdown()
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
+if previous and previous.api_version ~= API_VERSION then
+    error(('Conflicting DwarfUICore context-menu service versions: process ' ..
+        'has %s, requested %s.'):format(tostring(previous.api_version),
+            tostring(API_VERSION)))
 end
-
-local state = new_state(generation)
-dfhack.dwarfuicore[SERVICE_SLOT] = state
-
-local registration_manager = registrations.manager
-local input_hook_manager = input_hooks.manager
-local sampler = input_samples.ContextMenuInputSampler.new{
-    has_map_demand=function()
-        return registration_manager:map_registration_count() > 0
-    end,
-}
-local detector = target_detectors.ContextMenuTargetDetector.new{
-    registrations=registration_manager,
-}
+if previous and runtime_generation > 0 then
+    assert(previous.runtime_generation == runtime_generation,
+        'DwarfUICore context-menu service belongs to another runtime generation.')
+end
 
 ---Fails explicitly if invoked before the concrete screen factory is installed.
 ---@return dwarfuicore.ContextMenuPresentationController
@@ -499,11 +559,30 @@ local function unavailable_presentation_factory()
     error('DwarfUICore context-menu presentation is not installed.')
 end
 
-service = ContextMenuService.new(state, {
-    registrations=registration_manager,
-    detector=detector,
-    sampler=sampler,
-    input_hook=input_hook_manager,
-    presentation_factory=unavailable_presentation_factory,
-})
-state.service = service
+if previous then
+    assert(type(previous.service) == 'table',
+        'DwarfUICore context-menu service state is incomplete.')
+    service = previous.service
+else
+    local state = new_state(1, runtime_generation)
+    local registration_manager = registrations.manager
+    local input_hook_manager = input_hooks.manager
+    local sampler = input_samples.ContextMenuInputSampler.new{
+        has_map_demand=function()
+            return registration_manager:map_registration_count() > 0
+        end,
+    }
+    local detector = target_detectors.ContextMenuTargetDetector.new{
+        registrations=registration_manager,
+    }
+    local constructed_service = ContextMenuService.new(state, {
+        registrations=registration_manager,
+        detector=detector,
+        sampler=sampler,
+        input_hook=input_hook_manager,
+        presentation_factory=unavailable_presentation_factory,
+    })
+    state.service = constructed_service
+    dfhack.dwarfuicore[SERVICE_SLOT] = state
+    service = constructed_service
+end

@@ -1,0 +1,763 @@
+local module_loader = require('support.module_loader')
+local repo_root = require('support.repo_root')
+
+---Loads one isolated UserPrompt model stack over controlled process state.
+---@return table context
+local function load_context()
+    local process = {dwarfuicore={service_provider_runtime={generation=7}}}
+    local _, immutable_enum = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
+    local _, contracts = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+            reqscript={
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+            },
+        })
+    local _, namespace = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+    local _, immutable_proxy = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+    local _, identity = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+            globals={dfhack=process},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/namespace']=namespace,
+                ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+            },
+        })
+    local _, value = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/user_prompt/value.lua', {
+            reqscript={
+                ['dwarfuicore/service_provider/namespace']=namespace,
+            },
+        })
+    local _, service = module_loader.load(repo_root,
+        'src/scripts_modinstalled/dwarfuicore/user_prompt/service.lua', {
+            globals={dfhack=process},
+            reqscript={
+                ['dwarfuicore/service_provider/contracts']=contracts,
+                ['dwarfuicore/service_provider/identity']=identity,
+                ['dwarfuicore/service_provider/namespace']=namespace,
+                ['dwarfuicore/user_prompt/value']=value,
+                ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+            },
+        })
+    return {process=process, contracts=contracts, identity=identity,
+        value=value, module=service}
+end
+
+---Creates one request snapshot with test callbacks.
+---@param context table
+---@param namespace? string
+---@param on_select? function
+---@param on_cancel? function
+---@return dwarfuicore.MapLocationPromptRequest request
+local function request(context, namespace, on_select, on_cancel)
+    return context.value.MapLocationPromptRequest.new(namespace or 'owner', {
+        title='Title',
+        message='Message',
+        on_select=on_select or function() end,
+        on_cancel=on_cancel,
+    })
+end
+
+---Creates cleanup stand-ins that append their names to one event log.
+---@param events table
+---@param callback? fun(name: string)
+---@return dwarfuicore.UserPromptCleanupPorts cleanup
+local function cleanup_ports(events, callback)
+    local cleanup = {}
+    for _, name in ipairs{
+            'input', 'render', 'tooltip_suppression', 'indicator',
+            'invalidation'} do
+        cleanup[name] = function()
+            table.insert(events, name)
+            if callback then callback(name) end
+        end
+    end
+    return cleanup
+end
+
+---Asserts one stable internal error category without depending on detail text.
+---@param callback function
+---@param category string
+local function assert_category(callback, category)
+    local ok, failure = pcall(callback)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(failure):find(
+        ('[%s]'):format(category), 1, true), tostring(failure))
+end
+
+describe('UserPrompt state model', function()
+    it('defines immutable complete state and terminal-cause sets', function()
+        local context = load_context()
+        local state = context.module.UserPromptState
+        local availability = context.module.UserPromptAvailability
+        local cause = context.module.UserPromptTerminalCause
+
+        assert.same({IDLE=1, ACTIVATING=2, ACTIVE=3, TERMINATING=4},
+            (function()
+                local copy = {}
+                for key, value in pairs(state) do copy[key] = value end
+                return copy
+            end)())
+        assert.equals(10, (function()
+            local count = 0
+            for _ in pairs(cause) do count = count + 1 end
+            return count
+        end)())
+        assert.same({AVAILABLE=1, TRANSIENT_UNAVAILABLE=2, DISABLED=3,
+            RETIRED=4}, (function()
+                local copy = {}
+                for key, value in pairs(availability) do copy[key] = value end
+                return copy
+            end)())
+        assert.has_error(function() state.OTHER = 99 end)
+        assert.has_error(function() availability.OTHER = 99 end)
+        assert.has_error(function() cause.OTHER = 99 end)
+    end)
+
+    it('rejects a second prompt before cleanup or ownership mutation',
+            function()
+        local context = load_context()
+        local events = {}
+        local state = context.module.new_state(7)
+        local service = context.module.UserPromptService.new(
+            state, cleanup_ports(events))
+        local second_view = context.module.UserPromptService.new(
+            state, cleanup_ports(events))
+        local first = service:start(request(context, 'first'), 1)
+        local before = context.identity.get_process_allocator():snapshot()
+
+        assert_category(function()
+            second_view:start(request(context, 'second'), 1)
+        end, 'SERVICE_BUSY')
+        local after = context.identity.get_process_allocator():snapshot()
+        assert.same(before, after)
+        assert.same({}, events)
+        assert.is_true(service:is_active(first, 'first', 1))
+        local diagnostics = service:get_diagnostics()
+        assert.equals('first', diagnostics.active_namespace)
+        assert.equals(1, diagnostics.admitted_count)
+        assert.equals(1, diagnostics.busy_rejection_count)
+        assert.is_nil(diagnostics.request)
+        assert.is_nil(diagnostics.on_select)
+        assert.is_nil(diagnostics.on_cancel)
+    end)
+
+    it('retains copied request text callbacks and ownership until termination',
+            function()
+        local context = load_context()
+        local source = {
+            title='Original title',
+            message='Original\nmessage',
+            on_select=function() end,
+            on_cancel=function() end,
+        }
+        local snapshot = context.value.MapLocationPromptRequest.new(
+            'owner', source)
+        local observed
+        local cleanup = cleanup_ports({}, function(name)
+            if name == 'input' then
+                observed = {
+                    namespace=snapshot.namespace,
+                    title=snapshot.title,
+                    message=snapshot.message,
+                    on_select=snapshot.on_select,
+                    on_cancel=snapshot.on_cancel,
+                }
+            end
+        end)
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup)
+        service:start(snapshot, 1)
+
+        source.title = 'Changed title'
+        source.message = 'Changed message'
+        source.on_select = function() error('replacement') end
+        source.on_cancel = nil
+        assert.equals('owner', service:get_diagnostics().active_namespace)
+        assert.is_true(service:cancel_active(
+            context.module.UserPromptTerminalCause.ESCAPE))
+        assert.equals('owner', observed.namespace)
+        assert.equals('Original title', observed.title)
+        assert.equals('Original\nmessage', observed.message)
+        assert.is_not_equal(source.on_select, observed.on_select)
+        assert.is_function(observed.on_cancel)
+    end)
+
+    it('clears authoritative state before ordered cleanup and callback',
+            function()
+        local context = load_context()
+        local events = {}
+        local service
+        local cleanup = cleanup_ports(events, function(name)
+            local diagnostics = service:get_diagnostics()
+            assert.is_false(diagnostics.active, name)
+            assert.equals(context.module.UserPromptState.TERMINATING,
+                diagnostics.state, name)
+        end)
+        local callback_position
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup)
+        local handle = service:start(request(context, 'owner', function(pos)
+            table.insert(events, 'select')
+            assert.equals(context.module.UserPromptState.IDLE,
+                service:get_diagnostics().state)
+            callback_position = pos
+            pos.x = 99
+        end, function()
+            table.insert(events, 'cancel')
+        end), 1)
+        local sampled = {x=1, y=2, z=3}
+
+        assert.is_true(service:complete(sampled))
+        assert.same({'input', 'render', 'tooltip_suppression', 'indicator',
+            'invalidation', 'select'}, events)
+        assert.same({x=1, y=2, z=3}, sampled)
+        assert.equals(99, callback_position.x)
+        assert.is_false(service:is_active(handle, 'owner', 1))
+        assert.is_false(service:complete({x=4, y=5, z=6}))
+        local diagnostics = service:get_diagnostics()
+        assert.equals(1, diagnostics.terminal_count)
+        assert.equals(1, diagnostics.completion_count)
+        assert.equals(0, diagnostics.cancellation_count)
+        assert.equals(context.module.UserPromptTerminalCause.LEFT_RELEASE,
+            diagnostics.last_terminal_cause)
+        assert.equals('owner', diagnostics.last_terminal_identity.namespace)
+    end)
+
+    it('covers every terminal cause with mutually exclusive callbacks',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for name, cause in pairs(causes) do
+            local selected = 0
+            local cancelled = 0
+            local service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}))
+            local handle = service:start(request(context, 'owner', function()
+                selected = selected + 1
+            end, function()
+                cancelled = cancelled + 1
+            end), 1)
+
+            local changed
+            if cause == causes.LEFT_RELEASE then
+                changed = service:complete(nil)
+            elseif cause == causes.API_CANCEL then
+                changed = service:cancel(handle, 'owner', 1)
+            elseif cause == causes.NAMESPACE_CLEAR then
+                changed = service:clear_namespace('owner', 1)
+            else
+                changed = service:cancel_active(cause)
+            end
+            assert.is_true(changed, name)
+            assert.equals(cause,
+                service:get_diagnostics().last_terminal_cause, name)
+            assert.equals(cause == causes.LEFT_RELEASE and 1 or 0,
+                selected, name)
+            assert.equals(cause == causes.LEFT_RELEASE and 0 or 1,
+                cancelled, name)
+            assert.is_false(service:cancel_active(causes.ESCAPE), name)
+        end
+    end)
+
+    it('contains cleanup and callback failures without skipping work',
+            function()
+        local context = load_context()
+        local events = {}
+        local cleanup = cleanup_ports(events, function(name)
+            if name == 'render' or name == 'indicator' then
+                error(name .. ' failed')
+            end
+        end)
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup)
+        service:start(request(context, 'owner', nil, function()
+            table.insert(events, 'cancel')
+            error('callback failed')
+        end), 1)
+
+        assert.is_true(service:cancel_active(
+            context.module.UserPromptTerminalCause.INTERNAL_FAILURE))
+        assert.same({'input', 'render', 'tooltip_suppression', 'indicator',
+            'invalidation', 'cancel'}, events)
+        local diagnostics = service:get_diagnostics()
+        assert.is_false(diagnostics.active)
+        assert.equals(context.module.UserPromptState.IDLE, diagnostics.state)
+        assert.equals(2, diagnostics.cleanup_failure_count)
+        assert.equals('render', diagnostics.last_cleanup_failures[1].port)
+        assert.equals('indicator', diagnostics.last_cleanup_failures[2].port)
+        assert.equals(1, diagnostics.callback_failure_count)
+        assert.is_truthy(diagnostics.last_callback_error:find(
+            'callback failed', 1, true))
+    end)
+
+    it('preserves malformed, stale, foreign, then terminal precedence',
+            function()
+        local context = load_context()
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        local current = service:start(request(context, 'owner'), 1)
+        local allocator = context.identity.get_process_allocator()
+        local stale = context.identity.create_prompt_handle(
+            allocator:allocate_identity(6,
+                context.contracts.ServiceKind.USER_PROMPT, 1, 'owner'))
+        local foreign_namespace = context.identity.create_prompt_handle(
+            allocator:allocate_identity(7,
+                context.contracts.ServiceKind.USER_PROMPT, 1, 'other'))
+        local foreign_contract = context.identity.create_prompt_handle(
+            allocator:allocate_identity(7,
+                context.contracts.ServiceKind.USER_PROMPT, 2, 'owner'))
+        local map_handle = context.identity.create_map_handle(
+            allocator:allocate_identity(7,
+                context.contracts.ServiceKind.TOOLTIP, 1, 'owner'))
+
+        assert_category(function() service:is_active({}, 'owner', 1) end,
+            'INVALID_ARGUMENT')
+        assert_category(function()
+            service:is_active(map_handle, 'owner', 1)
+        end, 'INVALID_ARGUMENT')
+        assert_category(function() service:is_active(stale, 'owner', 1) end,
+            'STALE_HANDLE')
+        assert_category(function()
+            service:is_active(foreign_namespace, 'owner', 1)
+        end, 'FOREIGN_HANDLE')
+        assert_category(function()
+            service:is_active(foreign_contract, 'owner', 1)
+        end, 'FOREIGN_HANDLE')
+        assert.is_true(service:cancel(current, 'owner', 1))
+        assert.is_false(service:cancel(current, 'owner', 1))
+        assert.is_false(service:is_active(current, 'owner', 1))
+    end)
+
+    it('retains active requests when handles are collected', function()
+        local context = load_context()
+        local selected = 0
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        local handle = service:start(request(context, 'owner', function()
+            selected = selected + 1
+        end), 1)
+        local weak = setmetatable({handle}, {__mode='v'})
+        handle = nil
+        collectgarbage('collect')
+        collectgarbage('collect')
+
+        assert.is_nil(weak[1])
+        assert.is_true(service:get_diagnostics().active)
+        assert.is_true(service:complete(nil))
+        assert.equals(1, selected)
+    end)
+
+    it('isolates namespace cleanup and blocks same-namespace callback reentry',
+            function()
+        local context = load_context()
+        local service
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        service:start(request(context, 'owner', nil, function()
+            service:start(request(context, 'owner'), 1)
+        end), 1)
+
+        assert.is_false(service:clear_namespace('other', 1))
+        assert.is_true(service:clear_namespace('owner', 1))
+        local diagnostics = service:get_diagnostics()
+        assert.is_false(diagnostics.active)
+        assert.equals(1, diagnostics.callback_failure_count)
+        assert.is_truthy(diagnostics.last_callback_error:find(
+            '[SERVICE_BUSY]', 1, true))
+    end)
+
+    it('allows eligible callbacks to open one replacement without a queue',
+            function()
+        local context = load_context()
+        local service
+        local replacement
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        service:start(request(context, 'first', function()
+            replacement = service:start(request(context, 'second'), 1)
+        end), 1)
+
+        assert.is_true(service:complete(nil))
+        assert.is_true(service:is_active(replacement, 'second', 1))
+        local diagnostics = service:get_diagnostics()
+        assert.equals('second', diagnostics.active_namespace)
+        assert.equals(2, diagnostics.admitted_count)
+        assert.is_nil(diagnostics.queue)
+    end)
+
+    it('admits in exact transactional order and clears committed ownership',
+            function()
+        local context = load_context()
+        local events = {}
+        local resources
+        local service
+        local cleanup = {
+            input=function(_, _, _, current)
+                table.insert(events, 'cleanup-input')
+                current.input_active = false
+            end,
+            render=function(_, _, _, current)
+                table.insert(events, 'cleanup-render')
+                current.render_active = false
+            end,
+            tooltip_suppression=function(_, _, _, current)
+                table.insert(events, 'cleanup-tooltip')
+                current.tooltip_suppressed = false
+            end,
+            indicator=function(_, _, _, current)
+                table.insert(events, 'cleanup-indicator')
+                current.indicator_active = false
+            end,
+            invalidation=function()
+                table.insert(events, 'cleanup-invalidate')
+            end,
+        }
+        local activation = {
+            resolve_surface=function()
+                table.insert(events, 'resolve')
+                return {name='surface'}
+            end,
+            prepare_input=function()
+                table.insert(events, 'prepare-input')
+                return {name='input'}
+            end,
+            prepare_render=function()
+                table.insert(events, 'prepare-render')
+                return {name='render'}
+            end,
+            prepare_indicator=function()
+                table.insert(events, 'prepare-indicator')
+                return {name='indicator'}
+            end,
+            rollback_input=function() table.insert(events, 'rollback-input') end,
+            rollback_render=function() table.insert(events, 'rollback-render') end,
+            rollback_indicator=function()
+                table.insert(events, 'rollback-indicator')
+            end,
+            close_menu=function() table.insert(events, 'close-menu') end,
+            commit=function(current)
+                table.insert(events, 'commit')
+                assert.is_true(service:has_active_prompt())
+                resources = current
+                current.input_active = true
+                current.render_active = true
+                current.tooltip_suppressed = true
+                current.indicator_active = true
+            end,
+            invalidate=function()
+                table.insert(events, 'activate-invalidate')
+            end,
+        }
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup, activation)
+
+        local handle = service:start(request(context), 1)
+        assert.same({'resolve', 'prepare-input', 'prepare-render',
+            'prepare-indicator', 'close-menu', 'commit',
+            'activate-invalidate'}, events)
+        assert.is_true(service:is_active(handle, 'owner', 1))
+        assert.is_true(resources.input_active)
+        assert.is_true(resources.render_active)
+        assert.is_true(resources.tooltip_suppressed)
+        assert.is_true(resources.indicator_active)
+
+        assert.is_true(service:cancel(handle, 'owner', 1))
+        assert.same({'cleanup-input', 'cleanup-render', 'cleanup-tooltip',
+            'cleanup-indicator', 'cleanup-invalidate'},
+            {table.unpack(events, 8)})
+        assert.is_false(resources.input_active)
+        assert.is_false(resources.render_active)
+        assert.is_false(resources.tooltip_suppressed)
+        assert.is_false(resources.indicator_active)
+    end)
+
+    it('rolls back every fallible preparation boundary before menu mutation',
+            function()
+        local context = load_context()
+        for _, failure_stage in ipairs{
+                'resolve', 'input', 'render', 'indicator',
+            } do
+            local events = {}
+            local activation = {
+                resolve_surface=function()
+                    table.insert(events, 'resolve')
+                    if failure_stage == 'resolve' then error('resolve failed') end
+                    return {}
+                end,
+                prepare_input=function()
+                    table.insert(events, 'input')
+                    if failure_stage == 'input' then error('input failed') end
+                    return {}
+                end,
+                prepare_render=function()
+                    table.insert(events, 'render')
+                    if failure_stage == 'render' then error('render failed') end
+                    return {}
+                end,
+                prepare_indicator=function()
+                    table.insert(events, 'indicator')
+                    if failure_stage == 'indicator' then
+                        error('indicator failed')
+                    end
+                    return {}
+                end,
+                rollback_input=function()
+                    table.insert(events, 'rollback-input')
+                end,
+                rollback_render=function()
+                    table.insert(events, 'rollback-render')
+                end,
+                rollback_indicator=function()
+                    table.insert(events, 'rollback-indicator')
+                end,
+                close_menu=function() table.insert(events, 'close-menu') end,
+                commit=function() table.insert(events, 'commit') end,
+                invalidate=function() table.insert(events, 'invalidate') end,
+            }
+            local service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}), activation)
+
+            assert_category(function()
+                service:start(request(context), 1)
+            end, 'INVALID_ARGUMENT')
+            assert.is_false(service:has_active_prompt(), failure_stage)
+            assert.equals(context.module.UserPromptState.IDLE,
+                service:get_diagnostics().state, failure_stage)
+            assert.is_nil((function()
+                for _, event in ipairs(events) do
+                    if event == 'close-menu' or event == 'commit' or
+                            event == 'invalidate' then return event end
+                end
+            end)(), failure_stage)
+            if failure_stage == 'render' then
+                assert.equals('rollback-input', events[#events])
+            elseif failure_stage == 'indicator' then
+                assert.same({'rollback-render', 'rollback-input'},
+                    {events[#events - 1], events[#events]})
+            end
+        end
+
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}), {
+                resolve_surface=function() return nil end,
+                prepare_input=function() error('not reached') end,
+                prepare_render=function() error('not reached') end,
+                prepare_indicator=function() error('not reached') end,
+                rollback_input=function() end,
+                rollback_render=function() end,
+                rollback_indicator=function() end,
+                close_menu=function() error('not reached') end,
+                commit=function() error('not reached') end,
+                invalidate=function() error('not reached') end,
+            })
+        assert_category(function()
+            service:start(request(context), 1)
+        end, 'INVALID_ARGUMENT')
+        assert.is_false(service:has_active_prompt())
+    end)
+
+    it('contains post-commit invalidation failure as prompt cancellation',
+            function()
+        local context = load_context()
+        local cancelled = 0
+        local events = {}
+        local activation = {
+            resolve_surface=function() return {} end,
+            prepare_input=function() return {} end,
+            prepare_render=function() return {} end,
+            prepare_indicator=function() return {} end,
+            rollback_input=function() end,
+            rollback_render=function() end,
+            rollback_indicator=function() end,
+            close_menu=function() table.insert(events, 'close-menu') end,
+            commit=function() table.insert(events, 'commit') end,
+            invalidate=function()
+                table.insert(events, 'activate-invalidate')
+                error('invalidate failed')
+            end,
+        }
+        local service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports(events), activation)
+
+        assert_category(function()
+            service:start(request(context, 'owner', nil, function()
+                cancelled = cancelled + 1
+                table.insert(events, 'cancel')
+            end), 1)
+        end, 'INVALID_ARGUMENT')
+        assert.is_false(service:has_active_prompt())
+        assert.equals(1, cancelled)
+        assert.equals(context.module.UserPromptTerminalCause.INTERNAL_FAILURE,
+            service:get_diagnostics().last_terminal_cause)
+        assert.same({'close-menu', 'commit', 'activate-invalidate',
+            'input', 'render', 'tooltip_suppression', 'indicator',
+            'invalidation', 'cancel'}, events)
+    end)
+
+    it('permits replacement reentry for every consumer-driven terminal path',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, example in ipairs{
+                {cause=causes.LEFT_RELEASE, complete=true},
+                {cause=causes.RIGHT_RELEASE},
+                {cause=causes.ESCAPE},
+                {cause=causes.API_CANCEL, api_cancel=true},
+            } do
+            local service
+            local replacement
+            local callback = function()
+                replacement = service:start(request(context, 'replacement'), 1)
+            end
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}))
+            local handle = service:start(request(context, 'owner',
+                example.complete and callback or nil,
+                example.complete and nil or callback), 1)
+
+            if example.complete then
+                assert.is_true(service:complete(nil))
+            elseif example.api_cancel then
+                assert.is_true(service:cancel(handle, 'owner', 1))
+            else
+                assert.is_true(service:cancel_active(example.cause))
+            end
+            assert.is_true(service:is_active(replacement, 'replacement', 1))
+        end
+    end)
+
+    it('rejects lifecycle callback reentry while restoring later admission',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, cause in ipairs{
+                causes.INPUT_ROOT_LOSS,
+                causes.PRESENTATION_ROOT_LOSS,
+                causes.WORLD_UNLOAD,
+            } do
+            local service
+            local callback_failure
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup_ports({}))
+            service:start(request(context, 'owner', nil, function()
+                local ok, failure = pcall(function()
+                    service:start(request(context, 'replacement'), 1)
+                end)
+                assert.is_false(ok)
+                callback_failure = tostring(failure)
+                local diagnostics = service:get_diagnostics()
+                assert.equals(
+                    context.module.UserPromptAvailability.TRANSIENT_UNAVAILABLE,
+                    diagnostics.availability)
+                assert.equals(cause, diagnostics.unavailable_cause)
+            end), 1)
+
+            assert.is_true(service:cancel_active(cause))
+            assert.is_truthy(callback_failure:find(
+                '[SERVICE_UNHEALTHY]', 1, true))
+            assert.equals(context.module.UserPromptAvailability.AVAILABLE,
+                service:get_diagnostics().availability)
+            local later = service:start(request(context, 'later'), 1)
+            assert.is_true(service:is_active(later, 'later', 1))
+        end
+    end)
+
+    it('disables only UserPrompt after internal or terminal-cleanup failure',
+            function()
+        local context = load_context()
+        local causes = context.module.UserPromptTerminalCause
+        for _, failing_port in ipairs{
+                false, 'input', 'render', 'tooltip_suppression', 'indicator',
+                'invalidation',
+            } do
+            local events = {}
+            local service
+            local callback_count = 0
+            local callback_reentry_failure
+            local cleanup = cleanup_ports(events, function(name)
+                if name == failing_port then error(name .. ' failed') end
+            end)
+            service = context.module.UserPromptService.new(
+                context.module.new_state(7), cleanup)
+            service:start(request(context, 'owner', nil, function()
+                callback_count = callback_count + 1
+                local ok, failure = pcall(function()
+                    service:start(request(context, 'replacement'), 1)
+                end)
+                assert.is_false(ok)
+                callback_reentry_failure = tostring(failure)
+            end), 1)
+
+            local cause = failing_port == false and
+                causes.INTERNAL_FAILURE or causes.API_CANCEL
+            assert.is_true(service:cancel_active(cause))
+            assert.equals(1, callback_count)
+            assert.same({'input', 'render', 'tooltip_suppression', 'indicator',
+                'invalidation'}, events)
+            assert.is_truthy(callback_reentry_failure:find(
+                '[SERVICE_UNHEALTHY]', 1, true))
+            local diagnostics = service:get_diagnostics()
+            assert.equals(context.module.UserPromptAvailability.DISABLED,
+                diagnostics.availability)
+            assert.equals(causes.INTERNAL_FAILURE,
+                diagnostics.unavailable_cause)
+            assert.equals(failing_port == false and 1 or 0,
+                diagnostics.internal_failure_count)
+            if failing_port == false then
+                assert.is_truthy(diagnostics.last_internal_error:find(
+                    'Internal prompt failure.', 1, true))
+            end
+            assert.equals(failing_port == false and 0 or 1,
+                #diagnostics.last_cleanup_failures)
+            assert_category(function()
+                service:start(request(context, 'later'), 1)
+            end, 'SERVICE_UNHEALTHY')
+        end
+    end)
+
+    it('retires idle and active generations before reload callback dispatch',
+            function()
+        local context = load_context()
+        local service
+        local callback_count = 0
+        service = context.module.UserPromptService.new(
+            context.module.new_state(7), cleanup_ports({}))
+        service:start(request(context, 'owner', nil, function()
+            callback_count = callback_count + 1
+            assert.equals(context.module.UserPromptAvailability.RETIRED,
+                service:get_diagnostics().availability)
+            assert_category(function()
+                service:start(request(context, 'replacement'), 1)
+            end, 'SERVICE_UNHEALTHY')
+        end), 1)
+
+        assert.is_true(service:retire_for_reload())
+        assert.equals(1, callback_count)
+        assert.is_false(service:retire_for_reload())
+        assert.equals(context.module.UserPromptAvailability.RETIRED,
+            service:get_diagnostics().availability)
+        assert_category(function()
+            service:start(request(context, 'later'), 1)
+        end, 'SERVICE_UNHEALTHY')
+
+        local failing_cleanup = cleanup_ports({}, function(name)
+            if name == 'indicator' then error('retirement cleanup failed') end
+        end)
+        local failing_service = context.module.UserPromptService.new(
+            context.module.new_state(7), failing_cleanup)
+        failing_service:start(request(context, 'failing'), 1)
+        assert.is_true(failing_service:retire_for_reload())
+        local diagnostics = failing_service:get_diagnostics()
+        assert.equals(context.module.UserPromptAvailability.RETIRED,
+            diagnostics.availability)
+        assert.equals(context.module.UserPromptTerminalCause.CORE_RELOAD,
+            diagnostics.unavailable_cause)
+        assert.equals('indicator',
+            diagnostics.last_cleanup_failures[1].port)
+    end)
+end)

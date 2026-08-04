@@ -52,6 +52,12 @@ local function registration_double()
         self.failure_observer = callback
     end
 
+    ---Stores the contribution-removal observer.
+    ---@param callback function|nil
+    function manager:set_removal_observer(callback)
+        self.removal_observer = callback
+    end
+
     ---Disables registration and discovery for this generation.
     ---@param message string
     ---@return boolean
@@ -101,16 +107,12 @@ end
 local function hook_double()
     local manager = {root_sets={}, shutdown_count=0}
 
-    ---Stores the opening handler.
+    ---Stores the context-menu consumer and failure observer.
     ---@param callback function|nil
-    function manager:set_handler(callback)
+    ---@param failure_handler? function
+    function manager:set_context_consumer(callback, failure_handler)
         self.handler = callback
-    end
-
-    ---Stores the hook-failure handler.
-    ---@param callback function|nil
-    function manager:set_failure_handler(callback)
-        self.failure_handler = callback
+        self.failure_handler = failure_handler
     end
 
     ---Records one root-set reconciliation.
@@ -196,6 +198,16 @@ local function load_harness(state)
         return self.options.source_root
     end
 
+    ---Returns whether this controlled session contains one exact identity.
+    ---@param identity table
+    ---@return boolean
+    function Session:contains_identity(identity)
+        for _, contribution in ipairs(self.options.contributions or {}) do
+            if contribution.identity == identity then return true end
+        end
+        return false
+    end
+
     ---Returns one live controlled callback context.
     ---@return table|nil
     function Session:create_selection_context()
@@ -250,6 +262,7 @@ local function detection(callback)
     local candidate = {
         source={},
         root={},
+        identity={},
         definition={
             entries={{
                 label='Action',
@@ -340,6 +353,47 @@ describe('context-menu service', function()
         assert.is_false(service:is_open())
         assert.equals(1, presentation.closed)
         assert.is_false(service:close())
+    end)
+
+    it('blocks every opening path while the process guard is active', function()
+        local harness = load_harness()
+        local factory, presentation = presenter_factory()
+        local service = create_service(harness, {
+            presentation_factory=factory,
+        })
+        local blocked = true
+        service:set_opening_guard(function() return blocked end)
+
+        assert.is_false(service:open(detection()))
+        assert.is_false(service:handle_opening_input(
+            {_MOUSE_R=true}, 1, {}))
+        assert.is_false(service:is_open())
+        assert.equals(0, presentation.shown)
+
+        blocked = false
+        local opened_detection = detection()
+        assert.is_true(service:open(opened_detection))
+        assert.is_true(service:is_open())
+        assert.is_equal(opened_detection.root,
+            service:get_open_source_root())
+        assert.equals(1, presentation.shown)
+        assert.is_true(service:close())
+        assert.is_nil(service:get_open_source_root())
+    end)
+
+    it('closes an open session synchronously when a contribution is removed',
+            function()
+        local harness = load_harness()
+        local registrations = registration_double()
+        local service = create_service(harness, {registrations=registrations})
+        local target = detection()
+
+        service:start()
+        assert.is_true(service:open(target))
+        assert.is_not_nil(registrations.removal_observer)
+        registrations.removal_observer(target.candidate.identity)
+
+        assert.is_false(service:is_open())
     end)
 
     it('validates an open map session against identity and copied position',
@@ -572,7 +626,7 @@ describe('context-menu service', function()
             harness.process.onStateChange.dwarfuicore_context_menu)
     end)
 
-    it('destructively resets singleton state on module reload', function()
+    it('preserves its compatible singleton state on module reload', function()
         local state = load_harness()
         local factory = presenter_factory()
         state.module.service:set_presentation_factory(factory)
@@ -582,10 +636,11 @@ describe('context-menu service', function()
 
         state = load_harness(state)
 
-        assert.is_false(state.module.service:is_open())
+        assert.is_equal(previous, state.module.service)
+        assert.is_true(state.module.service:is_open())
         assert.is_false(state.module.service:is_disabled())
-        assert.equals(0, state.module.service:get_diagnostics().open_count)
-        assert.is_false(previous:is_open())
-        assert.equals(1, previous_hook.shutdown_count)
+        assert.equals(1, state.module.service:get_diagnostics().open_count)
+        assert.is_true(previous:is_open())
+        assert.equals(0, previous_hook.shutdown_count)
     end)
 end)

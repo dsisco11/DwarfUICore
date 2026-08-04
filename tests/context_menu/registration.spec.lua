@@ -88,6 +88,25 @@ local function load_harness()
         local _, numbers = module_loader.load(repo_root, NUMBERS_PATH)
         local _, immutable_enum =
             module_loader.load(repo_root, IMMUTABLE_ENUM_PATH)
+        local _, immutable_proxy = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+        local _, contracts = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+                reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+            })
+        local _, namespaces = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+        local _, identities = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+                globals={dfhack=dfhack},
+                reqscript={
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
+                    ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+                },
+            })
+        local _, weak_store = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/service_provider/weak_store.lua')
         local _, definitions = module_loader.load(
             repo_root, DEFINITION_PATH, {
                 reqscript={['dwarfuicore/utils/numbers']=numbers},
@@ -95,6 +114,7 @@ local function load_harness()
         local _, targets = module_loader.load(repo_root, TARGET_PATH, {
             reqscript={
                 ['dwarfuicore/context_menu/definition']=definitions,
+                ['dwarfuicore/service_provider/identity']=identities,
                 ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 ['dwarfuicore/utils/numbers']=numbers,
             },
@@ -113,10 +133,14 @@ local function load_harness()
             })
         local _, map_module = module_loader.load(
             repo_root, MAP_TARGET_PATH, {
+                globals={dfhack=dfhack},
                 reqscript={
                     ['dwarfuicore/context_menu/definition']=definitions,
                     ['dwarfuicore/context_menu/target']=targets,
                     ['dwarfuicore/utils/numbers']=numbers,
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/identity']=identities,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
                     ['dwarfuicore/view_root_resolver']=resolver_module,
                 },
             })
@@ -129,6 +153,10 @@ local function load_harness()
                     ['dwarfuicore/context_menu/root_discovery']=discovery_module,
                     ['dwarfuicore/context_menu/target']=targets,
                     ['dwarfuicore/view_root_resolver']=resolver_module,
+                    ['dwarfuicore/service_provider/contracts']=contracts,
+                    ['dwarfuicore/service_provider/identity']=identities,
+                    ['dwarfuicore/service_provider/namespace']=namespaces,
+                    ['dwarfuicore/service_provider/weak_store']=weak_store,
                 },
             })
         return {
@@ -358,7 +386,8 @@ describe('context-menu registration', function()
         local map_identity =
             manager:resolve_map_tile(handle).identity
 
-        assert.equals(widget_identity + 1, map_identity)
+        assert.equals(widget_identity.local_identity + 1,
+            map_identity.local_identity)
         assert.is_true(manager:update_map_tile(handle, {
             pos={x=4, y=5, z=6},
             definition=definition('Moved'),
@@ -453,6 +482,30 @@ describe('context-menu registration', function()
                 #harness.state.root_notifications])
     end)
 
+    it('does not retain a weak widget through its registration callback',
+            function()
+        local harness = load_harness()
+        local manager = harness.create_manager(harness.load_generation())
+        local weak_widget
+        do
+            local widget = harness.widgets.Panel{}
+            local captured_widget = widget
+            weak_widget = setmetatable({widget}, {__mode='v'})
+            assert.is_true(manager:register(widget, {
+                title='Actions',
+                entries={{
+                    label='Capture',
+                    on_select=function() return captured_widget end,
+                }},
+            }))
+        end
+
+        collectgarbage('collect')
+        collectgarbage('collect')
+        assert.is_nil(weak_widget[1])
+        assert.equals(0, manager:registration_count())
+    end)
+
     it('keeps discovery active for an open menu after final unregister',
             function()
         local harness = load_harness()
@@ -498,7 +551,7 @@ describe('context-menu registration', function()
         assert.is_nil(manager:resolve_widget(widget))
     end)
 
-    it('destructively invalidates registrations across module generations',
+    it('preserves compatible registrations across ordinary module loads',
             function()
         local harness = load_harness()
         local first_generation = harness.load_generation()
@@ -507,24 +560,24 @@ describe('context-menu registration', function()
         local owner = harness.widgets.Panel{subviews={widget}}
         harness.present_native(owner)
         first:register(widget, definition())
-        first:register_map_tile{
+        local map_handle = first:register_map_tile{
             owner=owner,
             pos={x=1, y=2, z=3},
             definition=definition('Map'),
         }
+        assert.is_not_nil(map_handle)
         assert.equals(2, first:registration_count())
 
         local second_generation = harness.load_generation()
         local second = second_generation.module.manager
-        assert.equals(0, second:registration_count())
-        assert.equals(0, first:registration_count())
-        assert.is_nil(first:resolve_widget(widget))
-        assert.is_false(first:get_diagnostics().current)
-        assert.has_error(function()
-            first:register(widget, definition('Stale'))
-        end)
+        assert.is_equal(first, second)
+        assert.equals(2, second:registration_count())
+        assert.equals(2, first:registration_count())
+        assert.is_not_nil(first:resolve_widget(widget))
+        assert.is_true(first:get_diagnostics().current)
+        assert.is_false(first:register(widget, definition('Updated')))
         assert.is_true(harness.run_next())
-        assert.is_false(
+        assert.is_true(
             first:get_diagnostics().discovery.running)
     end)
 
@@ -537,11 +590,17 @@ describe('context-menu registration', function()
         local root = harness.widgets.Panel{subviews={widget}}
         harness.present_native(root)
         local original_subviews = #root.subviews
+        local removed_identity
+        manager:set_removal_observer(function(identity)
+            removed_identity = identity
+        end)
         manager:register(widget, definition())
+        local registered_identity = manager:resolve_widget(widget).identity
 
         assert.equals(original_subviews, #root.subviews)
         assert.is_nil(manager.screen)
         assert.is_true(manager:unregister(widget))
+        assert.same(registered_identity, removed_identity)
         assert.is_false(manager:unregister(widget))
         assert.equals(original_subviews, #root.subviews)
         assert.equals(0, manager:registration_count())
@@ -566,11 +625,95 @@ describe('context-menu registration', function()
         assert.is_true(manager:clear())
         local diagnostics = manager:get_diagnostics()
         assert.equals(0, manager:registration_count())
-        assert.equals(0, diagnostics.widget_registration_sequence)
+        assert.is_true(diagnostics.widget_registration_sequence > 0)
         assert.equals(0, diagnostics.map.registration_sequence)
         assert.is_false(diagnostics.discovery.running)
         assert.is_true(diagnostics.current)
         assert.is_true(manager:register(widget, definition('Again')))
         assert.equals(1, manager:registration_count())
+    end)
+
+    it('keeps another namespace contribution and its physical target alive',
+            function()
+        local harness = load_harness()
+        local manager = harness.create_manager(harness.load_generation())
+        local widget = harness.widgets.Panel{}
+        local root = harness.widgets.Panel{subviews={widget}}
+        harness.present_native(root)
+        local removed = {}
+        manager:set_removal_observer(function(value)
+            table.insert(removed, value.namespace)
+        end)
+        assert.is_true(manager:register('alpha', widget, definition('Alpha')))
+        local before = manager:resolve_widget(widget).sequence
+        assert.is_true(manager:register('beta', widget, definition('Beta')))
+        local contributions = manager:resolve_widget_contributions(widget)
+        assert.equals(2, #contributions)
+        assert.equals('alpha', contributions[1].identity.namespace)
+        assert.equals('beta', contributions[2].identity.namespace)
+        assert.is_true(manager:clear_namespace('alpha'))
+        assert.same({'alpha'}, removed)
+        assert.equals(before, manager:resolve_widget(widget).sequence)
+        contributions = manager:resolve_widget_contributions(widget)
+        assert.equals(1, #contributions)
+        assert.equals('beta', contributions[1].identity.namespace)
+    end)
+
+    it('invalidates a composed open session when one namespace is cleared',
+            function()
+        local harness = load_harness()
+        local generation = harness.load_generation()
+        local manager = harness.create_manager(generation)
+        local widget = harness.widgets.Panel{}
+        local root = harness.widgets.Panel{subviews={widget}}
+        harness.present_native(root)
+        assert.is_true(manager:register('alpha', widget, definition('Alpha')))
+        assert.is_true(manager:register('beta', widget, definition('Beta')))
+        local contributions = manager:resolve_widget_contributions(widget)
+        local session = generation.targets.ContextMenuOpenSession.new{
+            definition=contributions[1]:get_definition_snapshot(),
+            target=generation.targets.ContextMenuTargetDescriptor.new(
+                generation.targets.ContextMenuTargetKind.WIDGET,
+                contributions[1].identity),
+            anchor=generation.targets.ContextMenuAnchorDescriptor.screen_position(
+                1, 1),
+            source=contributions[1].source,
+            source_root=root,
+            contributions={
+                {
+                    identity=contributions[1].identity,
+                    definition=contributions[1]:get_definition_snapshot(),
+                    source=contributions[1].source,
+                },
+                {
+                    identity=contributions[2].identity,
+                    definition=contributions[2]:get_definition_snapshot(),
+                    source=contributions[2].source,
+                },
+            },
+        }
+
+        assert.is_true(manager:validate_open_session(session))
+        assert.is_true(manager:clear_namespace('alpha'))
+        assert.is_false(manager:validate_open_session(session))
+        contributions = manager:resolve_widget_contributions(widget)
+        assert.equals(1, #contributions)
+        assert.equals('beta', contributions[1].identity.namespace)
+    end)
+
+    it('reports namespace composition without retaining definitions or callbacks',
+            function()
+        local harness = load_harness()
+        local manager = harness.create_manager(harness.load_generation())
+        local widget = harness.widgets.Panel{}
+        local root = harness.widgets.Panel{subviews={widget}}
+        harness.present_native(root)
+        assert.is_true(manager:register('alpha', widget, definition('Alpha')))
+        local diagnostics = manager:get_diagnostics()
+        assert.equals(1, #diagnostics.widget_contributions)
+        local contribution = diagnostics.widget_contributions[1]
+        assert.equals('alpha', contribution.identity.namespace)
+        assert.is_nil(contribution.definition)
+        assert.is_nil(contribution.on_select)
     end)
 end)

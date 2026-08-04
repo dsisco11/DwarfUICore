@@ -8,15 +8,21 @@ local STATE_SLOT = 'tooltip_render_hook'
 local OVERLAY_RENDER_METHOD = 'render_viewscreen_widgets'
 local SCREEN_RENDER_METHOD = 'onRender'
 local function_chain = reqscript('dwarfuicore/utils/function_chain')
+local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 
 ---@enum dwarfuicore.TooltipRenderTransport
 TooltipRenderTransport = {
     OVERLAY=1,
     SCREEN=2,
 }
+TooltipRenderTransport = immutable_enum.define(
+    TooltipRenderTransport, 'TooltipRenderTransport')
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local process_state = dfhack.dwarfuicore[STATE_SLOT]
+local publish_process_state = false
+local runtime_state = dfhack.dwarfuicore.service_provider_runtime
+local runtime_generation = runtime_state and runtime_state.generation or 0
 
 if process_state and process_state.api_version ~= API_VERSION then
     error(('Conflicting DwarfUICore tooltip render-hook versions: ' ..
@@ -44,8 +50,13 @@ if not process_state then
         reorderable_wrappers=setmetatable({}, {__mode='k'}),
         selected_transport=nil,
         selected_owner=nil,
+        runtime_generation=runtime_generation,
     }
-    dfhack.dwarfuicore[STATE_SLOT] = process_state
+    publish_process_state = true
+elseif runtime_generation > 0 then
+    assert(process_state.runtime_generation <= runtime_generation,
+        'DwarfUICore tooltip render hook belongs to a future runtime generation.')
+    process_state.runtime_generation = runtime_generation
 end
 process_state.failure_count = process_state.failure_count or 0
 process_state.overlay_module_replacement_count =
@@ -75,6 +86,7 @@ process_state.reorderable_wrappers =
 
 ---@class dwarfuicore.TooltipRenderHookState
 ---@field api_version integer
+---@field runtime_generation integer
 ---@field overlay_module table|nil
 ---@field overlay_hook dwarfuicore.TooltipRenderHookRecord|nil
 ---@field screen_hooks table<table, dwarfuicore.TooltipRenderHookRecord>
@@ -260,17 +272,20 @@ function TooltipRenderHookManager:mark_wrapper_reorderable(wrapper)
     return true
 end
 
----Selects and idempotently repairs the exported native-overlay render seam.
+---Idempotently repairs the exported native-overlay render seam.
+---@param select_owner? boolean whether to select this owner after preparation
 ---@return boolean changed
-function TooltipRenderHookManager:ensure_overlay()
+function TooltipRenderHookManager:ensure_overlay(select_owner)
     local state = self._state
     local overlay = require('plugins.overlay')
     local current = overlay[OVERLAY_RENDER_METHOD]
     assert(type(current) == 'function',
         'plugins.overlay.render_viewscreen_widgets must be a function.')
 
-    state.selected_transport = TooltipRenderTransport.OVERLAY
-    state.selected_owner = overlay
+    if select_owner ~= false then
+        state.selected_transport = TooltipRenderTransport.OVERLAY
+        state.selected_owner = overlay
+    end
     local previous = state.overlay_hook
     if state.overlay_module == overlay and previous and
             current == previous.active_trampoline then
@@ -322,10 +337,11 @@ function TooltipRenderHookManager:ensure_overlay()
     return true
 end
 
----Selects and idempotently repairs one Lua screen's effective render seam.
+---Idempotently repairs one Lua screen's effective render seam.
 ---@param owner table
+---@param select_owner? boolean whether to select this owner after preparation
 ---@return boolean changed
-function TooltipRenderHookManager:ensure_screen(owner)
+function TooltipRenderHookManager:ensure_screen(owner, select_owner)
     assert(type(owner) == 'table',
         'DwarfUICore tooltip screen-hook owner must be a table.')
     local current = owner[SCREEN_RENDER_METHOD]
@@ -333,8 +349,10 @@ function TooltipRenderHookManager:ensure_screen(owner)
         'DwarfUICore tooltip screen owner onRender must be a function.')
 
     local state = self._state
-    state.selected_transport = TooltipRenderTransport.SCREEN
-    state.selected_owner = owner
+    if select_owner ~= false then
+        state.selected_transport = TooltipRenderTransport.SCREEN
+        state.selected_owner = owner
+    end
     local previous = state.screen_hooks[owner]
     if previous and current == previous.active_trampoline then
         previous.generation = state.generation
@@ -383,6 +401,14 @@ function TooltipRenderHookManager:ensure_screen(owner)
     state.screen_hooks[owner] = record
     rawset(owner, SCREEN_RENDER_METHOD, trampoline)
     return true
+end
+
+---Selects one already-prepared render owner through non-throwing assignments.
+---@param transport dwarfuicore.TooltipRenderTransport
+---@param owner table
+function TooltipRenderHookManager:select_owner(transport, owner)
+    self._state.selected_transport = transport
+    self._state.selected_owner = owner
 end
 
 ---Clears transport selection without removing installed inert trampolines.
@@ -495,6 +521,7 @@ function TooltipRenderHookManager:get_diagnostics()
             (failure.owner_ref and failure.owner_ref[1])) or nil
     return {
         api_version=state.api_version,
+        runtime_generation=state.runtime_generation,
         generation=state.generation,
         presenter_installed=type(state.presenter) == 'function',
         disabled_generation=state.disabled_generation,
@@ -546,14 +573,9 @@ function TooltipRenderHookManager:get_diagnostics()
     }
 end
 
--- Loading a same-version module generation retires stale presentation
--- closures while preserving installed trampolines and their predecessor
--- chains. The new generation can adopt them with an idempotent ensure call.
-process_state.generation = process_state.generation + 1
-process_state.presenter = nil
-process_state.selected_transport = nil
-process_state.selected_owner = nil
-process_state.disabled_generation = nil
-process_state.last_error = nil
-
-manager = TooltipRenderHookManager.new(process_state)
+manager = process_state.manager or TooltipRenderHookManager.new(process_state)
+setmetatable(manager, TooltipRenderHookManager)
+process_state.manager = manager
+if publish_process_state then
+    dfhack.dwarfuicore[STATE_SLOT] = process_state
+end

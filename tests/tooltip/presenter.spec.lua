@@ -4,6 +4,25 @@ local widget_harness = require('support.widget_harness')
 local _, target_types = module_loader.load(repo_root,
     'src/scripts_modinstalled/dwarfuicore/tooltip/target.lua')
 local ObservationKind = target_types.TooltipPointerObservationKind
+local _, immutable_enum = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/utils/immutable_enum.lua')
+local _, immutable_proxy = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/immutable_proxy.lua')
+local _, contracts = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/contracts.lua', {
+        reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+    })
+local _, namespaces = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/namespace.lua')
+local _, identities = module_loader.load(repo_root,
+    'src/scripts_modinstalled/dwarfuicore/service_provider/identity.lua', {
+        globals={dfhack={}},
+        reqscript={
+            ['dwarfuicore/service_provider/contracts']=contracts,
+            ['dwarfuicore/service_provider/namespace']=namespaces,
+            ['dwarfuicore/service_provider/immutable_proxy']=immutable_proxy,
+        },
+    })
 
 local function load_environment()
     local state = {
@@ -102,6 +121,7 @@ local function load_environment()
             globals={dfhack=process},
             reqscript={
                 ['dwarfuicore/tooltip/target']=target_types,
+                ['dwarfuicore/service_provider/identity']=identities,
             },
         })
     local function load_hook_generation()
@@ -111,6 +131,7 @@ local function load_environment()
                 require_modules={['plugins.overlay']=overlay},
                 reqscript={
                     ['dwarfuicore/utils/function_chain']=function_chain,
+                    ['dwarfuicore/utils/immutable_enum']=immutable_enum,
                 },
             })
         return result
@@ -203,9 +224,11 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         root:updateLayout(widget_harness.rect(0, 0, 40, 20))
         env.state.df_viewscreen = {widgets=root}
         local handle = {}
+        local composite_identity = {namespace='plugin', local_identity=1}
         local registry = {
-            contains=function(_, candidate)
-                return candidate == handle
+            contains_identity=function(_, candidate, candidate_identity)
+                return candidate == handle and
+                    candidate_identity == composite_identity
             end,
             get_tooltip=function(_, candidate)
                 return candidate == handle and 'Map tooltip' or nil
@@ -213,12 +236,18 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         }
         local map_target = env.target_adapter.adapt_map_tile({
             kind=ObservationKind.TARGET,
-            identity=handle,
+            target=handle,
+            identity=composite_identity,
             source_root=root,
         }, registry)
 
         env.service:accept_pointer_observation(
             observation(1, map_target, root, 3, 4))
+        local source_identity = env.service:get_intent().source_identity
+        assert.equals(composite_identity.namespace,
+            source_identity.namespace)
+        assert.equals(composite_identity.local_identity,
+            source_identity.local_identity)
         env.overlay.render_viewscreen_widgets()
 
         local diagnostics = env.tooltip.presenter:get_diagnostics()
@@ -226,6 +255,8 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.equals('Map tooltip',
             env.tooltip.presenter._renderer.label.text)
         assert.equals(1, diagnostics.render_count)
+        assert.equals(composite_identity.local_identity,
+            diagnostics.current_source_identity.local_identity)
         assert.is_equal(root,
             env.service:get_intent().source_root)
     end)
@@ -478,7 +509,297 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         assert.is_false(presenter:start())
     end)
 
-    it('reloads presenter and renderer while adopting one active trampoline',
+    it('can hide presentation without clearing the selected tooltip intent',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Retained tooltip')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+        env.overlay.render_viewscreen_widgets()
+
+        local intent = env.service:get_intent()
+        local selected_owner =
+            env.hook.manager:get_diagnostics().selected_owner
+        env.tooltip.presenter._renderer:set_tooltip(nil, nil, nil, nil)
+
+        assert.is_false(env.tooltip.presenter._renderer.visible)
+        assert.is_equal(intent, env.service:get_intent())
+        assert.is_equal(widget,
+            env.service:get_diagnostics().target)
+        assert.is_equal(selected_owner,
+            env.hook.manager:get_diagnostics().selected_owner)
+
+        env.service:accept_pointer_observation(
+            observation(2, widget, root, 3, 2))
+        env.overlay.render_viewscreen_widgets()
+        assert.is_true(env.tooltip.presenter._renderer.visible)
+        assert.equals('Retained tooltip',
+            env.tooltip.presenter._renderer.label.text)
+        assert.is_equal(widget,
+            env.service:get_diagnostics().target)
+    end)
+
+    it('suppresses only ordinary tooltip painting for an authoritative intent',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Retained tooltip')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+        env.overlay.render_viewscreen_widgets()
+
+        local retained_intent = env.service:get_intent()
+        local frame_paints = env.state.frame_paints
+        local authoritative_renders = 0
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                root, function(painter, transport, owner)
+                    assert.is_not_nil(painter)
+                    assert.equals(env.hook.TooltipRenderTransport.OVERLAY,
+                        transport)
+                    assert.is_equal(env.overlay, owner)
+                    authoritative_renders = authoritative_renders + 1
+                end)
+        local diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_true(diagnostics.authoritative_intent_prepared)
+        assert.is_false(diagnostics.authoritative_intent_active)
+        assert.is_false(diagnostics.tooltip_suppressed)
+        assert.equals(env.hook.TooltipRenderTransport.OVERLAY,
+            diagnostics.authoritative_transport)
+        assert.is_equal(env.overlay, diagnostics.authoritative_owner)
+
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(frame_paints + 1, env.state.frame_paints)
+        assert.equals(0, authoritative_renders)
+        assert.is_false(
+            env.tooltip.presenter:activate_authoritative_intent({}))
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(1, authoritative_renders)
+        assert.equals(frame_paints + 1, env.state.frame_paints)
+        assert.is_equal(retained_intent, env.service:get_intent())
+        assert.is_equal(widget, env.service:get_diagnostics().target)
+        diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_true(diagnostics.authoritative_intent_active)
+        assert.is_true(diagnostics.tooltip_suppressed)
+        assert.equals(1, diagnostics.authoritative_render_count)
+
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+        assert.is_false(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(frame_paints + 2, env.state.frame_paints)
+        assert.equals('Retained tooltip',
+            env.tooltip.presenter._renderer.label.text)
+        assert.is_equal(retained_intent, env.service:get_intent())
+        diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.authoritative_intent_prepared)
+        assert.is_false(diagnostics.authoritative_intent_active)
+        assert.is_false(diagnostics.tooltip_suppressed)
+    end)
+
+    it('classifies the native userdata widget container as an overlay root',
+            function()
+        local env = load_environment()
+        local native_root = io.stdout
+        env.state.df_viewscreen = {widgets=native_root}
+        local renders = 0
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                native_root, function() renders = renders + 1 end)
+
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(1, renders)
+        assert.is_equal(env.overlay,
+            env.tooltip.presenter:get_diagnostics().authoritative_owner)
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+    end)
+
+    it('invalidates and releases render before restoring tooltip suppression',
+            function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Retained tooltip')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+
+        local prepared = env.tooltip.presenter:prepare_authoritative_intent(
+            root, function() end)
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        local invalidations = env.state.invalidations
+        assert.is_false(
+            env.tooltip.presenter:invalidate_authoritative_intent({}))
+        assert.is_true(
+            env.tooltip.presenter:invalidate_authoritative_intent(prepared))
+        assert.equals(invalidations + 1, env.state.invalidations)
+
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_render(prepared))
+        local diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.authoritative_intent_active)
+        assert.is_true(diagnostics.tooltip_suppressed)
+        assert.is_nil(env.hook.manager:get_diagnostics().selected_owner)
+
+        assert.is_true(
+            env.tooltip.presenter:release_tooltip_suppression(prepared))
+        diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.tooltip_suppressed)
+        assert.is_equal(env.overlay,
+            env.hook.manager:get_diagnostics().selected_owner)
+        assert.is_equal(widget, env.service:get_diagnostics().target)
+        assert.is_false(
+            env.tooltip.presenter:release_authoritative_render(prepared))
+        assert.is_false(
+            env.tooltip.presenter:release_tooltip_suppression(prepared))
+    end)
+
+    it('keeps an authoritative intent on its exact prepared screen root',
+            function()
+        local env = load_environment()
+        local first_native = {}
+        local first = env.ZScreen{_native=first_native}
+        first:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        local second_native = {}
+        local second = env.ZScreen{_native=second_native}
+        second:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        local second_target = target('Second tooltip')
+        env.service:register(second_target)
+        env.state.cur_viewscreen = second_native
+        env.service:accept_pointer_observation(
+            observation(1, second_target, second, 3, 4))
+
+        local authoritative_renders = 0
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                first, function(_, transport, owner)
+                    assert.equals(env.hook.TooltipRenderTransport.SCREEN,
+                        transport)
+                    assert.is_equal(first, owner)
+                    authoritative_renders = authoritative_renders + 1
+                end)
+        local selected = env.hook.manager:get_diagnostics()
+        assert.is_equal(second, selected.selected_owner)
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        selected = env.hook.manager:get_diagnostics()
+        assert.is_equal(first, selected.selected_owner)
+
+        env.service:accept_pointer_observation(
+            observation(2, second_target, second, 4, 5))
+        assert.is_equal(first,
+            env.hook.manager:get_diagnostics().selected_owner)
+        env.state.cur_viewscreen = first_native
+        second:onRender()
+        env.overlay.render_viewscreen_widgets()
+        assert.equals(0, authoritative_renders)
+        first:onRender()
+        assert.equals(1, authoritative_renders)
+
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+        assert.is_equal(second,
+            env.hook.manager:get_diagnostics().selected_owner)
+        env.state.cur_viewscreen = second_native
+        second:onRender()
+        assert.equals('Second tooltip',
+            env.tooltip.presenter._renderer.label.text)
+        assert.equals(1, authoritative_renders)
+    end)
+
+    it('rolls back preparation and retires stale intent across Core reload',
+            function()
+        local env = load_environment()
+        local invalid_root = env.widgets.Panel{}
+        assert.has_error(function()
+            env.tooltip.presenter:prepare_authoritative_intent(
+                invalid_root, function() end)
+        end, 'DwarfUICore authoritative presentation root is unsupported.')
+        assert.has_error(function()
+            env.tooltip.presenter:prepare_authoritative_intent(
+                {}, 'invalid')
+        end, 'DwarfUICore authoritative presentation intent requires present().')
+
+        local native = {}
+        local screen = env.ZScreen{_native=native}
+        screen:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.cur_viewscreen = native
+        local renders = 0
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                screen, function() renders = renders + 1 end)
+        local trampoline = screen.onRender
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+        assert.is_equal(trampoline, screen.onRender)
+        screen:onRender()
+        assert.equals(1, renders)
+
+        local retired = env.tooltip.presenter
+        assert.is_true(retired:retire_for_reload())
+        assert.is_true(prepared.released)
+        assert.is_false(prepared.active)
+        assert.is_false(retired:get_diagnostics().tooltip_suppressed)
+        screen:onRender()
+        assert.equals(1, renders)
+
+        env.process.dwarfuicore.tooltip_runtime = nil
+        local next_hook = env.load_hook_generation()
+        local next_tooltip = env.load_tooltip_generation(next_hook)
+        assert.is_not_equal(retired, next_tooltip.presenter)
+        assert.is_equal(trampoline, screen.onRender)
+        screen:onRender()
+        assert.equals(1, renders)
+        assert.is_false(
+            next_tooltip.presenter:get_diagnostics().tooltip_suppressed)
+        assert.is_false(
+            next_tooltip.presenter:get_diagnostics().authoritative_intent_active)
+    end)
+
+    it('clears ownership before best-effort tooltip restoration', function()
+        local env = load_environment()
+        local root = env.widgets.Panel{}
+        root:updateLayout(widget_harness.rect(0, 0, 40, 20))
+        env.state.df_viewscreen = {widgets=root}
+        local widget = target('Recovery target')
+        env.service:register(widget)
+        env.service:accept_pointer_observation(
+            observation(1, widget, root, 2, 2))
+        local prepared =
+            env.tooltip.presenter:prepare_authoritative_intent(
+                root, function() end)
+        assert.is_true(
+            env.tooltip.presenter:activate_authoritative_intent(prepared))
+
+        local trampoline = env.overlay.render_viewscreen_widgets
+        env.overlay.render_viewscreen_widgets = nil
+        assert.is_true(
+            env.tooltip.presenter:release_authoritative_intent(prepared))
+        local diagnostics = env.tooltip.presenter:get_diagnostics()
+        assert.is_false(diagnostics.authoritative_intent_active)
+        assert.is_false(diagnostics.tooltip_suppressed)
+        assert.is_truthy(diagnostics.last_authoritative_cleanup_error)
+        assert.is_nil(
+            env.hook.manager:get_diagnostics().selected_owner)
+        env.overlay.render_viewscreen_widgets = trampoline
+    end)
+
+    it('preserves presenter, renderer, and trampoline across module loads',
             function()
         local env = load_environment()
         local root = env.widgets.Panel{}
@@ -499,19 +820,19 @@ describe('DwarfUICore intent-driven tooltip presenter', function()
         local next_hook = env.load_hook_generation()
         local next_tooltip = env.load_tooltip_generation(next_hook)
         local diagnostics = next_hook.manager:get_diagnostics()
-        assert.is_not_equal(first_presenter, next_tooltip.presenter)
-        assert.is_not_equal(first_renderer,
+        assert.is_equal(first_presenter, next_tooltip.presenter)
+        assert.is_equal(first_renderer,
             next_tooltip.presenter._renderer)
         assert.is_equal(trampoline,
             env.overlay.render_viewscreen_widgets)
-        assert.equals(first_generation + 1, diagnostics.generation)
+        assert.equals(first_generation, diagnostics.generation)
         assert.equals(diagnostics.generation,
             diagnostics.overlay.generation)
         assert.is_true(diagnostics.overlay.outermost)
 
         env.overlay.render_viewscreen_widgets()
-        assert.equals(1, first_presenter:get_diagnostics().render_count)
-        assert.equals(1,
+        assert.equals(2, first_presenter:get_diagnostics().render_count)
+        assert.equals(2,
             next_tooltip.presenter:get_diagnostics().render_count)
         assert.equals(2,
             next_hook.manager:get_diagnostics().render_count)

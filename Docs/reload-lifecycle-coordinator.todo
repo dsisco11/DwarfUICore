@@ -30,6 +30,8 @@ implementation and evidence are complete.
 - [ ] Do not implement pre-coordinator adoption, legacy-state inspection, or an
   upgrade-in-place adapter.
 - [ ] Do not install packages or automatically restart Dwarf Fortress.
+- [ ] Do not change production startup behavior or add a startup detector, gate,
+  or automatic coordinator-activation path.
 - [ ] Keep the first-activation restart operator-controlled and do not perform
   live coordinator activation before that restart is confirmed.
 
@@ -393,6 +395,11 @@ knowledge of service-specific process state or owner shapes.
 - [ ] Extend command and service-runtime tests for all successful, disabled,
   malformed, retryable, restart-required, current/older, and future-record
   branches.
+- [ ] Prove through production call-site inspection and focused tests that
+  coordinator recovery operations are invoked only by the explicit reload
+  transaction after the service runtime has entered retiring state.
+- [ ] Prove ordinary module loading, service acquisition, API invocation, and
+  handle validation never invoke coordinator recovery.
 - [ ] Perform a follow-up review proving `command.lua` contains orchestration
   only before marking this phase complete.
 
@@ -404,6 +411,8 @@ Completion criteria:
   required cleanup gates pass.
 - [ ] Current/older failure advances to disabled; future failure disables
   without advancement.
+- [ ] Coordinator recovery has no production entry path outside explicit reload
+  after retiring state begins.
 - [ ] Command and service-runtime focused suites pass.
 
 ## Phase 9: Registry, syntax, and package integration

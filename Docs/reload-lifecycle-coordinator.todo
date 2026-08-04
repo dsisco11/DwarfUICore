@@ -82,8 +82,9 @@ Completion criteria:
   reconstruction failures, stale objects, and trampoline identity are covered
   by focused tests with recorded terminal results.
 - [ ] Every initial lifecycle owner is mapped to an explicit proposed policy.
-- [ ] The approved per-owner quiescence invariant remains recorded consistently
-  in the proposal and characterization tests.
+- [ ] The approved per-owner quiescence invariant is documented as an intended
+  coordinator delta without requiring the pre-coordinator baseline to satisfy
+  it.
 
 ## Phase 2: Add lifecycle contracts and process-stable coordinator state
 
@@ -108,9 +109,9 @@ registration exist without yet replacing command orchestration.
     to match the service runtime generation.
   - [ ] Key records by runtime generation plus owner identifier so a partial
     successor cannot overwrite an older owner.
-  - [ ] Implement registration validation for identifiers, positive matching
-    generation, recognized order, callbacks, uniqueness, and exact captured
-    state.
+  - [ ] Implement structural registration validation for identifiers, positive
+    matching generation, recognized order, callback function types, and
+    uniqueness.
   - [ ] Return an opaque internal token for construction rollback and private
     diagnostics.
   - [ ] Reject malformed or untrusted records without invoking callbacks and
@@ -235,6 +236,8 @@ existing render trampoline remains process-stable and adoptable.
   - [ ] Prevent double presentation during retirement or adoption.
 - [ ] Extend tooltip runtime, service, registration, presenter, and render-hook
   tests for complete and partial publication topologies.
+- [ ] Prove tooltip quiescence, retirement, and discard callbacks act only on
+  their exact captured owner state and cannot mutate replacement state.
 - [ ] Prove old tooltip APIs and handles remain stale after advancement and are
   never made current by coordinator recovery.
 - [ ] Perform a follow-up review of tooltip owner coverage and exact trampoline
@@ -268,6 +271,8 @@ ownership participate in generic coordinator recovery.
   - [ ] Do not make this hook adoptable.
 - [ ] Cover failure before and after each context-menu publication/registration
   boundary and prove rollback or retained tracking.
+- [ ] Prove context-menu quiescence, retirement, and discard callbacks act only
+  on their exact captured owner state and cannot mutate replacement state.
 - [ ] Extend context-menu service, registration, input-hook, command reload,
   and failure-lifecycle tests.
 - [ ] Preserve the required ordering after UserPrompt cancellation and before
@@ -300,6 +305,8 @@ deterministic recovery order without invoking consumer callbacks unsafely.
   callable dispatch before fallible retirement.
 - [ ] Add failure injection around state-change callback removal, active-work
   cancellation, shared-owner release, retirement, and discard.
+- [ ] Prove UserPrompt quiescence, retirement, and discard callbacks act only on
+  their exact captured owner state and cannot mutate replacement state.
 - [ ] Extend UserPrompt runtime, service, input-consumer, lifecycle, and command
   reload tests.
 - [ ] Perform a follow-up review of UserPrompt-first ordering and shared-owner

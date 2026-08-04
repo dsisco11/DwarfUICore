@@ -30,8 +30,8 @@ APIs. It remains private and provides no consumer-visible lifecycle methods.
 This design removes service slot names, service object shapes, and duplicated
 generation comparison from `dwarfuicore/command.lua`. It also makes failed
 reconstruction attempt cleanup of everything it successfully published,
-discard every successfully retired owner, and retain failed cleanup records
-before leaving the successor runtime disabled.
+attempt discard of every successfully retired owner, and retain failed
+retirement or discard records before leaving the successor runtime disabled.
 
 ## Motivation
 
@@ -447,7 +447,8 @@ the command must:
    successor generation;
 2. attempt every eligible quiescence and retirement despite individual
    failures;
-3. discard successfully retired successor records;
+3. attempt to discard every successfully retired successor record and retain
+   any `RETIRED` record whose discard fails;
 4. clear the service runtime's partial service and facade caches;
 5. mark the successor generation disabled; and
 6. report both the reconstruction failure and any cleanup failures.
@@ -461,7 +462,9 @@ cannot be retried in-process and is reported as requiring process restart.
 Modules must publish and register transactionally so failure before
 registration leaves no process-owned state. Focused tests must inject failure
 after each publication boundary to prove that every partial topology is either
-cleaned immediately or remains tracked for retry.
+cleaned immediately, remains tracked for in-process retirement or discard
+retry, or remains tracked as diagnostic-only `QUIESCE_FAILED` state pending
+process restart.
 
 ## Ordinary generation validation
 
@@ -610,14 +613,21 @@ The proposal is satisfied only when all of the following are proven:
 - Failed retirement or discard of a current- or older-generation record
   advances the runtime generation, leaves the successor disabled, preserves
   retry records, and rejects old APIs and handles as stale.
-- Failed cleanup of a future-generation record leaves the current generation
-  disabled without advancement, preserves the record for retry when safe, and
-  blocks reconstruction. Existing same-generation APIs and handles reject that
-  disabled runtime as `SERVICE_UNHEALTHY`.
+- Failed retirement or discard of a future-generation record leaves the current
+  generation disabled without advancement, preserves the record for in-process
+  retry, and blocks reconstruction.
+- A future-generation `QUIESCE_FAILED` record also disables the current runtime
+  without advancement and blocks reconstruction, but remains diagnostic-only
+  until the required process restart.
+- Existing same-generation APIs and handles reject a runtime disabled by either
+  future-generation failure as `SERVICE_UNHEALTHY`.
 - A failed reconstruction attempts quiescence and retirement of every
-  successfully published successor owner, discards every successfully retired
-  owner, and retains each safely inactive failed record before returning.
-- A corrected retry reaches a healthy later generation.
+  successfully published successor owner, attempts discard of every
+  successfully retired owner, and retains each `RETIRE_FAILED` or
+  discard-failed `RETIRED` record for retry before returning. It retains each
+  `QUIESCE_FAILED` record for diagnostics pending process restart.
+- A corrected retry of a retryable retirement or discard failure reaches a
+  healthy later generation.
 - Tooltip presenter retirement preserves the exact render trampoline, and the
   successor generation adopts it without double presentation.
 - Ordinary module loading and service use still reject split-generation state.

@@ -70,8 +70,6 @@ should declare how their own process state is retired and discarded.
 - Preserve reload-safe hook trampolines for successor adoption.
 - Preserve strict generation validation for ordinary service acquisition, API
   invocation, handle validation, and module construction.
-- Support an in-process upgrade from the process state created by the current
-  implementation.
 - Keep the coordinator private and out of the public service-provider
   contract.
 
@@ -83,10 +81,12 @@ should declare how their own process state is retired and discarded.
   intent, or public API validity across explicit Core reload.
 - Automatically reloading DwarfUI or another consumer plugin.
 - Adding a general plugin lifecycle framework for non-DwarfUICore code.
+- Migrating process state created by a pre-coordinator DwarfUICore runtime.
 - Replacing all process-owned slots with one generation container in this
   change.
-- Installing packages, restarting Dwarf Fortress, or changing production
-  startup behavior.
+- Installing packages, automatically restarting Dwarf Fortress, or changing
+  production startup behavior. The required first-activation restart remains
+  operator-controlled.
 
 ## Architectural boundary
 
@@ -94,25 +94,20 @@ should declare how their own process state is retired and discarded.
 
 `dwarfuicore/command.lua` should own only transaction orchestration:
 
-1. load the module registry, service runtime, reload coordinator, and, while
-   upgrade-in-place migration is supported, the transitional adapter;
+1. load the module registry, service runtime, and reload coordinator;
 2. ask the service runtime to enter retiring state;
-3. ask the transitional adapter to adopt untracked legacy owners into the
-   coordinator;
-4. ask the coordinator to recover every structurally valid tracked lifecycle
+3. ask the coordinator to recover every structurally valid tracked lifecycle
    owner;
-5. advance to an initializing successor generation;
-6. discard successfully retired generation-owned state;
-7. clear and reconstruct registered module environments;
-8. publish the successor runtime as healthy; and
-9. on failure, retire and discard eligible partial successor state before publishing a
+4. advance to an initializing successor generation;
+5. discard successfully retired generation-owned state;
+6. clear and reconstruct registered module environments;
+7. publish the successor runtime as healthy; and
+8. on failure, retire and discard eligible partial successor state before publishing a
    disabled runtime.
 
 The command must not name tooltip, context-menu, UserPrompt, presenter,
 registration-manager, or hook-manager process slots. It must not inspect an
-owner object or compare an owner's generation itself. Loading and invoking the
-generic transitional adapter does not transfer legacy slot knowledge into the
-command.
+owner object or compare an owner's generation itself.
 
 ### Reload coordinator owns
 
@@ -124,16 +119,7 @@ The proposed private module `dwarfuicore/reload_coordinator` owns:
 - record state transitions and retry behavior;
 - best-effort invocation and aggregate failure reporting;
 - discard eligibility;
-- private diagnostics for tests and reload failure reports; and
-- adoption of transitional records produced from pre-coordinator process
-  state.
-
-The coordinator also owns a privileged legacy-adoption operation. It is
-available only while the service runtime is retiring, accepts records whose
-generation is any positive integer, and applies the same identity, callback,
-uniqueness, and ordering validation as normal registration. A generation later
-than the retiring runtime is retained as a reported recovery anomaly, not
-rejected or made current. Ordinary construction cannot call this operation.
+- private diagnostics for tests and reload failure reports.
 
 The coordinator must start with `--@ module=true`, export through the DFHack
 module environment, and be registered in `dwarfuicore/module_registry.lua`
@@ -244,20 +230,6 @@ selection inside explicit reload.
 If coordinator registration fails, the constructing module must undo its
 publication before returning the failure. It must not leave untracked process
 state behind.
-
-### Legacy adoption contract
-
-The transitional adapter exposes an operation equivalent to
-`adopt_untracked(coordinator, retiring_generation)`. The command invokes it
-after `begin_reload()` and before `recover_tracked_owners()`.
-
-The adapter inspects only known pre-coordinator process state and submits each
-captured owner through the coordinator's privileged legacy-adoption operation.
-The coordinator, not the adapter, validates that the service runtime is
-retiring and that every adopted generation is a positive integer. It records a
-diagnostic anomaly when an adopted generation is later than the retiring
-generation. This path is not a relaxed form of `register_owner()` and is not
-available during initialization or ordinary service construction.
 
 ## Quiescence and retirement contract
 
@@ -383,9 +355,6 @@ Any change to a listed policy requires an explicit proposal amendment.
 | `context_menu_input_hook` | Generation-owned and destructively retired | Release priority consumers, restore/remove owned native and screen hooks through `shutdown()`, and discard its process state. It is not adoptable under this proposal. |
 | `user_prompt_service` and its runtime callback ownership | Generation-owned | Remove the state-change callback, cancel active work with the Core-reload cause, release shared input/render ownership, and discard exact service state. |
 
-The transitional adapter must map legacy state to this same inventory instead
-of inventing a separate migration policy.
-
 ## Reload transaction
 
 The successful transaction is:
@@ -464,63 +433,47 @@ The following behavior remains unchanged:
 
 Only explicit reload may invoke coordinator recovery.
 
-## Upgrade-in-place migration
+## Process restart compatibility boundary
 
-The first coordinator-bearing release must recover state created by the
-current pre-coordinator implementation. That process state has no coordinator
-records, so normal registration cannot account for it retroactively.
+The coordinator does not adopt process state created by a pre-coordinator
+DwarfUICore runtime. Such state has no trusted coordinator record, quiescence
+callback, or transactional publication proof. Introducing the coordinator
+therefore requires the operator to restart Dwarf Fortress before the
+coordinator-bearing runtime is initialized.
 
-A private transitional adapter should inspect the known legacy process slots
-without loading generation-sensitive service modules. It should create
-coordinator records that capture exact legacy objects and their existing
-retirement methods. This is the only component allowed to know the old slot
-layout.
+Activating the coordinator-bearing runtime requires a documented process
+restart. Source-reloading coordinator-bearing code into a process that ran the
+pre-coordinator implementation is unsupported and must not be attempted. No
+runtime detector, adapter, or old-owner inspection is required. After restart,
+every process-owned subsystem is constructed by coordinator-aware code and
+registered transactionally from its first publication.
 
-The command loads this adapter with the other transaction modules, enters the
-runtime's retiring state, and calls `adopt_untracked()` before the coordinator
-selects retirement records. The adapter uses only the coordinator's privileged
-legacy-adoption operation; it cannot use ordinary registration to bypass the
-current-generation requirement. Structurally valid future-labeled legacy state
-is adopted as an anomaly so the coordinator can retire it rather than strand
-it outside lifecycle tracking.
-
-The adapter must:
-
-- run only when the coordinator has no record for the captured legacy state;
-- use exact object identity in every discard callback;
-- preserve reload-safe tooltip render-hook state;
-- cover complete and partial tooltip, context-menu, and UserPrompt ownership;
-- be idempotent across failed reload attempts; and
-- expose private diagnostics identifying migrated records.
-
-After migration, `command.lua` uses only the coordinator. The current
-`PROCESS_OWNER_SLOTS`, tooltip slot inspection, and service-specific teardown
-fallbacks are removed from the command. The transitional adapter may remain
-for compatibility with in-process upgrades, but new modules must never publish
-unregistered state through it.
+Source reload remains supported after that restart. All state created by the
+coordinator-bearing runtime is tracked and can use the normal recovery
+contract, including disabled, partial, stale-labeled, and future-labeled owner
+records.
 
 ## Module and package organization
 
 The implementation should add private modules equivalent to:
 
 - `dwarfuicore/reload_contracts` for immutable numeric lifecycle enums;
-- `dwarfuicore/reload_coordinator` for process state and operations; and
-- `dwarfuicore/reload_legacy` for pre-coordinator state migration.
+- `dwarfuicore/reload_coordinator` for process state and operations.
 
 Exact names may be refined during checklist review, but responsibilities must
 remain separated. The modules must be added to `module_registry.lua` in
 dependency order, included in syntax and package checks, and remain absent from
 the public `dwarfuicore/services` exports.
 
-## Migration sequence
+## Implementation sequence
 
 1. Characterize current successful reload, split-generation recovery,
    teardown failure, reconstruction retry, stale API/handle rejection, and
    trampoline identity behavior.
 2. Add coordinator contracts, state validation, registration, deterministic
    retirement, discard, aggregation, retry, and diagnostics tests.
-3. Add the transitional adapter and prove upgrade from complete and partial
-   pre-coordinator process state.
+3. Document and observe the required process restart before first activation
+   or live validation of coordinator-bearing code.
 4. Register tooltip generation-owned state and preserve render-hook adoption.
 5. Register context-menu owners, including partial construction boundaries.
 6. Register UserPrompt owners and preserve cancellation-before-shared-owner
@@ -532,9 +485,10 @@ the public `dwarfuicore/services` exports.
 10. Run the complete acceptance evidence without modifying installed
     packages.
 
-Each migration step must keep focused tests green. The command-level legacy
-recovery implementation is removed only after the transitional adapter covers
-the same complete and partial process states.
+Each implementation step must keep focused tests green. The current
+command-level recovery implementation is removed only after coordinator-aware
+modules cover the same complete and partial process states created after
+restart.
 
 ## Alternatives rejected
 
@@ -568,9 +522,9 @@ direction now.
 ### Clean only after reconstruction failure
 
 Immediate rollback prevents newly failed generations from leaking state, but
-it cannot recover legacy state, interrupted cleanup, or an already disabled
-split generation. The coordinator must support both immediate rollback and
-later explicit recovery.
+it cannot finish interrupted cleanup or recover an already disabled split
+generation. The coordinator must support both immediate rollback and later
+explicit recovery for coordinator-tracked state.
 
 ## Acceptance criteria
 
@@ -589,8 +543,8 @@ The proposal is satisfied only when all of the following are proven:
 - Successful records retire exactly once; failed idempotent records can be
   retried.
 - Discard cannot clear replacement state.
-- Complete and partial legacy process states migrate without loading stale
-  service modules.
+- First activation and live validation occur only after the required process
+  restart; no in-process pre-coordinator migration is attempted.
 - Every structurally valid future-labeled owner is reported as anomalous,
   quiesced, retired, and exactly discarded before normal single-step runtime
   advancement and reconstruction.
@@ -617,8 +571,8 @@ The proposal is satisfied only when all of the following are proven:
 
 Adopt the reload lifecycle coordinator plus immediate failed-reconstruction
 cleanup. Keep generation validation strict everywhere outside explicit reload,
-preserve stable hook identities through explicit adoption, and isolate
-pre-coordinator slot knowledge in a transitional adapter.
+preserve stable hook identities through explicit adoption, and require a
+process restart before first activating the coordinator-bearing runtime.
 
 This is the smallest architecture that corrects ownership direction, handles
 both current and future split-generation failures, and allows the reload

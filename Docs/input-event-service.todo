@@ -1,0 +1,536 @@
+# Input Event Service Implementation Plan
+
+Source proposal: `Docs/input-event-service-proposal.md`
+
+## Goal
+
+Implement contract major 1 of the namespace-bound `InputEventServiceProvider`
+and its process-wide shared input runtime. The implementation must centralize
+native/Lua input interception, synchronous input snapshots, continuous pointer
+sampling, private Core arbitration, and public `MAP_CLICK`/`RAW_CLICK`
+interception and observation without moving tooltip, context-menu, or UserPrompt
+policy into the generic service.
+
+The common `MAP_CLICK` contract means that a host-classified mouse input occurred
+over an exact map tile and complete generic UI resolution proved that no UI
+element obstructed it. `RAW_CLICK` means only that a host-classified mouse input
+occurred while DFHack supplied an exact map coordinate. Both event types apply to
+all host-classified mouse keys, including button, press/release, wheel, and future
+mouse boundaries.
+
+## Assumptions and fixed boundaries
+
+- [ ] Treat `Docs/input-event-service-proposal.md` as authoritative when this
+  plan and implementation details differ.
+- [ ] Keep this implementation inside DwarfUICore; do not migrate external
+  DwarfUI consumers as part of this plan.
+- [ ] Preserve tooltip, context-menu, and UserPrompt target selection,
+  presentation, state transitions, callbacks, and service-specific consumption
+  semantics.
+- [ ] Reuse the existing validated immutable `ScreenPosition` and
+  `MapTilePosition` public value types.
+- [ ] Use immutable numeric enum tables for every closed discriminator set.
+- [ ] Treat hook support and UI-resolution support as separate capabilities:
+  raw events require a hook-supported input surface, while semantic map events
+  additionally require complete UI-resolution support.
+- [ ] Treat the original intercepted keys table as read-only in every private
+  Core consumer.
+- [ ] Do not add public keyboard events, synthesized hover/drag/double-click
+  gestures, priorities, cancellation, event transformation, or a generic string
+  event bus.
+
+## Phase 1: Contract types and canonical snapshot factory
+
+Outcome: Shared immutable input facts and discriminator types exist independently
+of the current context-menu owner, without changing active input behavior.
+
+- [ ] Define the immutable numeric private `InputDispatchResult` enum with
+  `PASS` and `CONSUME` members.
+- [ ] Define immutable numeric public enum tables for `InputEventType` and
+  `InputEventDisposition` with the approved version-1 members.
+  - [ ] Expose `MAP_CLICK` and `RAW_CLICK` through `InputEventType`.
+  - [ ] Expose `PASS` and `CONSUME` through `InputEventDisposition`.
+  - [ ] Construct the tables with DwarfUICore's immutable-enum helper.
+- [ ] Define immutable copied `MouseInput` values containing one exact
+  host-provided mouse key.
+- [ ] Implement one canonical snapshot factory for intercepted input snapshots
+  and continuous pointer samples.
+  - [ ] Allocate process-wide monotonic sequence values shared by both sample
+    paths.
+  - [ ] Copy and validate optional `ScreenPosition` and `MapTilePosition`
+    values.
+  - [ ] Collect every host-classified mouse key in an intercepted keys table.
+  - [ ] Sort copied `MouseInput` values deterministically by key.
+  - [ ] Produce immutable `InputSnapshot` values with `sequence`,
+    `mouse_inputs`, `screen_position`, and `map_position`.
+  - [ ] Produce immutable `PointerSample` values with `sequence`,
+    `screen_position`, and `map_position`.
+  - [ ] Never store parallel per-axis coordinate fields or a redundant
+    coordinate-space discriminator.
+- [ ] Keep map-coordinate acquisition demand-driven and sample each requested
+  coordinate source at most once per snapshot.
+- [ ] Add LuaDoc declarations for every new class, method, enum, alias, and
+  public field.
+- [ ] Add focused unit coverage for copied positions, immutability, sorted mouse
+  keys, empty non-mouse collections, malformed/nil positions, shared sequencing,
+  and demand-aware sampling.
+
+Completion criteria:
+
+- [ ] One canonical factory can create both immutable sample shapes with no
+  consumer-specific policy.
+- [ ] Each intercepted input table produces at most one screen sample and one
+  map sample, according to aggregate demand.
+- [ ] Snapshot/value tests prove that coordinates exist only inside immutable
+  position values and that all host-classified mouse keys are retained.
+
+## Phase 2: Relocate and preserve the process input hook
+
+Outcome: Input Event owns the existing process-wide native and Lua interception
+chain while current consumers continue to behave through a temporary internal
+compatibility boundary.
+
+- [ ] Relocate the generic responsibilities of
+  `dwarfuicore/context_menu/input_hook.lua` beneath the Input Event runtime.
+- [ ] Preserve native overlay and Lua-screen input ownership behavior.
+  - [ ] Preserve compatible predecessor and foreign-wrapper chains.
+  - [ ] Prevent duplicate active trampolines.
+  - [ ] Preserve current module/method replacement repair behavior.
+  - [ ] Keep trampolines inert when no current dispatcher is installed.
+  - [ ] Prevent retired runtime generations from dispatching into current
+    state.
+  - [ ] Restore only wrappers still owned by DwarfUICore during destructive
+    shutdown.
+- [ ] Keep `dwarfuicore/context_menu/input_hook.lua` as a temporary private
+  compatibility export where required by unmigrated Core consumers.
+- [ ] Ensure no public API or external consumer depends on the compatibility
+  export.
+- [ ] Activate the input hook only while a private intercepted-input consumer or
+  public Input Event subscription has demand.
+- [ ] Make removal of the final demand source leave the input path inert while
+  permitting reload-adoptable trampolines to remain installed.
+- [ ] Add focused regression coverage for native/Lua interception, predecessor
+  delegation, foreign wrappers, duplicate prevention, repair, inert dispatch,
+  owned cleanup, and generation retirement/adoption.
+
+Completion criteria:
+
+- [ ] Exactly one process-wide native/Lua input interception chain is active.
+- [ ] Existing context-menu input behavior remains unchanged through the
+  temporary compatibility boundary.
+- [ ] Hook-chain regressions pass before any private consumer is migrated.
+
+## Phase 3: Establish private Core arbitration and migrate context menu
+
+Outcome: The shared runtime creates one pre-arbitration input snapshot and
+context menu consumes it through deterministic private arbitration without
+resampling coordinates.
+
+- [ ] Add the typed private `CoreInputConsumer(keys, snapshot)` collaboration
+  boundary.
+- [ ] Create exactly one immutable `InputSnapshot` before private arbitration
+  for every intercepted input table.
+- [ ] Pass the same unchanged original keys table and same snapshot to every
+  eligible private consumer.
+- [ ] Enforce the private-consumer contract that the original keys table is
+  read-only and must not be mutated.
+- [ ] Assemble private consumers in a fixed Core-defined order rather than by
+  registration timing or caller-selected priority.
+- [ ] Stop private arbitration on the first `InputDispatchResult.CONSUME`.
+  - [ ] Suppress both public event channels for every Core-consumed input table.
+  - [ ] Skip inherited input handling.
+  - [ ] Return `true` from the input trampoline.
+- [ ] Delegate the original keys table unchanged when all private consumers
+  return `PASS`.
+- [ ] Prevent duplicate private-consumer attachment and public access to private
+  registration or priority controls.
+- [ ] Preserve consumer-specific fail-closed ownership rules without inferring
+  ownership from an exception alone.
+- [ ] Migrate context menu to shared snapshots and private arbitration.
+  - [ ] Remove context menu's direct ownership of generic sampling.
+  - [ ] Prohibit context menu from resampling screen or map coordinates for the
+    same input table.
+  - [ ] Retain its widget/map contribution registries and target detection.
+  - [ ] Retain opening eligibility, menu assembly, selection callbacks, menu
+    screen ownership, and menu-specific consumption.
+- [ ] Add focused tests for deterministic private ordering, first-consumer
+  consumption, pass-through delegation, read-only keys expectations, snapshot
+  identity, suppression, failure handling, and unchanged context-menu behavior.
+
+Completion criteria:
+
+- [ ] Context menu runs through Input Event private arbitration with no generic
+  coordinate resampling.
+- [ ] Private consumption suppresses future public dispatch and inherited
+  handling for every consumed input table, not only left releases.
+- [ ] Context-menu behavioral regressions pass before UserPrompt is migrated.
+
+## Phase 4: Migrate UserPrompt with prompt-first ownership
+
+Outcome: UserPrompt uses the same snapshot/arbitration boundary while preserving
+its authoritative precedence and exclusive click ownership.
+
+- [ ] Attach UserPrompt as the highest-precedence private Core input consumer
+  while a prompt is active.
+- [ ] Preserve UserPrompt completion, cancellation, consumption, indicator,
+  presentation, callback, and failure contracts.
+- [ ] Supply the shared pre-arbitration snapshot to completion and cancellation
+  logic.
+- [ ] Prohibit UserPrompt from resampling screen or map coordinates for the same
+  input table.
+- [ ] Suppress both public event channels for a prompt-consumed left release.
+- [ ] Ensure inactive UserPrompt contributes no input demand and cannot affect
+  public dispatch or context-menu behavior.
+- [ ] Add focused tests for prompt-first ordering, active/inactive demand,
+  completion/cancellation coordinates, consumed-click suppression, context-menu
+  exclusion, callback behavior, and no resampling.
+
+Completion criteria:
+
+- [ ] UserPrompt and context menu receive the same pre-arbitration facts in the
+  required fixed order.
+- [ ] Prompt-owned input cannot leak to public interceptors, observers,
+  inherited handling, or context-menu opening.
+- [ ] Existing UserPrompt and context-menu regression suites remain green.
+
+## Phase 5: Move pointer-poller ownership and migrate tooltip
+
+Outcome: Input Event owns one process-wide demand-driven pointer poller, and
+tooltip consumes shared pointer samples without depending on public click
+subscriptions.
+
+- [ ] Move `dwarfuicore/pointer_poller.lua` ownership and demand accounting into
+  the Input Event runtime.
+- [ ] Maintain separate demand counts for intercepted input, screen-pointer
+  polling, and map-pointer polling.
+- [ ] Activate continuous polling only while a private continuous-pointer
+  consumer exists.
+- [ ] Request map coordinates only while a current continuous consumer explicitly
+  requires them.
+- [ ] Ensure widget-only tooltip targets request screen samples without calling
+  `dfhack.gui.getMousePos()` every frame.
+- [ ] Ensure exact map-tooltip targets create map-coordinate demand.
+- [ ] Migrate tooltip polling predicates into private subscriptions or demand
+  contributions.
+- [ ] Preserve tooltip widget/map registrations, target detection, pointer
+  enter/update/leave mediation, immutable presentation intent, and
+  completed-render ownership.
+- [ ] Keep tooltip independent of public map-click/raw-click callbacks and public
+  observer registration.
+- [ ] Invalidate current sampled facts on world unload, root loss, and surface
+  replacement without removing process-owned public subscriptions.
+- [ ] Add focused tests for demand transitions, pointer-only/map polling,
+  sequence sharing, sample invalidation, teardown, and unchanged tooltip
+  behavior.
+
+Completion criteria:
+
+- [ ] Exactly one process-wide pointer poller remains.
+- [ ] Map polling never occurs without current map demand.
+- [ ] Tooltip regressions prove that polling ownership moved without changing
+  target or presentation semantics.
+
+## Phase 6: Build the process runtime and namespace-bound public provider
+
+Outcome: Consumers can acquire immutable contract-major-1 API objects and manage
+typed namespace-bound subscriptions without yet depending on unfinished event
+semantics.
+
+- [ ] Implement one lazy, transactional, process-wide Input Event runtime.
+- [ ] Export `InputEventServiceProvider` through
+  `reqscript('dwarfuicore/services')` using the existing exact-version provider
+  pattern.
+- [ ] Return a distinct immutable `InputEventServiceApi` for every `new()` call
+  while sharing one namespace domain for APIs bound to the same namespace.
+- [ ] Expose immutable `EventType` and `Disposition` enum tables on each API.
+- [ ] Implement the generic public methods only:
+  - [ ] `observe(event_type, callback)`.
+  - [ ] `intercept(event_type, handler)`.
+  - [ ] `unsubscribe(handle)`.
+  - [ ] `is_subscribed(handle)`.
+  - [ ] `clear_namespace()`.
+- [ ] Validate callback/handler type and exact numeric enum membership before
+  runtime initialization or registry mutation.
+- [ ] Reject strings and unknown numbers while accepting a valid numeric member
+  regardless of its source.
+- [ ] Create a distinct opaque subscription for each successful registration,
+  bound to service kind, contract major, namespace, generation, local identity,
+  event type, and dispatch channel.
+- [ ] Permit multiple registrations from one namespace and retain global
+  registration sequence.
+- [ ] Strongly retain callbacks while subscriptions are active; do not make API
+  or handle garbage collection an implicit unsubscribe operation.
+- [ ] Implement same-domain inactive, malformed, stale-generation, and
+  foreign-domain handle behavior with established error precedence.
+- [ ] Ensure namespace cleanup cannot remove private Core consumers or another
+  namespace's subscriptions.
+- [ ] Add the modules to `dwarfuicore/module_registry.lua` in dependency order
+  and update registry, service-export, provider, and package declaration tests.
+- [ ] Add focused tests for acquisition identity, immutability, validation
+  ordering, namespaces, handles, cleanup, stale APIs/handles, foreign handles,
+  repeated construction, and transactional initialization failure.
+
+Completion criteria:
+
+- [ ] The public surface contains one generic `observe` method and one generic
+  `intercept` method selected by immutable numeric event type.
+- [ ] Namespace, identity, generation, service-kind, and contract-major
+  boundaries are enforced by tests.
+- [ ] Repeated acquisition reuses one healthy process runtime without replacing
+  a healthy hook chain.
+
+## Phase 7: Derive raw and unobstructed map events
+
+Outcome: The runtime creates immutable event values with the exact approved raw
+and semantic eligibility guarantees for every host-classified mouse boundary.
+
+- [ ] Derive at most one `RawClickEvent` per qualifying intercepted input table
+  after private arbitration.
+  - [ ] Require a hook-supported current input surface.
+  - [ ] Require at least one host-classified mouse key.
+  - [ ] Require that no private Core consumer consumed the table.
+  - [ ] Require one valid non-nil map position from the shared snapshot.
+  - [ ] Include the complete immutable sorted `mouse_inputs` collection,
+    sequence, map position, and optional screen position.
+- [ ] Treat every host-classified mouse key as eligible without requiring paired
+  boundaries, a gesture latch, or a preceding down event.
+- [ ] Do not synthesize double-clicks or combine multiple keys tables into one
+  gesture.
+- [ ] Suppress both public channels when the map position is nil or malformed.
+- [ ] Permit a raw event with nil screen position when its map position is valid.
+- [ ] Implement generic front-to-back UI obstruction resolution for semantic
+  map events.
+  - [ ] Resolve the native viewscreen widget root, current Lua screen, active
+    overlay roots, and every additional shared Core pointer root.
+  - [ ] Resolve duplicate roots once in effective front-to-back order.
+  - [ ] Preserve generic visibility, activity, clipping, frame, child-order, and
+    `PointerPolicy` meanings.
+  - [ ] Treat `MISS`, `PASS`, and `NONE` as non-obstructing and continue to lower
+    roots.
+  - [ ] Treat `TARGET` and `BLOCKED` as obstructing.
+  - [ ] Treat unavailable screen coordinates, uninspectable roots, unresolved
+    order, and unsupported UI-resolution surfaces as unable to prove
+    unobstructed ownership.
+- [ ] Keep hook support distinct from UI-resolution support so an unresolved UI
+  surface can still publish an otherwise eligible raw event.
+- [ ] Perform root resolution only when the captured dispatch state contains an
+  eligible semantic subscription or explicit private UI-resolution demand.
+- [ ] Derive at most one immutable `MapClickedEvent` when all raw conditions hold
+  and complete root resolution proves the sampled screen position unobstructed.
+- [ ] Give paired raw and semantic events the same sequence, copied positions,
+  and mouse-input collection.
+- [ ] Resolve eligibility against pre-delegation coordinates and UI state without
+  reclassification after inherited handling.
+- [ ] Add focused matrix coverage for every mouse-key class, mixed key tables,
+  off-map input, nil screen coordinates, each pointer policy, overlapping roots,
+  duplicate roots, unknown/unsupported roots, UI obstruction, semantic demand,
+  and paired event identity.
+
+Completion criteria:
+
+- [ ] Raw-event tests prove coordinate qualification without any unobstructed-map
+  claim.
+- [ ] Semantic-event tests prove complete unobstructed UI resolution and
+  conservative suppression when that proof is unavailable.
+- [ ] Press, release, wheel, additional buttons, and representative future host
+  mouse keys use the same per-input-table contract.
+
+## Phase 8: Implement deterministic public interception and observation
+
+Outcome: Eligible semantic and raw subscriptions execute through the approved
+pre-delegation interception and post-delegation observation channels with
+deterministic mutation, recursion, consumption, and error behavior.
+
+- [ ] Before invoking the first public callback for an input event, capture both
+  stable interceptor and observer candidate snapshots.
+- [ ] Interleave eligible semantic and raw subscriptions by global registration
+  sequence within each channel.
+- [ ] Exclude subscriptions added during the current event from both captured
+  snapshots.
+- [ ] Check active state immediately before each callback and skip subscriptions
+  removed before their turn.
+- [ ] Dispatch interceptors after private arbitration and before inherited input
+  handling.
+- [ ] Continue on exact `Disposition.PASS`.
+- [ ] On the first exact `Disposition.CONSUME`, stop later interceptors, skip
+  inherited handling, and make the trampoline return `true`.
+- [ ] Treat nil, booleans, unknown numbers, exceptions, and every other invalid
+  interceptor return as a recorded failure and fail open as `PASS`.
+- [ ] Delegate the original keys table unchanged and preserve the inherited
+  return value when every interceptor passes.
+- [ ] Dispatch observers after inherited handling or after public consumption
+  skips delegation.
+- [ ] Keep observers eligible when an interceptor consumes or inherited handling
+  reports that it handled the input.
+- [ ] Ignore every observer return value and prevent observers from altering
+  consumption or inherited results.
+- [ ] Deliver one shared immutable event object to callbacks for the same event
+  type and channel.
+- [ ] Retain public event values only for dispatch unless a consumer explicitly
+  retains them.
+- [ ] Contain and record callback failures against the responsible subscription
+  and namespace without suppressing later observers or disabling Core services.
+- [ ] Give recursive input dispatch a later sequence and independent interceptor
+  and observer snapshots captured at the same defined points.
+- [ ] Add focused tests for cross-event ordering, first-consume behavior,
+  pass-through, observer timing, inherited results, callback mutation,
+  unsubscription-before-turn, registration-during-dispatch, recursion, invalid
+  returns, exceptions, and failure isolation.
+
+Completion criteria:
+
+- [ ] `intercept()` is observably pre-delegation and is the only public operation
+  capable of consuming input.
+- [ ] `observe()` is observably post-delegation and cannot affect ownership or
+  inherited results.
+- [ ] Ordering, mutation, recursive dispatch, and failure tests establish one
+  deterministic contract across both event types.
+
+## Phase 9: Complete lifecycle, reload, diagnostics, and error contracts
+
+Outcome: The service remains healthy and isolated across demand transitions,
+failures, surface changes, shutdown, and explicit DwarfUICore reload.
+
+- [ ] Use established exception transport, stable token categories, and
+  precedence for provider construction and API calls.
+- [ ] Use the exact public error prefixes documented by the proposal.
+- [ ] Record observer and interceptor failures as private asynchronous dispatch
+  failures rather than synchronous API-call failures.
+- [ ] Provide private diagnostics for counts, identities, demand, sequences,
+  surfaces, and failure text without exposing another namespace's callback.
+- [ ] Preserve subscriptions across world unload, root loss, and surface
+  replacement while invalidating sampled facts.
+- [ ] Retire old dispatchers before publishing new-generation state.
+- [ ] Permit adoption of compatible surviving hook trampolines by the next
+  runtime generation.
+- [ ] Invalidate APIs and handles from the retired generation.
+- [ ] Ensure partial initialization publishes neither a healthy facade nor a
+  subscription.
+- [ ] Ensure failures in public callbacks cannot disable private Core consumers.
+- [ ] Ensure failures in tooltip, context menu, or UserPrompt cannot remove
+  unrelated public subscriptions.
+- [ ] Restore only still-owned wrappers during destructive shutdown.
+- [ ] Add focused tests for lazy construction, failure rollback, demand teardown,
+  world/root/surface invalidation, diagnostics privacy, reload adoption,
+  generation retirement, stale handles, callback isolation, and owned cleanup.
+
+Completion criteria:
+
+- [ ] Reload leaves one healthy runtime, one hook chain, and one pointer poller.
+- [ ] Retired state is inert and stale APIs/handles are rejected consistently.
+- [ ] Failure injection proves namespace and service isolation without weakening
+  base-game input behavior.
+
+## Phase 10: Remove compatibility ownership and finalize integration
+
+Outcome: Every Core consumer uses the shared owner directly and no duplicate or
+context-menu-named generic input infrastructure remains.
+
+- [ ] Confirm context menu, UserPrompt, and tooltip no longer import the
+  temporary context-menu compatibility input owner.
+- [ ] Remove the temporary `dwarfuicore/context_menu/input_hook.lua`
+  compatibility export after all internal imports are migrated.
+- [ ] Remove or consolidate superseded context-menu sampler and pointer-poller
+  ownership without deleting consumer-specific target policy.
+- [ ] Confirm public click dispatch is not used as the private communication
+  mechanism for tooltip, context menu, or UserPrompt.
+- [ ] Update module registry order, reload ownership, package manifests, source
+  declarations, and package-content expectations for the final module layout.
+- [ ] Document the public provider, exact event meanings, all-mouse-key scope,
+  generic `observe`/`intercept` usage, dispositions, handles, callback timing,
+  consumption, immutability, and error behavior.
+- [ ] Keep public documentation free of unsupported future features and make the
+  raw event's lack of UI-obstruction guarantee explicit.
+- [ ] Add regressions proving no duplicate process hook or poller chain remains
+  and no removed compatibility path is packaged.
+
+Completion criteria:
+
+- [ ] Generic input interception, sampling, and polling have one Input Event
+  owner.
+- [ ] Consumer-specific target, state, presentation, and ownership policy remain
+  in their original services.
+- [ ] The published source and package contain no obsolete compatibility owner.
+
+## Phase 11: Qualification and evidence
+
+Outcome: Distinct source, unit, integration, package, reload, and live-runtime
+evidence demonstrate the complete proposal contract without conflating proof
+boundaries.
+
+- [ ] Run focused unit suites for snapshot/value behavior, hook ownership,
+  arbitration, all consumer migrations, provider/handles, event derivation,
+  dispatch ordering, demand, failures, and reload.
+- [ ] Run existing tooltip, context-menu, UserPrompt, provider, registry, and
+  package regression suites.
+- [ ] Run the complete DwarfUICore unit suite.
+- [ ] Run Lua syntax/source-declaration validation for all production and test
+  modules.
+- [ ] Build the distributable package and verify exact expanded and archive
+  contents.
+- [ ] Record live native-overlay input evidence for raw and unobstructed map
+  events, public consumption, inherited pass-through, UI obstruction, and
+  private-consumer suppression.
+- [ ] Record live Lua-screen input evidence for the same supported contracts.
+- [ ] Record installed-runtime evidence separately from source-checkout evidence.
+- [ ] Record explicit reload evidence showing trampoline adoption, stale
+  generation rejection, one runtime, one hook chain, and one pointer poller.
+- [ ] Record cleanup evidence proving temporary subscriptions, test UI, hooks,
+  and runtime state are removed or returned to their intended inert state.
+- [ ] Do not claim a live behavior from unit, source, syntax, package, or static
+  evidence alone.
+
+Completion criteria:
+
+- [ ] Focused, regression, full-unit, syntax, source, and package validations all
+  pass and are recorded as distinct results.
+- [ ] Native, Lua-screen, installed-runtime, reload, and cleanup evidence is
+  recorded independently with terminal results.
+- [ ] Any failed or unavailable evidence remains unchecked and is not presented
+  as completion.
+
+## Final acceptance
+
+- [ ] `InputEventServiceProvider` follows the immutable namespace-bound
+  acquisition pattern and shares one healthy process runtime.
+- [ ] Public registration and handle operations enforce service, contract,
+  namespace, generation, and identity boundaries.
+- [ ] Every intercepted input table creates one immutable demand-aware snapshot
+  before private arbitration, and all private consumers receive that snapshot
+  with the unchanged read-only original keys table.
+- [ ] Private consumers do not resample coordinates; private consumption
+  suppresses both public channels and inherited handling.
+- [ ] Every qualifying host-classified mouse-input table samples map position at
+  most once and publishes at most one immutable raw event and one immutable
+  semantic event with shared sequence, copied positions, and sorted mouse input.
+- [ ] Coordinates are stored only as immutable `ScreenPosition` and
+  `MapTilePosition` values, never as parallel axis fields.
+- [ ] `MAP_CLICK` requires complete proof that no active UI target or blocker is
+  in the way; pass-through UI does not obstruct, while targeted, blocking,
+  unknown, and unsupported UI-resolution surfaces do.
+- [ ] `RAW_CLICK` requires an exact map coordinate but does not claim that UI was
+  absent; UI-resolution failure or known obstruction alone does not suppress it.
+- [ ] Non-mouse, off-map, and private-Core-consumed input publishes neither
+  public event.
+- [ ] Semantic and raw subscriptions interleave deterministically by global
+  registration order within interception and observation.
+- [ ] The first valid public `CONSUME` stops later interceptors and inherited
+  handling; failures and invalid returns are recorded and treated as `PASS`.
+- [ ] Observers run after inherited handling or skipped delegation, use the
+  pre-delegation snapshot, and cannot consume or alter inherited results.
+- [ ] Callback ordering, registration mutation, removal, recursion, and failure
+  containment are deterministic and covered.
+- [ ] Native and Lua input seams preserve wrapper-chain, repair, reload, and
+  owned-cleanup behavior.
+- [ ] Tooltip uses shared demand-driven pointer samples while preserving tooltip
+  semantics.
+- [ ] Context menu uses shared intercepted snapshots while preserving menu
+  semantics.
+- [ ] UserPrompt retains prompt-first arbitration and does not leak owned input
+  to public dispatch.
+- [ ] Exactly one process hook and one pointer poller remain after migration, and
+  map-coordinate polling does not occur without current map demand.
+- [ ] Every proposal requirement is implemented or explicitly deferred with a
+  documented rationale approved against the source proposal.
+- [ ] Required source, unit, integration, package, live-runtime, reload, and
+  cleanup evidence is complete and recorded separately.

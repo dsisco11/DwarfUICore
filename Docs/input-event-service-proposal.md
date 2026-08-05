@@ -1,8 +1,9 @@
-# DwarfUICore Input Events Service Proposal
+# DwarfUICore Input Event Service Proposal
 
 ## Status
 
-Proposed on 2026-08-05. This document defines the intended version 1 public
+Proposed on 2026-08-05 and revised after contract review. This document defines
+the intended version 1 public
 contract and private runtime responsibilities for review. It does not authorize
 implementation until the contract is approved.
 
@@ -13,11 +14,11 @@ policy into a generic event bus.
 
 ## Summary
 
-DwarfUICore should provide an `InputEventsServiceProvider` that exposes
-namespace-bound map-click observation and supports shared private input
-infrastructure for Core services.
+DwarfUICore should provide an `InputEventServiceProvider` that exposes
+namespace-bound semantic and raw map-click observation and supports shared
+private input infrastructure for Core services.
 
-The process-wide Input Events runtime should own:
+The process-wide Input Event runtime should own:
 
 - native-overlay and Lua-screen input interception;
 - continuous pointer and optional map-position sampling;
@@ -31,8 +32,9 @@ Tooltip, context menu, UserPrompt, and future systems should consume this shared
 runtime while retaining their own target detection, state transitions,
 presentation, and service-specific registrations.
 
-Contract major 1 should publicly expose only map-click observation. Broader
-event kinds or public input consumption require their own reviewed contracts.
+Contract major 1 should publicly expose unobstructed map-click observation and
+raw coordinate-qualified map-click observation. Broader event kinds or public
+input consumption require their own reviewed contracts.
 
 ## Motivation
 
@@ -62,12 +64,15 @@ make those boundaries explicit without centralizing unrelated UI policy.
 
 ## Goals
 
-- Expose a typed `InputEventsServiceProvider` through
+- Expose a typed `InputEventServiceProvider` through
   `reqscript('dwarfuicore/services')`.
-- Support one version 1 public operation, `on_map_clicked(callback)`.
-- Deliver one immutable event for each eligible left-button release with an
-  exact map position.
-- Keep public map-click observation non-consuming.
+- Support `on_map_clicked(callback)` for unobstructed map clicks and
+  `on_raw_map_clicked(callback)` for coordinate-qualified raw clicks.
+- Make the commonly used map-click event mean that a click occurred over an
+  exact map tile and no UI element obstructed that tile.
+- Deliver raw map-click events when DFHack reports a map position even when UI
+  obstruction prevents the semantic map-click event.
+- Keep both public map-click observation methods non-consuming.
 - Preserve base-game input behavior when observers are present.
 - Own exactly one process-wide native/Lua input interception chain.
 - Own exactly one process-wide pointer poller.
@@ -90,8 +95,8 @@ make those boundaries explicit without centralizing unrelated UI policy.
 - A global replacement for DFHack `onInput` methods.
 - Shared tooltip/context-menu target registries or contribution selection.
 - Shared presentation, rendering, menu opening, or prompt state machines.
-- Determining that a map tile semantically owns a click over every possible
-  native or third-party UI surface.
+- Inferring unobstructed ownership through uninspectable third-party surfaces;
+  an unknown surface conservatively obstructs semantic map clicks.
 - Replacing `PointerDispatcher`, tooltip target adapters, context-menu target
   adapters, or map projection policy.
 - Migrating external DwarfUI consumers as part of the initial implementation.
@@ -112,9 +117,13 @@ A **public observer** is a namespace-bound callback that receives a derived
 event but cannot consume or alter input dispatch.
 
 A **map click** is an eligible left-button release whose synchronous map sample
-is non-nil. It means that DFHack reported a map coordinate at that pointer
-position; it does not assert universal UI ownership of the tile beneath every
-possible overlay.
+is non-nil and whose screen position is unobstructed by every known eligible UI
+root. It means a click occurred over an exact map tile and no UI element was in
+the way.
+
+A **raw map click** is an eligible left-button release whose synchronous map
+sample is non-nil. It means only that DFHack reported a map coordinate at the
+pointer position. It may occur through or over a UI element.
 
 ## Public API
 
@@ -127,12 +136,12 @@ pattern:
 local services = reqscript('dwarfuicore/services')
 
 local inputEvents =
-    services.InputEventsServiceProvider:new(1, 'my-plugin')
+    services.InputEventServiceProvider:new(1, 'my-plugin')
 ```
 
 Every `new()` call returns a distinct immutable API object. API objects bound to
 the same namespace share one namespace domain, and all namespaces delegate to
-one process-wide Input Events runtime.
+one process-wide Input Event runtime.
 
 ### Map-click observation
 
@@ -140,6 +149,11 @@ one process-wide Input Events runtime.
 local subscription = inputEvents:on_map_clicked(function(event)
     local position = event.map_position
     -- position is an immutable copied {x, y, z} value
+end)
+
+local rawSubscription = inputEvents:on_raw_map_clicked(function(event)
+    local position = event.map_position
+    -- a UI element may have been over this map coordinate
 end)
 ```
 
@@ -149,19 +163,26 @@ The proposed version 1 types are:
 ---@class dwarfuicore.MapClickedEvent
 ---@field sequence integer
 ---@field map_position dwarfuicore.MapTilePosition
+---@field screen_position dwarfuicore.ScreenPosition
+
+---@class dwarfuicore.RawMapClickedEvent
+---@field sequence integer
+---@field map_position dwarfuicore.MapTilePosition
 ---@field screen_position dwarfuicore.ScreenPosition|nil
 
 ---@alias dwarfuicore.MapClickedObserver fun(event: dwarfuicore.MapClickedEvent)
+---@alias dwarfuicore.RawMapClickedObserver fun(event: dwarfuicore.RawMapClickedEvent)
 
 ---@class dwarfuicore.InputEventSubscription
 
----@class dwarfuicore.InputEventsServiceApi
----@field get_contract_version fun(self: dwarfuicore.InputEventsServiceApi): integer
----@field get_namespace fun(self: dwarfuicore.InputEventsServiceApi): string
----@field on_map_clicked fun(self: dwarfuicore.InputEventsServiceApi, callback: dwarfuicore.MapClickedObserver): dwarfuicore.InputEventSubscription
----@field unsubscribe fun(self: dwarfuicore.InputEventsServiceApi, handle: dwarfuicore.InputEventSubscription): boolean removed
----@field is_subscribed fun(self: dwarfuicore.InputEventsServiceApi, handle: dwarfuicore.InputEventSubscription): boolean subscribed
----@field clear_namespace fun(self: dwarfuicore.InputEventsServiceApi): boolean changed
+---@class dwarfuicore.InputEventServiceApi
+---@field get_contract_version fun(self: dwarfuicore.InputEventServiceApi): integer
+---@field get_namespace fun(self: dwarfuicore.InputEventServiceApi): string
+---@field on_map_clicked fun(self: dwarfuicore.InputEventServiceApi, callback: dwarfuicore.MapClickedObserver): dwarfuicore.InputEventSubscription
+---@field on_raw_map_clicked fun(self: dwarfuicore.InputEventServiceApi, callback: dwarfuicore.RawMapClickedObserver): dwarfuicore.InputEventSubscription
+---@field unsubscribe fun(self: dwarfuicore.InputEventServiceApi, handle: dwarfuicore.InputEventSubscription): boolean removed
+---@field is_subscribed fun(self: dwarfuicore.InputEventServiceApi, handle: dwarfuicore.InputEventSubscription): boolean subscribed
+---@field clear_namespace fun(self: dwarfuicore.InputEventServiceApi): boolean changed
 ```
 
 `MapTilePosition` and `ScreenPosition` are the existing validated copied public
@@ -172,7 +193,8 @@ of dispatch unless the consumer explicitly retains them.
 
 - `callback` must be a function.
 - Validation completes before service initialization or registration mutation.
-- Each successful call creates a distinct opaque subscription.
+- Each successful call creates a distinct opaque subscription bound to that
+  explicit event method.
 - Multiple subscriptions from one namespace are permitted.
 - Registration order is retained for deterministic callback dispatch.
 - Dropping the API object or subscription handle does not implicitly
@@ -191,17 +213,17 @@ same-domain handle is already inactive.
 `is_subscribed(handle)` reports whether that exact recognized same-domain
 subscription remains active.
 
-`clear_namespace()` removes every Input Events subscription owned by the bound
+`clear_namespace()` removes every Input Event subscription owned by the bound
 namespace. It never removes private Core consumers or another namespace's
 subscriptions.
 
 Malformed, stale-generation, and foreign-domain handles follow the established
 `INVALID_ARGUMENT`, `STALE_HANDLE`, and `FOREIGN_HANDLE` precedence.
 
-## Map-click event contract
+## Raw map-click event contract
 
 Contract major 1 recognizes `_MOUSE_L` as the left-button release boundary. A
-map-click event is eligible when all of the following are true:
+raw map-click event is eligible when all of the following are true:
 
 1. Input interception is active on a supported current surface.
 2. The input table contains `_MOUSE_L`.
@@ -212,16 +234,19 @@ map-click event is eligible when all of the following are true:
 down boundary, maintain a gesture latch, infer double-clicks, or combine
 multiple input tables into one gesture.
 
-For an eligible release, the runtime:
+For an eligible raw release, the runtime:
 
 1. Samples the screen pointer at most once.
 2. Samples the map pointer exactly once.
 3. Copies and validates both available positions.
-4. Creates one immutable `MapClickedEvent` with the current dispatch sequence.
-5. Delegates unchanged to the inherited input handler.
-6. Notifies the stable snapshot of eligible public observers in registration
+4. Creates one immutable `RawMapClickedEvent` with the current dispatch
+   sequence.
+5. Resolves current UI obstruction and prepares a `MapClickedEvent` when the
+   click is unobstructed.
+6. Delegates unchanged to the inherited input handler.
+7. Notifies the stable snapshot of eligible public observers in registration
    order.
-7. Returns the inherited handler's original result unchanged.
+8. Returns the inherited handler's original result unchanged.
 
 Post-delegation observation prevents a callback from changing UI state before
 the input reaches the inherited owner. The event retains the pre-delegation
@@ -233,8 +258,55 @@ input. That return value does not provide a reliable cross-surface definition
 of whether a map tile or an overlaid control semantically owned the click.
 
 If the map sample is nil or malformed, no public event is published. A missing
-screen sample does not suppress an otherwise valid map click; in that case
+screen sample does not suppress an otherwise valid raw map click; in that case
 `screen_position` is nil.
+
+## Unobstructed map-click event contract
+
+`on_map_clicked(callback)` is the preferred public operation. It publishes only
+when the raw map-click conditions are satisfied and Input Event can prove that
+no known UI element obstructed the sampled screen coordinate.
+
+The runtime resolves the sampled screen coordinate against the complete current
+set of supported UI roots in front-to-back order using the existing generic
+pointer policies:
+
+| Pointer result | Semantic map click |
+| --- | --- |
+| `MISS` | Eligible; continue checking lower roots. |
+| `PASS` or `NONE` policy | Eligible; continue checking lower roots. |
+| `TARGET` | Obstructed; do not publish `MapClickedEvent`. |
+| `BLOCKED` | Obstructed; do not publish `MapClickedEvent`. |
+
+The supported root set must include the current native viewscreen widget root,
+the current Lua screen, active overlay widget roots, and every additional root
+already registered with shared Core pointer detection. Duplicate roots are
+resolved once according to their effective front-to-back order.
+
+The service uses generic UI hit testing only. A widget does not need a tooltip,
+context-menu, or Input Event registration to obstruct the map. Visibility,
+activity, clipping, frame bounds, child order, and `PointerPolicy` retain their
+existing generic meanings.
+
+Obstruction is resolved before inherited input handling against the same
+pre-delegation UI state as the coordinate snapshot. Callback dispatch remains
+post-delegation and does not reclassify the click if inherited handling changes
+the current screen or widget tree.
+
+If screen coordinates are unavailable, a root cannot be inspected, root order
+cannot be established, or the current surface is unsupported, the runtime
+cannot prove that the map is unobstructed. It therefore suppresses
+`MapClickedEvent` while still publishing `RawMapClickedEvent`.
+
+For an unobstructed release, the runtime creates a separate immutable
+`MapClickedEvent` using the same sequence and copied positions as the raw
+event. The click is eligible for both observer methods. All eligible callbacks
+are dispatched from one stable, globally registration-ordered subscription
+snapshot, so semantic and raw subscriptions interleave deterministically by
+registration sequence.
+
+Private Core consumption suppresses both semantic and raw public events. UI
+obstruction suppresses only the semantic event.
 
 ## Runtime architecture
 
@@ -244,9 +316,9 @@ services.
 
 ```mermaid
 flowchart LR
-    Consumer[Consumer plugin] --> Provider[InputEventsServiceProvider]
-    Provider --> API[Namespace-bound Input Events API]
-    API --> Runtime[Process-wide Input Events runtime]
+    Consumer[Consumer plugin] --> Provider[InputEventServiceProvider]
+    Provider --> API[Namespace-bound Input Event API]
+    API --> Runtime[Process-wide Input Event runtime]
 
     Runtime --> Hook[Input hook manager]
     Runtime --> Poller[Pointer poller]
@@ -270,7 +342,7 @@ snapshots and decides what those facts mean within its own contract.
 ## Input interception ownership
 
 The current context-menu input hook manager should be relocated beneath the
-Input Events runtime without changing its established chain behavior during the
+Input Event runtime without changing its established chain behavior during the
 initial extraction.
 
 The shared manager must continue to:
@@ -291,7 +363,7 @@ new owner.
 ## Immutable snapshots and sampling
 
 `context_menu/input_sample.lua` and `pointer_poller.lua` currently represent two
-related sample paths. The Input Events runtime should establish one canonical
+related sample paths. The Input Event runtime should establish one canonical
 snapshot factory while preserving two acquisition triggers:
 
 - intercepted input produces an input snapshot synchronously; and
@@ -303,8 +375,9 @@ labels, sequence allocator, immutability behavior, and map-demand rules.
 Map sampling must remain demand-driven. Pointer-only tooltip registrations must
 not cause `dfhack.gui.getMousePos()` to run every frame. Exact map tooltip
 registrations or another private map-pointer subscriber create map demand, and
-public map-click observers create map demand only for eligible intercepted left
-releases.
+public semantic and raw map-click observers create map demand only for eligible
+intercepted left releases. Semantic observers additionally create UI-root
+resolution demand.
 
 Continuous pointer samples and intercepted input snapshots share a process-wide
 sequence allocator. Sequence values establish publication order but do not
@@ -334,7 +407,8 @@ Arbitration rules are:
 - order is fixed by Core runtime assembly, not consumer registration timing;
 - UserPrompt retains precedence over context-menu opening input;
 - the first `CONSUME` result stops private arbitration and inherited delegation;
-- public map-click observation is suppressed for a Core-consumed left release;
+- public semantic and raw map-click observation is suppressed for a
+  Core-consumed left release;
 - `PASS` delegates the original keys table without mutation;
 - a consumer cannot subscribe itself twice; and
 - public namespaces cannot register private consumers or select priorities.
@@ -349,8 +423,10 @@ from an exception alone.
 Public observer callbacks are dispatched from a stable registration snapshot in
 ascending registration sequence.
 
-Each callback receives the same immutable event object. One observer cannot
-modify the event seen by another observer. Observer return values are ignored.
+Callbacks for one event method receive the same immutable event object.
+Semantic subscribers receive the prepared `MapClickedEvent`; raw subscribers
+receive the corresponding `RawMapClickedEvent`. One observer cannot modify
+the event seen by another observer. Observer return values are ignored.
 
 An observer failure:
 
@@ -376,7 +452,7 @@ Tooltip should use shared continuous pointer samples. It should retain:
 - completed-render presentation ownership.
 
 The current polling-demand predicates in `tooltip/registration.lua` should
-become private subscriptions or demand contributions to Input Events. Tooltip
+become private subscriptions or demand contributions to Input Event. Tooltip
 must not receive map-click callbacks or become dependent on public observer
 registration.
 
@@ -405,12 +481,13 @@ UserPrompt should remain the highest-precedence private Core input consumer whil
 a prompt is active. It retains its completion, cancellation, consumption,
 indicator, presentation, and callback contracts.
 
-Prompt-consumed left release must not publish a public map-click event. The
+Prompt-consumed left release must not publish a public semantic or raw map-click
+event. The
 click belongs to the active authoritative prompt interaction, and leaking it to
 independent observers would violate prompt exclusivity.
 
 When no prompt is active, UserPrompt contributes no input demand and has no
-effect on public map-click observation or context-menu behavior.
+effect on public semantic or raw map-click observation or context-menu behavior.
 
 ## Demand and lifecycle
 
@@ -436,7 +513,7 @@ generation retirement.
 
 ## Ownership and lifetime
 
-- One Input Events runtime exists process-wide.
+- One Input Event runtime exists process-wide.
 - Every public subscription belongs to one service kind, contract major,
   namespace, runtime generation, and local identity.
 - Callback functions remain strongly retained while their subscriptions are
@@ -458,13 +535,13 @@ transport and stable token format.
 The provider prefix is:
 
 ```text
-DwarfUICore InputEventsServiceProvider:
+DwarfUICore InputEventServiceProvider:
 ```
 
 The namespace-bound API prefix is:
 
 ```text
-DwarfUICore InputEventsServiceApi:
+DwarfUICore InputEventServiceApi:
 ```
 
 Argument validation, stale API/handle, foreign handle, unhealthy service, and
@@ -488,16 +565,19 @@ failures. They are contained and recorded privately.
 
 ## Compatibility and extensibility
 
-Contract major 1 exposes only `on_map_clicked(callback)`. Compatible additions
-may include private diagnostics, internal event kinds, and explicitly named
-public observation methods whose semantics do not weaken existing guarantees.
+Contract major 1 exposes `on_map_clicked(callback)` and
+`on_raw_map_clicked(callback)`. Compatible additions may include private
+diagnostics, internal event kinds, and explicitly named public observation
+methods whose semantics do not weaken existing guarantees.
 
 The following changes require a new contract major:
 
-- making map-click observation consuming;
+- making either map-click observation consuming;
 - changing the recognized boundary from `_MOUSE_L` release;
 - requiring a preceding down boundary;
-- publishing prompt-consumed clicks;
+- weakening `on_map_clicked` to include UI-obstructed clicks;
+- suppressing raw clicks merely because known UI obstructs the map coordinate;
+- publishing prompt-consumed clicks through either method;
 - changing post-delegation callback ordering;
 - making inherited handler results depend on observer behavior;
 - changing event position copy or immutability guarantees; or
@@ -511,16 +591,17 @@ them.
 
 Implementation should proceed through narrow, behavior-preserving extractions:
 
-1. Relocate the existing context-menu input hook manager under Input Events and
+1. Relocate the existing context-menu input hook manager under Input Event and
    retain a temporary internal compatibility export.
-2. Introduce the process-wide runtime and canonical immutable snapshot factory.
+2. Introduce the process-wide runtime, canonical immutable snapshot factory,
+   and shared current-root resolver.
 3. Migrate context menu to private arbitration without changing menu behavior.
 4. Migrate UserPrompt to the same arbitration boundary without changing prompt
    behavior or precedence.
-5. Move pointer-poller ownership and demand accounting into Input Events, then
+5. Move pointer-poller ownership and demand accounting into Input Event, then
    migrate tooltip polling without changing target semantics.
 6. Add the namespace-bound provider, adapter, public subscription registry, and
-   map-click observation contract.
+   semantic/raw map-click observation contracts.
 7. Remove internal compatibility exports after every Core consumer uses the new
    owner.
 
@@ -543,7 +624,7 @@ Parallel wrappers make precedence depend on installation and reload history.
 They duplicate chain repair, root selection, sampling, diagnostics, and teardown
 while making consumed-input behavior difficult to reason about.
 
-### Put all target detection in Input Events
+### Put all target detection in Input Event
 
 Tooltip, context menu, and prompts use different registrations, precedence, and
 state transitions. A universal target detector would centralize policy that is
@@ -560,6 +641,13 @@ event and should expose one explicitly named method.
 Consumption requires global arbitration, priority, failure, and conflict rules.
 Allowing arbitrary namespaces to suppress base-game input would be a materially
 larger and riskier contract than map-click notification.
+
+### Treat every coordinate-qualified click as `on_map_clicked`
+
+DFHack can report a map coordinate behind an overlaid widget. Making the common
+event coordinate-only would force most consumers to reproduce UI obstruction
+checks. The broader meaning is retained explicitly as
+`on_raw_map_clicked(callback)`.
 
 ### Derive map ownership from inherited return values
 
@@ -578,14 +666,23 @@ observation preserves inherited behavior and reports the pre-delegation sample.
 The proposal is satisfied when implementation and evidence demonstrate all of
 the following:
 
-- `InputEventsServiceProvider` follows the existing immutable namespace-bound
+- `InputEventServiceProvider` follows the existing immutable namespace-bound
   acquisition pattern and shares one healthy process runtime;
 - public registration, unsubscription, status, and namespace cleanup enforce
   service, contract, namespace, generation, and identity boundaries;
 - each eligible unconsumed `_MOUSE_L` release samples map position exactly once
-  and publishes at most one immutable map-click event;
+  and publishes at most one immutable raw event and one immutable semantic
+  event with the same sequence and copied positions;
+- `on_map_clicked` publishes only when complete generic root resolution proves
+  that no active UI target or blocker is in the way;
+- pass-through UI does not suppress `on_map_clicked`, while targeted, blocking,
+  unknown, and unsupported UI surfaces do;
+- `on_raw_map_clicked` publishes whenever an eligible click has an exact map
+  coordinate, regardless of known UI obstruction;
 - `_MOUSE_L_DOWN`, off-map releases, and Core-consumed prompt releases do not
-  publish map-click events;
+  publish either map-click event;
+- semantic and raw subscriptions interleave deterministically in global
+  registration order;
 - public observers cannot consume input or alter the inherited handler result;
 - observer callbacks run after inherited handling against the pre-delegation
   coordinate snapshot;
@@ -608,7 +705,8 @@ the following:
 
 ## Recommendation
 
-Approve `InputEventsServiceProvider` contract major 1 with public
-`on_map_clicked(callback)` observation and the private shared-input ownership
-defined above. After approval, create an implementation checklist governed by
-this proposal and perform the extraction in behavior-preserving increments.
+Approve `InputEventServiceProvider` contract major 1 with public unobstructed
+`on_map_clicked(callback)`, coordinate-qualified
+`on_raw_map_clicked(callback)`, and the private shared-input ownership defined
+above. After approval, create an implementation checklist governed by this
+proposal and perform the extraction in behavior-preserving increments.

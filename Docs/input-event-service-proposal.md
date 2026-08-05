@@ -72,10 +72,10 @@ make those boundaries explicit without centralizing unrelated UI policy.
   input arbitration.
 - Define `MAP_CLICK` and `RAW_CLICK` through a public immutable numeric
   `InputEventType` enum.
-- Make the commonly used map-click event mean that a click occurred over an
-  exact map tile and no UI element obstructed that tile.
-- Deliver raw-click events when DFHack reports a map position even when UI
-  obstruction prevents the map-click event.
+- Make the commonly used map-click event mean that a mouse input occurred over
+  an exact map tile and no UI element obstructed that tile.
+- Deliver raw-click events for every mouse input where DFHack reports a map
+  position, even when UI obstruction prevents the map-click event.
 - Keep observation non-consuming and allow only explicit interceptors to claim
   input.
 - Preserve base-game input behavior when observers are present.
@@ -98,7 +98,7 @@ make those boundaries explicit without centralizing unrelated UI policy.
 
 - A general application event bus.
 - String-dispatched event names or a public generic `subscribe(event_name)` API.
-- Public keyboard, raw mouse, hover, drag, double-click, or scroll events.
+- Public keyboard events or synthesized hover, drag, or double-click gestures.
 - Consumer-defined numeric priorities or reordering of private Core consumers.
 - A global replacement for DFHack `onInput` methods.
 - Shared tooltip/context-menu target registries or contribution selection.
@@ -130,14 +130,20 @@ A **public interceptor** is a namespace-bound handler registered for one exact
 event type that receives a derived event before inherited input handling and
 explicitly returns `PASS` or `CONSUME`.
 
-A **map click** is an eligible left-button release whose synchronous map sample
-is non-nil and whose screen position is unobstructed by every known eligible UI
-root. It means a click occurred over an exact map tile and no UI element was in
-the way.
+A **map click** is an eligible DFHack input table containing one or more mouse
+inputs whose synchronous map sample is non-nil and whose screen position is
+unobstructed by every known eligible UI root. It means mouse input occurred over
+an exact map tile and no UI element was in the way.
 
-A **raw click** is an eligible left-button release whose synchronous map sample
-is non-nil. The event reports that coordinate as context but does not call the
-interaction a map click: the click may have landed on a UI element.
+A **raw click** is an eligible DFHack input table containing one or more mouse
+inputs whose synchronous map sample is non-nil. The event reports that coordinate
+as context but does not call the interaction a map click: the mouse input may
+have landed on a UI element.
+
+A **mouse input** is one key in a DFHack input table that the host classifies as
+mouse input. The classification is open to host-supported buttons, press and
+release boundaries, wheel inputs, and future mouse keys; it is not limited to
+left or right buttons.
 
 ## Public API
 
@@ -169,6 +175,7 @@ end)
 local interception = inputEvents:intercept(
         inputEvents.EventType.MAP_CLICK, function(event)
     -- perform the map interaction before inherited input handling
+    local mouseInputs = event.mouse_inputs
     return inputEvents.Disposition.CONSUME
 end)
 
@@ -185,14 +192,19 @@ The proposed version 1 types are:
 ---@class dwarfuicore.MapClickedEvent
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
+---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field map_position dwarfuicore.MapTilePosition
 ---@field screen_position dwarfuicore.ScreenPosition
 
 ---@class dwarfuicore.RawClickEvent
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
+---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field map_position dwarfuicore.MapTilePosition
 ---@field screen_position dwarfuicore.ScreenPosition|nil
+
+---@class dwarfuicore.MouseInput
+---@field key string
 
 ---@alias dwarfuicore.InputEvent dwarfuicore.MapClickedEvent|dwarfuicore.RawClickEvent
 ---@alias dwarfuicore.InputEventObserver fun(event: dwarfuicore.InputEvent)
@@ -238,9 +250,11 @@ through DwarfUICore's existing immutable-enum helper. Every delivered event's
 `type` field equals the exact enum member used to select its subscription.
 
 `MapTilePosition` and `ScreenPosition` are the existing validated copied public
-value types. Delivered event values are retained by the service only for the
-duration of dispatch unless the consumer explicitly retains them. Callback
-functions remain strongly retained by their active subscriptions.
+value types. `MouseInput` is an immutable copied value whose `key` is one exact
+host-provided mouse-input key. Each event's `mouse_inputs` field is a non-empty
+immutable array ordered by key. Delivered event values are retained by the
+service only for the duration of dispatch unless the consumer explicitly retains
+them. Callback functions remain strongly retained by their active subscriptions.
 
 ### Registration contract
 
@@ -258,8 +272,8 @@ functions remain strongly retained by their active subscriptions.
 - Public observers cannot consume input and their return values are ignored.
 - Public interceptors must return exactly `Disposition.PASS` or
   `Disposition.CONSUME`.
-- A callback added during dispatch is not eligible for the current event.
-- A callback removed before its turn during dispatch is skipped.
+- A subscription added during dispatch is not eligible for the current event.
+- A subscription removed before its turn during dispatch is skipped.
 
 ### Subscription operations
 
@@ -280,33 +294,45 @@ Malformed, stale-generation, and foreign-domain handles follow the established
 
 ## Raw-click event contract
 
-Contract major 1 recognizes `_MOUSE_L` as the left-button release boundary. A
-raw-click event is eligible when all of the following are true:
+Contract major 1 recognizes every host-classified mouse-input key in one DFHack
+input table. Snapshot acquisition and private arbitration occur for every
+intercepted input table. A raw-click event is eligible for public dispatch when
+all of the following are true:
 
 1. Input interception is active on a supported current surface.
-2. The input table contains `_MOUSE_L`.
-3. No earlier private Core consumer claims that boundary.
-4. `dfhack.gui.getMousePos()` returns a value with `x`, `y`, and `z`.
+2. The input table contains at least one host-classified mouse-input key.
+3. No private Core consumer claims that input table.
+4. The shared snapshot's map position is non-nil.
 
-`_MOUSE_L_DOWN` does not publish an event. The service does not require a prior
-down boundary, maintain a gesture latch, infer double-clicks, or combine
-multiple input tables into one gesture.
+Every host-classified mouse-input key is eligible, including button press,
+button release, wheel, and future host mouse boundaries. The service does not
+require a paired boundary, maintain a gesture latch, infer double-clicks, or
+combine multiple input tables into one gesture.
 
-For an eligible raw release, the runtime:
+For one intercepted input table, the runtime:
 
-1. Samples the screen pointer at most once.
-2. Samples the map pointer exactly once.
-3. Copies and validates both available positions.
-4. Creates one immutable `RawClickEvent` with the current dispatch
-   sequence.
-5. Resolves current UI obstruction and prepares a `MapClickedEvent` when the
-   click is unobstructed.
-6. Dispatches eligible public interceptors in global registration order.
-7. Delegates unchanged to the inherited input handler only if no interceptor
+1. Collects every host-classified mouse-input key and sorts the copied values by
+   key.
+2. Samples the screen pointer at most once when aggregate demand requires it.
+3. Samples the map pointer at most once when aggregate demand requires it.
+4. Copies and validates the available positions and creates one immutable
+   `InputSnapshot`.
+5. Dispatches private Core consumers with the original keys table and that
+   snapshot.
+6. If a private consumer returns `CONSUME`, suppresses both public channels,
+   skips inherited handling, and returns `true`.
+7. If no mouse input or exact map position is present, delegates unchanged to
+   inherited handling without creating a public event.
+8. Creates one immutable `RawClickEvent` containing the complete immutable
+   `mouse_inputs` collection and the current dispatch sequence.
+9. Resolves current UI obstruction and prepares one `MapClickedEvent` with the
+   same mouse inputs, positions, and sequence when unobstructed.
+10. Dispatches eligible public interceptors in global registration order.
+11. Delegates unchanged to the inherited input handler only if no interceptor
    returns `Disposition.CONSUME`.
-8. Notifies the stable snapshot of eligible public observers in registration
+12. Notifies the stable snapshot of eligible public observers in registration
    order.
-9. Returns `true` for a consumed event or the inherited handler's original
+13. Returns `true` for a consumed event or the inherited handler's original
    result otherwise.
 
 Interception is explicitly pre-delegation so a consumer can claim the click.
@@ -318,9 +344,9 @@ Observers still run when an interceptor consumes the input or the inherited
 handler reports that it handled the input. Neither result changes raw-click
 eligibility.
 
-If the map sample is nil or malformed, no public event is published. A missing
-screen sample does not suppress an otherwise valid raw click; in that case
-`screen_position` is nil.
+If the map sample is nil or malformed, neither public channel is dispatched. A
+missing screen sample does not suppress an otherwise valid raw click; in that
+case `screen_position` is nil and only the raw channel is eligible.
 
 ## Unobstructed map-click event contract
 
@@ -360,7 +386,7 @@ cannot be established, or the current surface is unsupported, the runtime
 cannot prove that the map is unobstructed. It therefore suppresses
 `MapClickedEvent` while still dispatching `RawClickEvent`.
 
-For an unobstructed release, the runtime creates a separate immutable
+For an unobstructed mouse-input table, the runtime creates a separate immutable
 `MapClickedEvent` using the same sequence and copied positions as the raw
 event. The click is eligible for both semantic and raw channels. All eligible
 callbacks and handlers are dispatched from stable, globally registration-ordered
@@ -400,8 +426,10 @@ flowchart LR
     Poller --> PointerAPI[Screen and map pointer APIs]
 ```
 
-The runtime is infrastructure, not a semantic mediator. Each service receives
-snapshots and decides what those facts mean within its own contract.
+The runtime does not mediate consumer-specific tooltip, context-menu, or prompt
+semantics. It owns derivation of its declared public event types, while each
+consumer service receives snapshots and decides what those facts mean within
+its own contract.
 
 ## Input interception ownership
 
@@ -441,6 +469,7 @@ The canonical private snapshot shapes are:
 ```lua
 ---@class dwarfuicore.InputSnapshot
 ---@field sequence integer
+---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field screen_position dwarfuicore.ScreenPosition|nil
 ---@field map_position dwarfuicore.MapTilePosition|nil
 
@@ -457,6 +486,12 @@ also expose or store parallel `screen_x`, `screen_y`, `map_x`, `map_y`, or
 `map_z` fields. The position value's type intrinsically identifies its
 coordinate space; snapshots and events do not require a separate
 coordinate-space label.
+
+Each intercepted input table creates exactly one `InputSnapshot` before private
+arbitration. Its `mouse_inputs` array is immutable, may be empty for non-mouse
+input, and contains every host-classified mouse key in deterministic key order.
+The original keys table remains separate and is passed unchanged alongside the
+snapshot.
 
 Map sampling must remain demand-driven. Pointer-only tooltip registrations must
 not cause `dfhack.gui.getMousePos()` to run every frame. Exact map tooltip
@@ -479,6 +514,8 @@ API.
 Each consumer returns one member of a private immutable numeric result enum:
 
 ```lua
+---@alias dwarfuicore.CoreInputConsumer fun(keys: table, snapshot: dwarfuicore.InputSnapshot): dwarfuicore.InputDispatchResult
+
 ---@enum dwarfuicore.InputDispatchResult
 local InputDispatchResult = {
     PASS = 1,
@@ -490,6 +527,8 @@ The real enum must be created through the existing immutable-enum helper.
 
 Arbitration rules are:
 
+- every consumer receives the same original keys table and immutable
+  `InputSnapshot`;
 - order is fixed by Core runtime assembly, not consumer registration timing;
 - UserPrompt retains precedence over context-menu opening input;
 - the first `CONSUME` result stops private arbitration and inherited delegation;
@@ -588,6 +627,8 @@ arbitration. It should retain:
 
 The migration removes context menu's ownership of the generic hook and sampler;
 it does not turn context-menu target detection into global map-click policy.
+Context-menu arbitration uses the shared pre-arbitration snapshot and must not
+resample screen or map coordinates for the same input table.
 
 ## UserPrompt integration
 
@@ -599,6 +640,10 @@ Prompt-consumed left release must not dispatch a public map-click or raw-click
 event. The
 click belongs to the active authoritative prompt interaction, and leaking it to
 independent observers would violate prompt exclusivity.
+
+UserPrompt completion and cancellation receive the shared pre-arbitration
+snapshot and must not resample screen or map coordinates for the same input
+table.
 
 When no prompt is active, UserPrompt contributes no input demand and has no
 effect on public map-click or raw-click dispatch or context-menu behavior.
@@ -690,7 +735,7 @@ The following changes require a new contract major:
 
 - allowing an `observe()` callback to consume input;
 - preventing an `intercept()` handler from consuming input;
-- changing the recognized boundary from `_MOUSE_L` release;
+- excluding a host-classified mouse-input key from event eligibility;
 - requiring a preceding down boundary;
 - weakening the semantic map-click channel to include UI-obstructed clicks;
 - suppressing raw clicks merely because known UI obstructs the map coordinate;
@@ -772,7 +817,7 @@ through the same `observe()` and `intercept()` operations.
 
 An inherited `onInput` result does not consistently distinguish map ownership
 from overlays, controls, or viewscreens. `RAW_CLICK` therefore reports only the
-narrower fact that a left release had an exact map coordinate. `MAP_CLICK`
+narrower fact that a mouse-input table had an exact map coordinate. `MAP_CLICK`
 derives its stronger unobstructed guarantee from generic pre-delegation UI
 resolution instead of the inherited return value.
 
@@ -793,10 +838,16 @@ the following:
   acquisition pattern and shares one healthy process runtime;
 - public registration, unsubscription, status, and namespace cleanup enforce
   service, contract, namespace, generation, and identity boundaries;
-- each eligible `_MOUSE_L` release not consumed by private Core arbitration
-  samples map position exactly once and publishes at most one immutable raw
-  event and one immutable semantic event with the same sequence and copied
-  positions, including when a public interceptor later consumes the event;
+- every intercepted input table creates one immutable demand-aware snapshot
+  before private arbitration, and every private consumer receives that same
+  snapshot with the unchanged original keys table;
+- private Core consumers use the shared snapshot without resampling coordinates,
+  and private consumption suppresses public dispatch and inherited handling;
+- each eligible input table containing any host-classified mouse-input key and
+  not consumed by private Core arbitration samples map position exactly once
+  and publishes at most one immutable raw event and one immutable semantic event
+  with the same sequence, copied positions, and immutable sorted mouse-input
+  collection, including when a public interceptor later consumes the event;
 - every input snapshot, pointer sample, and public event stores coordinates as
   immutable position values without parallel per-axis coordinate fields;
 - the semantic map-click channel is eligible only when complete generic root
@@ -805,8 +856,8 @@ the following:
   blocking, unknown, and unsupported UI surfaces do;
 - the raw-click channel is eligible whenever a click has an exact map
   coordinate, regardless of known UI obstruction;
-- `_MOUSE_L_DOWN`, off-map releases, and Core-consumed prompt releases do not
-  publish either the map-click or raw-click event;
+- input tables without mouse input, off-map mouse input, and Core-consumed
+  prompt input do not publish either the map-click or raw-click event;
 - semantic and raw subscriptions interleave deterministically in global
   registration order within the interception and observation channels;
 - interceptors run before inherited handling and the first explicit

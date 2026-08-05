@@ -86,7 +86,7 @@ make those boundaries explicit without centralizing unrelated UI policy.
   retaining their existing semantics.
 - Provide deterministic private Core-consumer arbitration before inherited
   input handling.
-- Activate hooks and polling only while a public observer or private Core
+- Activate hooks and polling only while a public subscription or private Core
   consumer has demand.
 - Follow existing namespace, identity, immutability, generation, error, reload,
   and package conventions.
@@ -232,9 +232,9 @@ of dispatch unless the consumer explicitly retains them.
 ### Registration contract
 
 - `callback` or `handler` must be a function.
-- `event_type` must be an exact member of the API's immutable
-  `InputEventType` enum. Strings, unknown numbers, and enum values from an
-  incompatible contract are rejected.
+- `event_type` must equal one numeric value exposed by the API's immutable
+  `InputEventType` enum. Strings and numbers not present in that enum are
+  rejected; the numeric value's source is irrelevant.
 - Validation completes before service initialization or registration mutation.
 - Each successful call creates a distinct opaque subscription bound to the
   exact accepted event type and dispatch channel.
@@ -320,10 +320,10 @@ The runtime resolves the sampled screen coordinate against the complete current
 set of supported UI roots in front-to-back order using the existing generic
 pointer policies:
 
-| Pointer result | Semantic map click |
+| Policy or resolved outcome | Semantic map click |
 | --- | --- |
 | `MISS` | Eligible; continue checking lower roots. |
-| `PASS` or `NONE` policy | Eligible; continue checking lower roots. |
+| `PASS` or `NONE` policy | Resolve as `MISS`; continue checking lower roots. |
 | `TARGET` | Obstructed; do not publish `MapClickedEvent`. |
 | `BLOCKED` | Obstructed; do not publish `MapClickedEvent`. |
 
@@ -484,6 +484,11 @@ Interceptor failure is contained, recorded against its subscription and
 namespace, and treated as `Disposition.PASS`. A public extension must opt into
 consumption successfully; an exception cannot unexpectedly block base-game
 input or disable another subscriber.
+
+Returning `nil`, a boolean, an unknown number, or any value other than the
+exact `Disposition.PASS` or `Disposition.CONSUME` numeric member is an
+interceptor failure. It follows the same recorded, contained, fail-open behavior
+as a raised exception.
 
 Observers remain eligible after public interception. An observer can therefore
 report a click that a public interceptor consumed, but cannot alter that
@@ -658,9 +663,8 @@ The following changes require a new contract major:
 - changing event position copy or immutability guarantees; or
 - replacing explicit methods with string-dispatched generic subscription.
 
-Public interception, priorities, cancellation, or event transformation should
-be proposed separately even if the private runtime can technically support
-them.
+Public priorities, cancellation, or event transformation should be proposed
+separately even if the runtime can technically support them.
 
 ## Migration strategy
 
@@ -708,8 +712,9 @@ not actually shared and would make unrelated service changes risky.
 ### Expose a generic public event bus
 
 A string-based `subscribe(name, callback)` surface weakens type checking,
-versioning, documentation, and compatibility. Version 1 has one reviewed public
-event and should expose one explicitly named method.
+versioning, documentation, and compatibility. Version 1 instead exposes the
+typed `observe()` and `intercept()` operations, with event selection restricted
+to members of the versioned `InputEventType` enum.
 
 ### Let observer return values consume input
 
@@ -732,11 +737,13 @@ An inherited `onInput` result does not consistently distinguish map ownership
 from overlays, controls, or viewscreens. Version 1 therefore reports the
 narrower fact that a left release had an exact map coordinate.
 
-### Publish before inherited input handling
+### Observe before inherited input handling
 
-A public callback could open or dismiss UI, move the map, or mutate game state
-before the original click reaches its existing owner. Post-delegation
-observation preserves inherited behavior and reports the pre-delegation sample.
+An observer could open or dismiss UI, move the map, or mutate game state before
+the original click reaches its existing owner. Post-delegation observation
+preserves inherited behavior and reports the pre-delegation sample. Explicit
+`intercept()` handlers remain pre-delegation because claiming input is their
+documented purpose.
 
 ## Acceptance criteria
 
@@ -747,9 +754,10 @@ the following:
   acquisition pattern and shares one healthy process runtime;
 - public registration, unsubscription, status, and namespace cleanup enforce
   service, contract, namespace, generation, and identity boundaries;
-- each eligible unconsumed `_MOUSE_L` release samples map position exactly once
-  and publishes at most one immutable raw event and one immutable semantic
-  event with the same sequence and copied positions;
+- each eligible `_MOUSE_L` release not consumed by private Core arbitration
+  samples map position exactly once and publishes at most one immutable raw
+  event and one immutable semantic event with the same sequence and copied
+  positions, including when a public interceptor later consumes the event;
 - the semantic map-click channel is eligible only when complete generic root
   resolution proves that no active UI target or blocker is in the way;
 - pass-through UI does not suppress semantic map clicks, while targeted,
@@ -757,7 +765,7 @@ the following:
 - the raw-click channel is eligible whenever a click has an exact map
   coordinate, regardless of known UI obstruction;
 - `_MOUSE_L_DOWN`, off-map releases, and Core-consumed prompt releases do not
-  publish either map-click event;
+  publish either the map-click or raw-click event;
 - semantic and raw subscriptions interleave deterministically in global
   registration order within the interception and observation channels;
 - interceptors run before inherited handling and the first explicit

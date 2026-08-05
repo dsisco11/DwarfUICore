@@ -80,6 +80,7 @@ describe('DwarfUICore package contract', function()
             'service_provider/identity.lua',
             'input_event/types.lua',
             'input_event/snapshot_factory.lua',
+            'input_event/input_hook.lua',
             'service_provider/runtime.lua',
             'service_provider/acquisition.lua',
             'service_provider/api.lua',
@@ -171,7 +172,7 @@ describe('DwarfUICore package contract', function()
             function()
         local context_menu_modules = {
             'definition.lua',
-            'input_hook.lua',
+            
             'input_sample.lua',
             'map_target.lua',
             'registration.lua',
@@ -209,9 +210,19 @@ describe('DwarfUICore package contract', function()
                 table.insert(owners, spec.name)
             end
         end
-        assert.same({'dwarfuicore/context_menu/input_hook'}, owners)
+        assert.same({'dwarfuicore/input_event/input_hook'}, owners)
         assert.is_false(source_exists(
             'src/scripts_modinstalled/dwarfuicore/user_prompt/input_hook.lua'))
+    end)
+
+    it('keeps the context-menu hook as a private compatibility export',
+            function()
+        local source = read_source(
+            'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua')
+        assert.is_truthy(source:find('--@ module=true', 1, true))
+        assert.is_truthy(source:find(
+            "reqscript('dwarfuicore/input_event/input_hook')", 1, true))
+        assert.is_nil(source:find('feed_viewscreen_widgets', 1, true))
     end)
 
     it('ships one authoritative completed-render hook owner', function()

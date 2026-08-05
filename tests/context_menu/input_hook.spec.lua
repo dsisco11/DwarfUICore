@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local MODULE_PATH =
-    'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua'
+    'src/scripts_modinstalled/dwarfuicore/input_event/input_hook.lua'
 
 ---Loads one hook generation over a shared process and overlay.
 ---@param process table
@@ -25,6 +25,33 @@ local function load_hook(process, overlay)
 end
 
 describe('context-menu input hook', function()
+    it('re-exports the Input Event manager through the compatibility module',
+            function()
+        local hook = load_hook({dwarfuicore={}}, {
+            feed_viewscreen_widgets=function() end,
+        })
+        local _, compatibility = module_loader.load(repo_root,
+            'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua', {
+                reqscript={
+                    ['dwarfuicore/input_event/input_hook']=hook,
+                },
+            })
+
+        assert.is_equal(hook.manager, compatibility.manager)
+    end)
+
+    it('adopts the legacy process state under Input Event ownership', function()
+        local legacy_state = {api_version=2, runtime_generation=0}
+        local process = {dwarfuicore={
+            context_menu_input_hook=legacy_state,
+        }}
+
+        load_hook(process, {feed_viewscreen_widgets=function() end})
+
+        assert.is_equal(legacy_state,
+            process.dwarfuicore.input_event_input_hook)
+    end)
+
     it('dispatches before native delegation with exact boundary values',
             function()
         local events = {}

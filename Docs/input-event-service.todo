@@ -94,35 +94,35 @@ Outcome: Input Event owns the existing process-wide native and Lua interception
 chain while current consumers continue to behave through a temporary internal
 compatibility boundary.
 
-- [ ] Relocate the generic responsibilities of
+- [x] Relocate the generic responsibilities of
   `dwarfuicore/context_menu/input_hook.lua` beneath the Input Event runtime.
-- [ ] Preserve native overlay and Lua-screen input ownership behavior.
-  - [ ] Preserve compatible predecessor and foreign-wrapper chains.
-  - [ ] Prevent duplicate active trampolines.
-  - [ ] Preserve current module/method replacement repair behavior.
-  - [ ] Keep trampolines inert when no current dispatcher is installed.
-  - [ ] Prevent retired runtime generations from dispatching into current
+- [x] Preserve native overlay and Lua-screen input ownership behavior.
+  - [x] Preserve compatible predecessor and foreign-wrapper chains.
+  - [x] Prevent duplicate active trampolines.
+  - [x] Preserve current module/method replacement repair behavior.
+  - [x] Keep trampolines inert when no current dispatcher is installed.
+  - [x] Prevent retired runtime generations from dispatching into current
     state.
-  - [ ] Restore only wrappers still owned by DwarfUICore during destructive
+  - [x] Restore only wrappers still owned by DwarfUICore during destructive
     shutdown.
-- [ ] Keep `dwarfuicore/context_menu/input_hook.lua` as a temporary private
+- [x] Keep `dwarfuicore/context_menu/input_hook.lua` as a temporary private
   compatibility export where required by unmigrated Core consumers.
-- [ ] Ensure no public API or external consumer depends on the compatibility
+- [x] Ensure no public API or external consumer depends on the compatibility
   export.
-- [ ] Activate the input hook only while a private intercepted-input consumer or
+- [x] Activate the input hook only while a private intercepted-input consumer or
   public Input Event subscription has demand.
-- [ ] Make removal of the final demand source leave the input path inert while
+- [x] Make removal of the final demand source leave the input path inert while
   permitting reload-adoptable trampolines to remain installed.
-- [ ] Add focused regression coverage for native/Lua interception, predecessor
+- [x] Add focused regression coverage for native/Lua interception, predecessor
   delegation, foreign wrappers, duplicate prevention, repair, inert dispatch,
   owned cleanup, and generation retirement/adoption.
 
 Completion criteria:
 
-- [ ] Exactly one process-wide native/Lua input interception chain is active.
-- [ ] Existing context-menu input behavior remains unchanged through the
+- [x] Exactly one process-wide native/Lua input interception chain is active.
+- [x] Existing context-menu input behavior remains unchanged through the
   temporary compatibility boundary.
-- [ ] Hook-chain regressions pass before any private consumer is migrated.
+- [x] Hook-chain regressions pass before any private consumer is migrated.
 
 ## Phase 3: Establish private Core arbitration and migrate context menu
 

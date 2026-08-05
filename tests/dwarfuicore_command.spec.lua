@@ -114,7 +114,7 @@ local function load_root(registry, dfhack)
             ['dwarfuicore/tooltip/render_hook']={},
             ['dwarfuicore/context_menu/service']={},
             ['dwarfuicore/context_menu/registration']={},
-            ['dwarfuicore/context_menu/input_hook']={},
+            ['dwarfuicore/input_event/input_hook']={},
             ['dwarfuicore/service_provider/immutable_proxy']={
                 new_factory=function(_, _, properties)
                     return {create=function() return properties or {} end}
@@ -288,7 +288,7 @@ describe('dwarfuicore command lifecycle', function()
         local loaded = {
             ['dwarfuicore/tooltip/runtime']=true,
             ['dwarfuicore/context_menu/service']=true,
-            ['dwarfuicore/context_menu/input_hook']=true,
+            ['dwarfuicore/input_event/input_hook']=true,
             ['dwarfuicore/user_prompt/service']=true,
             ['dwarfuicore/user_prompt/runtime']=true,
             ['dwarfuicore/alpha']=true,
@@ -335,7 +335,7 @@ describe('dwarfuicore command lifecycle', function()
                     table.insert(events, 'context-menu')
                 end},
             },
-            ['dwarfuicore/context_menu/input_hook']={
+            ['dwarfuicore/input_event/input_hook']={
                 manager={shutdown=function()
                     table.insert(events, 'unexpected-input-shutdown')
                 end},
@@ -390,7 +390,7 @@ describe('dwarfuicore command lifecycle', function()
         local loaded = {
             ['dwarfuicore/tooltip/render_hook']=true,
             ['dwarfuicore/context_menu/registration']=true,
-            ['dwarfuicore/context_menu/input_hook']=true,
+            ['dwarfuicore/input_event/input_hook']=true,
             ['dwarfuicore/user_prompt/service']=true,
         }
         local dfhack = dfhack_stub(loaded)
@@ -417,7 +417,7 @@ describe('dwarfuicore command lifecycle', function()
                         table.insert(events, 'context-menu-partial')
                     end},
                 },
-                ['dwarfuicore/context_menu/input_hook']={
+                ['dwarfuicore/input_event/input_hook']={
                     manager={shutdown=function()
                         table.insert(events, 'input-partial')
                     end},

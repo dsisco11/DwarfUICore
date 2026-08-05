@@ -8,7 +8,7 @@ local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
 local CONTEXT_MENU_INPUT_HOOK_SCRIPT =
-    'dwarfuicore/context_menu/input_hook'
+    'dwarfuicore/input_event/input_hook'
 local USER_PROMPT_SERVICE_SCRIPT = 'dwarfuicore/user_prompt/service'
 local USER_PROMPT_RUNTIME_SCRIPT = 'dwarfuicore/user_prompt/runtime'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',

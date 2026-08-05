@@ -49,7 +49,7 @@ MODULES = {
     {name='dwarfuicore/context_menu/map_target', contract='ContextMenuMapTargetRegistry', contract_type='table'},
     {name='dwarfuicore/context_menu/registration', contract='manager', contract_type='table'},
     {name='dwarfuicore/context_menu/target_detector', contract='ContextMenuTargetDetector', contract_type='table'},
-    {name='dwarfuicore/context_menu/input_hook', contract='manager', contract_type='table'},
+    {name='dwarfuicore/input_event/input_hook', contract='manager', contract_type='table'},
     {name='dwarfuicore/context_menu/renderer', contract='ContextMenuWindow', contract_type='table'},
     {name='dwarfuicore/context_menu/service', contract='service', contract_type='table'},
     {name='dwarfuicore/context_menu/screen', contract='ContextMenuScreen', contract_type='table'},

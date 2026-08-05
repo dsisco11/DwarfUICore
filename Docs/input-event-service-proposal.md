@@ -210,11 +210,19 @@ local InputEventDisposition = {
     CONSUME = 2,
 }
 
+---@class dwarfuicore.InputEventTypeEnum
+---@field MAP_CLICK dwarfuicore.InputEventType
+---@field RAW_CLICK dwarfuicore.InputEventType
+
+---@class dwarfuicore.InputEventDispositionEnum
+---@field PASS dwarfuicore.InputEventDisposition
+---@field CONSUME dwarfuicore.InputEventDisposition
+
 ---@class dwarfuicore.InputEventSubscription
 
 ---@class dwarfuicore.InputEventServiceApi
----@field EventType dwarfuicore.InputEventType
----@field Disposition dwarfuicore.InputEventDisposition
+---@field EventType dwarfuicore.InputEventTypeEnum
+---@field Disposition dwarfuicore.InputEventDispositionEnum
 ---@field get_contract_version fun(self: dwarfuicore.InputEventServiceApi): integer
 ---@field get_namespace fun(self: dwarfuicore.InputEventServiceApi): string
 ---@field observe fun(self: dwarfuicore.InputEventServiceApi, event_type: dwarfuicore.InputEventType, callback: dwarfuicore.InputEventObserver): dwarfuicore.InputEventSubscription
@@ -230,8 +238,9 @@ through DwarfUICore's existing immutable-enum helper. Every delivered event's
 `type` field equals the exact enum member used to select its subscription.
 
 `MapTilePosition` and `ScreenPosition` are the existing validated copied public
-value types. The callback and event values are retained only for the duration
-of dispatch unless the consumer explicitly retains them.
+value types. Delivered event values are retained by the service only for the
+duration of dispatch unless the consumer explicitly retains them. Callback
+functions remain strongly retained by their active subscriptions.
 
 ### Registration contract
 
@@ -424,8 +433,8 @@ snapshot factory while preserving two acquisition triggers:
 - intercepted input produces an input snapshot synchronously; and
 - active polling demand produces a pointer sample on a later frame.
 
-Both snapshot forms should use the same copied position values, coordinate-space
-labels, sequence allocator, immutability behavior, and map-demand rules.
+Both snapshot forms should use the same copied position values, sequence
+allocator, immutability behavior, and map-demand rules.
 
 The canonical private snapshot shapes are:
 
@@ -445,7 +454,9 @@ The canonical private snapshot shapes are:
 `MapTilePosition` contains its immutable `x`, `y`, and `z` fields. Input
 snapshots, pointer samples, `MapClickedEvent`, and `RawClickEvent` must not
 also expose or store parallel `screen_x`, `screen_y`, `map_x`, `map_y`, or
-`map_z` fields.
+`map_z` fields. The position value's type intrinsically identifies its
+coordinate space; snapshots and events do not require a separate
+coordinate-space label.
 
 Map sampling must remain demand-driven. Pointer-only tooltip registrations must
 not cause `dfhack.gui.getMousePos()` to run every frame. Exact map tooltip
@@ -538,9 +549,11 @@ An observer failure:
 - does not unregister the observer automatically; and
 - does not disable tooltip, context menu, UserPrompt, or the hook chain.
 
-Recursive input dispatch or observer-driven registration mutation must not
-corrupt the active snapshot. A recursively published event receives a later
-sequence and its own stable observer snapshot.
+Recursive input dispatch or callback-driven registration mutation must not
+corrupt the active snapshots. A recursively published event receives a later
+sequence and its own independently captured stable interceptor and observer
+snapshots. Each recursive channel snapshot is captured at the same point in
+dispatch as its non-recursive counterpart.
 
 ## Tooltip integration
 
@@ -758,8 +771,10 @@ through the same `observe()` and `intercept()` operations.
 ### Derive map ownership from inherited return values
 
 An inherited `onInput` result does not consistently distinguish map ownership
-from overlays, controls, or viewscreens. Version 1 therefore reports the
-narrower fact that a left release had an exact map coordinate.
+from overlays, controls, or viewscreens. `RAW_CLICK` therefore reports only the
+narrower fact that a left release had an exact map coordinate. `MAP_CLICK`
+derives its stronger unobstructed guarantee from generic pre-delegation UI
+resolution instead of the inherited return value.
 
 ### Observe before inherited input handling
 
@@ -804,6 +819,9 @@ the following:
 - callback ordering and mutation during dispatch are deterministic;
 - one observer failure is contained without suppressing later observers or
   disabling another service;
+- an interceptor exception or invalid return is recorded and treated as
+  `Disposition.PASS`, allowing later interceptors and inherited delegation to
+  proceed normally;
 - the native and Lua input seams retain current wrapper-chain, repair, reload,
   and cleanup behavior;
 - tooltip uses shared demand-driven pointer sampling while retaining tooltip

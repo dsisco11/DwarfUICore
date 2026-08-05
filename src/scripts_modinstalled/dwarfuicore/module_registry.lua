@@ -15,6 +15,8 @@ MODULES = {
     {name='dwarfuicore/service_provider/namespace', contract='validate'},
     {name='dwarfuicore/service_provider/immutable_proxy', contract='new_factory'},
     {name='dwarfuicore/service_provider/identity', contract='get_process_allocator'},
+    {name='dwarfuicore/input_event/types', contract='InputEventType', contract_type='table'},
+    {name='dwarfuicore/input_event/snapshot_factory', contract='SnapshotFactory', contract_type='table'},
     {name='dwarfuicore/service_provider/runtime', contract='validate'},
     {name='dwarfuicore/service_provider/acquisition', contract='acquire'},
     {name='dwarfuicore/service_provider/api', contract='new_factory'},

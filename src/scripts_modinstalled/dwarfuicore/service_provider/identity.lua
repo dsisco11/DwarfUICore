@@ -30,6 +30,7 @@ local SEPARATED_HANDLE_STATE_FIELDS = {
 }
 local MAP_COORDINATE_MIN = -0x8000
 local MAP_COORDINATE_MAX = 0x7fff
+local position_values = setmetatable({}, {__mode='k'})
 
 ---Plain reload-stable process identity counter state.
 ---@class dwarfuicore.ProcessIdentityState
@@ -54,13 +55,33 @@ CompositeIdentity = {}
 ---@field y integer
 ---@field z integer
 MapTilePosition = {}
-MapTilePosition.__index = MapTilePosition
+MapTilePosition.__index = function(position, key)
+    local values = position_values[position]
+    return values and values[key] or nil
+end
+MapTilePosition.__newindex = function()
+    error('DwarfUICore map tile positions are immutable.', 2)
+end
+MapTilePosition.__pairs = function(position)
+    return next, position_values[position] or {}, nil
+end
+MapTilePosition.__metatable = false
 
 ---@class dwarfuicore.ScreenPosition
 ---@field x integer
 ---@field y integer
 ScreenPosition = {}
-ScreenPosition.__index = ScreenPosition
+ScreenPosition.__index = function(position, key)
+    local values = position_values[position]
+    return values and values[key] or nil
+end
+ScreenPosition.__newindex = function()
+    error('DwarfUICore screen positions are immutable.', 2)
+end
+ScreenPosition.__pairs = function(position)
+    return next, position_values[position] or {}, nil
+end
+ScreenPosition.__metatable = false
 
 ---@class dwarfuicore.ContextMenuSelectionContext
 ---@field screen_position dwarfuicore.ScreenPosition
@@ -93,7 +114,9 @@ function MapTilePosition.new(value)
             math.type(value.z) == 'integer' and value.z >= MAP_COORDINATE_MIN and
             value.z <= MAP_COORDINATE_MAX,
         'DwarfUICore map tile position requires signed 16-bit x, y, and z.')
-    return setmetatable({x=value.x, y=value.y, z=value.z}, MapTilePosition)
+    local position = setmetatable({}, MapTilePosition)
+    position_values[position] = {x=value.x, y=value.y, z=value.z}
+    return position
 end
 
 ---Copy-constructs and validates one exact interface-cell position.
@@ -103,7 +126,9 @@ function ScreenPosition.new(value)
     assert(type(value) == 'table' and math.type(value.x) == 'integer' and
             math.type(value.y) == 'integer',
         'DwarfUICore screen position requires integer x and y.')
-    return setmetatable({x=value.x, y=value.y}, ScreenPosition)
+    local position = setmetatable({}, ScreenPosition)
+    position_values[position] = {x=value.x, y=value.y}
+    return position
 end
 
 ---Copy-constructs one approved public context-menu callback context.

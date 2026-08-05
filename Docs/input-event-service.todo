@@ -44,48 +44,48 @@ mouse boundaries.
 Outcome: Shared immutable input facts and discriminator types exist independently
 of the current context-menu owner, without changing active input behavior.
 
-- [ ] Define the immutable numeric private `InputDispatchResult` enum with
+- [x] Define the immutable numeric private `InputDispatchResult` enum with
   `PASS` and `CONSUME` members.
-- [ ] Define immutable numeric public enum tables for `InputEventType` and
+- [x] Define immutable numeric public enum tables for `InputEventType` and
   `InputEventDisposition` with the approved version-1 members.
-  - [ ] Expose `MAP_CLICK` and `RAW_CLICK` through `InputEventType`.
-  - [ ] Expose `PASS` and `CONSUME` through `InputEventDisposition`.
-  - [ ] Construct the tables with DwarfUICore's immutable-enum helper.
-- [ ] Define immutable copied `MouseInput` values containing one exact
+  - [x] Expose `MAP_CLICK` and `RAW_CLICK` through `InputEventType`.
+  - [x] Expose `PASS` and `CONSUME` through `InputEventDisposition`.
+  - [x] Construct the tables with DwarfUICore's immutable-enum helper.
+- [x] Define immutable copied `MouseInput` values containing one exact
   host-provided mouse key.
-- [ ] Implement one canonical snapshot factory for intercepted input snapshots
+- [x] Implement one canonical snapshot factory for intercepted input snapshots
   and continuous pointer samples.
-  - [ ] Allocate process-wide monotonic sequence values shared by both sample
+  - [x] Allocate process-wide monotonic sequence values shared by both sample
     paths.
-  - [ ] Copy and validate optional `ScreenPosition` and `MapTilePosition`
+  - [x] Copy and validate optional `ScreenPosition` and `MapTilePosition`
     values.
-  - [ ] Collect every host-classified mouse key in an intercepted keys table.
-  - [ ] Sort copied `MouseInput` values deterministically by key.
-  - [ ] Produce immutable `InputSnapshot` values with `sequence`,
+  - [x] Collect every host-classified mouse key in an intercepted keys table.
+  - [x] Sort copied `MouseInput` values deterministically by key.
+  - [x] Produce immutable `InputSnapshot` values with `sequence`,
     `mouse_inputs`, `screen_position`, and `map_position`.
-  - [ ] Produce immutable `PointerSample` values with `sequence`,
+  - [x] Produce immutable `PointerSample` values with `sequence`,
     `screen_position`, and `map_position`.
-  - [ ] Never store parallel per-axis coordinate fields or a redundant
+  - [x] Never store parallel per-axis coordinate fields or a redundant
     coordinate-space discriminator.
-- [ ] Keep map-coordinate acquisition demand-driven and sample each requested
+- [x] Keep map-coordinate acquisition demand-driven and sample each requested
   coordinate source at most once per snapshot.
-- [ ] Make synchronous input-snapshot demand explicit and independently
+- [x] Make synchronous input-snapshot demand explicit and independently
   countable for screen coordinates, map coordinates, and UI-root resolution so
   each later private consumer and public subscription can contribute only the
   facts its contract requires.
-- [ ] Add LuaDoc declarations for every new class, method, enum, alias, and
+- [x] Add LuaDoc declarations for every new class, method, enum, alias, and
   public field.
-- [ ] Add focused unit coverage for copied positions, immutability, sorted mouse
+- [x] Add focused unit coverage for copied positions, immutability, sorted mouse
   keys, empty non-mouse collections, malformed/nil positions, shared sequencing,
   and demand-aware sampling.
 
 Completion criteria:
 
-- [ ] One canonical factory can create both immutable sample shapes with no
+- [x] One canonical factory can create both immutable sample shapes with no
   consumer-specific policy.
-- [ ] Each intercepted input table produces at most one screen sample and one
+- [x] Each intercepted input table produces at most one screen sample and one
   map sample, according to aggregate demand.
-- [ ] Snapshot/value tests prove that coordinates exist only inside immutable
+- [x] Snapshot/value tests prove that coordinates exist only inside immutable
   position values and that all host-classified mouse keys are retained.
 
 ## Phase 2: Relocate and preserve the process input hook

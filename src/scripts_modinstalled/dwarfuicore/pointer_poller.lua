@@ -6,7 +6,7 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 local runtime_state = dfhack.dwarfuicore.service_provider_runtime
 local runtime_generation = runtime_state and runtime_state.generation or 0
 
----@class dwarfuicore.PointerSample
+---@class dwarfuicore.LegacyPointerSample
 ---@field sequence integer
 ---@field x integer|nil
 ---@field y integer|nil
@@ -25,7 +25,7 @@ local runtime_generation = runtime_state and runtime_state.generation or 0
 ---@alias dwarfuicore.PointerPollerMapSampler fun(): {x: integer, y: integer, z: integer}|nil
 
 ---Accepts one immutable sample and must not retain mutable poller state.
----@alias dwarfuicore.PointerPollerObserver fun(sample: dwarfuicore.PointerSample)
+---@alias dwarfuicore.PointerPollerObserver fun(sample: dwarfuicore.LegacyPointerSample)
 
 ---Returns whether another pointer sample is currently required.
 ---@alias dwarfuicore.PointerPollerDemand fun(): boolean
@@ -85,7 +85,7 @@ end
 ---@param map_x integer|nil
 ---@param map_y integer|nil
 ---@param map_z integer|nil
----@return dwarfuicore.PointerSample
+---@return dwarfuicore.LegacyPointerSample
 local function make_sample(sequence, x, y, map_x, map_y, map_z)
     local values = {
         sequence=sequence,

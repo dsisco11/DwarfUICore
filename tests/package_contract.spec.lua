@@ -78,6 +78,8 @@ describe('DwarfUICore package contract', function()
             'service_provider/namespace.lua',
             'service_provider/immutable_proxy.lua',
             'service_provider/identity.lua',
+            'input_event/types.lua',
+            'input_event/snapshot_factory.lua',
             'service_provider/runtime.lua',
             'service_provider/acquisition.lua',
             'service_provider/api.lua',

@@ -82,6 +82,9 @@ make those boundaries explicit without centralizing unrelated UI policy.
 - Own exactly one process-wide native/Lua input interception chain.
 - Own exactly one process-wide pointer poller.
 - Sample screen and map coordinates at most once for each dispatched snapshot.
+- Store sampled coordinates only as immutable `ScreenPosition` and
+  `MapTilePosition` values, never as separate per-axis snapshot or event
+  fields.
 - Allow tooltip, context menu, and UserPrompt to share input mechanics while
   retaining their existing semantics.
 - Provide deterministic private Core-consumer arbitration before inherited
@@ -109,11 +112,12 @@ make those boundaries explicit without centralizing unrelated UI policy.
 ## Terminology
 
 An **input snapshot** is an immutable, sequenced copy of facts sampled while one
-DFHack input table is being dispatched.
+DFHack input table is being dispatched. Its optional screen and map coordinates
+are immutable position values, not separate axis fields.
 
 A **pointer sample** is an immutable, sequenced screen-pointer snapshot produced
 by the shared poller. It may include a map position when current demand requires
-one.
+one. Both positions use the same immutable value types as intercepted input.
 
 A **Core input consumer** is a private DwarfUICore collaborator that may claim
 an intercepted input boundary before the inherited handler runs.
@@ -422,6 +426,26 @@ snapshot factory while preserving two acquisition triggers:
 
 Both snapshot forms should use the same copied position values, coordinate-space
 labels, sequence allocator, immutability behavior, and map-demand rules.
+
+The canonical private snapshot shapes are:
+
+```lua
+---@class dwarfuicore.InputSnapshot
+---@field sequence integer
+---@field screen_position dwarfuicore.ScreenPosition|nil
+---@field map_position dwarfuicore.MapTilePosition|nil
+
+---@class dwarfuicore.PointerSample
+---@field sequence integer
+---@field screen_position dwarfuicore.ScreenPosition|nil
+---@field map_position dwarfuicore.MapTilePosition|nil
+```
+
+`ScreenPosition` contains its immutable `x` and `y` fields.
+`MapTilePosition` contains its immutable `x`, `y`, and `z` fields. Input
+snapshots, pointer samples, `MapClickedEvent`, and `RawClickEvent` must not
+also expose or store parallel `screen_x`, `screen_y`, `map_x`, `map_y`, or
+`map_z` fields.
 
 Map sampling must remain demand-driven. Pointer-only tooltip registrations must
 not cause `dfhack.gui.getMousePos()` to run every frame. Exact map tooltip
@@ -758,6 +782,8 @@ the following:
   samples map position exactly once and publishes at most one immutable raw
   event and one immutable semantic event with the same sequence and copied
   positions, including when a public interceptor later consumes the event;
+- every input snapshot, pointer sample, and public event stores coordinates as
+  immutable position values without parallel per-axis coordinate fields;
 - the semantic map-click channel is eligible only when complete generic root
   resolution proves that no active UI target or blocker is in the way;
 - pass-through UI does not suppress semantic map clicks, while targeted,

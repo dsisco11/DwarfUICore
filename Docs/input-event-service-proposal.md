@@ -299,7 +299,7 @@ input table. Snapshot acquisition and private arbitration occur for every
 intercepted input table. A raw-click event is eligible for public dispatch when
 all of the following are true:
 
-1. Input interception is active on a supported current surface.
+1. Input interception is active on a hook-supported current surface.
 2. The input table contains at least one host-classified mouse-input key.
 3. No private Core consumer claims that input table.
 4. The shared snapshot's map position is non-nil.
@@ -325,8 +325,10 @@ For one intercepted input table, the runtime:
    inherited handling without creating a public event.
 8. Creates one immutable `RawClickEvent` containing the complete immutable
    `mouse_inputs` collection and the current dispatch sequence.
-9. Resolves current UI obstruction and prepares one `MapClickedEvent` with the
-   same mouse inputs, positions, and sequence when unobstructed.
+9. When the captured dispatch state contains an eligible semantic subscription
+   or another explicit private UI-root-resolution demand source, resolves
+   current UI obstruction and prepares one `MapClickedEvent` with the same mouse
+   inputs, positions, and sequence when unobstructed.
 10. Dispatches eligible public interceptors in global registration order.
 11. Delegates unchanged to the inherited input handler only if no interceptor
    returns `Disposition.CONSUME`.
@@ -381,10 +383,13 @@ pre-delegation UI state as the coordinate snapshot. Callback dispatch remains
 post-delegation and does not reclassify the click if inherited handling changes
 the current screen or widget tree.
 
-If screen coordinates are unavailable, a root cannot be inspected, root order
-cannot be established, or the current surface is unsupported, the runtime
-cannot prove that the map is unobstructed. It therefore suppresses
-`MapClickedEvent` while still dispatching `RawClickEvent`.
+Hook support and UI-resolution support are separate capabilities. A
+hook-supported surface can deliver a raw click even when its UI roots cannot be
+resolved. If screen coordinates are unavailable, a root cannot be inspected,
+root order cannot be established, or the current hook-supported surface is not
+supported by UI resolution, the runtime cannot prove that the map is
+unobstructed. It therefore suppresses `MapClickedEvent` while still dispatching
+`RawClickEvent`.
 
 For an unobstructed mouse-input table, the runtime creates a separate immutable
 `MapClickedEvent` using the same sequence and copied positions as the raw
@@ -497,8 +502,8 @@ Map sampling must remain demand-driven. Pointer-only tooltip registrations must
 not cause `dfhack.gui.getMousePos()` to run every frame. Exact map tooltip
 registrations or another private map-pointer subscriber create map demand, and
 public map-click and raw-click subscriptions create map demand only for eligible
-intercepted left releases. Semantic map-click subscriptions additionally create
-UI-root resolution demand.
+intercepted mouse-input tables. Semantic map-click subscriptions additionally
+create UI-root resolution demand.
 
 Continuous pointer samples and intercepted input snapshots share a process-wide
 sequence allocator. Sequence values establish publication order but do not
@@ -529,11 +534,13 @@ Arbitration rules are:
 
 - every consumer receives the same original keys table and immutable
   `InputSnapshot`;
+- consumers must treat the original keys table as read-only and must not mutate
+  it;
 - order is fixed by Core runtime assembly, not consumer registration timing;
 - UserPrompt retains precedence over context-menu opening input;
 - the first `CONSUME` result stops private arbitration and inherited delegation;
-- public map-click and raw-click dispatch is suppressed for a
-  Core-consumed left release;
+- public map-click and raw-click dispatch is suppressed for every Core-consumed
+  input table;
 - `PASS` delegates the original keys table without mutation;
 - a consumer cannot subscribe itself twice; and
 - public namespaces cannot register private consumers or select priorities.
@@ -550,6 +557,12 @@ input handling. Eligible semantic and raw interceptors share one stable snapshot
 ordered by global subscription sequence. The first interceptor to return
 `Disposition.CONSUME` claims the event, stops later public interceptors, skips
 inherited handling, and causes the input trampoline to return `true`.
+
+Before invoking the first public callback for an input event, the runtime
+captures both the interceptor and observer candidate snapshots. A subscription
+added by any callback is therefore ineligible for that event. Active state is
+still checked immediately before each callback so a subscription removed before
+its turn is skipped.
 
 `Disposition.PASS` continues interception. If every eligible interceptor
 passes, the original keys table delegates unchanged to the inherited handler.

@@ -10,3 +10,11 @@
 - Load project modules with `reqscript('path/without/extension')`; use `require()` only for DFHack or external libraries.
 - Add reload-managed modules to `dwarfuicore/module_registry.lua` in dependency order and update registry/package tests.
 - Use immutable numeric `---@enum` tables for every closed discriminator set.
+
+## Coding Conventions
+
+- Avoid global variables.
+- Prefix private members with an underscore.
+- Use class-like tables to encapsulate state and behavior.
+- Do not create copy-methods for class-like tables. Instead, the classes constructor should accept a table of values to initialize the instance.
+- Avoid creating loose functions. Instead, define them as methods on a class-like table.

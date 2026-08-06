@@ -133,9 +133,9 @@ Introduce an internal `PointerObstructionClassifier` base class that defines the
 common classification boundary for every supported UI object model. Its
 `invoke(root, screen_position)` method returns one canonical immutable
 classification carrying `TARGET`, `BLOCKED`, `MISS`, or `UNKNOWN`, plus an
-optional neutral subject for `TARGET` or `BLOCKED` and a target-local position
-for `TARGET` when the object model can provide them. `MISS` and `UNKNOWN` do
-not carry a subject.
+conditionally present neutral subject that is required for `TARGET` and
+`BLOCKED`, plus a target-local position required for `TARGET`. `MISS` and
+`UNKNOWN` carry neither field, as specified by the invariant table below.
 
 The following is non-executable interface pseudocode; the implementation must
 provide the validation and immutable-result factories described below.
@@ -333,7 +333,7 @@ The initial native compatibility table is:
 
 This table is implemented as an immutable exact-concrete-type registry whose values are `PointerPolicy` members. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted for self-policy classification. Types absent from the registry and lacking that flag cannot claim or block the pointer and therefore resolve themselves as canonical `MISS`.
 
-Structural traversal is a separate capability check. If any recognized or unrecognized object exposes the supported native `widget_container` child interface, the native classifier traverses those children in display order as it would for `PASS`, even when the container's own self-policy is unregistered. This capability check does not classify the container as interactive and does not use inheritance to select a pointer policy. `UNKNOWN` is produced by failed inspection, not stored in the registry. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain self-`MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
+Structural fallback traversal is a separate capability check used only when a concrete type has no exact registry entry and no `CAN_KEY_ACTIVATE` fallback. If that otherwise-unclassified object exposes the supported native `widget_container` child interface, the native classifier traverses its children in display order as it would for `PASS` while the container itself remains `MISS`. Exact registry policy always takes precedence, so registered `TARGET` and `NONE` widgets retain their terminal semantics, and the activation fallback retains `TARGET` semantics. This capability check does not classify the container as interactive and does not use inheritance to select a pointer policy. `UNKNOWN` is produced by failed inspection, not stored in the registry. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain self-`MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
 
 ## Input Pipeline Impact
 

@@ -284,7 +284,7 @@ end
 ---@return boolean handled
 local function dispatch(transport, owner, keys)
     local state = get_process_state()
-    if not state then return false end
+    if not state then return {consumed=false, public=nil} end
     local context_active = state.disabled_generation ~= state.generation and
         type(state.context_handler) == 'function'
     local snapshot = state.snapshot_factory:capture_input(
@@ -299,11 +299,11 @@ local function dispatch(transport, owner, keys)
             if not consumed_ok then
                 fail_priority_dispatch(state, consumer, transport, owner,
                     result, true)
-                return true
+                return {consumed=true, public=nil}
             end
             if result == InputDispatchResult.CONSUME then
                 state.priority_handled_count = state.priority_handled_count + 1
-                return true
+                return {consumed=true, public=nil}
             end
             state.priority_delegated_count = state.priority_delegated_count + 1
         else
@@ -322,12 +322,12 @@ local function dispatch(transport, owner, keys)
             if not handled_ok then
                 fail_priority_dispatch(
                     state, consumer, transport, owner, handled, true)
-                return true
+                return {consumed=true, public=nil}
             end
             if handled then
                 state.priority_handled_count =
                     state.priority_handled_count + 1
-                return true
+                return {consumed=true, public=nil}
             end
             state.priority_delegated_count =
                 state.priority_delegated_count + 1
@@ -339,10 +339,9 @@ local function dispatch(transport, owner, keys)
     end
 
     if not context_active then
-        if state.public_deriver then
-            state.last_public_derivation = state.public_deriver(snapshot, owner)
-        end
-        return false
+        local public = state.public_deriver and
+            state.public_deriver(snapshot, owner) or nil
+        return {consumed=public and public.consumed == true, public=public}
     end
     state.dispatch_count = state.dispatch_count + 1
     local ok, handled = call_private_consumer(state.context_handler,
@@ -358,17 +357,15 @@ local function dispatch(transport, owner, keys)
             owner=transport == ContextMenuInputTransport.NATIVE and owner or nil,
             error=tostring(handled),
         }
-        return false
+        return {consumed=false, public=nil}
     end
     if handled == InputDispatchResult.CONSUME then
         state.handled_count = state.handled_count + 1
-        return true
+        return {consumed=true, public=nil}
     end
     state.delegated_count = state.delegated_count + 1
-    if state.public_deriver then
-        state.last_public_derivation = state.public_deriver(snapshot, owner)
-    end
-    return false
+    local public = state.public_deriver and state.public_deriver(snapshot, owner) or nil
+    return {consumed=public and public.consumed == true, public=public}
 end
 
 ---Builds the native pre-delegation input trampoline.
@@ -380,13 +377,16 @@ local function make_native_trampoline(owner, predecessor)
     trampoline = function(viewscreen_name, viewscreen, keys, ...)
         local state = get_process_state()
         local record = state and state.native_hook
-        if record and record.active and
-                record.active_trampoline == trampoline and
-                dispatch(ContextMenuInputTransport.NATIVE, owner, keys) then
+        local result = record and record.active and
+            record.active_trampoline == trampoline and
+            dispatch(ContextMenuInputTransport.NATIVE, owner, keys) or nil
+        if result and result.consumed then
+            if result.public and result.public.complete then result.public.complete() end
             return true
         end
-        return unpack_returns(table.pack(
-            predecessor(viewscreen_name, viewscreen, keys, ...)))
+        local inherited = table.pack(predecessor(viewscreen_name, viewscreen, keys, ...))
+        if result and result.public and result.public.complete then result.public.complete() end
+        return unpack_returns(inherited)
     end
     return trampoline
 end
@@ -401,12 +401,16 @@ local function make_screen_trampoline(owner_ref, predecessor)
         local owner = owner_ref[1]
         local state = get_process_state()
         local record = state and owner and state.screen_hooks[owner]
-        if record and record.active and
-                record.active_trampoline == trampoline and
-                dispatch(ContextMenuInputTransport.SCREEN, owner, keys) then
+        local result = record and record.active and
+            record.active_trampoline == trampoline and
+            dispatch(ContextMenuInputTransport.SCREEN, owner, keys) or nil
+        if result and result.consumed then
+            if result.public and result.public.complete then result.public.complete() end
             return true
         end
-        return unpack_returns(table.pack(predecessor(self, keys, ...)))
+        local inherited = table.pack(predecessor(self, keys, ...))
+        if result and result.public and result.public.complete then result.public.complete() end
+        return unpack_returns(inherited)
     end
     return trampoline
 end

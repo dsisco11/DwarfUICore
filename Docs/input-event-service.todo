@@ -368,49 +368,49 @@ Outcome: Eligible semantic and raw subscriptions execute through the approved
 pre-delegation interception and post-delegation observation channels with
 deterministic mutation, recursion, consumption, and error behavior.
 
-- [ ] Before invoking the first public callback for an input event, capture both
+- [x] Before invoking the first public callback for an input event, capture both
   stable interceptor and observer candidate snapshots.
-- [ ] Interleave eligible semantic and raw subscriptions by global registration
+- [x] Interleave eligible semantic and raw subscriptions by global registration
   sequence within each channel.
-- [ ] Exclude subscriptions added during the current event from both captured
+- [x] Exclude subscriptions added during the current event from both captured
   snapshots.
-- [ ] Check active state immediately before each callback and skip subscriptions
+- [x] Check active state immediately before each callback and skip subscriptions
   removed before their turn.
-- [ ] Dispatch interceptors after private arbitration and before inherited input
+- [x] Dispatch interceptors after private arbitration and before inherited input
   handling.
-- [ ] Continue on exact `Disposition.PASS`.
-- [ ] On the first exact `Disposition.CONSUME`, stop later interceptors, skip
+- [x] Continue on exact `Disposition.PASS`.
+- [x] On the first exact `Disposition.CONSUME`, stop later interceptors, skip
   inherited handling, and make the trampoline return `true`.
-- [ ] Treat nil, booleans, unknown numbers, exceptions, and every other invalid
+- [x] Treat nil, booleans, unknown numbers, exceptions, and every other invalid
   interceptor return as a recorded failure and fail open as `PASS`.
-- [ ] Delegate the original keys table unchanged and preserve the inherited
+- [x] Delegate the original keys table unchanged and preserve the inherited
   return value when every interceptor passes.
-- [ ] Dispatch observers after inherited handling or after public consumption
+- [x] Dispatch observers after inherited handling or after public consumption
   skips delegation.
-- [ ] Keep observers eligible when an interceptor consumes or inherited handling
+- [x] Keep observers eligible when an interceptor consumes or inherited handling
   reports that it handled the input.
-- [ ] Ignore every observer return value and prevent observers from altering
+- [x] Ignore every observer return value and prevent observers from altering
   consumption or inherited results.
-- [ ] Deliver one shared immutable event object to callbacks for the same event
+- [x] Deliver one shared immutable event object to callbacks for the same event
   type and channel.
-- [ ] Retain public event values only for dispatch unless a consumer explicitly
+- [x] Retain public event values only for dispatch unless a consumer explicitly
   retains them.
-- [ ] Contain and record callback failures against the responsible subscription
+- [x] Contain and record callback failures against the responsible subscription
   and namespace without suppressing later observers or disabling Core services.
-- [ ] Give recursive input dispatch a later sequence and independent interceptor
+- [x] Give recursive input dispatch a later sequence and independent interceptor
   and observer snapshots captured at the same defined points.
-- [ ] Add focused tests for cross-event ordering, first-consume behavior,
+- [x] Add focused tests for cross-event ordering, first-consume behavior,
   pass-through, observer timing, inherited results, callback mutation,
   unsubscription-before-turn, registration-during-dispatch, recursion, invalid
   returns, exceptions, and failure isolation.
 
 Completion criteria:
 
-- [ ] `intercept()` is observably pre-delegation and is the only public operation
+- [x] `intercept()` is observably pre-delegation and is the only public operation
   capable of consuming input.
-- [ ] `observe()` is observably post-delegation and cannot affect ownership or
+- [x] `observe()` is observably post-delegation and cannot affect ownership or
   inherited results.
-- [ ] Ordering, mutation, recursive dispatch, and failure tests establish one
+- [x] Ordering, mutation, recursive dispatch, and failure tests establish one
   deterministic contract across both event types.
 
 ## Phase 9: Complete lifecycle, reload, diagnostics, and error contracts

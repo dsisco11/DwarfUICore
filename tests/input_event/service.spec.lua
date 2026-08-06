@@ -87,4 +87,106 @@ describe('Input Event subscription service', function()
         end, 'DwarfUICore Input Event callback must be a function.')
         assert.equals(0, #context.demands)
     end)
+
+    it('dispatches globally ordered interceptors before retained observers', function()
+        local context = load_context()
+        local calls = {}
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function(event)
+                table.insert(calls, 'first:' .. event.sequence)
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.MAP_CLICK,
+            'observe', function(event) table.insert(calls, 'observer:' .. event.sequence) end)
+        local dispatch = context.service:begin_dispatch({raw={sequence=7}, map={sequence=7}})
+        assert.is_false(dispatch.consumed)
+        assert.same({'first:7'}, calls)
+        context.service:complete_dispatch(dispatch)
+        assert.same({'first:7', 'observer:7'}, calls)
+    end)
+
+    it('consumes once, skips removed candidates, and isolates callback failures', function()
+        local context = load_context()
+        local calls = {}
+        local observed
+        local removed
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function()
+                context.service:unsubscribe('alpha', 1, removed)
+                error('failure')
+            end)
+        removed = context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'intercept', function()
+                table.insert(calls, 'removed')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function()
+                table.insert(calls, 'consume')
+                return context.types.InputEventDisposition.CONSUME
+            end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'observe', function(event) observed = event end)
+        local dispatch = context.service:begin_dispatch({raw={sequence=8}, map=nil})
+        assert.is_true(dispatch.consumed)
+        assert.same({'consume'}, calls)
+        context.service:complete_dispatch(dispatch)
+        assert.equals(8, observed.sequence)
+        assert.equals(1, #context.service._failures)
+    end)
+
+    it('uses independent snapshots for mutation and recursive dispatch', function()
+        local context = load_context()
+        local calls, nested = {}, false
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function()
+                table.insert(calls, 'raw')
+                if not nested then
+                    nested = true
+                    context.service:subscribe('alpha', 1,
+                        context.types.InputEventType.RAW_CLICK, 'intercept',
+                        function() table.insert(calls, 'late')
+                            return context.types.InputEventDisposition.PASS
+                        end)
+                    context.service:begin_dispatch({raw={sequence=10}, map={sequence=10}})
+                end
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.MAP_CLICK,
+            'intercept', function()
+                table.insert(calls, 'map')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:begin_dispatch({raw={sequence=9}, map={sequence=9}})
+        assert.same({'raw', 'raw', 'map', 'late', 'map'}, calls)
+    end)
+
+    it('fails open for invalid interceptor returns and isolates observers', function()
+        local context = load_context()
+        local calls, first_event, second_event = {}, nil, nil
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function() return true end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'intercept', function()
+                table.insert(calls, 'pass')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'observe', function() return context.types.InputEventDisposition.CONSUME end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'observe', function(event) first_event = event end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.MAP_CLICK,
+            'observe', function() error('observer failure') end)
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'observe', function(event)
+                second_event = event
+                table.insert(calls, 'observer')
+            end)
+        local dispatch = context.service:begin_dispatch({raw={sequence=11}, map={sequence=11}})
+        assert.is_false(dispatch.consumed)
+        context.service:complete_dispatch(dispatch)
+        assert.same({'pass', 'observer'}, calls)
+        assert.is_equal(first_event, second_event)
+        assert.equals(2, #context.service._failures)
+    end)
 end)

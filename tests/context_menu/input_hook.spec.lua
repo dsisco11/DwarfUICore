@@ -675,4 +675,35 @@ describe('context-menu input hook', function()
             'dwarfmode', {}, {OWNED=true}))
         assert.equals(2, predecessor_count)
     end)
+
+    it('completes public dispatch after delegation and after public consumption',
+            function()
+        local events = {}
+        local overlay = {feed_viewscreen_widgets=function()
+                table.insert(events, 'inherited')
+                return 'base'
+            end}
+        local module = load_hook({dwarfuicore={}}, overlay)
+        module.manager:set_public_deriver(function()
+            table.insert(events, 'intercept')
+            return {consumed=false, complete=function()
+                    table.insert(events, 'observe')
+                end}
+        end)
+        module.manager:ensure_native()
+        assert.equals('base', overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {CUSTOM=true}))
+        assert.same({'intercept', 'inherited', 'observe'}, events)
+
+        events = {}
+        module.manager:set_public_deriver(function()
+            table.insert(events, 'intercept')
+            return {consumed=true, complete=function()
+                    table.insert(events, 'observe')
+                end}
+        end)
+        assert.is_true(overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {CUSTOM=true}))
+        assert.same({'intercept', 'observe'}, events)
+    end)
 end)

@@ -177,12 +177,25 @@ The root-kind obstruction resolver selects the classifier explicitly from
 `MISS` to no obstruction, and `UNKNOWN` to fail-closed suppression.
 
 The existing `PointerDispatcher` ceases to own `gui.View` obstruction logic.
-Its `resolve()` operation delegates to
-`GuiViewPointerObstructionClassifier`, preserving the existing result shape for
-callers, while `sample()` retains coordinate sampling, current-target state,
-and pointer enter, leave, and update lifecycle dispatch. This keeps tooltip and
-context-menu pointer behavior compatible while giving Input Event one shared
-classification abstraction.
+Its `resolve(root, screen_position)` operation delegates to
+`GuiViewPointerObstructionClassifier` and returns the canonical
+`PointerClassification` directly. The former `PointerResultKind` enum and
+per-axis result `x` and `y` fields are retired; every direct consumer migrates
+to `PointerClassificationKind` and immutable `local_position`.
+
+`PointerDispatcher.sample()` retains optional coordinate sampling,
+current-target state, and pointer enter, leave, and update lifecycle dispatch.
+It creates one immutable `ScreenPosition`, delegates classification, and unpacks
+`local_position` only when invoking the established lifecycle callback
+signatures. This keeps tooltip and context-menu callback behavior compatible
+without retaining a second result shape.
+
+An `UNKNOWN` classification has channel-specific meaning. The obstruction
+resolver fails closed for the current `MAP_CLICK`. Continuous
+`PointerDispatcher.sample()` treats it as an indeterminate sample: it records
+the classification, preserves the previous target, and emits no enter, leave,
+or update callback. The next determinate sample compares against that preserved
+target normally.
 
 ## Root Discovery
 
@@ -342,6 +355,9 @@ Add focused coverage for:
 - GUI-view and native roots dispatched to their explicit classifier subclasses;
 - `PointerDispatcher.resolve()` delegating to the GUI-view classifier;
 - `PointerDispatcher.sample()` retaining enter, leave, and update lifecycle behavior after extraction;
+- `PointerDispatcher.sample()` preserving its current target and emitting no lifecycle transition for `UNKNOWN`;
+- canonical immutable `local_position` replacing result `x` and `y` fields;
+- retirement of `PointerResultKind` in favor of `PointerClassificationKind`;
 - no duplicate GUI-view obstruction implementation remaining in `PointerDispatcher`;
 - native userdata delegated only to the native hit tester;
 - Lua and overlay views delegated only to the generic resolver;
@@ -392,14 +408,16 @@ If Core must reproduce DFHack overlay applicability predicates, tests cover repr
 4. Return shallow tagged descriptors plus explicit collection status.
 5. Introduce the classifier base contract and canonical immutable classification result.
 6. Extract GUI-view obstruction logic from `PointerDispatcher` into `GuiViewPointerObstructionClassifier`, retaining dispatcher sampling and pointer lifecycle behavior.
-7. Implement `NativeUiPointerObstructionClassifier` with the native geometry and exact-type compatibility policies.
-8. Place both classifiers behind the kind-based obstruction resolver.
-9. Replace indiscriminate overlay-database scanning with one isolated compatibility adapter matching DFHack's feed predicates.
-10. Deduplicate roots by object identity and reject incompatible duplicate kinds.
-11. Tag existing context and priority-consumer roots as explicit Core roots.
-12. Split the existing trampoline into pre-predecessor and post-predecessor processing without adding another hook.
-13. Update unit and DwarfSpec coverage, including predecessor-consumption and click-consumption ordering.
-14. Reconcile accepted decisions into the parent proposal and todo.
+7. Replace `PointerResultKind` and legacy result coordinate fields with the canonical classification enum and immutable `local_position`.
+8. Migrate every direct classification consumer: tooltip target detection, context-menu target detection, Input Event UI-obstruction resolution, pointer tests, and their service-specific tests.
+9. Implement `NativeUiPointerObstructionClassifier` with the native geometry and exact-type compatibility policies.
+10. Place both classifiers behind the kind-based obstruction resolver.
+11. Replace indiscriminate overlay-database scanning with one isolated compatibility adapter matching DFHack's feed predicates.
+12. Deduplicate roots by object identity and reject incompatible duplicate kinds.
+13. Tag existing context and priority-consumer roots as explicit Core roots.
+14. Split the existing trampoline into pre-predecessor and post-predecessor processing without adding another hook.
+15. Update unit and DwarfSpec coverage, including predecessor-consumption and click-consumption ordering.
+16. Reconcile accepted decisions into the parent proposal and todo.
 
 ## Alternatives Rejected
 
@@ -447,6 +465,8 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 8. Overlay viewscreen and focus applicability is resolved by the compatibility adapter, while the existing pointer classifier evaluates dynamic active and visible values exactly once during hit testing.
 9. Duplicate root objects are inspected once, with incompatible object-model kinds producing unknown.
 10. One `PointerObstructionClassifier` contract governs GUI-view and native classification; `PointerDispatcher` retains sampling and lifecycle responsibilities but delegates GUI-view obstruction classification.
+11. All direct resolver consumers use the canonical classification enum and immutable local position; no legacy result shape remains.
+12. An indeterminate continuous sample preserves the current pointer target and emits no lifecycle transition, while an indeterminate obstruction decision suppresses only the current `MAP_CLICK`.
 
 ## Acceptance Criteria
 
@@ -455,6 +475,8 @@ This direction is ready to merge into the parent proposal when:
 - every supported UI domain has an explicit root kind;
 - every supported root kind selects a `PointerObstructionClassifier` subclass through the root-kind resolver;
 - GUI-view obstruction behavior has one implementation shared by the resolver and `PointerDispatcher`;
+- every direct pointer-resolution consumer uses `PointerClassification` without legacy enum or per-axis result fields;
+- `UNKNOWN` has explicit fail-closed map-obstruction behavior and non-transitioning continuous-pointer behavior;
 - root collection is shallow and never adapts descendants;
 - overlay applicability matches the actual current input context;
 - native positioning follows the isolated `GLOBAL_POSITIONING` compatibility contract;

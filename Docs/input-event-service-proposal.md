@@ -390,6 +390,11 @@ from `PointerDispatcher`; `NativeUiPointerObstructionClassifier` contains native
 userdata traversal and compatibility policy. `PointerDispatcher` retains
 sampling and pointer lifecycle dispatch and delegates GUI-view classification to
 the same classifier, so Core has only one implementation of GUI pointer policy.
+All consumers use the canonical immutable classification result and local
+position; the legacy pointer-result enum and per-axis result fields are removed.
+An unknown obstruction classification fails closed for `MAP_CLICK`, while an
+unknown continuous pointer sample preserves the current target without emitting
+a lifecycle transition.
 
 The service uses generic UI hit testing only. A widget does not need a tooltip,
 context-menu, or Input Event registration to obstruct the map. Visibility,

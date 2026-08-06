@@ -13,6 +13,8 @@
 
 ## Coding Conventions
 
+- Adhere to the DRY principle (Don't Repeat Yourself).
+- Adhere to the KISS principle (Keep It Stupid Simple), but not at the expense of clarity and good architecture/abstractions.
 - Avoid global variables.
 - Prefix private members with an underscore.
 - Use class-like tables to encapsulate state and behavior.

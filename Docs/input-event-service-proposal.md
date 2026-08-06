@@ -82,7 +82,7 @@ notification after the applicable interception stage.
 - Own exactly one process-wide native/Lua input interception chain.
 - Own exactly one process-wide pointer poller.
 - Sample screen and map coordinates at most once for each dispatched snapshot.
-- Store sampled coordinates only as immutable `ScreenPosition` and
+- Store sampled coordinates only as immutable `Position2D` and
   `MapTilePosition` values, never as separate per-axis snapshot or event
   fields.
 - Allow tooltip, context menu, and UserPrompt to share input mechanics while
@@ -194,14 +194,14 @@ The proposed version 1 types are:
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field map_position dwarfuicore.MapTilePosition
----@field screen_position dwarfuicore.ScreenPosition
+---@field screen_position dwarfuicore.Position2D
 
 ---@class dwarfuicore.RawClickEvent
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field map_position dwarfuicore.MapTilePosition
----@field screen_position dwarfuicore.ScreenPosition|nil
+---@field screen_position dwarfuicore.Position2D|nil
 
 ---@class dwarfuicore.MouseInput
 ---@field key string
@@ -249,7 +249,7 @@ table literals describe their members; implementation must construct them
 through DwarfUICore's existing immutable-enum helper. Every delivered event's
 `type` field equals the exact enum member used to select its subscription.
 
-`MapTilePosition` and `ScreenPosition` are the existing validated copied public
+`MapTilePosition` and `Position2D` are the existing validated copied public
 value types. `MouseInput` is an immutable copied value whose `key` is one exact
 host-provided mouse-input key. Each event's `mouse_inputs` field is a non-empty
 immutable array ordered by key. Delivered event values are retained by the
@@ -390,11 +390,13 @@ from `PointerDispatcher`; `NativeUiPointerObstructionClassifier` contains native
 userdata traversal and compatibility policy. `PointerDispatcher` retains
 sampling and pointer lifecycle dispatch and delegates GUI-view classification to
 the same classifier, so Core has only one implementation of GUI pointer policy.
-All consumers use the canonical immutable classification result and local
-position; the legacy pointer-result enum and per-axis result fields are removed.
-An unknown obstruction classification fails closed for `MAP_CLICK`, while an
-unknown continuous pointer sample preserves the current target without emitting
-a lifecycle transition.
+All consumers use the canonical immutable classification result, neutral
+`subject`, and local position; the legacy pointer-result enum and per-axis result
+fields are removed. Every classifier call crosses the shared non-throwing
+invocation boundary, which records failures and converts exceptions or invalid
+results to `UNKNOWN`. An unknown obstruction classification fails closed for
+`MAP_CLICK`, while an unknown continuous pointer sample preserves the current
+target without emitting a lifecycle transition.
 
 The service uses generic UI hit testing only. A widget does not need a tooltip,
 context-menu, or Input Event registration to obstruct the map. Visibility,
@@ -502,16 +504,16 @@ The canonical private snapshot shapes are:
 ---@class dwarfuicore.InputSnapshot
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field screen_position dwarfuicore.ScreenPosition|nil
+---@field screen_position dwarfuicore.Position2D|nil
 ---@field map_position dwarfuicore.MapTilePosition|nil
 
 ---@class dwarfuicore.PointerSample
 ---@field sequence integer
----@field screen_position dwarfuicore.ScreenPosition|nil
+---@field screen_position dwarfuicore.Position2D|nil
 ---@field map_position dwarfuicore.MapTilePosition|nil
 ```
 
-`ScreenPosition` contains its immutable `x` and `y` fields.
+`Position2D` contains its immutable `x` and `y` fields.
 `MapTilePosition` contains its immutable `x`, `y`, and `z` fields. Input
 snapshots, pointer samples, `MapClickedEvent`, and `RawClickEvent` must not
 also expose or store parallel `screen_x`, `screen_y`, `map_x`, `map_y`, or

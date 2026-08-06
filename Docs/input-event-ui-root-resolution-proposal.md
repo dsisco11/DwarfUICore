@@ -133,8 +133,9 @@ Introduce an internal `PointerObstructionClassifier` base class that defines the
 common classification boundary for every supported UI object model. Its
 `classify(root, screen_position)` method returns one canonical immutable
 classification carrying `TARGET`, `BLOCKED`, `MISS`, or `UNKNOWN`, plus an
-optional original target and target-local position when the object model can
-provide them.
+optional neutral subject for TARGET or BLOCKED and a target-local position
+for TARGET when the object model can provide them. MISS and UNKNOWN do
+not carry a subject.
 
 ```lua
 ---@enum PointerClassificationKind
@@ -147,15 +148,15 @@ PointerClassificationKind = {
 
 ---@class PointerClassification
 ---@field kind PointerClassificationKind
----@field target unknown|nil
----@field local_position ScreenPosition|nil
+---@field subject unknown|nil Object classified as TARGET or BLOCKED.
+---@field local_position Position2D|nil Target-local position populated only for TARGET.
 
 ---@class PointerObstructionClassifier
 PointerObstructionClassifier = {}
 
 ---Classifies one root at an immutable screen position.
 ---@param root unknown
----@param screen_position ScreenPosition
+---@param screen_position Position2D
 ---@return PointerClassification
 function PointerObstructionClassifier:classify(root, screen_position)
     error('PointerObstructionClassifier:classify must be implemented')
@@ -163,8 +164,14 @@ end
 ```
 
 The base class owns the result contract and common validation only. It does not
-infer an object model from Lua runtime type. Two initial subclasses implement
-the model-specific logic:
+infer an object model from Lua runtime type. Callers never invoke an overridable
+classify() method directly. A shared non-throwing invoke() boundary validates
+arguments, contains subclass exceptions, validates the returned classification,
+records internal failure diagnostics, and returns UNKNOWN for every failure.
+Both the root-kind obstruction resolver and PointerDispatcher must use this
+boundary, ensuring identical failure transport.
+
+Two initial subclasses implement the model-specific logic:
 
 - `GuiViewPointerObstructionClassifier` owns `gui.View` activity, visibility,
   geometry, clipping, reverse descendant traversal, and `PointerPolicy` logic;
@@ -185,7 +192,7 @@ to `PointerClassificationKind` and immutable `local_position`.
 
 `PointerDispatcher.sample()` retains optional coordinate sampling,
 current-target state, and pointer enter, leave, and update lifecycle dispatch.
-It creates one immutable `ScreenPosition`, delegates classification, and unpacks
+It creates one immutable `Position2D`, delegates classification, and unpacks
 `local_position` only when invoking the established lifecycle callback
 signatures. This keeps tooltip and context-menu callback behavior compatible
 without retaining a second result shape.
@@ -352,6 +359,8 @@ Add focused coverage for:
 - applicable malformed overlays producing unknown;
 - dynamic overlay active and visible values evaluated exactly once by the pointer classifier;
 - the classifier base contract and canonical immutable result validation;
+- subclass exceptions and invalid results converted to UNKNOWN by the shared invocation boundary;
+- TARGET and BLOCKED carrying subject, with only TARGET carrying local_position;
 - GUI-view and native roots dispatched to their explicit classifier subclasses;
 - `PointerDispatcher.resolve()` delegating to the GUI-view classifier;
 - `PointerDispatcher.sample()` retaining enter, leave, and update lifecycle behavior after extraction;
@@ -465,8 +474,9 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 8. Overlay viewscreen and focus applicability is resolved by the compatibility adapter, while the existing pointer classifier evaluates dynamic active and visible values exactly once during hit testing.
 9. Duplicate root objects are inspected once, with incompatible object-model kinds producing unknown.
 10. One `PointerObstructionClassifier` contract governs GUI-view and native classification; `PointerDispatcher` retains sampling and lifecycle responsibilities but delegates GUI-view obstruction classification.
-11. All direct resolver consumers use the canonical classification enum and immutable local position; no legacy result shape remains.
-12. An indeterminate continuous sample preserves the current pointer target and emits no lifecycle transition, while an indeterminate obstruction decision suppresses only the current `MAP_CLICK`.
+11. All direct resolver consumers use the canonical classification enum, neutral subject, and immutable local position; no legacy result shape remains.
+12. Classifier exceptions and invalid results are contained by the shared invocation boundary and become UNKNOWN for both obstruction and continuous sampling.
+13. An indeterminate continuous sample preserves the current pointer target and emits no lifecycle transition, while an indeterminate obstruction decision suppresses only the current `MAP_CLICK`.
 
 ## Acceptance Criteria
 
@@ -475,7 +485,8 @@ This direction is ready to merge into the parent proposal when:
 - every supported UI domain has an explicit root kind;
 - every supported root kind selects a `PointerObstructionClassifier` subclass through the root-kind resolver;
 - GUI-view obstruction behavior has one implementation shared by the resolver and `PointerDispatcher`;
-- every direct pointer-resolution consumer uses `PointerClassification` without legacy enum or per-axis result fields;
+- every direct pointer-resolution consumer uses PointerClassification with neutral subject and immutable local_position, without legacy enum or per-axis result fields;
+- every classifier call crosses the shared non-throwing invocation boundary;
 - `UNKNOWN` has explicit fail-closed map-obstruction behavior and non-transitioning continuous-pointer behavior;
 - root collection is shallow and never adapts descendants;
 - overlay applicability matches the actual current input context;

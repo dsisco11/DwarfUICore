@@ -2,7 +2,7 @@
 
 -- Process-wide context-menu session authority and opening-input mediation.
 
-local input_hooks = reqscript('dwarfuicore/context_menu/input_hook')
+local input_hooks = reqscript('dwarfuicore/input_event/input_hook')
 local input_types = reqscript('dwarfuicore/input_event/types')
 local registrations = reqscript('dwarfuicore/context_menu/registration')
 local target_detectors = reqscript('dwarfuicore/context_menu/target_detector')

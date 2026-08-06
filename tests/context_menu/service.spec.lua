@@ -238,7 +238,7 @@ local function load_harness(state)
     local _, module = module_loader.load(repo_root, SERVICE_PATH, {
         globals={dfhack=state.process, SC_WORLD_UNLOADED=42},
         reqscript={
-            ['dwarfuicore/context_menu/input_hook']={manager=state.hook},
+            ['dwarfuicore/input_event/input_hook']={manager=state.hook},
             ['dwarfuicore/context_menu/input_sample']=input_samples,
             ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
             ['dwarfuicore/context_menu/registration']={

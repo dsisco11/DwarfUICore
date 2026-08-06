@@ -124,21 +124,6 @@ describe('context-menu input hook', function()
         assert.same({'prompt', 'context', 'prompt'}, events)
     end)
 
-    it('re-exports the Input Event manager through the compatibility module',
-            function()
-        local hook = load_hook({dwarfuicore={}}, {
-            feed_viewscreen_widgets=function() end,
-        })
-        local _, compatibility = module_loader.load(repo_root,
-            'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua', {
-                reqscript={
-                    ['dwarfuicore/input_event/input_hook']=hook,
-                },
-            })
-
-        assert.is_equal(hook.manager, compatibility.manager)
-    end)
-
     it('adopts the legacy process state under Input Event ownership', function()
         local legacy_state = {api_version=2, runtime_generation=0}
         local process = {dwarfuicore={

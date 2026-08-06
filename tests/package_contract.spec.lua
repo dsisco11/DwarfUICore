@@ -62,6 +62,26 @@ describe('DwarfUICore package contract', function()
         end
     end)
 
+    it('documents the public Input Event contract', function()
+        local guide = read_source('Docs/input-event-service.md')
+        for _, required in ipairs({
+                'InputEventServiceProvider:new(1, namespace)',
+                'EventType.MAP_CLICK',
+                'EventType.RAW_CLICK',
+                'observe(event_type, callback)',
+                'intercept(event_type, handler)',
+                'Disposition.PASS',
+                'Disposition.CONSUME',
+                'not over UI',
+                'every host-classified mouse key',
+                'opaque handle',
+                'immutable',
+                'Observer exceptions',
+            }) do
+            assert.is_truthy(guide:find(required, 1, true), required)
+        end
+    end)
+
     it('owns shared infrastructure under the dwarfuicore namespace', function()
         local shared_modules = {
             'class.lua',
@@ -176,7 +196,6 @@ describe('DwarfUICore package contract', function()
         local context_menu_modules = {
             'definition.lua',
             
-            'input_sample.lua',
             'map_target.lua',
             'registration.lua',
             'renderer.lua',
@@ -218,14 +237,25 @@ describe('DwarfUICore package contract', function()
             'src/scripts_modinstalled/dwarfuicore/user_prompt/input_hook.lua'))
     end)
 
-    it('keeps the context-menu hook as a private compatibility export',
-            function()
-        local source = read_source(
-            'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua')
-        assert.is_truthy(source:find('--@ module=true', 1, true))
-        assert.is_truthy(source:find(
-            "reqscript('dwarfuicore/input_event/input_hook')", 1, true))
-        assert.is_nil(source:find('feed_viewscreen_widgets', 1, true))
+    it('ships no context-menu compatibility input owner', function()
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/context_menu/input_hook.lua'))
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/pointer_poller.lua'))
+        assert.is_false(source_exists(
+            'src/scripts_modinstalled/dwarfuicore/context_menu/input_sample.lua'))
+
+        for _, relative_path in ipairs({
+                'context_menu/service.lua',
+                'user_prompt/runtime.lua',
+            }) do
+            local source = read_source(
+                'src/scripts_modinstalled/dwarfuicore/' .. relative_path)
+            assert.is_truthy(source:find(
+                "reqscript('dwarfuicore/input_event/input_hook')", 1, true))
+            assert.is_nil(source:find(
+                "reqscript('dwarfuicore/context_menu/input_hook')", 1, true))
+        end
     end)
 
     it('does not retain direct context-menu input sampling ownership', function()

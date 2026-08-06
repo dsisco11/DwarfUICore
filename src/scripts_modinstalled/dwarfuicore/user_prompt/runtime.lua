@@ -6,7 +6,7 @@ local guidm = require('gui.dwarfmode')
 local context_service_module =
     reqscript('dwarfuicore/context_menu/service')
 reqscript('dwarfuicore/context_menu/screen')
-local input_hook_module = reqscript('dwarfuicore/context_menu/input_hook')
+local input_hook_module = reqscript('dwarfuicore/input_event/input_hook')
 local indicator_module = reqscript('dwarfuicore/user_prompt/indicator')
 local input_consumer_module =
     reqscript('dwarfuicore/user_prompt/input_consumer')

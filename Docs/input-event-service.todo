@@ -453,31 +453,31 @@ Completion criteria:
 Outcome: Every Core consumer uses the shared owner directly and no duplicate or
 context-menu-named generic input infrastructure remains.
 
-- [ ] Confirm context menu, UserPrompt, and tooltip no longer import the
+- [x] Confirm context menu, UserPrompt, and tooltip no longer import the
   temporary context-menu compatibility input owner.
-- [ ] Remove the temporary `dwarfuicore/context_menu/input_hook.lua`
+- [x] Remove the temporary `dwarfuicore/context_menu/input_hook.lua`
   compatibility export after all internal imports are migrated.
-- [ ] Remove or consolidate superseded context-menu sampler and pointer-poller
+- [x] Remove or consolidate superseded context-menu sampler and pointer-poller
   ownership without deleting consumer-specific target policy.
-- [ ] Confirm public click dispatch is not used as the private communication
+- [x] Confirm public click dispatch is not used as the private communication
   mechanism for tooltip, context menu, or UserPrompt.
-- [ ] Update module registry order, reload ownership, package manifests, source
+- [x] Update module registry order, reload ownership, package manifests, source
   declarations, and package-content expectations for the final module layout.
-- [ ] Document the public provider, exact event meanings, all-mouse-key scope,
+- [x] Document the public provider, exact event meanings, all-mouse-key scope,
   generic `observe`/`intercept` usage, dispositions, handles, callback timing,
   consumption, immutability, and error behavior.
-- [ ] Keep public documentation free of unsupported future features and make the
+- [x] Keep public documentation free of unsupported future features and make the
   raw event's lack of UI-obstruction guarantee explicit.
-- [ ] Add regressions proving no duplicate process hook or poller chain remains
+- [x] Add regressions proving no duplicate process hook or poller chain remains
   and no removed compatibility path is packaged.
 
 Completion criteria:
 
-- [ ] Generic input interception, sampling, and polling have one Input Event
+- [x] Generic input interception, sampling, and polling have one Input Event
   owner.
-- [ ] Consumer-specific target, state, presentation, and ownership policy remain
+- [x] Consumer-specific target, state, presentation, and ownership policy remain
   in their original services.
-- [ ] The published source and package contain no obsolete compatibility owner.
+- [x] The published source and package contain no obsolete compatibility owner.
 
 ## Phase 11: Qualification and evidence
 

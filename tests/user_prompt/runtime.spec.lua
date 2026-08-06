@@ -87,7 +87,7 @@ local function load_runtime(generation, settings)
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
-                ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/input_hook']={manager=input_manager},
                 ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function() return true end},
@@ -337,7 +337,7 @@ local function load_integrated_runtime()
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
-                ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/input_hook']={manager=input_manager},
                 ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function(_, surface)

@@ -110,7 +110,7 @@ local function hook_double()
     ---Stores the context-menu consumer and failure observer.
     ---@param callback function|nil
     ---@param failure_handler? function
-    function manager:set_context_consumer(callback, failure_handler)
+    function manager:set_private_context_consumer(callback, failure_handler)
         self.handler = callback
         self.failure_handler = failure_handler
     end
@@ -240,6 +240,7 @@ local function load_harness(state)
         reqscript={
             ['dwarfuicore/context_menu/input_hook']={manager=state.hook},
             ['dwarfuicore/context_menu/input_sample']=input_samples,
+            ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
             ['dwarfuicore/context_menu/registration']={
                 manager=state.registrations,
             },
@@ -426,18 +427,14 @@ describe('context-menu service', function()
         assert.is_false(captured_actions.map_session_is_valid())
     end)
 
-    it('opens only actionable right-click targets from one synchronous sample',
+    it('opens only actionable right-click targets from one shared snapshot',
             function()
         local harness = load_harness()
         local factory, presentation = presenter_factory()
-        local captures, detections = 0, 0
+        local detections = 0
         local current = detection()
         local service = create_service(harness, {
             presentation_factory=factory,
-            sampler={capture=function()
-                captures = captures + 1
-                return {x=1, y=2}
-            end},
             detector={detect=function(_, sample)
                 assert.same({x=1, y=2}, sample)
                 detections = detections + 1
@@ -445,19 +442,19 @@ describe('context-menu service', function()
             end},
         })
 
-        assert.is_false(service:handle_opening_input(
-            {_MOUSE_R_DOWN=true}, 1, {}))
-        assert.same({0, 0}, {captures, detections})
-        assert.is_true(service:handle_opening_input({
+        assert.equals(1, service:handle_opening_input(
+            {_MOUSE_R_DOWN=true}, {screen_position={x=1, y=2}}, 1, {}))
+        assert.equals(0, detections)
+        assert.equals(2, service:handle_opening_input({
             _MOUSE_R=true,
             _MOUSE_R_DOWN=true,
             PAUSE=true,
-        }, 1, {}))
-        assert.same({1, 1}, {captures, detections})
+        }, {screen_position={x=1, y=2}}, 1, {}))
+        assert.equals(1, detections)
         assert.equals(1, presentation.shown)
-        assert.is_false(service:handle_opening_input(
-            {_MOUSE_R=true}, 1, {}))
-        assert.same({1, 1}, {captures, detections})
+        assert.equals(1, service:handle_opening_input(
+            {_MOUSE_R=true}, {screen_position={x=1, y=2}}, 1, {}))
+        assert.equals(1, detections)
     end)
 
     it('leaves misses and blockers transparent', function()
@@ -526,11 +523,11 @@ describe('context-menu service', function()
         local service = create_service(harness, {
             input_hook=hook,
             registrations=registrations,
-            sampler={capture=function() error('sample failed') end},
+            detector={detect=function() error('detector failed') end},
         })
 
-        assert.is_false(service:handle_opening_input(
-            {_MOUSE_R=true}, 1, {}))
+        assert.equals(1, service:handle_opening_input(
+            {_MOUSE_R=true}, {screen_position={x=1, y=2}}, 1, {}))
         assert.is_true(service:is_disabled())
         assert.is_true(registrations.disabled)
         assert.equals(1, hook.shutdown_count)

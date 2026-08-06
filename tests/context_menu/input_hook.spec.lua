@@ -18,6 +18,25 @@ local function load_hook(process, overlay)
         reqscript={
             ['dwarfuicore/utils/function_chain']=function_chain,
             ['dwarfuicore/utils/immutable_enum']=immutable_enum,
+            ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}, InputSampleDemandType={SCREEN_POSITION=1, MAP_POSITION=2}},
+            ['dwarfuicore/input_event/snapshot_factory']={
+                SnapshotFactory={new=function() return {capture_input=function(_, _, _) return {screen_position=nil, map_position=nil} end} end},
+                InputDemandTracker={new=function() return {
+                    _counts={},
+                    acquire=function(self, demand_type)
+                        self._counts[demand_type] = (self._counts[demand_type] or 0) + 1
+                        return {demand_type=demand_type}
+                    end,
+                    release=function(self, handle)
+                        self._counts[handle.demand_type] = self._counts[handle.demand_type] - 1
+                        return true
+                    end,
+                    get_snapshot=function() return {screen_position=false, map_position=false} end,
+                    get_count=function(self, demand_type)
+                        return self._counts[demand_type] or 0
+                    end,
+                } end},
+            },
         },
         require_modules={['plugins.overlay']=overlay},
     })
@@ -25,6 +44,46 @@ local function load_hook(process, overlay)
 end
 
 describe('context-menu input hook', function()
+    it('passes one snapshot to the private consumer and consumes explicitly',
+            function()
+        local predecessor_count = 0
+        local overlay = {feed_viewscreen_widgets=function()
+            predecessor_count = predecessor_count + 1
+            return 'base'
+        end}
+        local module = load_hook({dwarfuicore={}}, overlay)
+        local keys = {_MOUSE_R=true}
+        local observed_snapshot
+        module.manager:set_private_context_consumer(function(input, snapshot)
+            assert.is_equal(keys, input)
+            observed_snapshot = snapshot
+            return 2
+        end)
+        module.manager:ensure_native()
+
+        assert.is_true(overlay.feed_viewscreen_widgets('dwarfmode', {}, keys))
+        assert.is_not_nil(observed_snapshot)
+        assert.equals(0, predecessor_count)
+    end)
+
+    it('acquires and releases context snapshot demand with its lifecycle',
+            function()
+        local module = load_hook({dwarfuicore={}}, {
+            feed_viewscreen_widgets=function() end,
+        })
+        module.manager:set_private_context_consumer(function()
+            return 1
+        end)
+        local active = module.manager:get_diagnostics()
+        assert.equals(1, active.screen_snapshot_demand)
+        assert.equals(1, active.map_snapshot_demand)
+
+        module.manager:set_private_context_consumer(nil)
+        local inactive = module.manager:get_diagnostics()
+        assert.equals(0, inactive.screen_snapshot_demand)
+        assert.equals(0, inactive.map_snapshot_demand)
+    end)
+
     it('re-exports the Input Event manager through the compatibility module',
             function()
         local hook = load_hook({dwarfuicore={}}, {
@@ -424,7 +483,7 @@ describe('context-menu input hook', function()
         assert.is_false(diagnostics.priority_consumer_active)
     end)
 
-    it('requires exact booleans from both consumer positions', function()
+    it('requires explicit results from private consumers', function()
         local predecessor_count = 0
         local priority_failure
         local context_failure
@@ -454,8 +513,7 @@ describe('context-menu input hook', function()
         assert.equals('base', overlay.feed_viewscreen_widgets(
             'dwarfmode', {}, {CUSTOM=true}))
         assert.equals(1, predecessor_count)
-        assert.is_truthy(context_failure:find(
-            'must return a boolean', 1, true))
+        assert.is_nil(context_failure)
     end)
 
     it('prepares fallibly, activates without rewrapping, and rolls back roots',
@@ -535,7 +593,7 @@ describe('context-menu input hook', function()
             second.manager:get_diagnostics().priority_dispatch_count)
     end)
 
-    it('contains unexpected handler failures and becomes transparent',
+    it('contains unexpected private-consumer failures and delegates',
             function()
         local predecessor_count = 0
         local printed = {}
@@ -551,7 +609,7 @@ describe('context-menu input hook', function()
         }
         local module = load_hook(process, overlay)
         local observed
-        module.manager:set_context_consumer(
+        module.manager:set_private_context_consumer(
             function() error('hook exploded') end,
             function(message) observed = message end)
         module.manager:ensure_native()
@@ -560,9 +618,9 @@ describe('context-menu input hook', function()
             overlay.feed_viewscreen_widgets(
                 'dwarfmode', {}, {_MOUSE_R=true}))
         assert.equals(1, predecessor_count)
-        assert.is_truthy(observed:find('hook exploded', 1, true))
-        assert.equals(1, #printed)
-        assert.is_true(module.manager:get_diagnostics().disabled)
+        assert.is_nil(observed)
+        assert.equals(0, #printed)
+        assert.is_false(module.manager:get_diagnostics().disabled)
         assert.equals('delegated',
             overlay.feed_viewscreen_widgets(
                 'dwarfmode', {}, {_MOUSE_R=true}))

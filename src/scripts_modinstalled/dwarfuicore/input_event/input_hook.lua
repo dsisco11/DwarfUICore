@@ -4,6 +4,12 @@
 
 local function_chain = reqscript('dwarfuicore/utils/function_chain')
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
+local snapshot_factory_module = reqscript(
+    'dwarfuicore/input_event/snapshot_factory')
+local input_types = reqscript('dwarfuicore/input_event/types')
+
+local InputDispatchResult = input_types.InputDispatchResult
+InputDispatchResult = InputDispatchResult
 
 local API_VERSION = 2
 local STATE_SLOT = 'input_event_input_hook'
@@ -50,6 +56,15 @@ if not process_state then
         generation=1,
         context_handler=nil,
         context_failure_handler=nil,
+        snapshot_factory=snapshot_factory_module.SnapshotFactory.new{
+            is_mouse_input=function(key)
+                return type(key) == 'string' and
+                    key:find('_MOUSE', 1, true) ~= nil
+            end,
+        },
+        demand_tracker=snapshot_factory_module.InputDemandTracker.new(),
+        context_screen_demand=nil,
+        context_map_demand=nil,
         prepared_consumer=nil,
         priority_consumer=nil,
         context_roots=setmetatable({}, {__mode='k'}),
@@ -71,6 +86,23 @@ if not process_state then
         disabled_generation=nil,
     }
 end
+if process_state.snapshot_factory == nil then
+    process_state.snapshot_factory = snapshot_factory_module.SnapshotFactory.new{
+        is_mouse_input=function(key)
+            return type(key) == 'string' and
+                key:find('_MOUSE', 1, true) ~= nil
+        end,
+    }
+end
+if process_state.demand_tracker == nil then
+    process_state.demand_tracker = snapshot_factory_module.InputDemandTracker.new()
+end
+if process_state.context_handler and process_state.context_screen_demand == nil then
+    process_state.context_screen_demand = process_state.demand_tracker:acquire(
+        input_types.InputSampleDemandType.SCREEN_POSITION)
+    process_state.context_map_demand = process_state.demand_tracker:acquire(
+        input_types.InputSampleDemandType.MAP_POSITION)
+end
 
 ---@class dwarfuicore.ContextMenuInputHookRecord
 ---@field transport dwarfuicore.ContextMenuInputTransport
@@ -90,6 +122,10 @@ end
 ---@field generation integer
 ---@field context_handler function|nil
 ---@field context_failure_handler function|nil
+---@field snapshot_factory dwarfuicore.SnapshotFactory
+---@field demand_tracker dwarfuicore.InputDemandTracker
+---@field context_screen_demand table|nil
+---@field context_map_demand table|nil
 ---@field prepared_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
 ---@field priority_consumer dwarfuicore.PreparedPriorityInputConsumer|nil
 ---@field context_roots table<any, boolean>
@@ -120,6 +156,8 @@ end
 ---@field root any
 ---@field active boolean
 ---@field released boolean
+
+---@alias dwarfuicore.CoreInputConsumer fun(keys: table, snapshot: dwarfuicore.InputSnapshot): dwarfuicore.InputDispatchResult
 
 ---@class dwarfuicore.ContextMenuInputHookManager
 ---@field _state dwarfuicore.ContextMenuInputHookState
@@ -219,6 +257,22 @@ local function call_boolean(callback, message, keys, transport, owner)
     end, debug.traceback)
 end
 
+---Runs one private consumer and requires an explicit dispatch result.
+---@param callback dwarfuicore.CoreInputConsumer
+---@param keys table
+---@param snapshot dwarfuicore.InputSnapshot
+---@return boolean ok
+---@return dwarfuicore.InputDispatchResult|string result
+local function call_private_consumer(callback, keys, snapshot)
+    return xpcall(function()
+        local result = callback(keys, snapshot)
+        assert(result == InputDispatchResult.PASS or
+            result == InputDispatchResult.CONSUME,
+            'DwarfUICore private input consumer returned an invalid result.')
+        return result
+    end, debug.traceback)
+end
+
 ---Runs the priority consumer before the context-menu opening adapter.
 ---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
@@ -227,6 +281,10 @@ end
 local function dispatch(transport, owner, keys)
     local state = get_process_state()
     if not state then return false end
+    local context_active = state.disabled_generation ~= state.generation and
+        type(state.context_handler) == 'function'
+    local snapshot = state.snapshot_factory:capture_input(
+        keys, state.demand_tracker:get_snapshot())
 
     local consumer = state.priority_consumer
     if consumer then
@@ -261,22 +319,29 @@ local function dispatch(transport, owner, keys)
         end
     end
 
-    if state.disabled_generation == state.generation or
-            type(state.context_handler) ~= 'function' then return false end
+    if not context_active then return false end
     state.dispatch_count = state.dispatch_count + 1
-    local ok, handled = call_boolean(state.context_handler,
-        'DwarfUICore context-menu input handler must return a boolean.',
-        keys, transport, owner)
+    local ok, handled = call_private_consumer(state.context_handler,
+        keys, snapshot)
     if not ok then
-        fail_dispatch(state, transport, owner, handled)
+        state.failure_count = state.failure_count + 1
+        state.last_error = tostring(handled)
+        state.last_failure = {
+            generation=state.generation,
+            consumer_kind=InputConsumerKind.CONTEXT_MENU,
+            owned=false,
+            transport=transport,
+            owner=transport == ContextMenuInputTransport.NATIVE and owner or nil,
+            error=tostring(handled),
+        }
         return false
     end
-    if handled then
+    if handled == InputDispatchResult.CONSUME then
         state.handled_count = state.handled_count + 1
-    else
-        state.delegated_count = state.delegated_count + 1
+        return true
     end
-    return handled
+    state.delegated_count = state.delegated_count + 1
+    return false
 end
 
 ---Builds the native pre-delegation input trampoline.
@@ -331,14 +396,44 @@ end
 ---Installs the context-menu consumer adapter and its failure observer.
 ---@param handler function|nil
 ---@param failure_handler? fun(message: string)
-function ContextMenuInputHookManager:set_context_consumer(
+function ContextMenuInputHookManager:set_private_context_consumer(
         handler, failure_handler)
     assert(handler == nil or type(handler) == 'function',
-        'DwarfUICore context-menu input handler must be a function.')
+        'DwarfUICore private context input handler must be a function.')
     assert(failure_handler == nil or type(failure_handler) == 'function',
         'DwarfUICore context-menu hook failure handler must be a function.')
-    self._state.context_handler = handler
-    self._state.context_failure_handler = failure_handler
+    local state = self._state
+    assert(handler == nil or state.context_handler == nil,
+        'DwarfUICore private context input consumer is already active.')
+    if handler and state.context_screen_demand == nil then
+        state.context_screen_demand = state.demand_tracker:acquire(
+            input_types.InputSampleDemandType.SCREEN_POSITION)
+        state.context_map_demand = state.demand_tracker:acquire(
+            input_types.InputSampleDemandType.MAP_POSITION)
+    elseif handler == nil and state.context_screen_demand ~= nil then
+        state.demand_tracker:release(state.context_screen_demand)
+        state.demand_tracker:release(state.context_map_demand)
+        state.context_screen_demand = nil
+        state.context_map_demand = nil
+    end
+    state.context_handler = handler
+    state.context_failure_handler = failure_handler
+end
+
+---Installs the retired boolean context-menu adapter for private callers.
+---@param handler function|nil
+---@param failure_handler? fun(message: string)
+function ContextMenuInputHookManager:set_context_consumer(handler, failure_handler)
+    if handler == nil then
+        return self:set_private_context_consumer(nil, failure_handler)
+    end
+    self:set_private_context_consumer(function(keys, _, transport, owner)
+        local handled = handler(keys, transport, owner)
+        assert(type(handled) == 'boolean',
+            'DwarfUICore context-menu input handler must return a boolean.')
+        return handled and InputDispatchResult.CONSUME or
+            InputDispatchResult.PASS
+    end, failure_handler)
 end
 
 ---Ensures the input seam required by one supported root.
@@ -665,6 +760,12 @@ function ContextMenuInputHookManager:shutdown()
     end
     state.context_handler = nil
     state.context_failure_handler = nil
+    if state.context_screen_demand ~= nil then
+        state.demand_tracker:release(state.context_screen_demand)
+        state.demand_tracker:release(state.context_map_demand)
+        state.context_screen_demand = nil
+        state.context_map_demand = nil
+    end
     state.context_roots = setmetatable({}, {__mode='k'})
     state.disabled_generation = state.generation
     if state.native_hook then
@@ -715,6 +816,10 @@ function ContextMenuInputHookManager:get_diagnostics()
         priority_consumer_prepared=state.prepared_consumer ~= nil,
         context_consumer_installed=
             type(state.context_handler) == 'function',
+        screen_snapshot_demand=state.demand_tracker:get_count(
+            input_types.InputSampleDemandType.SCREEN_POSITION),
+        map_snapshot_demand=state.demand_tracker:get_count(
+            input_types.InputSampleDemandType.MAP_POSITION),
         handler_installed=type(state.context_handler) == 'function',
         disabled=state.disabled_generation == state.generation,
         disabled_generation=state.disabled_generation,

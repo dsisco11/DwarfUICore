@@ -225,6 +225,13 @@ describe('DwarfUICore package contract', function()
         assert.is_nil(source:find('feed_viewscreen_widgets', 1, true))
     end)
 
+    it('does not retain direct context-menu input sampling ownership', function()
+        local source = read_source(
+            'src/scripts_modinstalled/dwarfuicore/context_menu/service.lua')
+        assert.is_nil(source:find("context_menu/input_sample", 1, true))
+        assert.is_nil(source:find('_sampler', 1, true))
+    end)
+
     it('ships one authoritative completed-render hook owner', function()
         local owners = {}
         for _, spec in ipairs(registry.MODULES) do

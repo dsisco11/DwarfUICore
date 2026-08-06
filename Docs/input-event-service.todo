@@ -130,56 +130,56 @@ Outcome: The shared runtime creates one pre-arbitration input snapshot and
 context menu consumes it through deterministic private arbitration without
 resampling coordinates.
 
-- [ ] Add the typed private `CoreInputConsumer(keys, snapshot)` collaboration
+- [x] Add the typed private `CoreInputConsumer(keys, snapshot)` collaboration
   boundary.
-- [ ] Create exactly one immutable `InputSnapshot` before private arbitration
+- [x] Create exactly one immutable `InputSnapshot` before private arbitration
   for every intercepted input table.
-- [ ] Pass the same unchanged original keys table and same snapshot to every
+- [x] Pass the same unchanged original keys table and same snapshot to every
   eligible private consumer.
-- [ ] Enforce the private-consumer contract that the original keys table is
+- [x] Enforce the private-consumer contract that the original keys table is
   read-only and must not be mutated.
-- [ ] Assemble private consumers in a fixed Core-defined order rather than by
+- [x] Assemble private consumers in a fixed Core-defined order rather than by
   registration timing or caller-selected priority.
-- [ ] Stop private arbitration on the first `InputDispatchResult.CONSUME`.
-  - [ ] Suppress both public event channels for every Core-consumed input table.
-  - [ ] Skip inherited input handling.
-  - [ ] Return `true` from the input trampoline.
-- [ ] Delegate the original keys table unchanged when all private consumers
+- [x] Stop private arbitration on the first `InputDispatchResult.CONSUME`.
+  - [x] Suppress both public event channels for every Core-consumed input table.
+  - [x] Skip inherited input handling.
+  - [x] Return `true` from the input trampoline.
+- [x] Delegate the original keys table unchanged when all private consumers
   return `PASS`.
-- [ ] Prevent duplicate private-consumer attachment and public access to private
+- [x] Prevent duplicate private-consumer attachment and public access to private
   registration or priority controls.
-- [ ] Preserve consumer-specific fail-closed ownership rules without inferring
+- [x] Preserve consumer-specific fail-closed ownership rules without inferring
   ownership from an exception alone.
-- [ ] Require an ownership-sensitive private consumer to contain failures that
+- [x] Require an ownership-sensitive private consumer to contain failures that
   occur after it classifies an input table as owned and return `CONSUME` when its
   contract requires fail-closed behavior.
-- [ ] Record an exception that escapes a private consumer and treat it as `PASS`
+- [x] Record an exception that escapes a private consumer and treat it as `PASS`
   because the dispatcher received no explicit ownership result; do not infer
   consumption from the exception itself.
-- [ ] Migrate context menu to shared snapshots and private arbitration.
-  - [ ] Register and remove context menu's synchronous screen/map snapshot demand
+- [x] Migrate context menu to shared snapshots and private arbitration.
+  - [x] Register and remove context menu's synchronous screen/map snapshot demand
     with its private-consumer lifecycle.
-  - [ ] Remove context menu's direct ownership of generic sampling.
-  - [ ] Prohibit context menu from resampling screen or map coordinates for the
+  - [x] Remove context menu's direct ownership of generic sampling.
+  - [x] Prohibit context menu from resampling screen or map coordinates for the
     same input table.
-  - [ ] Retain its widget/map contribution registries and target detection.
-  - [ ] Retain opening eligibility, menu assembly, selection callbacks, menu
+  - [x] Retain its widget/map contribution registries and target detection.
+  - [x] Retain opening eligibility, menu assembly, selection callbacks, menu
     screen ownership, and menu-specific consumption.
-- [ ] Until UserPrompt is migrated in Phase 4, preserve its existing
+- [x] Until UserPrompt is migrated in Phase 4, preserve its existing
   compatibility-path precedence over the newly migrated context-menu consumer.
-- [ ] Add focused tests for deterministic private ordering, first-consumer
+- [x] Add focused tests for deterministic private ordering, first-consumer
   consumption, pass-through delegation, read-only keys expectations, snapshot
   identity, suppression, failure handling, and unchanged context-menu behavior.
-- [ ] Add a transitional regression proving an active compatibility-path
+- [x] Add a transitional regression proving an active compatibility-path
   UserPrompt still receives input before the migrated context-menu consumer.
 
 Completion criteria:
 
-- [ ] Context menu runs through Input Event private arbitration with no generic
+- [x] Context menu runs through Input Event private arbitration with no generic
   coordinate resampling.
-- [ ] Private consumption suppresses future public dispatch and inherited
+- [x] Private consumption suppresses future public dispatch and inherited
   handling for every consumed input table, not only left releases.
-- [ ] Context-menu behavioral regressions pass before UserPrompt is migrated.
+- [x] Context-menu behavioral regressions pass before UserPrompt is migrated.
 
 ## Phase 4: Migrate UserPrompt with prompt-first ownership
 

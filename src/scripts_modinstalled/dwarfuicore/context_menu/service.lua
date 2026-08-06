@@ -3,7 +3,7 @@
 -- Process-wide context-menu session authority and opening-input mediation.
 
 local input_hooks = reqscript('dwarfuicore/context_menu/input_hook')
-local input_samples = reqscript('dwarfuicore/context_menu/input_sample')
+local input_types = reqscript('dwarfuicore/input_event/types')
 local registrations = reqscript('dwarfuicore/context_menu/registration')
 local target_detectors = reqscript('dwarfuicore/context_menu/target_detector')
 local targets = reqscript('dwarfuicore/context_menu/target')
@@ -11,6 +11,7 @@ local numbers = reqscript('dwarfuicore/utils/numbers')
 
 local DetectionKind = target_detectors.ContextMenuDetectionKind
 local TargetKind = targets.ContextMenuTargetKind
+local InputDispatchResult = input_types.InputDispatchResult
 
 local API_VERSION = 1
 local SERVICE_SLOT = 'context_menu_service'
@@ -34,7 +35,6 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@class dwarfuicore.ContextMenuServiceOptions
 ---@field registrations dwarfuicore.ContextMenuRegistrationManager
 ---@field detector dwarfuicore.ContextMenuTargetDetector
----@field sampler dwarfuicore.ContextMenuInputSampler
 ---@field input_hook dwarfuicore.ContextMenuInputHookManager
 ---@field presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field printer? fun(message: string)
@@ -62,7 +62,6 @@ dfhack.dwarfuicore = dfhack.dwarfuicore or {}
 ---@field _state dwarfuicore.ContextMenuServiceState
 ---@field _registrations dwarfuicore.ContextMenuRegistrationManager
 ---@field _detector dwarfuicore.ContextMenuTargetDetector
----@field _sampler dwarfuicore.ContextMenuInputSampler
 ---@field _input_hook dwarfuicore.ContextMenuInputHookManager
 ---@field _presentation_factory dwarfuicore.ContextMenuPresentationFactory
 ---@field _printer fun(message: string)
@@ -117,7 +116,7 @@ function ContextMenuService.new(state, options)
     assert(type(options) == 'table',
         'DwarfUICore context-menu service requires options.')
     for _, name in ipairs{
-            'registrations', 'detector', 'sampler', 'input_hook',
+            'registrations', 'detector', 'input_hook',
             'presentation_factory',
         } do
         assert(options[name] ~= nil,
@@ -131,7 +130,6 @@ function ContextMenuService.new(state, options)
         _state=state,
         _registrations=options.registrations,
         _detector=options.detector,
-        _sampler=options.sampler,
         _input_hook=options.input_hook,
         _presentation_factory=options.presentation_factory,
         _printer=options.printer or default_printer,
@@ -398,16 +396,35 @@ end
 ---@param transport dwarfuicore.ContextMenuInputTransport
 ---@param owner table
 ---@return boolean handled
-function ContextMenuService:handle_opening_input(keys, transport, owner)
+function ContextMenuService:handle_opening_input(keys, snapshot, transport, owner)
+    local legacy_invocation = type(snapshot) ~= 'table' or
+        snapshot.screen_position == nil and snapshot.map_position == nil
+    if legacy_invocation then
+        owner = transport
+        transport = snapshot
+        snapshot = {screen_position=nil, map_position=nil}
+    end
+    local function result(value)
+        if legacy_invocation then return value == InputDispatchResult.CONSUME end
+        return value
+    end
     if self:is_disabled() or self._state.session or
             self._opening_guard() or
             type(keys) ~= 'table' or not keys._MOUSE_R then
-        return false
+        return result(InputDispatchResult.PASS)
     end
 
     local detection
     local resolved, failure = xpcall(function()
-        local sample = self._sampler:capture()
+        local screen_position = snapshot.screen_position
+        local map_position = snapshot.map_position
+        local sample = {
+            x=screen_position and screen_position.x or nil,
+            y=screen_position and screen_position.y or nil,
+            map_x=map_position and map_position.x or nil,
+            map_y=map_position and map_position.y or nil,
+            map_z=map_position and map_position.z or nil,
+        }
         detection = self._detector:detect(sample)
         assert(type(detection) == 'table' and
                 (detection.kind == DetectionKind.TARGET or
@@ -417,13 +434,15 @@ function ContextMenuService:handle_opening_input(keys, transport, owner)
     end, debug.traceback)
     if not resolved then
         self:_disable('opening resolution', failure, true)
-        return false
+        return result(InputDispatchResult.PASS)
     end
-    if detection.kind ~= DetectionKind.TARGET then return false end
+    if detection.kind ~= DetectionKind.TARGET then
+        return result(InputDispatchResult.PASS)
+    end
 
     local opened = self:open(detection)
-    if self:is_disabled() then return true end
-    return opened
+    if self:is_disabled() or opened then return result(InputDispatchResult.CONSUME) end
+    return result(InputDispatchResult.PASS)
 end
 
 ---Closes the menu and clears all registrations after a world unload.
@@ -465,9 +484,9 @@ end
 function ContextMenuService:start()
     if self._started then return false end
     self._started = true
-    self._input_hook:set_context_consumer(
-        function(keys, transport, owner)
-            return self:handle_opening_input(keys, transport, owner)
+    self._input_hook:set_private_context_consumer(
+        function(keys, snapshot)
+            return self:handle_opening_input(keys, snapshot)
         end,
         function(message)
             self:_disable('input hook', message, false)
@@ -567,18 +586,12 @@ else
     local state = new_state(1, runtime_generation)
     local registration_manager = registrations.manager
     local input_hook_manager = input_hooks.manager
-    local sampler = input_samples.ContextMenuInputSampler.new{
-        has_map_demand=function()
-            return registration_manager:map_registration_count() > 0
-        end,
-    }
     local detector = target_detectors.ContextMenuTargetDetector.new{
         registrations=registration_manager,
     }
     local constructed_service = ContextMenuService.new(state, {
         registrations=registration_manager,
         detector=detector,
-        sampler=sampler,
         input_hook=input_hook_manager,
         presentation_factory=unavailable_presentation_factory,
     })

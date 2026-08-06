@@ -182,12 +182,16 @@ end
 ---@return integer|nil
 ---@return integer|nil
 local function default_screen_sampler()
+    if type(dfhack.screen) ~= 'table' or
+            type(dfhack.screen.getMousePos) ~= 'function' then return nil, nil end
     return dfhack.screen.getMousePos()
 end
 
 ---Reads the current exact map position exactly once.
 ---@return {x: integer, y: integer, z: integer}|nil
 local function default_map_sampler()
+    if type(dfhack.gui) ~= 'table' or
+            type(dfhack.gui.getMousePos) ~= 'function' then return nil end
     return dfhack.gui.getMousePos()
 end
 

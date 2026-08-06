@@ -34,7 +34,7 @@ presentation, and service-specific registrations.
 
 Contract major 1 should publicly expose unobstructed map-click and
 coordinate-qualified raw-click channels. Each channel supports explicit
-pre-delegation interception and post-delegation observation.
+staged interception and observation around DFHack overlay processing.
 
 ## Motivation
 
@@ -67,7 +67,7 @@ make those boundaries explicit without centralizing unrelated UI policy.
 - Expose a typed `InputEventServiceProvider` through
   `reqscript('dwarfuicore/services')`.
 - Support one `observe(event_type, callback)` operation for non-consuming
-  post-delegation notification.
+notification after the applicable interception stage.
 - Support one `intercept(event_type, handler)` operation for pre-delegation
   input arbitration.
 - Define `MAP_CLICK` and `RAW_CLICK` through a public immutable numeric
@@ -329,22 +329,32 @@ For one intercepted input table, the runtime:
    or another explicit private UI-root-resolution demand source, resolves
    current UI obstruction and prepares one `MapClickedEvent` with the same mouse
    inputs, positions, and sequence when unobstructed.
-10. Dispatches eligible public interceptors in global registration order.
-11. Delegates unchanged to the inherited input handler only if no interceptor
-   returns `Disposition.CONSUME`.
-12. Notifies the stable snapshot of eligible public observers in registration
-   order.
-13. Returns `true` for a consumed event or the inherited handler's original
-   result otherwise.
+10. Dispatches eligible `RAW_CLICK` interceptors in registration order.
+11. If raw interception passes, invokes the overlay-feed predecessor exactly
+    once and retains its consumed result.
+12. Notifies eligible `RAW_CLICK` observers after raw consumption or predecessor
+    completion.
+13. If raw interception or the predecessor consumed the input, suppresses all
+    `MAP_CLICK` callbacks and returns consumed.
+14. If UI resolution was obstructed or unknown, suppresses `MAP_CLICK` and
+    returns the predecessor's pass result.
+15. Otherwise dispatches `MAP_CLICK` interceptors and then observers in
+    registration order.
+16. Returns `true` when a `MAP_CLICK` interceptor consumed; otherwise returns
+    pass so DFHack can continue to native game delegation.
 
-Interception is explicitly pre-delegation so a consumer can claim the click.
-Observation is post-delegation, or after delegation is skipped for a consumed
-click. Both receive the same pre-delegation coordinate snapshot even if handling
-changes the current screen, map view, or pointer interpretation.
+`RAW_CLICK` interception occurs before DFHack overlay processing and can claim
+the physical input before any later delivery. `MAP_CLICK` interception occurs
+only after DFHack overlays have declined the input, but can still prevent native
+game delegation. Both event types receive the same pre-predecessor coordinate
+snapshot even if handling changes the current screen, map view, or pointer
+interpretation.
 
-Observers still run when an interceptor consumes the input or the inherited
-handler reports that it handled the input. Neither result changes raw-click
-eligibility.
+`RAW_CLICK` observers run after raw consumption or overlay-predecessor
+completion. `MAP_CLICK` observers run after semantic interception. Observation
+is therefore post-Core and post-DFHack-overlay processing, but not post-native
+game processing, since native game `feed()` executes in C++ only after the Lua
+trampoline returns.
 
 If the map sample is nil or malformed, neither public channel is dispatched. A
 missing screen sample does not suppress an otherwise valid raw click; in that
@@ -384,20 +394,23 @@ post-delegation and does not reclassify the click if inherited handling changes
 the current screen or widget tree.
 
 Hook support and UI-resolution support are separate capabilities. A
-hook-supported surface can deliver a raw click even when its UI roots cannot be
-resolved. If screen coordinates are unavailable, a root cannot be inspected,
-root order cannot be established, or the current hook-supported surface is not
-supported by UI resolution, the runtime cannot prove that the map is
-unobstructed. It therefore suppresses `MapClickedEvent` while still dispatching
-`RawClickEvent`.
+hook-supported surface can deliver a raw click even when a recognized UI root
+cannot be inspected. If screen coordinates are unavailable, a recognized root
+cannot be inspected, or root order cannot be established, the runtime cannot
+prove that the map is unobstructed. It therefore suppresses `MapClickedEvent`
+while still dispatching `RawClickEvent`. Native widgets are an explicit
+compatibility exception: absent roots, unrecognized widget variants, and native
+geometry without a recognized interaction signal are treated as non-obstructing
+instead of being inferred as input targets.
 
 For an unobstructed mouse-input table, the runtime creates a separate immutable
 `MapClickedEvent` using the same sequence and copied positions as the raw
 event. The click is eligible for both semantic and raw channels. All eligible
-callbacks and handlers are dispatched from stable, globally registration-ordered
-subscription snapshots. Semantic and raw subscriptions interleave
-deterministically by registration sequence within their interception or
-observation channel.
+callbacks and handlers are dispatched from stable registration-ordered
+subscription snapshots. `RAW_CLICK` delivery precedes overlay processing, and
+eligible `MAP_CLICK` delivery follows overlay processing. Registrations are
+ordered globally within each event type and dispatch channel; the two event
+types do not interleave across that boundary.
 
 Private Core consumption suppresses both public click channels. UI obstruction
 suppresses only the semantic map-click channel.
@@ -552,11 +565,13 @@ from an exception alone.
 
 ## Public interceptor dispatch
 
-Public interceptors run after private Core arbitration and before inherited
-input handling. Eligible semantic and raw interceptors share one stable snapshot
-ordered by global subscription sequence. The first interceptor to return
-`Disposition.CONSUME` claims the event, stops later public interceptors, skips
-inherited handling, and causes the input trampoline to return `true`.
+Public interceptors run after private Core arbitration. `RAW_CLICK` interceptors
+run before the overlay-feed predecessor. If they all pass and the predecessor
+also passes, eligible `MAP_CLICK` interceptors run before native game
+delegation. Within either event type, the first interceptor to return
+`Disposition.CONSUME` claims the physical input, stops later interceptors for
+that event type, skips all later event stages and host delegation, and causes
+the input trampoline to return `true`.
 
 Before invoking the first public callback for an input event, the runtime
 captures both the interceptor and observer candidate snapshots. A subscription
@@ -564,8 +579,9 @@ added by any callback is therefore ineligible for that event. Active state is
 still checked immediately before each callback so a subscription removed before
 its turn is skipped.
 
-`Disposition.PASS` continues interception. If every eligible interceptor
-passes, the original keys table delegates unchanged to the inherited handler.
+`Disposition.PASS` continues the current event-type stage. Passing the raw stage
+delegates unchanged to the overlay predecessor. Passing an eligible semantic
+stage returns pass so DFHack can delegate unchanged to native game handling.
 
 Interceptor failure is contained, recorded against its subscription and
 namespace, and treated as `Disposition.PASS`. A public extension must opt into
@@ -577,9 +593,9 @@ exact `Disposition.PASS` or `Disposition.CONSUME` numeric member is an
 interceptor failure. It follows the same recorded, contained, fail-open behavior
 as a raised exception.
 
-Observers remain eligible after public interception. An observer can therefore
-report a click that a public interceptor consumed, but cannot alter that
-decision.
+`RAW_CLICK` observers remain eligible after raw interception consumes, but
+`MAP_CLICK` callbacks are suppressed. `MAP_CLICK` observers remain eligible
+after semantic interception consumes. No observer can alter either decision.
 
 ## Public observer dispatch
 
@@ -753,7 +769,8 @@ The following changes require a new contract major:
 - weakening the semantic map-click channel to include UI-obstructed clicks;
 - suppressing raw clicks merely because known UI obstructs the map coordinate;
 - publishing prompt-consumed clicks through either method;
-- changing post-delegation callback ordering;
+- changing the RAW-interception, overlay-predecessor, RAW-observation, and
+  MAP-delivery ordering;
 - making inherited handler results depend on observer behavior;
 - changing event position copy or immutability guarantees; or
 - replacing explicit methods with string-dispatched generic subscription.
@@ -834,13 +851,13 @@ narrower fact that a mouse-input table had an exact map coordinate. `MAP_CLICK`
 derives its stronger unobstructed guarantee from generic pre-delegation UI
 resolution instead of the inherited return value.
 
-### Observe before inherited input handling
+### Observe before DFHack overlay processing
 
 An observer could open or dismiss UI, move the map, or mutate game state before
-the original click reaches its existing owner. Post-delegation observation
-preserves inherited behavior and reports the pre-delegation sample. Explicit
-`intercept()` handlers remain pre-delegation because claiming input is their
-documented purpose.
+DFHack overlays classify the original click. Raw observation therefore waits
+until raw consumption or overlay-predecessor completion, and semantic
+observation follows semantic interception. Explicit `intercept()` handlers run
+at their documented claim boundaries because claiming input is their purpose.
 
 ## Acceptance criteria
 
@@ -866,20 +883,25 @@ the following:
 - the semantic map-click channel is eligible only when complete generic root
   resolution proves that no active UI target or blocker is in the way;
 - pass-through UI does not suppress semantic map clicks, while targeted,
-  blocking, unknown, and unsupported UI surfaces do;
+  blocking, and uninspectable recognized UI roots do; unrecognized native
+  widgets do not suppress semantic map clicks;
 - the raw-click channel is eligible whenever a click has an exact map
   coordinate, regardless of known UI obstruction;
 - input tables without mouse input, off-map mouse input, and Core-consumed
   prompt input do not publish either the map-click or raw-click event;
-- semantic and raw subscriptions interleave deterministically in global
-  registration order within the interception and observation channels;
-- interceptors run before inherited handling and the first explicit
-  `Disposition.CONSUME` skips later interceptors and inherited handling;
-- observers run after inherited handling or after consumed delegation is
-  skipped, and observer return values never affect consumption;
+- raw subscriptions run in registration order before semantic subscriptions;
+  subscriptions remain registration-ordered within each event type and channel;
+- `RAW_CLICK` interceptors run before the overlay predecessor, while eligible
+  `MAP_CLICK` interceptors run after overlays decline and before native game
+  delegation;
+- the first explicit `Disposition.CONSUME` skips later applicable stages and
+  host delegation;
+- raw observers run after raw consumption or predecessor completion, semantic
+  observers run after semantic interception, and observer return values never
+  affect consumption;
 - public observers cannot consume input or alter the inherited handler result;
-- observer callbacks run after inherited handling against the pre-delegation
-  coordinate snapshot;
+- observer callbacks use the pre-predecessor coordinate snapshot and complete
+  before native game input handling;
 - callback ordering and mutation during dispatch are deterministic;
 - one observer failure is contained without suppressing later observers or
   disabling another service;

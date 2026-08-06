@@ -418,34 +418,34 @@ Completion criteria:
 Outcome: The service remains healthy and isolated across demand transitions,
 failures, surface changes, shutdown, and explicit DwarfUICore reload.
 
-- [ ] Use established exception transport, stable token categories, and
+- [x] Use established exception transport, stable token categories, and
   precedence for provider construction and API calls.
-- [ ] Use the exact public error prefixes documented by the proposal.
-- [ ] Record observer and interceptor failures as private asynchronous dispatch
+- [x] Use the exact public error prefixes documented by the proposal.
+- [x] Record observer and interceptor failures as private asynchronous dispatch
   failures rather than synchronous API-call failures.
-- [ ] Provide private diagnostics for counts, identities, demand, sequences,
+- [x] Provide private diagnostics for counts, identities, demand, sequences,
   surfaces, and failure text without exposing another namespace's callback.
-- [ ] Preserve subscriptions across world unload, root loss, and surface
+- [x] Preserve subscriptions across world unload, root loss, and surface
   replacement while invalidating sampled facts.
-- [ ] Retire old dispatchers before publishing new-generation state.
-- [ ] Permit adoption of compatible surviving hook trampolines by the next
+- [x] Retire old dispatchers before publishing new-generation state.
+- [x] Permit adoption of compatible surviving hook trampolines by the next
   runtime generation.
-- [ ] Invalidate APIs and handles from the retired generation.
-- [ ] Ensure partial initialization publishes neither a healthy facade nor a
+- [x] Invalidate APIs and handles from the retired generation.
+- [x] Ensure partial initialization publishes neither a healthy facade nor a
   subscription.
-- [ ] Ensure failures in public callbacks cannot disable private Core consumers.
-- [ ] Ensure failures in tooltip, context menu, or UserPrompt cannot remove
+- [x] Ensure failures in public callbacks cannot disable private Core consumers.
+- [x] Ensure failures in tooltip, context menu, or UserPrompt cannot remove
   unrelated public subscriptions.
-- [ ] Restore only still-owned wrappers during destructive shutdown.
-- [ ] Add focused tests for lazy construction, failure rollback, demand teardown,
+- [x] Restore only still-owned wrappers during destructive shutdown.
+- [x] Add focused tests for lazy construction, failure rollback, demand teardown,
   world/root/surface invalidation, diagnostics privacy, reload adoption,
   generation retirement, stale handles, callback isolation, and owned cleanup.
 
 Completion criteria:
 
-- [ ] Reload leaves one healthy runtime, one hook chain, and one pointer poller.
-- [ ] Retired state is inert and stale APIs/handles are rejected consistently.
-- [ ] Failure injection proves namespace and service isolation without weakening
+- [x] Reload leaves one healthy runtime, one hook chain, and one pointer poller.
+- [x] Retired state is inert and stale APIs/handles are rejected consistently.
+- [x] Failure injection proves namespace and service isolation without weakening
   base-game input behavior.
 
 ## Phase 10: Remove compatibility ownership and finalize integration

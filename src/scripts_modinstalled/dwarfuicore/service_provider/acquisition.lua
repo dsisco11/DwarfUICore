@@ -238,6 +238,12 @@ function acquire(service_kind, contract_major, load_adapter, requested_major,
         end
     end))
     if not result[1] then
+        if not service_was_cached and
+                service_kind == contracts.ServiceKind.INPUT_EVENT and
+                type(service) == 'table' and
+                type(service.retire_for_reload) == 'function' then
+            pcall(service.retire_for_reload, service)
+        end
         if transaction_active then
             runtime.cancel_service_acquisition(service_kind, generation)
         end

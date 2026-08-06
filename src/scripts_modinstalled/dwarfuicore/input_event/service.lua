@@ -17,6 +17,7 @@ local root_collector = reqscript('dwarfuicore/input_event/ui_root_collector')
 ---@field _input_manager dwarfuicore.ContextMenuInputHookManager
 ---@field _subscriptions table<dwarfuicore.InputEventSubscription, table>
 ---@field _failures table[]
+---@field _retired boolean
 InputEventService = {}
 InputEventService.__index = InputEventService
 
@@ -83,7 +84,8 @@ function InputEventService.new(generation, input_manager)
             type(input_manager.acquire_subscription_demand) == 'function',
         'DwarfUICore Input Event service requires the input manager.')
     local service = setmetatable({_generation=generation,
-        _input_manager=input_manager, _subscriptions={}, _failures={}},
+        _input_manager=input_manager, _subscriptions={}, _failures={},
+        _retired=false},
         InputEventService)
     input_manager:set_public_deriver(function(snapshot, current_root)
         local derivation = service:derive_current(snapshot, true, current_root,
@@ -92,6 +94,7 @@ function InputEventService.new(generation, input_manager)
         return {derivation=derivation, consumed=dispatch.consumed,
             complete=function() service:complete_dispatch(dispatch) end}
     end)
+    dfhack.dwarfuicore.input_event_service = service
     return service
 end
 
@@ -104,6 +107,8 @@ end
 ---@return dwarfuicore.InputEventSubscription handle
 function InputEventService:subscribe(consumer_namespace, contract_major,
         event_type, channel, callback)
+    assert(not self._retired,
+        'DwarfUICore Input Event service is retired.')
     assert(is_event_type(event_type), 'DwarfUICore Input Event type is invalid.')
     assert(is_channel(channel), 'DwarfUICore Input Event channel is invalid.')
     assert(type(callback) == 'function',
@@ -119,6 +124,47 @@ function InputEventService:subscribe(consumer_namespace, contract_major,
             self._input_manager:acquire_subscription_demand(semantic, true,
                 semantic)}
     return handle
+end
+
+---Retires public delivery and releases every public demand contribution.
+---@return boolean changed
+function InputEventService:retire_for_reload()
+    if self._retired then return false end
+    self._retired = true
+    self._input_manager:set_public_deriver(nil)
+    local handles = {}
+    for handle in pairs(self._subscriptions) do table.insert(handles, handle) end
+    for _, handle in ipairs(handles) do
+        local record = self._subscriptions[handle]
+        self._subscriptions[handle] = nil
+        self._input_manager:release_subscription_demand(record.demand)
+    end
+    if dfhack.dwarfuicore.input_event_service == self then
+        dfhack.dwarfuicore.input_event_service = nil
+    end
+    return true
+end
+
+---Returns private lifecycle and dispatch diagnostics without callbacks.
+---@return table diagnostics
+function InputEventService:get_diagnostics()
+    local subscriptions = {}
+    for _, record in pairs(self._subscriptions) do
+        table.insert(subscriptions, {namespace=record.identity.namespace,
+            contract_major=record.identity.contract_major,
+            event_type=record.event_type, channel=record.channel,
+            sequence=record.sequence})
+    end
+    table.sort(subscriptions, function(left, right)
+        return left.sequence < right.sequence
+    end)
+    local failure = self._failures[#self._failures]
+    local input = type(self._input_manager.get_diagnostics) == 'function' and
+        self._input_manager:get_diagnostics() or nil
+    return {generation=self._generation, retired=self._retired,
+        subscriptions=subscriptions, failure_count=#self._failures, input=input,
+        last_failure=failure and {namespace=failure.namespace,
+            sequence=failure.sequence, error=failure.error} or nil}
 end
 
 ---Captures public candidates and runs eligible interceptors before delegation.

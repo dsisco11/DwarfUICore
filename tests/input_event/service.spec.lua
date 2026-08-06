@@ -189,4 +189,21 @@ describe('Input Event subscription service', function()
         assert.is_equal(first_event, second_event)
         assert.equals(2, #context.service._failures)
     end)
+
+    it('retires delivery, releases demand, and exposes callback-free diagnostics', function()
+        local context = load_context()
+        context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,
+            'observe', function() end)
+        assert.is_true(context.service:retire_for_reload())
+        assert.is_true(context.demands[1].released)
+        assert.is_nil(context.manager.deriver)
+        assert.same({generation=1, retired=true, subscriptions={},
+            failure_count=0, input=nil, last_failure=nil},
+            context.service:get_diagnostics())
+        assert.is_false(context.service:retire_for_reload())
+        assert.has_error(function()
+            context.service:subscribe('alpha', 1,
+                context.types.InputEventType.RAW_CLICK, 'observe', function() end)
+        end, 'DwarfUICore Input Event service is retired.')
+    end)
 end)

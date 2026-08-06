@@ -8,7 +8,7 @@ local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
 local CONTEXT_MENU_INPUT_HOOK_SCRIPT =
-    'dwarfuicore/input_event/input_hook'
+      'dwarfuicore/input_event/input_hook'
 local USER_PROMPT_SERVICE_SCRIPT = 'dwarfuicore/user_prompt/service'
 local USER_PROMPT_RUNTIME_SCRIPT = 'dwarfuicore/user_prompt/runtime'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',
@@ -77,12 +77,13 @@ local function retire_tooltip()
 end
 
 ---Retires the current context-menu service or partial registration owner.
-local function retire_context_menu()
+  local function retire_context_menu()
     local service = find_loaded_script_environment(CONTEXT_MENU_SERVICE_SCRIPT)
     if service and service.service and type(service.service.shutdown) == 'function' then
         service.service:shutdown()
         return
     end
+
     local registration = find_loaded_script_environment(CONTEXT_MENU_REGISTRATION_SCRIPT)
     if registration and registration.manager and type(registration.manager.shutdown) == 'function' then
         registration.manager:shutdown()
@@ -92,6 +93,15 @@ local function retire_context_menu()
     if input_hook and input_hook.manager and
             type(input_hook.manager.shutdown) == 'function' then
         input_hook.manager:shutdown()
+    end
+end
+
+---Retires public Input Event subscriptions before shared-hook teardown.
+local function retire_input_event()
+    local service = type(dfhack.dwarfuicore) == 'table' and
+        dfhack.dwarfuicore.input_event_service or nil
+    if service and type(service.retire_for_reload) == 'function' then
+        service:retire_for_reload()
     end
 end
 
@@ -129,7 +139,8 @@ function initialize()
 end
 
 ---Retires Core-owned runtime owners before an explicit development reload.
-function teardown()
+  function teardown()
+    retire_input_event()
     retire_user_prompt()
     retire_context_menu()
     retire_tooltip()

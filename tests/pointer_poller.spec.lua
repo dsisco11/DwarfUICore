@@ -2,7 +2,7 @@ local module_loader = require('support.module_loader')
 local repo_root = require('support.repo_root')
 
 local POLLER_PATH =
-    'src/scripts_modinstalled/dwarfuicore/pointer_poller.lua'
+    'src/scripts_modinstalled/dwarfuicore/input_event/pointer_poller.lua'
 
 ---Creates a controlled scheduler and an isolated poller module generation.
 ---@param state table|nil
@@ -39,6 +39,7 @@ local function load_harness(state)
 
     local _, module = module_loader.load(repo_root, POLLER_PATH, {
         globals={dfhack=dfhack},
+        reqscript={['dwarfuicore/input_event/snapshot_factory']={}},
     })
 
     ---Queues one controlled callback without executing it synchronously.
@@ -58,25 +59,44 @@ local function load_harness(state)
                 state.demand = false
             end
         end,
-        has_demand=function()
-            state.demand_checks = (state.demand_checks or 0) + 1
-            return state.demand
-        end,
-        has_map_demand=function()
-            state.map_demand_checks = (state.map_demand_checks or 0) + 1
-            return state.map_demand
-        end,
+        demand_tracker={
+            has_screen_demand=function()
+                state.demand_checks = (state.demand_checks or 0) + 1
+                return state.demand
+            end,
+            has_map_demand=function()
+                state.map_demand_checks = (state.map_demand_checks or 0) + 1
+                return state.map_demand
+            end,
+            get_diagnostics=function()
+                return {screen_pointer_demand=state.demand and 1 or 0,
+                    map_pointer_demand=state.map_demand and 1 or 0}
+            end,
+        },
+        snapshot_factory={capture_pointer=function()
+                state.mouse_reads = state.mouse_reads + 1
+                if state.map_demand then state.map_reads = state.map_reads + 1 end
+                state.sequence = (state.sequence or 0) + 1
+                local map = state.map_demand and state.map_pos or nil
+                local screen = state.mouse_x ~= nil and state.mouse_y ~= nil
+                local complete_map = map and map.x ~= nil and map.y ~= nil and
+                    map.z ~= nil
+                local values = {sequence=state.sequence,
+                    x=screen and state.mouse_x or nil,
+                    y=screen and state.mouse_y or nil,
+                    map_x=complete_map and map.x or nil,
+                    map_y=complete_map and map.y or nil,
+                    map_z=complete_map and map.z or nil,
+                    coordinate_space='screen-cells',
+                    screen_position=screen and {x=state.mouse_x,
+                        y=state.mouse_y} or nil, map_position=map}
+                return setmetatable({}, {__index=values, __newindex=function()
+                    error('DwarfUICore pointer samples are immutable.', 2)
+                end})
+            end},
     }
     if not state.use_defaults then
         options.scheduler = schedule
-        options.sample_pointer = function()
-            state.mouse_reads = state.mouse_reads + 1
-            return state.mouse_x, state.mouse_y
-        end
-        options.sample_map_pointer = function()
-            state.map_reads = state.map_reads + 1
-            return state.map_pos
-        end
     end
 
     ---Runs the oldest controlled callback.
@@ -477,13 +497,18 @@ describe('DwarfUICore pointer poller', function()
         local _, module = module_loader.load(repo_root, POLLER_PATH, {
             globals={dfhack=dfhack},
             require_modules={},
-            reqscript={},
+            reqscript={['dwarfuicore/input_event/snapshot_factory']={}},
         })
 
         assert.equals('table', type(module.PointerPoller))
         local poller = module.PointerPoller.new{
             observer=function() end,
-            has_demand=function() return false end,
+            demand_tracker={has_screen_demand=function() return false end,
+                has_map_demand=function() return false end,
+                get_diagnostics=function()
+                    return {screen_pointer_demand=0, map_pointer_demand=0}
+                end},
+            snapshot_factory={capture_pointer=function() return {} end},
         }
         assert.is_false(poller:start())
     end)

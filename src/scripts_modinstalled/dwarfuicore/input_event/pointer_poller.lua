@@ -167,8 +167,8 @@ end
 ---Samples once, observes once, and conditionally queues the successor.
 ---@param expected_generation integer
 function PointerPoller:_tick(expected_generation)
-    if expected_generation ~= self._generation or not self._running or
-            not self:_is_current() then
+    if expected_generation ~= self._generation then return end
+    if not self._running or not self:_is_current() then
         self._running = false
         self._scheduled = false
         return
@@ -184,7 +184,12 @@ function PointerPoller:_tick(expected_generation)
         ui_root_resolution=false,
     })
     self._last_sequence = sample.sequence
-    self._observer(sample)
+    local ok, failure = pcall(self._observer, sample)
+    if not ok then
+        self:_halt()
+        error('DwarfUICore pointer poller observer failed: ' ..
+            tostring(failure), 0)
+    end
     if expected_generation == self._generation and self._running and
             self:_is_current() and
             self._demand_tracker:has_screen_demand() then

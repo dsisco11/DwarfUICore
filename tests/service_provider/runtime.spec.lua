@@ -150,7 +150,7 @@ describe('service-provider process runtime', function()
             contracts.ServiceKind.TOOLTIP, 1))
     end)
 
-    it('accepts UserPrompt in every service-kind-keyed runtime map', function()
+    it('accepts UserPrompt and Input Event in every service-kind-keyed runtime map', function()
         local state = healthy_state()
         local process = {dwarfuicore={service_provider_runtime=state}}
         local runtime = load_runtime(process)
@@ -207,6 +207,16 @@ describe('service-provider process runtime', function()
             contracts.ServiceKind.TOOLTIP, adapter_key))
         assert.is_nil(rawget(state, 'supported_versions'))
         assert.is_nil(rawget(state, 'manifest'))
+    end)
+
+    it('accepts Input Event service acquisition records', function()
+        local state = healthy_state()
+        local process = {dwarfuicore={service_provider_runtime=state}}
+        local runtime = load_runtime(process)
+        local service = runtime.initialize_service(
+            contracts.ServiceKind.INPUT_EVENT, function() return {} end)
+        assert.equals(service, runtime.get_service(
+            contracts.ServiceKind.INPUT_EVENT, 1))
     end)
 
     it('validates without teardown, reload, repair, clear, or rescan effects', function()

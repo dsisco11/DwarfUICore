@@ -157,6 +157,7 @@ local function load_context(settings)
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function() return true end},
                 },

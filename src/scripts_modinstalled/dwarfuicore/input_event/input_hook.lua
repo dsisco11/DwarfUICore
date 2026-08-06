@@ -32,6 +32,7 @@ InputConsumerKind = immutable_enum.define({
 local PRIORITY_CONSUMER_FIELDS = {
     owns=true,
     handle=true,
+    consume=true,
     on_failure=true,
 }
 
@@ -150,6 +151,7 @@ end
 ---@class dwarfuicore.PriorityInputConsumer
 ---@field owns fun(keys: table, transport: dwarfuicore.ContextMenuInputTransport, owner: table): boolean
 ---@field handle fun(keys: table, transport: dwarfuicore.ContextMenuInputTransport, owner: table): boolean
+---@field consume? dwarfuicore.CoreInputConsumer
 ---@field on_failure? fun(message: string)
 
 ---@class dwarfuicore.PreparedPriorityInputConsumer: dwarfuicore.PriorityInputConsumer
@@ -249,9 +251,9 @@ end
 ---@param owner table
 ---@return boolean ok
 ---@return boolean|string result
-local function call_boolean(callback, message, keys, transport, owner)
+local function call_boolean(callback, message, keys, snapshot, transport, owner)
     return xpcall(function()
-        local result = callback(keys, transport, owner)
+        local result = callback(keys, snapshot, transport, owner)
         assert(type(result) == 'boolean', message)
         return result
     end, debug.traceback)
@@ -289,9 +291,23 @@ local function dispatch(transport, owner, keys)
     local consumer = state.priority_consumer
     if consumer then
         state.priority_dispatch_count = state.priority_dispatch_count + 1
+        if consumer.consume then
+            local consumed_ok, result = call_private_consumer(
+                consumer.consume, keys, snapshot)
+            if not consumed_ok then
+                fail_priority_dispatch(state, consumer, transport, owner,
+                    result, true)
+                return true
+            end
+            if result == InputDispatchResult.CONSUME then
+                state.priority_handled_count = state.priority_handled_count + 1
+                return true
+            end
+            state.priority_delegated_count = state.priority_delegated_count + 1
+        else
         local owns_ok, owned = call_boolean(consumer.owns,
             'DwarfUICore priority input ownership must return a boolean.',
-            keys, transport, owner)
+            keys, snapshot, transport, owner)
         if not owns_ok then
             state.priority_delegated_count =
                 state.priority_delegated_count + 1
@@ -300,7 +316,7 @@ local function dispatch(transport, owner, keys)
         elseif owned then
             local handled_ok, handled = call_boolean(consumer.handle,
                 'DwarfUICore priority input handler must return a boolean.',
-                keys, transport, owner)
+                keys, snapshot, transport, owner)
             if not handled_ok then
                 fail_priority_dispatch(
                     state, consumer, transport, owner, handled, true)
@@ -316,6 +332,7 @@ local function dispatch(transport, owner, keys)
         else
             state.priority_delegated_count =
                 state.priority_delegated_count + 1
+        end
         end
     end
 
@@ -497,10 +514,9 @@ function ContextMenuInputHookManager:prepare_priority_consumer(root, consumer)
         assert(PRIORITY_CONSUMER_FIELDS[key],
             'DwarfUICore priority input consumer contains an unknown field.')
     end
-    assert(type(consumer.owns) == 'function',
-        'DwarfUICore priority input consumer requires owns().')
-    assert(type(consumer.handle) == 'function',
-        'DwarfUICore priority input consumer requires handle().')
+    assert(type(consumer.consume) == 'function' or
+            type(consumer.owns) == 'function' and type(consumer.handle) == 'function',
+        'DwarfUICore priority input consumer requires consume() or owns()/handle().')
     assert(consumer.on_failure == nil or
             type(consumer.on_failure) == 'function',
         'DwarfUICore priority input consumer on_failure must be a function.')
@@ -510,6 +526,7 @@ function ContextMenuInputHookManager:prepare_priority_consumer(root, consumer)
         owns=consumer.owns,
         handle=consumer.handle,
         on_failure=consumer.on_failure,
+        consume=consumer.consume,
         active=false,
         released=false,
     }
@@ -526,6 +543,8 @@ function ContextMenuInputHookManager:activate_priority_consumer(prepared)
             self._state.priority_consumer ~= nil then return false end
     self._state.prepared_consumer = nil
     self._state.priority_consumer = prepared
+    prepared.map_demand = self._state.demand_tracker:acquire(
+        input_types.InputSampleDemandType.MAP_POSITION)
     prepared.active = true
     return true
 end
@@ -542,6 +561,10 @@ function ContextMenuInputHookManager:release_priority_consumer(prepared)
         changed = true
     end
     if self._state.priority_consumer == prepared then
+        if prepared.map_demand then
+            self._state.demand_tracker:release(prepared.map_demand)
+            prepared.map_demand = nil
+        end
         self._state.priority_consumer = nil
         changed = true
     end
@@ -748,6 +771,10 @@ function ContextMenuInputHookManager:shutdown()
     local state = self._state
     local changed = false
     if state.priority_consumer then
+        if state.priority_consumer.map_demand then
+            state.demand_tracker:release(state.priority_consumer.map_demand)
+            state.priority_consumer.map_demand = nil
+        end
         state.priority_consumer.active = false
         state.priority_consumer.released = true
         state.priority_consumer = nil

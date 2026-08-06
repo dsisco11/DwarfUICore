@@ -2,9 +2,12 @@
 
 -- Prompt-owned input classification and exact terminal dispatch.
 
+local input_types = reqscript('dwarfuicore/input_event/types')
+
+local InputDispatchResult = input_types.InputDispatchResult
+
 ---@class dwarfuicore.UserPromptInputConsumerOptions
 ---@field is_active fun(): boolean
----@field get_map_position fun(): table|nil
 ---@field complete fun(position: table|nil): boolean
 ---@field cancel fun(cause: dwarfuicore.UserPromptTerminalCause): boolean
 ---@field on_failure fun(message: string)
@@ -12,7 +15,6 @@
 
 ---@class dwarfuicore.UserPromptInputConsumer
 ---@field private _is_active fun(): boolean
----@field private _get_map_position fun(): table|nil
 ---@field private _complete fun(position: table|nil): boolean
 ---@field private _cancel fun(cause: dwarfuicore.UserPromptTerminalCause): boolean
 ---@field private _on_failure fun(message: string)
@@ -27,7 +29,7 @@ function UserPromptInputConsumer.new(options)
     assert(type(options) == 'table',
         'DwarfUICore UserPrompt input consumer requires options.')
     for _, name in ipairs{
-            'is_active', 'get_map_position', 'complete', 'cancel',
+            'is_active', 'complete', 'cancel',
             'on_failure',
         } do
         assert(type(options[name]) == 'function',
@@ -40,7 +42,6 @@ function UserPromptInputConsumer.new(options)
         'DwarfUICore UserPrompt input consumer requires terminal causes.')
     return setmetatable({
         _is_active=options.is_active,
-        _get_map_position=options.get_map_position,
         _complete=options.complete,
         _cancel=options.cancel,
         _on_failure=options.on_failure,
@@ -57,32 +58,27 @@ function UserPromptInputConsumer:owns(keys)
             keys._MOUSE_L_DOWN or keys._MOUSE_R_DOWN))
 end
 
----Copies the one authoritative left-release sample without validating it.
----@return table|nil position
-function UserPromptInputConsumer:_sample_completion_position()
-    local position = self._get_map_position()
-    if position == nil then return nil end
-    return {x=position.x, y=position.y, z=position.z}
-end
-
 ---Consumes one owned table using cancellation-before-completion precedence.
 ---@param keys table
----@return boolean handled
-function UserPromptInputConsumer:handle(keys)
+---@param snapshot dwarfuicore.InputSnapshot
+---@return dwarfuicore.InputDispatchResult result
+function UserPromptInputConsumer:consume(keys, snapshot)
     if keys.LEAVESCREEN then
         self._cancel(self._causes.ESCAPE)
-        return true
+        return InputDispatchResult.CONSUME
     end
     if keys._MOUSE_R then
         self._cancel(self._causes.RIGHT_RELEASE)
-        return true
+        return InputDispatchResult.CONSUME
     end
     if keys._MOUSE_L then
-        self._complete(self:_sample_completion_position())
-        return true
+        self._complete(snapshot.map_position)
+        return InputDispatchResult.CONSUME
     end
-    if keys._MOUSE_L_DOWN or keys._MOUSE_R_DOWN then return true end
-    return false
+    if keys._MOUSE_L_DOWN or keys._MOUSE_R_DOWN then
+        return InputDispatchResult.CONSUME
+    end
+    return InputDispatchResult.PASS
 end
 
 ---Cancels a prompt after protected dispatcher failure consumed its event.
@@ -95,8 +91,7 @@ end
 ---@return dwarfuicore.PriorityInputConsumer callbacks
 function UserPromptInputConsumer:callbacks()
     return {
-        owns=function(keys) return self:owns(keys) end,
-        handle=function(keys) return self:handle(keys) end,
+        consume=function(keys, snapshot) return self:consume(keys, snapshot) end,
         on_failure=function(message) self:on_failure(message) end,
     }
 end

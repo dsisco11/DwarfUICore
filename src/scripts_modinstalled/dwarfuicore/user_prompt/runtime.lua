@@ -10,6 +10,7 @@ local input_hook_module = reqscript('dwarfuicore/context_menu/input_hook')
 local indicator_module = reqscript('dwarfuicore/user_prompt/indicator')
 local input_consumer_module =
     reqscript('dwarfuicore/user_prompt/input_consumer')
+local input_types = reqscript('dwarfuicore/input_event/types')
 local renderer_module = reqscript('dwarfuicore/user_prompt/renderer')
 local service_module = reqscript('dwarfuicore/user_prompt/service')
 local tooltip_runtime = reqscript('dwarfuicore/tooltip/runtime')
@@ -22,6 +23,7 @@ local presenter = tooltip_runtime.presenter
 local context_service = context_service_module.service
 local renderer = renderer_module.UserPromptRenderer{}
 local causes = service_module.UserPromptTerminalCause
+local InputDispatchResult = input_types.InputDispatchResult
 local STATE_CHANGE_SLOT = 'dwarfuicore_user_prompt'
 local active_surface = nil
 local state_change_callback = nil
@@ -29,7 +31,6 @@ local state_change_callback = nil
 ---@type dwarfuicore.UserPromptInputConsumer
 local input_consumer = input_consumer_module.UserPromptInputConsumer.new{
     is_active=function() return prompt_service:has_active_prompt() end,
-    get_map_position=function() return dfhack.gui.getMousePos() end,
     complete=function(position) return prompt_service:complete(position) end,
     cancel=function(cause) return prompt_service:cancel_active(cause) end,
     on_failure=function(message)
@@ -93,12 +94,12 @@ end
 
 ---@type dwarfuicore.PriorityInputConsumer
 local guarded_input_callbacks = {
-    owns=function(keys, transport, owner)
-        local owned = input_callbacks.owns(keys, transport, owner)
-        if not ensure_active_surface(causes.INPUT_ROOT_LOSS) then return owned end
-        return owned
+    consume=function(keys, snapshot)
+        if not ensure_active_surface(causes.INPUT_ROOT_LOSS) then
+            return InputDispatchResult.CONSUME
+        end
+        return input_callbacks.consume(keys, snapshot)
     end,
-    handle=input_callbacks.handle,
     on_failure=input_callbacks.on_failure,
 }
 

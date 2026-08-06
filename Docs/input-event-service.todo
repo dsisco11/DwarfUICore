@@ -186,30 +186,30 @@ Completion criteria:
 Outcome: UserPrompt uses the same snapshot/arbitration boundary while preserving
 its authoritative precedence and exclusive click ownership.
 
-- [ ] Attach UserPrompt as the highest-precedence private Core input consumer
+- [x] Attach UserPrompt as the highest-precedence private Core input consumer
   while a prompt is active.
-- [ ] Register synchronous input and map-snapshot demand while a prompt is active
+- [x] Register synchronous input and map-snapshot demand while a prompt is active
   and remove both contributions when the prompt becomes inactive.
-- [ ] Preserve UserPrompt completion, cancellation, consumption, indicator,
+- [x] Preserve UserPrompt completion, cancellation, consumption, indicator,
   presentation, callback, and failure contracts.
-- [ ] Supply the shared pre-arbitration snapshot to completion and cancellation
+- [x] Supply the shared pre-arbitration snapshot to completion and cancellation
   logic.
-- [ ] Prohibit UserPrompt from resampling screen or map coordinates for the same
+- [x] Prohibit UserPrompt from resampling screen or map coordinates for the same
   input table.
-- [ ] Suppress both public event channels for a prompt-consumed left release.
-- [ ] Ensure inactive UserPrompt contributes no input demand and cannot affect
+- [x] Suppress both public event channels for a prompt-consumed left release.
+- [x] Ensure inactive UserPrompt contributes no input demand and cannot affect
   public dispatch or context-menu behavior.
-- [ ] Add focused tests for prompt-first ordering, active/inactive demand,
+- [x] Add focused tests for prompt-first ordering, active/inactive demand,
   completion/cancellation coordinates, consumed-click suppression, context-menu
   exclusion, callback behavior, and no resampling.
 
 Completion criteria:
 
-- [ ] UserPrompt and context menu receive the same pre-arbitration facts in the
+- [x] UserPrompt and context menu receive the same pre-arbitration facts in the
   required fixed order.
-- [ ] Prompt-owned input cannot leak to public interceptors, observers,
+- [x] Prompt-owned input cannot leak to public interceptors, observers,
   inherited handling, or context-menu opening.
-- [ ] Existing UserPrompt and context-menu regression suites remain green.
+- [x] Existing UserPrompt and context-menu regression suites remain green.
 
 ## Phase 5: Move pointer-poller ownership and migrate tooltip
 

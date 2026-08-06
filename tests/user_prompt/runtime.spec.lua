@@ -88,6 +88,7 @@ local function load_runtime(generation, settings)
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function() return true end},
                 },
@@ -189,7 +190,13 @@ local function load_integrated_runtime()
             },
         })
     local _, consumer_module = module_loader.load(repo_root,
-        'src/scripts_modinstalled/dwarfuicore/user_prompt/input_consumer.lua')
+        'src/scripts_modinstalled/dwarfuicore/user_prompt/input_consumer.lua', {
+            reqscript={
+                ['dwarfuicore/input_event/types']={
+                    InputDispatchResult={PASS=1, CONSUME=2},
+                },
+            },
+        })
     local dwarfmode = {
         getPanelLayout=function()
             return {map={x1=0, y1=0}}
@@ -331,6 +338,7 @@ local function load_integrated_runtime()
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
                 ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function(_, surface)
                         return state.presented_surface == surface
@@ -441,14 +449,16 @@ describe('UserPrompt runtime assembly', function()
 
         local callbacks = context.state.input_active.callbacks
         context.state.current_surface = {}
-        assert.is_true(callbacks.owns({_MOUSE_L_DOWN=true}))
-        assert.is_true(callbacks.handle({_MOUSE_L_DOWN=true}))
+        assert.equals(2, callbacks.consume({_MOUSE_L_DOWN=true}, {
+            map_position=nil,
+        }))
         assert.equals(1, context.state.map_sample_count)
         assert.is_true(context.service:is_active(handle, 'owner', 1))
-        assert.is_false(callbacks.owns({D_PAUSE=true}))
 
-        assert.is_true(callbacks.handle({_MOUSE_L=true}))
-        assert.equals(2, context.state.map_sample_count)
+        assert.equals(2, callbacks.consume({_MOUSE_L=true}, {
+            map_position={x=20, y=21, z=22},
+        }))
+        assert.equals(1, context.state.map_sample_count)
         assert.same({{x=20, y=21, z=22}}, selected)
         assert.is_false(context.service:is_active(handle, 'owner', 1))
         assert.is_false(context.state.opening_guard())
@@ -472,9 +482,9 @@ describe('UserPrompt runtime assembly', function()
         context.service:start(request, 1)
         local callbacks = context.state.input_active.callbacks
 
-        assert.is_true(callbacks.handle{
+        assert.equals(2, callbacks.consume({
             _MOUSE_R=true, _MOUSE_L=true, _MOUSE_L_DOWN=true,
-        })
+        }, {map_position=nil}))
         assert.equals(1, cancelled)
         assert.is_nil(context.state.map_sample_count)
         assert.is_false(context.service:has_active_prompt())
@@ -504,8 +514,10 @@ describe('UserPrompt runtime assembly', function()
                 })
             context.service:start(request, 1)
 
-            assert.is_true(
-                context.state.input_active.callbacks.handle(example.keys))
+            assert.equals(2,
+                context.state.input_active.callbacks.consume(example.keys, {
+                    map_position=nil,
+                }))
             assert.equals(1, cancelled)
             assert.is_false(context.service:has_active_prompt())
             assert.is_nil(context.state.input_active)
@@ -551,9 +563,9 @@ describe('UserPrompt runtime assembly', function()
         for _, example in ipairs{
                 {cause='INPUT_ROOT_LOSS', consumed=true,
                     trigger=function(context)
-                    return context.state.input_active.callbacks.owns{
+                    return context.state.input_active.callbacks.consume({
                         _MOUSE_L_DOWN=true,
-                    }
+                    }, {map_position=nil}) == 2
                 end},
                 {cause='PRESENTATION_ROOT_LOSS', trigger=function(context)
                     context.state.render_active.present{width=80, height=25}
@@ -784,8 +796,11 @@ describe('UserPrompt runtime assembly', function()
             if example.api_cancel then
                 assert.is_true(context.service:cancel(handle, 'owner', 1))
             else
-                assert.is_true(context.state.input_active.callbacks.handle(
-                    example.keys))
+                assert.equals(2,
+                    context.state.input_active.callbacks.consume(example.keys, {
+                        map_position=example.completion and
+                            {x=1, y=2, z=3} or nil,
+                    }))
             end
             assert.is_true(context.service:is_active(
                 replacement, 'replacement', 1))

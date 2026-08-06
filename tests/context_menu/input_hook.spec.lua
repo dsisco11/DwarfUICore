@@ -84,6 +84,46 @@ describe('context-menu input hook', function()
         assert.equals(0, inactive.map_snapshot_demand)
     end)
 
+    it('runs the prompt consumer before context with one shared snapshot',
+            function()
+        local events = {}
+        local predecessor_count = 0
+        local overlay = {feed_viewscreen_widgets=function()
+            predecessor_count = predecessor_count + 1
+            return 'base'
+        end}
+        local module = load_hook({dwarfuicore={}}, overlay)
+        local prompt_snapshot
+        local context_snapshot
+        local should_consume = false
+        local prompt = module.manager:prepare_priority_consumer({}, {
+            consume=function(_, snapshot)
+                table.insert(events, 'prompt')
+                prompt_snapshot = snapshot
+                return should_consume and 2 or 1
+            end,
+        })
+        module.manager:set_private_context_consumer(function(_, snapshot)
+            table.insert(events, 'context')
+            context_snapshot = snapshot
+            return 1
+        end)
+        assert.is_true(module.manager:activate_priority_consumer(prompt))
+        module.manager:ensure_native()
+
+        assert.equals('base', overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {_MOUSE_L=true}))
+        assert.same({'prompt', 'context'}, events)
+        assert.is_equal(prompt_snapshot, context_snapshot)
+        assert.equals(1, predecessor_count)
+
+        should_consume = true
+        assert.is_true(overlay.feed_viewscreen_widgets(
+            'dwarfmode', {}, {_MOUSE_L=true}))
+        assert.equals(1, predecessor_count)
+        assert.same({'prompt', 'context', 'prompt'}, events)
+    end)
+
     it('re-exports the Input Event manager through the compatibility module',
             function()
         local hook = load_hook({dwarfuicore={}}, {

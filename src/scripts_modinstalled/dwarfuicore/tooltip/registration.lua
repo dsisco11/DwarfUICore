@@ -4,8 +4,10 @@
 -- samples flow through target detection into presentation-neutral intent.
 
 local input_service = reqscript('dwarfuicore/tooltip/service').service
-local PointerPoller =
-    reqscript('dwarfuicore/pointer_poller').PointerPoller
+local pointer_poller =
+    reqscript('dwarfuicore/input_event/pointer_poller')
+local PointerPoller = pointer_poller.PointerPoller
+local PointerDemandTracker = pointer_poller.PointerDemandTracker
 local TooltipTargetDetector =
     reqscript('dwarfuicore/tooltip/target_detector').TooltipTargetDetector
 local map_targets =
@@ -95,18 +97,6 @@ end
 
 ---Returns whether tooltip registrations still require pointer samples.
 ---@return boolean
-local function has_polling_demand()
-    local has_demand = registration_count() > 0
-    if not has_demand then input_service:shutdown() end
-    return has_demand
-end
-
----Returns whether a live map registration requires exact map sampling.
----@return boolean
-local function has_map_sampling_demand()
-    return map_registration_count() > 0
-end
-
 ---Detects and mediates one presentation-independent pointer sample.
 ---@param sample dwarfuicore.PointerSample
 local function observe_pointer(sample)
@@ -160,15 +150,16 @@ if not poller then
         end,
     }
     detector = constructed_detector
-    local constructed_poller = PointerPoller.new{
-        observer=observe_pointer,
-        has_demand=has_polling_demand,
-        has_map_demand=has_map_sampling_demand,
-    }
+    local demand_tracker = PointerDemandTracker.new()
+    local constructed_poller = PointerPoller.new{observer=observe_pointer,
+        demand_tracker=demand_tracker}
     process_state = {
         runtime_generation=runtime_generation,
         detector=constructed_detector,
         poller=constructed_poller,
+        demand_tracker=demand_tracker,
+        widget_demands=setmetatable({}, {__mode='k'}),
+        map_demands=setmetatable({}, {__mode='k'}),
     }
     dfhack.dwarfuicore[RUNTIME_SLOT] = process_state
     poller = constructed_poller
@@ -181,9 +172,11 @@ if migrated_namespace_state then
             assert(input_service:register(widget, target_sequence),
                 'DwarfUICore tooltip target migration conflicted.')
             published_targets[widget] = true
+            process_state.widget_demands[widget] =
+                process_state.demand_tracker:acquire(false)
         end
     end)
-    if widget_store:contribution_count() > 0 then poller:start() end
+    if registration_count() > 0 then poller:start() end
 end
 
 ---Registers one namespace contribution for a physical widget target.
@@ -216,6 +209,10 @@ function register(consumer_namespace, widget, contract_major)
         assert(input_service:register(widget, target_sequence),
             'DwarfUICore tooltip physical target publication conflicted.')
     end
+    if not process_state.widget_demands[widget] then
+        process_state.widget_demands[widget] =
+            process_state.demand_tracker:acquire(false)
+    end
     poller:start()
     return created
 end
@@ -241,6 +238,9 @@ function unregister(consumer_namespace, widget, contract_major)
     input_service:release_target(record.identity)
     if not widget_store:contains_target(widget) then
         input_service:unregister(widget)
+        process_state.demand_tracker:release(
+            process_state.widget_demands[widget])
+        process_state.widget_demands[widget] = nil
     end
     release_idle_runtime()
     return true
@@ -259,6 +259,8 @@ function register_map_tile(consumer_namespace, options, contract_major)
         consumer_namespace, contract_major)
     local handle = map_targets:register(
         consumer_namespace, options, contract_major)
+    process_state.map_demands[handle] =
+        process_state.demand_tracker:acquire(true)
     poller:start()
     return handle
 end
@@ -296,6 +298,8 @@ function unregister_map_tile(consumer_namespace, handle, contract_major)
         consumer_namespace, handle, contract_major)
     if not removed then return false end
     input_service:release_target(composite_identity)
+    process_state.demand_tracker:release(process_state.map_demands[handle])
+    process_state.map_demands[handle] = nil
     release_idle_runtime()
     return true
 end
@@ -323,6 +327,9 @@ function clear_namespace(consumer_namespace, contract_major)
             input_service:release_target(record.identity)
             if not widget_store:contains_target(widget) then
                 input_service:unregister(widget)
+                process_state.demand_tracker:release(
+                    process_state.widget_demands[widget])
+                process_state.widget_demands[widget] = nil
             end
         end
     end
@@ -330,6 +337,8 @@ function clear_namespace(consumer_namespace, contract_major)
             consumer_namespace, contract_major)) do
         changed = true
         input_service:release_target(record.identity)
+        process_state.demand_tracker:release(process_state.map_demands[record.handle])
+        process_state.map_demands[record.handle] = nil
     end
     release_idle_runtime()
     return changed

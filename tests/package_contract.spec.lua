@@ -66,7 +66,6 @@ describe('DwarfUICore package contract', function()
         local shared_modules = {
             'class.lua',
             'map_projection.lua',
-            'pointer_poller.lua',
             'pointer.lua',
             'text.lua',
             'view_root_resolver.lua',
@@ -80,6 +79,7 @@ describe('DwarfUICore package contract', function()
             'service_provider/identity.lua',
             'input_event/types.lua',
             'input_event/snapshot_factory.lua',
+            'input_event/pointer_poller.lua',
             'input_event/input_hook.lua',
             'service_provider/runtime.lua',
             'service_provider/acquisition.lua',

@@ -3,7 +3,11 @@ local repo_root = require('support.repo_root')
 local widget_harness = require('support.widget_harness')
 
 local POINTER_POLLER_PATH =
-    'src/scripts_modinstalled/dwarfuicore/pointer_poller.lua'
+    'src/scripts_modinstalled/dwarfuicore/input_event/pointer_poller.lua'
+local INPUT_TYPES_PATH =
+    'src/scripts_modinstalled/dwarfuicore/input_event/types.lua'
+local SNAPSHOT_FACTORY_PATH =
+    'src/scripts_modinstalled/dwarfuicore/input_event/snapshot_factory.lua'
 local TARGET_DETECTOR_PATH =
     'src/scripts_modinstalled/dwarfuicore/tooltip/target_detector.lua'
 local ROOT_RESOLVER_PATH =
@@ -109,12 +113,22 @@ local function load_environment(state)
     local _, class_helpers = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/class.lua')
     local _, target_adapter = module_loader.load(repo_root, TARGET_PATH)
+    local _, input_types = module_loader.load(repo_root, INPUT_TYPES_PATH, {
+        reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
+    })
+    local _, snapshot_factory = module_loader.load(repo_root,
+        SNAPSHOT_FACTORY_PATH, {globals={dfhack=dfhack}, reqscript={
+            ['dwarfuicore/service_provider/identity']=identities,
+            ['dwarfuicore/input_event/types']=input_types,
+        }})
 
     ---Loads one coherent poller, detector, service, and registration generation.
     ---@return table registration
     local function load_generation()
         local _, pointer_poller = module_loader.load(
-            repo_root, POINTER_POLLER_PATH, {globals={dfhack=dfhack}})
+            repo_root, POINTER_POLLER_PATH, {globals={dfhack=dfhack}, reqscript={
+                ['dwarfuicore/input_event/snapshot_factory']=snapshot_factory,
+            }})
         local _, root_resolver = module_loader.load(
             repo_root, ROOT_RESOLVER_PATH, {
                 globals={dfhack=dfhack},
@@ -153,7 +167,7 @@ local function load_environment(state)
                 globals={dfhack=dfhack},
                 require_modules={},
                 reqscript={
-                    ['dwarfuicore/pointer_poller']=pointer_poller,
+                    ['dwarfuicore/input_event/pointer_poller']=pointer_poller,
                     ['dwarfuicore/tooltip/target_detector']=target_detector,
                     ['dwarfuicore/tooltip/map_target']=map_target,
                     ['dwarfuicore/tooltip/service']=service,

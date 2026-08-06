@@ -57,8 +57,8 @@ local function observation(sample, kind, candidate)
     return {
         sequence=sample.sequence,
         kind=kind,
-        pointer_x=sample.x,
-        pointer_y=sample.y,
+        pointer_x=sample.screen_position and sample.screen_position.x,
+        pointer_y=sample.screen_position and sample.screen_position.y,
         target=candidate.target,
         local_x=candidate.local_x,
         local_y=candidate.local_y,
@@ -116,7 +116,8 @@ function TooltipTargetDetector:detect(sample)
         'DwarfUICore tooltip target detector requires a pointer sample.')
     assert(type(sample.sequence) == 'number',
         'DwarfUICore pointer sample sequence must be a number.')
-    if sample.x == nil or sample.y == nil then
+    local position = sample.screen_position
+    if position == nil then
         return observation(sample, ObservationKind.MISS)
     end
 
@@ -143,7 +144,7 @@ function TooltipTargetDetector:detect(sample)
     local winner
     local blocked
     for root, root_sequence in pairs(roots) do
-        local result = self._resolve(root, sample.x, sample.y)
+        local result = self._resolve(root, position.x, position.y)
         if result.kind == PointerResultKind.TARGET then
             local registration = self._registrations[result.target]
             if registration then

@@ -217,35 +217,35 @@ Outcome: Input Event owns one process-wide demand-driven pointer poller, and
 tooltip consumes shared pointer samples without depending on public click
 subscriptions.
 
-- [ ] Move `dwarfuicore/pointer_poller.lua` ownership and demand accounting into
+- [x] Move `dwarfuicore/pointer_poller.lua` ownership and demand accounting into
   the Input Event runtime.
-- [ ] Maintain separate demand counts for intercepted input, screen-pointer
+- [x] Maintain separate demand counts for intercepted input, screen-pointer
   polling, and map-pointer polling.
-- [ ] Activate continuous polling only while a private continuous-pointer
+- [x] Activate continuous polling only while a private continuous-pointer
   consumer exists.
-- [ ] Request map coordinates only while a current continuous consumer explicitly
+- [x] Request map coordinates only while a current continuous consumer explicitly
   requires them.
-- [ ] Ensure widget-only tooltip targets request screen samples without calling
+- [x] Ensure widget-only tooltip targets request screen samples without calling
   `dfhack.gui.getMousePos()` every frame.
-- [ ] Ensure exact map-tooltip targets create map-coordinate demand.
-- [ ] Migrate tooltip polling predicates into private subscriptions or demand
+- [x] Ensure exact map-tooltip targets create map-coordinate demand.
+- [x] Migrate tooltip polling predicates into private subscriptions or demand
   contributions.
-- [ ] Preserve tooltip widget/map registrations, target detection, pointer
+- [x] Preserve tooltip widget/map registrations, target detection, pointer
   enter/update/leave mediation, immutable presentation intent, and
   completed-render ownership.
-- [ ] Keep tooltip independent of public map-click/raw-click callbacks and public
+- [x] Keep tooltip independent of public map-click/raw-click callbacks and public
   observer registration.
-- [ ] Invalidate current sampled facts on world unload, root loss, and surface
+- [x] Invalidate current sampled facts on world unload, root loss, and surface
   replacement without removing process-owned public subscriptions.
-- [ ] Add focused tests for demand transitions, pointer-only/map polling,
+- [x] Add focused tests for demand transitions, pointer-only/map polling,
   sequence sharing, sample invalidation, teardown, and unchanged tooltip
   behavior.
 
 Completion criteria:
 
-- [ ] Exactly one process-wide pointer poller remains.
-- [ ] Map polling never occurs without current map demand.
-- [ ] Tooltip regressions prove that polling ownership moved without changing
+- [x] Exactly one process-wide pointer poller remains.
+- [x] Map polling never occurs without current map demand.
+- [x] Tooltip regressions prove that polling ownership moved without changing
   target or presentation semantics.
 
 ## Phase 6: Build the process runtime and namespace-bound public provider

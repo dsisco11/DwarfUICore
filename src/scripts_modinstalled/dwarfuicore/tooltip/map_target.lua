@@ -196,11 +196,11 @@ local function miss(sample)
     return {
         sequence=sample.sequence,
         kind=ObservationKind.MISS,
-        pointer_x=sample.x,
-        pointer_y=sample.y,
-        map_x=sample.map_x,
-        map_y=sample.map_y,
-        map_z=sample.map_z,
+        pointer_x=sample.screen_position and sample.screen_position.x,
+        pointer_y=sample.screen_position and sample.screen_position.y,
+        map_x=sample.map_position and sample.map_position.x,
+        map_y=sample.map_position and sample.map_position.y,
+        map_z=sample.map_position and sample.map_position.z,
     }
 end
 
@@ -428,6 +428,7 @@ function TooltipMapTargetRegistry:clear_namespace(consumer_namespace,
     for _, handle in ipairs(handles) do
         local record = self._state.registrations[handle]
         if record then
+            record.handle = handle
             table.insert(removed, record)
             self:_remove_from_bucket(handle, record)
             self._state.registrations[handle] = nil
@@ -460,14 +461,16 @@ function TooltipMapTargetRegistry:detect(sample)
         'DwarfUICore map target detector requires a pointer sample.')
     assert(type(sample.sequence) == 'number',
         'DwarfUICore map target sample sequence must be a number.')
-    if sample.x == nil or sample.y == nil or
-            not is_signed_16(sample.map_x) or
-            not is_signed_16(sample.map_y) or
-            not is_signed_16(sample.map_z) then
+    local screen_position = sample.screen_position
+    local map_position = sample.map_position
+    if screen_position == nil or map_position == nil or
+            not is_signed_16(map_position.x) or
+            not is_signed_16(map_position.y) or
+            not is_signed_16(map_position.z) then
         return miss(sample)
     end
 
-    local key = coordinate_key(sample.map_x, sample.map_y, sample.map_z)
+    local key = coordinate_key(map_position.x, map_position.y, map_position.z)
     local bucket = self._state.coordinate_index[key]
     if not bucket then return miss(sample) end
 
@@ -486,11 +489,11 @@ function TooltipMapTargetRegistry:detect(sample)
     return {
         sequence=sample.sequence,
         kind=ObservationKind.TARGET,
-        pointer_x=sample.x,
-        pointer_y=sample.y,
-        map_x=sample.map_x,
-        map_y=sample.map_y,
-        map_z=sample.map_z,
+        pointer_x=screen_position.x,
+        pointer_y=screen_position.y,
+        map_x=map_position.x,
+        map_y=map_position.y,
+        map_z=map_position.z,
         target=winner.handle,
         identity=winner.record.identity,
         target_kind=target_types.TooltipTargetKind.MAP_TILE,

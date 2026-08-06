@@ -127,6 +127,63 @@ UiObstructionResult = {
 
 Aggregation is deterministic: any `BLOCK` wins, otherwise any `UNKNOWN` wins, and only all-`MISS` is unobstructed. Both `BLOCK` and `UNKNOWN` suppress `MAP_CLICK`; neither suppresses `RAW_CLICK`.
 
+### Pointer Obstruction Classifier Hierarchy
+
+Introduce an internal `PointerObstructionClassifier` base class that defines the
+common classification boundary for every supported UI object model. Its
+`classify(root, screen_position)` method returns one canonical immutable
+classification carrying `TARGET`, `BLOCKED`, `MISS`, or `UNKNOWN`, plus an
+optional original target and target-local position when the object model can
+provide them.
+
+```lua
+---@enum PointerClassificationKind
+PointerClassificationKind = {
+    TARGET = 1,
+    BLOCKED = 2,
+    MISS = 3,
+    UNKNOWN = 4,
+}
+
+---@class PointerClassification
+---@field kind PointerClassificationKind
+---@field target unknown|nil
+---@field local_position ScreenPosition|nil
+
+---@class PointerObstructionClassifier
+PointerObstructionClassifier = {}
+
+---Classifies one root at an immutable screen position.
+---@param root unknown
+---@param screen_position ScreenPosition
+---@return PointerClassification
+function PointerObstructionClassifier:classify(root, screen_position)
+    error('PointerObstructionClassifier:classify must be implemented')
+end
+```
+
+The base class owns the result contract and common validation only. It does not
+infer an object model from Lua runtime type. Two initial subclasses implement
+the model-specific logic:
+
+- `GuiViewPointerObstructionClassifier` owns `gui.View` activity, visibility,
+  geometry, clipping, reverse descendant traversal, and `PointerPolicy` logic;
+- `NativeUiPointerObstructionClassifier` owns native widget traversal,
+  positioning, visibility flags, and the exact-type interaction compatibility
+  registry.
+
+The root-kind obstruction resolver selects the classifier explicitly from
+`UiRootKind`, invokes it once, and maps `TARGET` and `BLOCKED` to obstruction,
+`MISS` to no obstruction, and `UNKNOWN` to fail-closed suppression.
+
+The existing `PointerDispatcher` ceases to own `gui.View` obstruction logic.
+Its `resolve()` operation delegates to
+`GuiViewPointerObstructionClassifier`, preserving the existing result shape for
+callers, while `sample()` retains coordinate sampling, current-target state,
+and pointer enter, leave, and update lifecycle dispatch. This keeps tooltip and
+context-menu pointer behavior compatible while giving Input Event one shared
+classification abstraction.
+
 ## Root Discovery
 
 ### Native Viewscreen Root
@@ -167,13 +224,13 @@ This remains an internal integration surface unless an external consumer require
 
 ### Lua and Overlay Views
 
-Lua and overlay roots can use the existing pointer dispatcher where they conform to its supported `gui.View` contract. The dispatcher remains the sole owner of active state, visibility, frames, descendant order, clipping, and pointer-policy evaluation. Each dynamic value is evaluated at most once per root or descendant during one geometric-resolution pass.
+Lua and overlay roots use `GuiViewPointerObstructionClassifier` where they conform to its supported `gui.View` contract. That classifier is the sole owner of active state, visibility, frames, descendant order, clipping, and pointer-policy evaluation. Each dynamic value is evaluated at most once per root or descendant during one geometric-resolution pass. `PointerDispatcher` delegates to the same classifier instead of maintaining a second implementation.
 
 An exception while inspecting an applicable root produces `UNKNOWN`; it is not evidence of a miss.
 
 ### Native Widget Trees
 
-Native traversal belongs in a dedicated hit tester. It must account for:
+Native traversal belongs in `NativeUiPointerObstructionClassifier`. It must account for:
 
 - `widget_container` child traversal and display order;
 - native active and visible flags, including ancestor visibility;
@@ -195,13 +252,13 @@ The initial native compatibility table is:
 | Native signal | Pointer classification | Rationale |
 | --- | --- | --- |
 | A visible, active button-family widget whose resolved rectangle contains the pointer | `TARGET` | Native definitions explicitly identify these as button controls. The initial family includes `widget_better_button`, `widget_interface_main_button`, `widget_interface_pets_livestock_button`, `widget_interface_small_button`, `widget_item_sheet_button`, `widget_job_details_button`, `widget_recenter_button`, `widget_sheet_button`, and `widget_unit_sheet_button`. |
-| A visible, active recognized selection or editing control whose resolved rectangle contains the pointer | `TARGET` | These controls normally own selection, navigation, scrolling, sorting, or text input. The initial family includes `widget_dropdown`, `widget_filter`, `widget_folder`, `widget_menu`, `widget_radio_rows`, `widget_scroll_rows`, `widget_table`, `widget_tabs`, `widget_textbox`, `widget_unit_list`, and recognized sort-widget families. |
+| A visible, active recognized selection or editing control whose resolved rectangle contains the pointer | `TARGET` | These controls normally own selection, navigation, scrolling, sorting, or text input. The initial exact-type set is `widget_dropdown`, `widget_filter`, `widget_folder`, `widget_menu`, `widget_radio_rows`, `widget_scroll_rows`, `widget_sort_widget`, `widget_table`, `widget_tabs`, `widget_textbox`, `widget_unit_list`, and `widget_unit_sort_widget`. |
 | A visible, active widget with `CAN_KEY_ACTIVATE` whose resolved rectangle contains the pointer | `TARGET` | This is the available native indication that the widget participates in activation, although Core cannot prove the exact mouse path. |
-| A recognized structural or presentation-only widget | `NONE` | Plain containers, layout containers, text, portraits, graphics switchers, and nine-slice decorations provide structure or rendering without an identified interaction signal. Descendants are still traversed. |
+| A recognized structural or presentation-only widget | `NONE` | The initial exact-type set is `widget`, `widget_container`, `widget_anchored_tile`, `widget_character`, `widget_columns_container`, `widget_creature_portrait`, `widget_graphics_switcher`, `widget_item_name`, `widget_item_portrait`, `widget_keybinding_display`, `widget_nineslice`, `widget_nineslice_horizontal`, `widget_params_container`, `widget_rows_container`, `widget_stack`, `widget_text`, `widget_text_multiline`, `widget_text_truncated`, `widget_unit_name`, and `widget_unit_portrait`. Containers still traverse their descendants. |
 | An unrecognized concrete widget type or recognized widget without an interaction signal | `MISS` | Core does not infer mouse interaction from visibility or occupied geometry alone. |
 | A recognized interactive widget whose activity, visibility, ancestry, rectangle, or clipping cannot be inspected | `UNKNOWN` | Core identified a likely input owner but cannot determine whether it contains the pointer. |
 
-This table is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
+This table is implemented as an immutable exact-concrete-type registry whose values are pointer-policy outcomes. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted. Types absent from the registry and lacking that flag resolve as `MISS`. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
 
 ## Input Pipeline Impact
 
@@ -281,6 +338,11 @@ Add focused coverage for:
 - focus-inapplicable overlays excluded;
 - applicable malformed overlays producing unknown;
 - dynamic overlay active and visible values evaluated exactly once by the pointer classifier;
+- the classifier base contract and canonical immutable result validation;
+- GUI-view and native roots dispatched to their explicit classifier subclasses;
+- `PointerDispatcher.resolve()` delegating to the GUI-view classifier;
+- `PointerDispatcher.sample()` retaining enter, leave, and update lifecycle behavior after extraction;
+- no duplicate GUI-view obstruction implementation remaining in `PointerDispatcher`;
 - native userdata delegated only to the native hit tester;
 - Lua and overlay views delegated only to the generic resolver;
 - `BLOCK` and `UNKNOWN` aggregation precedence;
@@ -325,16 +387,19 @@ If Core must reproduce DFHack overlay applicability predicates, tests cover repr
 ## Migration
 
 1. Keep native-to-generic-view adaptation removed.
-2. Implement fail-closed native traversal with the isolated `GLOBAL_POSITIONING` assumption.
+2. Implement heuristic native traversal that fails closed for recognized interactive widgets, resolves unrecognized widgets as misses, and isolates the `GLOBAL_POSITIONING` assumption.
 3. Introduce immutable root-kind and obstruction-result enums.
 4. Return shallow tagged descriptors plus explicit collection status.
-5. Place existing Lua resolution behind a kind-based obstruction resolver.
-6. Replace indiscriminate overlay-database scanning with one isolated compatibility adapter matching DFHack's feed predicates.
-7. Deduplicate roots by object identity and reject incompatible duplicate kinds.
-8. Tag existing context and priority-consumer roots as explicit Core roots.
-9. Split the existing trampoline into pre-predecessor and post-predecessor processing without adding another hook.
-10. Update unit and DwarfSpec coverage, including predecessor-consumption and click-consumption ordering.
-11. Reconcile accepted decisions into the parent proposal and todo.
+5. Introduce the classifier base contract and canonical immutable classification result.
+6. Extract GUI-view obstruction logic from `PointerDispatcher` into `GuiViewPointerObstructionClassifier`, retaining dispatcher sampling and pointer lifecycle behavior.
+7. Implement `NativeUiPointerObstructionClassifier` with the native geometry and exact-type compatibility policies.
+8. Place both classifiers behind the kind-based obstruction resolver.
+9. Replace indiscriminate overlay-database scanning with one isolated compatibility adapter matching DFHack's feed predicates.
+10. Deduplicate roots by object identity and reject incompatible duplicate kinds.
+11. Tag existing context and priority-consumer roots as explicit Core roots.
+12. Split the existing trampoline into pre-predecessor and post-predecessor processing without adding another hook.
+13. Update unit and DwarfSpec coverage, including predecessor-consumption and click-consumption ordering.
+14. Reconcile accepted decisions into the parent proposal and todo.
 
 ## Alternatives Rejected
 
@@ -381,12 +446,15 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 7. `RAW_CLICK` consumption prevents predecessor invocation, subsequent `MAP_CLICK` delivery, and native game delegation. `MAP_CLICK` occurs only after DFHack overlays decline the input.
 8. Overlay viewscreen and focus applicability is resolved by the compatibility adapter, while the existing pointer classifier evaluates dynamic active and visible values exactly once during hit testing.
 9. Duplicate root objects are inspected once, with incompatible object-model kinds producing unknown.
+10. One `PointerObstructionClassifier` contract governs GUI-view and native classification; `PointerDispatcher` retains sampling and lifecycle responsibilities but delegates GUI-view obstruction classification.
 
 ## Acceptance Criteria
 
 This direction is ready to merge into the parent proposal when:
 
 - every supported UI domain has an explicit root kind;
+- every supported root kind selects a `PointerObstructionClassifier` subclass through the root-kind resolver;
+- GUI-view obstruction behavior has one implementation shared by the resolver and `PointerDispatcher`;
 - root collection is shallow and never adapts descendants;
 - overlay applicability matches the actual current input context;
 - native positioning follows the isolated `GLOBAL_POSITIONING` compatibility contract;

@@ -383,6 +383,14 @@ the current Lua screen, active overlay widget roots, and every additional root
 already registered with shared Core pointer detection. Duplicate roots are
 resolved once according to their effective front-to-back order.
 
+Root resolution is orchestrated through a common internal
+`PointerObstructionClassifier` contract selected explicitly by root kind.
+`GuiViewPointerObstructionClassifier` contains the `gui.View` logic extracted
+from `PointerDispatcher`; `NativeUiPointerObstructionClassifier` contains native
+userdata traversal and compatibility policy. `PointerDispatcher` retains
+sampling and pointer lifecycle dispatch and delegates GUI-view classification to
+the same classifier, so Core has only one implementation of GUI pointer policy.
+
 The service uses generic UI hit testing only. A widget does not need a tooltip,
 context-menu, or Input Event registration to obstruct the map. Visibility,
 activity, clipping, frame bounds, child order, and `PointerPolicy` retain their
@@ -881,8 +889,9 @@ the following:
   collection, including when a public interceptor later consumes the event;
 - every input snapshot, pointer sample, and public event stores coordinates as
   immutable position values without parallel per-axis coordinate fields;
-- the semantic map-click channel is eligible only when complete generic root
-  resolution proves that no active UI target or blocker is in the way;
+- the semantic map-click channel is eligible only when complete supported root
+  resolution through the applicable root-kind classifiers proves that no active
+  UI target or blocker is in the way;
 - pass-through UI does not suppress semantic map clicks, while targeted,
   blocking, and uninspectable recognized UI roots do; unrecognized native
   widgets do not suppress semantic map clicks;

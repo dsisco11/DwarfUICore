@@ -1,0 +1,423 @@
+# Input Event UI Root Resolution Implementation Plan
+
+Source proposals: `Docs/input-event-ui-root-resolution-proposal.md` and
+`Docs/input-event-service-proposal.md`
+
+## Goal
+
+Replace provisional UI-root adaptation and duplicated pointer-hit logic with
+explicit root descriptors and shared obstruction classifiers. Preserve the
+public Input Event API, existing hook ownership, pointer-policy semantics, and
+RAW/predecessor/MAP ordering while making `MAP_CLICK` require determinate proof
+that no supported interactive UI element obstructed the sampled screen point.
+
+## Assumptions and constraints
+
+- The approved proposals are authoritative; this plan does not redesign the
+  public `observe(event_type, callback)` or `intercept(event_type, handler)` API.
+- The existing input trampoline remains the sole hook. No second trampoline or
+  native-to-`gui.View` adaptation is introduced.
+- `RAW_CLICK` does not require UI-resolution success. `MAP_CLICK` is suppressed
+  by `TARGET`, `BLOCKED`, `UNKNOWN`, or overlay-predecessor consumption.
+- Existing `PointerPolicy` continues to configure pointer behavior;
+  `PointerClassificationKind` represents the resolved result.
+- Native interaction recognition is intentionally heuristic. Unrecognized
+  native widgets are not hits merely because they occupy visible geometry.
+- `GLOBAL_POSITIONING` is treated as absolute screen space; other native widget
+  origins are parent-relative. Native automation must qualify this assumption.
+- Root collection is shallow. Classifiers own visibility, activity, geometry,
+  clipping, traversal, and pointer-policy evaluation.
+- All production classes and methods require LuaDoc, new production modules are
+  reload-managed in dependency order, and closed discriminators use immutable
+  numeric enums.
+
+## Phase 1: Establish generic position and canonical classification contracts
+
+Outcome: All pointer-resolution work can target one validated immutable result
+shape without introducing parallel coordinate or outcome types.
+
+- [ ] Rename the immutable `ScreenPosition` value type to `Position2D`.
+  - [ ] Update declarations, constructors, exports, and direct consumers.
+  - [ ] Preserve copied immutable `{x, y}` validation and behavior.
+- [ ] Rename the immutable `MapTilePosition` value type to `Position3D`.
+  - [ ] Update declarations, constructors, exports, and direct consumers.
+  - [ ] Preserve copied immutable `{x, y, z}` validation and behavior.
+- [ ] Ensure field names, not the generic value types, identify coordinate
+  space: `screen_position`, `map_position`, and `local_position`.
+- [ ] Introduce immutable numeric `PointerClassificationKind` members:
+  `TARGET`, `BLOCKED`, `MISS`, and `UNKNOWN`.
+- [ ] Introduce the immutable canonical classification result with fields
+  `kind`, `subject`, and `local_position`.
+  - [ ] Require `subject` and `local_position` for `TARGET`.
+  - [ ] Require `subject` and forbid `local_position` for `BLOCKED`.
+  - [ ] Forbid both optional fields for `MISS` and `UNKNOWN`.
+- [ ] Add focused tests for generic position immutability, copied values,
+  canonical result immutability, and every result invariant.
+
+Completion criteria:
+
+- [ ] Generic position and canonical classification contracts are available to
+  later migrations without separate axis fields or coordinate-space labels.
+- [ ] Invalid canonical result shapes are rejected by focused tests.
+
+## Phase 2: Introduce the shared classifier invocation boundary
+
+Outcome: GUI and native classifiers share one non-throwing, result-validating
+entry point with consistent diagnostics and `UNKNOWN` fallback behavior.
+
+- [ ] Add the `PointerObstructionClassifier` base class.
+  - [ ] Expose the public final-style `invoke(root, screen_position)` method.
+  - [ ] Define protected `_classify(root, screen_position)` for subclasses.
+  - [ ] Validate inputs before invoking subclass behavior.
+  - [ ] Catch classifier exceptions, record private diagnostics, and return a
+    canonical immutable `UNKNOWN` result.
+  - [ ] Validate subclass results and convert malformed results to `UNKNOWN`.
+- [ ] Ensure diagnostics distinguish invocation failure from a valid positive
+  obstruction without retaining mutable roots.
+- [ ] Add focused tests for valid results, input validation, exception
+  containment, malformed-result conversion, and diagnostic recording.
+
+Completion criteria:
+
+- [ ] Every classifier failure is contained at `invoke()` and represented as
+  canonical `UNKNOWN`.
+- [ ] Callers can rely on one immutable result contract and never call
+  `_classify()` directly.
+
+## Phase 3: Extract GUI-view classification from PointerDispatcher
+
+Outcome: GUI-view obstruction policy has one implementation shared by
+continuous pointer lifecycle and Input Event obstruction resolution.
+
+- [ ] Add `GuiViewPointerObstructionClassifier` as a
+  `PointerObstructionClassifier` subclass.
+- [ ] Move current `gui.View` activity, visibility, frame, clipping, child
+  traversal, and `PointerPolicy` resolution out of `PointerDispatcher`.
+- [ ] Preserve front-to-back traversal and existing `TARGET`, `PASS`, `BLOCK`,
+  and `NONE` meanings.
+- [ ] Evaluate dynamic active and visible values exactly once per root or
+  descendant in one classification.
+- [ ] Change `PointerDispatcher.resolve(root, screen_position)` to delegate to
+  the GUI classifier's public `invoke()` method.
+- [ ] Retain pointer sampling and enter, leave, and update lifecycle ownership
+  in `PointerDispatcher.sample()`.
+  - [ ] `TARGET` assigns `classification.subject` and performs normal lifecycle
+    transitions.
+  - [ ] `BLOCKED` and `MISS` clear the target and perform the existing leave
+    behavior when applicable.
+  - [ ] `UNKNOWN` preserves the current target and emits no enter, leave, or
+    update transition.
+  - [ ] Missing or incomplete pointer coordinates bypass classifier invocation,
+    resolve as `MISS`, and retain existing leave behavior.
+- [ ] Add focused tests for extracted policy parity, one-time dynamic
+  evaluation, dispatcher delegation, lifecycle outcomes, and absence of
+  duplicate GUI-view classification logic.
+
+Completion criteria:
+
+- [ ] GUI-view obstruction behavior exists only in the GUI classifier.
+- [ ] Existing determinate pointer lifecycle behavior is preserved and
+  indeterminate samples are non-transitioning.
+
+## Phase 4: Migrate all direct pointer-classification consumers
+
+Outcome: No service depends on the legacy result enum or per-axis result shape.
+
+- [ ] Migrate tooltip target detection to canonical classifications.
+- [ ] Migrate context-menu target detection to canonical classifications.
+- [ ] Migrate Input Event UI-obstruction resolution to canonical
+  classifications.
+- [ ] Update pointer and service-specific tests to use `kind`, `subject`, and
+  immutable `local_position`.
+- [ ] Retire `PointerResultKind` and legacy result `x` and `y` fields after all
+  direct consumers are migrated.
+- [ ] Confirm every direct classifier caller uses public `invoke()`.
+
+Completion criteria:
+
+- [ ] No production consumer references `PointerResultKind` or legacy result
+  coordinates.
+- [ ] Tooltip and context-menu behavior remains unchanged for determinate GUI
+  classifications.
+
+## Phase 5: Implement native UI obstruction classification
+
+Outcome: Native widget userdata is classified directly through an isolated,
+source-informed compatibility policy without pretending it is a `gui.View`.
+
+- [ ] Add `NativeUiPointerObstructionClassifier` as a
+  `PointerObstructionClassifier` subclass.
+- [ ] Implement native widget ancestry, visibility, activity, rectangle,
+  clipping, and child traversal against userdata.
+  - [ ] Treat `GLOBAL_POSITIONING=true` origins as absolute screen coordinates.
+  - [ ] Accumulate all other supported origins from parent-relative geometry.
+  - [ ] Traverse supported container children in display order.
+- [ ] Add an immutable exact-concrete-type registry whose values are existing
+  `PointerPolicy` members.
+  - [ ] Register the approved native button family as `TARGET`.
+  - [ ] Register the approved selection/editing family as `TARGET`.
+  - [ ] Register `widget_container`, `widget_columns_container`,
+    `widget_params_container`, `widget_rows_container`, and `widget_stack` as
+    `PASS`.
+  - [ ] Register the approved presentation-only family as `NONE`.
+- [ ] Apply exact-type policy before the separate `CAN_KEY_ACTIVATE` `TARGET`
+  fallback; do not use inheritance or name-pattern matching for self-policy.
+- [ ] For an unregistered object without activation fallback, resolve self as
+  `MISS` while traversing descendants only when it exposes the supported
+  `widget_container` child interface.
+- [ ] Keep exact `TARGET` and `NONE` policies and activation fallback terminal.
+- [ ] Map policy and geometry to canonical results.
+  - [ ] `TARGET` returns `TARGET` with widget subject and local position only
+    when eligible and hit; otherwise `MISS`.
+  - [ ] `PASS` traverses children and otherwise returns `MISS`.
+  - [ ] `BLOCK` traverses children first, then returns `BLOCKED` with subject
+    when its blocking region is hit, otherwise `MISS`.
+  - [ ] `NONE` returns `MISS` without descendant traversal.
+- [ ] Return `UNKNOWN` when a recognized interactive widget cannot be
+  inspected; do not turn unrecognized or merely visible native geometry into
+  an obstruction.
+- [ ] Add focused tests for absolute and parent-relative positioning, clipping,
+  exact registry precedence, activation fallback, every policy mapping,
+  `PASS` versus `NONE`, unregistered-container descendants, malformed
+  recognized widgets, and unrecognized occupied geometry.
+
+Completion criteria:
+
+- [ ] Native userdata is never adapted to a generic view.
+- [ ] Recognized interactive native controls obstruct when hit, while
+  unrecognized and presentation-only geometry does not become a false hit.
+- [ ] Native inspection uncertainty fails closed only for recognized
+  interactive widgets.
+
+## Phase 6: Replace UI-root collection with explicit shallow descriptors
+
+Outcome: Current roots are collected without traversal or runtime-type
+inference, deduplicated by identity, and dispatched to the correct classifier.
+
+- [ ] Introduce immutable numeric `UiRootKind` members:
+  `NATIVE_WIDGET_TREE`, `LUA_VIEW`, `OVERLAY_VIEW`, and
+  `CORE_REGISTERED_VIEW`.
+- [ ] Introduce immutable tagged root descriptors that retain the original root
+  object and explicit kind only for the current input.
+- [ ] Collect the current native viewscreen widget root, hooked Lua-screen
+  receiver, applicable overlay roots, and existing context/priority-consumer
+  roots as explicit Core roots.
+- [ ] Keep collection shallow; do not classify or recursively traverse roots
+  during collection.
+- [ ] Deduplicate roots by object identity.
+  - [ ] Resolve duplicate generic Lua kinds with precedence `OVERLAY_VIEW`, then
+    `LUA_VIEW`, then `CORE_REGISTERED_VIEW`.
+  - [ ] Treat one object reported under incompatible native and Lua kinds as a
+    collection-level `UNKNOWN`.
+- [ ] Route native descriptors only to the native classifier and all GUI-view
+  descriptor kinds only to the GUI classifier.
+- [ ] Aggregate root outcomes so `TARGET` or `BLOCKED` wins, then `UNKNOWN`,
+  and only all-`MISS` proves unobstructed input.
+- [ ] Record distinct diagnostics for collection failure, unsupported kind,
+  classifier/traversal failure, applicability failure, and positive
+  obstruction without exposing descriptors publicly.
+- [ ] Add focused tests for every descriptor kind, shallow collection,
+  identity deduplication, kind precedence, incompatible duplicates, explicit
+  dispatch, aggregation precedence, immutable descriptors, and per-input
+  lifetime.
+
+Completion criteria:
+
+- [ ] Test representation cannot alter root semantics because every root kind
+  is explicit.
+- [ ] All supported roots are classified once through the appropriate public
+  classifier boundary.
+- [ ] Only a complete all-`MISS` result qualifies as unobstructed.
+
+## Phase 7: Implement the overlay applicability compatibility adapter
+
+Outcome: Root collection includes only overlays applicable to the current input
+context while leaving dynamic pointer state to the shared GUI classifier.
+
+- [ ] Add one isolated adapter matching DFHack's overlay-feed viewscreen,
+  focus, and enabled predicates.
+- [ ] Exclude disabled, viewscreen-inapplicable, and focus-inapplicable overlays
+  during root collection.
+- [ ] Leave dynamic active, visible, geometry, clipping, traversal, and pointer
+  policy evaluation to `GuiViewPointerObstructionClassifier`.
+- [ ] Ensure the classifier captures each dynamic active and visible value once
+  for the current classification; do not reuse that capture when the overlay
+  predecessor independently executes later.
+- [ ] Treat failure to inspect an otherwise applicable supported overlay as
+  `UNKNOWN`; do not let inapplicable overlays interfere.
+- [ ] Add focused compatibility tests for enabled state and representative
+  viewscreen/focus transitions, plus malformed applicable overlays.
+
+Completion criteria:
+
+- [ ] Collected overlays match the current feed context closely enough that
+  inactive contexts neither obstruct nor produce false `UNKNOWN` results.
+- [ ] Overlay applicability and pointer classification have separate,
+  non-duplicated responsibilities.
+
+## Phase 8: Integrate classification with the existing input trampoline
+
+Outcome: One captured input snapshot and one hook enforce approved RAW,
+predecessor, and MAP ordering without resampling or changing public APIs.
+
+- [ ] Capture applicable root descriptors and geometric obstruction once from
+  the immutable pre-predecessor `screen_position`.
+- [ ] Do not perform a second screen-position or map-position lookup during
+  obstruction resolution or after predecessor invocation.
+- [ ] Preserve private Core-consumer arbitration before public click delivery.
+- [ ] Dispatch eligible `RAW_CLICK` interceptors before the predecessor.
+  - [ ] On raw consumption, stop later raw interceptors, notify eligible raw
+    observers, skip predecessor and every MAP callback, and return consumed.
+- [ ] Invoke the existing overlay-feed predecessor exactly once when raw input
+  passes and retain its consumed result.
+- [ ] Dispatch eligible `RAW_CLICK` observers after predecessor completion and
+  before any MAP callbacks.
+- [ ] Suppress every `MAP_CLICK` callback when the predecessor consumed input or
+  geometric aggregation is obstructed or `UNKNOWN`.
+- [ ] When predecessor and geometry both pass, dispatch `MAP_CLICK`
+  interceptors and then observers.
+  - [ ] A MAP interceptor may prevent native game delegation but cannot affect
+    completed RAW delivery or predecessor processing.
+- [ ] Preserve the parent proposal's registration ordering, callback snapshot,
+  mutation, recursion, failure containment, and immutable event guarantees.
+- [ ] Ensure obstruction uncertainty suppresses only the current `MAP_CLICK`
+  and does not make the service unhealthy or suppress an eligible `RAW_CLICK`.
+- [ ] Add focused tests for exact ordering, predecessor consumption, RAW and MAP
+  consumption, all-mouse-input eligibility, obstruction aggregation, no
+  resampling, observer timing, inherited return behavior, and failure
+  isolation.
+
+Completion criteria:
+
+- [ ] One physical mouse-input boundary produces the approved RAW/predecessor/
+  MAP sequence through the existing trampoline.
+- [ ] RAW consumption prevents MAP and all later host handling; MAP consumption
+  occurs only after overlays decline input and prevents native delegation.
+- [ ] Root resolution never changes otherwise eligible RAW delivery.
+
+## Phase 9: Complete reload, registry, packaging, and documentation migration
+
+Outcome: The redesigned modules participate correctly in reload/package
+boundaries and the retired adaptation/result contracts are absent.
+
+- [ ] Register new production modules in `dwarfuicore/module_registry.lua` in
+  dependency order and update registry/package declaration tests.
+- [ ] Ensure classifier modules and root descriptors follow generation and
+  reload ownership while per-input descriptors never survive reload.
+- [ ] Preserve the established service generation, hook adoption, stale-handle,
+  and owned-cleanup behavior.
+- [ ] Remove the provisional native-to-generic-view workaround and every
+  superseded UI-root adaptation path.
+- [ ] Remove obsolete legacy pointer-result declarations and compatibility
+  exports after consumers are migrated.
+- [ ] Update contributor documentation with supported root kinds, classifier
+  extension rules, native compatibility-policy requirements, and fail-closed
+  behavior.
+- [ ] Keep public documentation focused on event semantics, including RAW's
+  lack of UI guarantee and MAP's post-overlay/pre-native boundary.
+- [ ] Update exact expanded/archive package expectations for all added and
+  removed modules.
+
+Completion criteria:
+
+- [ ] Reload and packaging contain one current classifier/root-resolution
+  architecture with no adaptation workaround or legacy result shape.
+- [ ] Public API, hook ownership, and generation behavior remain unchanged.
+
+## Phase 10: Focused and regression qualification
+
+Outcome: Source and unit evidence demonstrate the redesigned contracts without
+conflating them with native-runtime behavior.
+
+- [ ] Run focused unit suites for positions, canonical results, classifier
+  invocation, GUI extraction, dispatcher lifecycle, native policy, root
+  collection, overlay compatibility, aggregation, and trampoline ordering.
+- [ ] Run tooltip, context-menu, UserPrompt, Input Event, provider, module
+  registry, reload, and package regression suites.
+- [ ] Run the complete DwarfUICore unit suite.
+- [ ] Run Lua syntax and source-declaration validation for production and test
+  modules.
+- [ ] Build the distributable package and verify exact expanded and archive
+  contents separately.
+- [ ] Record focused, regression, full-unit, syntax/source, and package results
+  as distinct evidence.
+
+Completion criteria:
+
+- [ ] Every required source and unit boundary passes with separately recorded
+  results.
+- [ ] Any failed or unavailable evidence remains unchecked and is not presented
+  as runtime qualification.
+
+## Phase 11: DwarfSpec automation qualification
+
+Outcome: Native runtime automation qualifies geometric classification,
+consumption ordering, reload behavior, and cleanup on supported input surfaces.
+
+- [ ] Run native-overlay automation proving unobstructed input emits RAW and
+  MAP, while recognized native, Lua, and overlay obstructions emit RAW only.
+- [ ] Qualify representative registered native button and selection/editing
+  controls as MAP obstructions.
+- [ ] Qualify representative structural, presentation-only, and unrecognized
+  native geometry as non-obstructing when no recognized interactive descendant
+  is hit.
+- [ ] Qualify `GLOBAL_POSITIONING` as absolute screen space and ordinary native
+  widget positioning as parent-relative.
+- [ ] Qualify visible DFHack elements with `PASS` or `NONE` as non-obstructing
+  and `TARGET` or `BLOCKED` as obstructing.
+- [ ] Qualify overlay viewscreen/focus applicability and overlay-predecessor
+  consumption independently from geometric obstruction.
+- [ ] Qualify mouse inputs beyond left/right through the same event contract;
+  do not add tests for nonexistent host event types.
+- [ ] Qualify exact interception/observation ordering.
+  - [ ] RAW consumption prevents predecessor invocation, MAP delivery, and
+    native game delegation.
+  - [ ] MAP consumption occurs after overlays decline input and prevents native
+    game delegation.
+- [ ] Run equivalent supported Lua-screen automation.
+- [ ] Run installed-package automation separately from source-checkout
+  automation.
+- [ ] Run reload automation proving one runtime, one hook chain, classifier
+  availability, stale-generation rejection, and no retained root descriptors.
+- [ ] Record terminal cleanup evidence proving temporary subscriptions, UI,
+  hooks, and runtime state are removed or returned to their intended inert
+  state without changing reload behavior.
+
+Completion criteria:
+
+- [ ] Native-overlay, Lua-screen, installed-package, reload, and cleanup results
+  are recorded independently with terminal status.
+- [ ] Native interaction and positioning assumptions have representative
+  runtime evidence rather than unit-test inference alone.
+- [ ] Any unavailable or failed runtime contract remains unchecked.
+
+## Final acceptance
+
+- [ ] Every supported root has an explicit immutable root kind and reaches the
+  correct classifier through public `invoke()`.
+- [ ] GUI pointer obstruction has one implementation shared by Input Event and
+  `PointerDispatcher`; continuous lifecycle remains owned by the dispatcher.
+- [ ] Native userdata is traversed directly using the approved exact-type
+  `PointerPolicy` registry, activation fallback, and structural fallback.
+- [ ] Unrecognized native UI does not become an interaction hit solely from
+  visibility or geometry; recognized uninspectable interaction surfaces become
+  `UNKNOWN`.
+- [ ] Canonical classifications use `kind`, neutral `subject`, and immutable
+  `local_position`; legacy kinds and per-axis result fields are removed.
+- [ ] Missing pointer coordinates produce determinate `MISS` before classifier
+  invocation; classifier uncertainty produces non-transitioning continuous
+  behavior and fail-closed MAP behavior.
+- [ ] Root collection is shallow, identity-deduplicated, per-input, and rejects
+  incompatible native/Lua duplicate kinds as `UNKNOWN`.
+- [ ] Overlay applicability mirrors current input context while dynamic
+  pointer state remains classifier-owned and captured once per classification.
+- [ ] One existing trampoline captures once, dispatches RAW before predecessor
+  and MAP after predecessor, and never resamples coordinates.
+- [ ] RAW consumption prevents MAP and host delegation; predecessor consumption
+  suppresses MAP; MAP consumption prevents only later native delegation.
+- [ ] Public provider methods, payload semantics, namespace/handle contracts,
+  hook ownership, reload behavior, and service health rules remain unchanged.
+- [ ] Every proposal requirement is implemented or explicitly deferred with an
+  approved rationale.
+- [ ] Required source, unit, package, DwarfSpec, reload, and cleanup evidence is
+  complete and recorded as distinct proof boundaries.

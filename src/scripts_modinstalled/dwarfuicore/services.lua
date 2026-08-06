@@ -41,3 +41,7 @@ ContextMenuServiceProvider = create_provider('ContextMenuServiceProvider',
 ---@type dwarfuicore.UserPromptServiceProvider
 UserPromptServiceProvider = create_provider('UserPromptServiceProvider',
     'dwarfuicore/service_provider/user_prompt_provider')
+
+---@type dwarfuicore.InputEventServiceProvider
+InputEventServiceProvider = create_provider('InputEventServiceProvider',
+    'dwarfuicore/service_provider/input_event_provider')

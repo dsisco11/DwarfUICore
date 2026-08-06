@@ -10,6 +10,8 @@ local PREFIX_BY_SERVICE_KIND = {
         'DwarfUICore ContextMenuServiceProvider:',
     [contracts.ServiceKind.USER_PROMPT]=
         'DwarfUICore UserPromptServiceProvider:',
+    [contracts.ServiceKind.INPUT_EVENT]=
+        'DwarfUICore InputEventServiceProvider:',
 }
 
 ---@class dwarfuicore.ServiceAcquisitionAdapter

@@ -18,6 +18,7 @@ MODULES = {
     {name='dwarfuicore/input_event/types', contract='InputEventType', contract_type='table'},
     {name='dwarfuicore/input_event/snapshot_factory', contract='SnapshotFactory', contract_type='table'},
     {name='dwarfuicore/input_event/pointer_poller', contract='PointerPoller', contract_type='table'},
+    {name='dwarfuicore/input_event/service', contract='InputEventService', contract_type='table'},
     {name='dwarfuicore/service_provider/runtime', contract='validate'},
     {name='dwarfuicore/service_provider/acquisition', contract='acquire'},
     {name='dwarfuicore/service_provider/api', contract='new_factory'},
@@ -57,9 +58,11 @@ MODULES = {
     {name='dwarfuicore/service_provider/tooltip_adapter_v1', contract='build_facade'},
     {name='dwarfuicore/service_provider/context_menu_adapter_v1', contract='build_facade'},
     {name='dwarfuicore/service_provider/user_prompt_adapter_v1', contract='build_facade'},
+    {name='dwarfuicore/service_provider/input_event_adapter_v1', contract='build_facade'},
     {name='dwarfuicore/service_provider/tooltip_provider', contract='get_provider'},
     {name='dwarfuicore/service_provider/context_menu_provider', contract='get_provider'},
     {name='dwarfuicore/service_provider/user_prompt_provider', contract='get_provider'},
+    {name='dwarfuicore/service_provider/input_event_provider', contract='get_provider'},
     {name='dwarfuicore/services', contract='TooltipServiceProvider', contract_type='table'},
 }
 

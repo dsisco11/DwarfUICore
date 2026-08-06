@@ -453,6 +453,37 @@ function ContextMenuInputHookManager:set_context_consumer(handler, failure_handl
     end, failure_handler)
 end
 
+---Acquires private snapshot-demand contributions for one public subscription.
+---@param needs_screen boolean
+---@param needs_map boolean
+---@param needs_ui_resolution boolean
+---@return table handle
+function ContextMenuInputHookManager:acquire_subscription_demand(needs_screen,
+        needs_map, needs_ui_resolution)
+    assert(type(needs_screen) == 'boolean' and type(needs_map) == 'boolean' and
+            type(needs_ui_resolution) == 'boolean',
+        'DwarfUICore Input Event subscription demand must be boolean.')
+    local tracker = self._state.demand_tracker
+    return {screen=needs_screen and tracker:acquire(
+            input_types.InputSampleDemandType.SCREEN_POSITION) or nil,
+        map=needs_map and tracker:acquire(
+            input_types.InputSampleDemandType.MAP_POSITION) or nil,
+        ui=needs_ui_resolution and tracker:acquire(
+            input_types.InputSampleDemandType.UI_ROOT_RESOLUTION) or nil}
+end
+
+---Releases a previously acquired public-subscription demand contribution.
+---@param handle table|nil
+---@return boolean released
+function ContextMenuInputHookManager:release_subscription_demand(handle)
+    if type(handle) ~= 'table' then return false end
+    local tracker, released = self._state.demand_tracker, false
+    for _, value in pairs(handle) do
+        if tracker:release(value) then released = true end
+    end
+    return released
+end
+
 ---Ensures the input seam required by one supported root.
 ---@param root any
 ---@return boolean changed

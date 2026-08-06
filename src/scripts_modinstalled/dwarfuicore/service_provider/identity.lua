@@ -164,7 +164,8 @@ end
 local function is_service_kind(value)
     return value == contracts.ServiceKind.TOOLTIP or
         value == contracts.ServiceKind.CONTEXT_MENU or
-        value == contracts.ServiceKind.USER_PROMPT
+        value == contracts.ServiceKind.USER_PROMPT or
+        value == contracts.ServiceKind.INPUT_EVENT
 end
 
 ---Validates the exact reload-stable counter state shape.

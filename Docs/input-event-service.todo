@@ -254,55 +254,55 @@ Outcome: Consumers can acquire immutable contract-major-1 API objects and manage
 typed namespace-bound subscriptions without yet depending on unfinished event
 semantics.
 
-- [ ] Implement one lazy, transactional, process-wide Input Event runtime.
-- [ ] Export `InputEventServiceProvider` through
+- [x] Implement one lazy, transactional, process-wide Input Event runtime.
+- [x] Export `InputEventServiceProvider` through
   `reqscript('dwarfuicore/services')` using the existing exact-version provider
   pattern.
-- [ ] Return a distinct immutable `InputEventServiceApi` for every `new()` call
+- [x] Return a distinct immutable `InputEventServiceApi` for every `new()` call
   while sharing one namespace domain for APIs bound to the same namespace.
-- [ ] Expose immutable `EventType` and `Disposition` enum tables on each API.
-- [ ] Implement the generic public methods only:
-  - [ ] `observe(event_type, callback)`.
-  - [ ] `intercept(event_type, handler)`.
-  - [ ] `unsubscribe(handle)`.
-  - [ ] `is_subscribed(handle)`.
-  - [ ] `clear_namespace()`.
-- [ ] Validate callback/handler type and exact numeric enum membership before
+- [x] Expose immutable `EventType` and `Disposition` enum tables on each API.
+- [x] Implement the generic public methods only:
+  - [x] `observe(event_type, callback)`.
+  - [x] `intercept(event_type, handler)`.
+  - [x] `unsubscribe(handle)`.
+  - [x] `is_subscribed(handle)`.
+  - [x] `clear_namespace()`.
+- [x] Validate callback/handler type and exact numeric enum membership before
   runtime initialization or registry mutation.
-- [ ] Reject strings and unknown numbers while accepting a valid numeric member
+- [x] Reject strings and unknown numbers while accepting a valid numeric member
   regardless of its source.
-- [ ] Create a distinct opaque subscription for each successful registration,
+- [x] Create a distinct opaque subscription for each successful registration,
   bound to service kind, contract major, namespace, generation, local identity,
   event type, and dispatch channel.
-- [ ] Wire every active public subscription into synchronous input-snapshot
+- [x] Wire every active public subscription into synchronous input-snapshot
   demand accounting.
-  - [ ] Both event types contribute input-hook and map-coordinate demand.
-  - [ ] `MAP_CLICK` additionally contributes screen-coordinate and UI-root
+  - [x] Both event types contribute input-hook and map-coordinate demand.
+  - [x] `MAP_CLICK` additionally contributes screen-coordinate and UI-root
     resolution demand.
-  - [ ] Unsubscription, namespace cleanup, generation retirement, and failed
+  - [x] Unsubscription, namespace cleanup, generation retirement, and failed
     registration remove or avoid publishing the corresponding contributions.
-  - [ ] Removing the final contribution makes each affected runtime path inert.
-- [ ] Permit multiple registrations from one namespace and retain global
+  - [x] Removing the final contribution makes each affected runtime path inert.
+- [x] Permit multiple registrations from one namespace and retain global
   registration sequence.
-- [ ] Strongly retain callbacks while subscriptions are active; do not make API
+- [x] Strongly retain callbacks while subscriptions are active; do not make API
   or handle garbage collection an implicit unsubscribe operation.
-- [ ] Implement same-domain inactive, malformed, stale-generation, and
+- [x] Implement same-domain inactive, malformed, stale-generation, and
   foreign-domain handle behavior with established error precedence.
-- [ ] Ensure namespace cleanup cannot remove private Core consumers or another
+- [x] Ensure namespace cleanup cannot remove private Core consumers or another
   namespace's subscriptions.
-- [ ] Add the modules to `dwarfuicore/module_registry.lua` in dependency order
+- [x] Add the modules to `dwarfuicore/module_registry.lua` in dependency order
   and update registry, service-export, provider, and package declaration tests.
-- [ ] Add focused tests for acquisition identity, immutability, validation
+- [x] Add focused tests for acquisition identity, immutability, validation
   ordering, namespaces, handles, cleanup, stale APIs/handles, foreign handles,
   repeated construction, and transactional initialization failure.
 
 Completion criteria:
 
-- [ ] The public surface contains one generic `observe` method and one generic
+- [x] The public surface contains one generic `observe` method and one generic
   `intercept` method selected by immutable numeric event type.
-- [ ] Namespace, identity, generation, service-kind, and contract-major
+- [x] Namespace, identity, generation, service-kind, and contract-major
   boundaries are enforced by tests.
-- [ ] Repeated acquisition reuses one healthy process runtime without replacing
+- [x] Repeated acquisition reuses one healthy process runtime without replacing
   a healthy hook chain.
 
 ## Phase 7: Derive raw and unobstructed map events

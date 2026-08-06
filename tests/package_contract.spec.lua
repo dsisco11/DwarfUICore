@@ -80,6 +80,7 @@ describe('DwarfUICore package contract', function()
             'input_event/types.lua',
             'input_event/snapshot_factory.lua',
             'input_event/pointer_poller.lua',
+            'input_event/service.lua',
             'input_event/input_hook.lua',
             'service_provider/runtime.lua',
             'service_provider/acquisition.lua',
@@ -87,9 +88,11 @@ describe('DwarfUICore package contract', function()
             'service_provider/tooltip_adapter_v1.lua',
             'service_provider/context_menu_adapter_v1.lua',
             'service_provider/user_prompt_adapter_v1.lua',
+            'service_provider/input_event_adapter_v1.lua',
             'service_provider/tooltip_provider.lua',
             'service_provider/context_menu_provider.lua',
             'service_provider/user_prompt_provider.lua',
+            'service_provider/input_event_provider.lua',
             'service_provider/weak_store.lua',
             'services.lua',
         }
@@ -280,6 +283,7 @@ describe('DwarfUICore package contract', function()
         assert.is_truthy(services:find('TooltipServiceProvider', 1, true))
         assert.is_truthy(services:find('ContextMenuServiceProvider', 1, true))
         assert.is_truthy(services:find('UserPromptServiceProvider', 1, true))
+        assert.is_truthy(services:find('InputEventServiceProvider', 1, true))
         assert.is_nil(root:find('UserPromptServiceProvider', 1, true))
         assert.is_nil(services:find('function get(', 1, true))
         assert.is_nil(services:find('get_diagnostics', 1, true))

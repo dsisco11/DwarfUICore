@@ -7,6 +7,7 @@ ServiceKind = immutable_enum.define({
     TOOLTIP=1,
     CONTEXT_MENU=2,
     USER_PROMPT=3,
+    INPUT_EVENT=4,
 }, 'ServiceKind')
 ---@enum dwarfuicore.RuntimeStatus
 RuntimeStatus = immutable_enum.define({INITIALIZING=1, HEALTHY=2, DISABLED=3,

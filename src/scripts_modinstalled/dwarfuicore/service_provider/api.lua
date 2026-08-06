@@ -9,6 +9,7 @@ local PREFIX_BY_SERVICE_KIND = {
     [contracts.ServiceKind.TOOLTIP]='DwarfUICore TooltipServiceApi:',
     [contracts.ServiceKind.CONTEXT_MENU]='DwarfUICore ContextMenuServiceApi:',
     [contracts.ServiceKind.USER_PROMPT]='DwarfUICore UserPromptServiceApi:',
+    [contracts.ServiceKind.INPUT_EVENT]='DwarfUICore InputEventServiceApi:',
 }
 local USER_PROMPT_BUSY_PREFIX =
     'DwarfUICore UserPromptService: [SERVICE_BUSY] '
@@ -137,7 +138,7 @@ end
 ---@param label string
 ---@param operation_names string[]
 ---@return dwarfuicore.ImmutableProxyFactory factory
-function new_factory(service_kind, label, operation_names)
+function new_factory(service_kind, label, operation_names, properties)
     assert(PREFIX_BY_SERVICE_KIND[service_kind],
         'DwarfUICore API service kind is invalid.')
     assert(type(label) == 'string' and label ~= '',
@@ -260,7 +261,9 @@ function new_factory(service_kind, label, operation_names)
                 fail(service_kind, contracts.ErrorCategory.SERVICE_UNHEALTHY,
                     'The bound service facade is incomplete.')
             end
-            if name == 'update_map_tile' or name == 'unregister_map_tile' then
+            if name == 'update_map_tile' or name == 'unregister_map_tile' or
+                    service_kind == contracts.ServiceKind.INPUT_EVENT and
+                    (name == 'unsubscribe' or name == 'is_subscribed') then
                 validate_handle(backing, select(1, ...))
             elseif service_kind == contracts.ServiceKind.USER_PROMPT and
                     (name == 'cancel' or name == 'is_active') then
@@ -291,6 +294,6 @@ function new_factory(service_kind, label, operation_names)
         end
     end
 
-    factory = immutable_proxy.new_factory(label, methods)
+    factory = immutable_proxy.new_factory(label, methods, properties)
     return factory
 end

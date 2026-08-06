@@ -131,11 +131,14 @@ Aggregation is deterministic: any `BLOCK` wins, otherwise any `UNKNOWN` wins, an
 
 Introduce an internal `PointerObstructionClassifier` base class that defines the
 common classification boundary for every supported UI object model. Its
-`classify(root, screen_position)` method returns one canonical immutable
+`invoke(root, screen_position)` method returns one canonical immutable
 classification carrying `TARGET`, `BLOCKED`, `MISS`, or `UNKNOWN`, plus an
-optional neutral subject for TARGET or BLOCKED and a target-local position
-for TARGET when the object model can provide them. MISS and UNKNOWN do
+optional neutral subject for `TARGET` or `BLOCKED` and a target-local position
+for `TARGET` when the object model can provide them. `MISS` and `UNKNOWN` do
 not carry a subject.
+
+The following is non-executable interface pseudocode; the implementation must
+provide the validation and immutable-result factories described below.
 
 ```lua
 ---@enum PointerClassificationKind
@@ -159,7 +162,8 @@ PointerObstructionClassifier = {}
 ---@param screen_position Position2D
 ---@return PointerClassification
 function PointerObstructionClassifier:invoke(root, screen_position)
-    -- validates, invokes _classify(), contains failures, and validates output
+    -- pseudocode: validate inputs, safely invoke _classify(), validate output,
+    -- and return a canonical UNKNOWN classification for any failure
 end
 
 ---Implements object-model-specific pointer classification.
@@ -324,10 +328,12 @@ The initial native compatibility table is:
 | A widget with `CAN_KEY_ACTIVATE` and no exact registry entry | `TARGET` fallback policy | This is the available native indication that the widget participates in activation, although Core cannot prove the exact mouse path. |
 | A recognized structural container | `PASS` | The initial exact-type set is `widget_container`, `widget_columns_container`, `widget_params_container`, `widget_rows_container`, and `widget_stack`. These widgets do not claim the pointer, but their descendants remain eligible. |
 | A recognized presentation-only widget | `NONE` | The initial exact-type set is `widget`, `widget_anchored_tile`, `widget_character`, `widget_creature_portrait`, `widget_graphics_switcher`, `widget_item_name`, `widget_item_portrait`, `widget_keybinding_display`, `widget_nineslice`, `widget_nineslice_horizontal`, `widget_text`, `widget_text_multiline`, `widget_text_truncated`, `widget_unit_name`, and `widget_unit_portrait`. These widgets neither claim the pointer nor expose eligible descendants. |
-| An unrecognized concrete widget type or recognized widget without an interaction signal | `MISS` | Core does not infer mouse interaction from visibility or occupied geometry alone. |
+| An unrecognized concrete widget type or recognized widget without an interaction signal | Self resolves as `MISS`; supported container descendants remain traversable | Core does not infer mouse interaction from visibility or occupied geometry alone, but an unrecognized container must not hide recognized interactive descendants. |
 | A recognized interactive widget whose activity, visibility, ancestry, rectangle, or clipping cannot be inspected | `UNKNOWN` | Core identified a likely input owner but cannot determine whether it contains the pointer. |
 
-This table is implemented as an immutable exact-concrete-type registry whose values are `PointerPolicy` members. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted. Types absent from the registry and lacking that flag resolve directly as canonical `MISS`. `UNKNOWN` is produced by failed inspection, not stored in the registry. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
+This table is implemented as an immutable exact-concrete-type registry whose values are `PointerPolicy` members. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted for self-policy classification. Types absent from the registry and lacking that flag cannot claim or block the pointer and therefore resolve themselves as canonical `MISS`.
+
+Structural traversal is a separate capability check. If any recognized or unrecognized object exposes the supported native `widget_container` child interface, the native classifier traverses those children in display order as it would for `PASS`, even when the container's own self-policy is unregistered. This capability check does not classify the container as interactive and does not use inheritance to select a pointer policy. `UNKNOWN` is produced by failed inspection, not stored in the registry. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain self-`MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
 
 ## Input Pipeline Impact
 
@@ -411,6 +417,7 @@ Add focused coverage for:
 - exact canonical `subject` and `local_position` invariants for every classification kind;
 - native registry policy values mapped to canonical classification outcomes;
 - structural `PASS` traversal remaining distinct from presentation-only `NONE`;
+- recognized interactive descendants remaining discoverable through unregistered native containers;
 - subclass exceptions and invalid results converted to `UNKNOWN` by the shared invocation boundary;
 - `TARGET` and `BLOCKED` carrying `subject`, with only `TARGET` carrying `local_position`;
 - GUI-view and native roots dispatched to their explicit classifier subclasses;

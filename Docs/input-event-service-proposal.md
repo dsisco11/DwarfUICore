@@ -858,8 +858,9 @@ to members of the versioned `InputEventType` enum.
 ### Let observer return values consume input
 
 Observation and interception must remain visibly different API operations.
-Treating a truthy observer return as consumption would make an apparently
-post-delegation notification callback capable of changing input ownership.
+Treating a truthy observer return as consumption would make a notification-only
+callback running at its documented post-interception boundary capable of
+changing input ownership.
 Only an explicit `intercept()` registration participates in pre-delegation
 arbitration.
 

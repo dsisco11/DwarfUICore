@@ -148,14 +148,14 @@ The overlay definition database is not an active-root list. DFHack's authoritati
 - enabled state;
 - current viewscreen applicability;
 - current focus applicability;
-- active state;
-- visible state where visibility can safely be evaluated during collection.
+- active state; and
+- visible state.
 
-The adapter receives the same `vs_name` and native viewscreen supplied to `feed_viewscreen_widgets`, starts from enabled definitions, applies viewscreen and focus matching, and evaluates dynamic `active` and `visible` values with DFHack-compatible semantics. Each dynamic applicability value is evaluated exactly once per root per intercepted input and captured in the root-resolution snapshot; hit testing must use that captured result instead of evaluating it again. The adapter requires contract tests across representative viewscreen and focus transitions.
+The adapter receives the same `vs_name` and native viewscreen supplied to `feed_viewscreen_widgets`, starts from enabled definitions, and applies viewscreen and focus matching. It does not evaluate dynamic `active` or `visible` values. For roots that pass those context predicates, the existing pointer classifier remains the sole owner of active and visible evaluation and evaluates each value once during geometric resolution. Together these stages reproduce DFHack's applicability predicates without duplicating pointer-classification responsibilities. The adapter requires contract tests across representative viewscreen and focus transitions.
 
 This filtering is required for correctness, not optimization. A globally enabled overlay can target another viewscreen or focus mode. Treating it as current UI can execute dynamic state outside its valid context, falsely suppress `MAP_CLICK`, or raise an error such as the observed caravan overlay failure when no caravan exists.
 
-Errors evaluating a context-inapplicable overlay do not affect the result because it should already have been excluded. Errors evaluating an applicable overlay produce unknown.
+Errors evaluating a context-inapplicable overlay do not affect the result because it should already have been excluded. Pointer-classifier errors while evaluating an applicable overlay's active or visible state produce unknown.
 
 ### Core-Registered Roots
 
@@ -167,7 +167,7 @@ This remains an internal integration surface unless an external consumer require
 
 ### Lua and Overlay Views
 
-Lua and overlay roots can use the existing pointer dispatcher where they conform to its supported `gui.View` contract. Captured root applicability is not reevaluated. Within an applicable root, frames, descendant order, clipping, and pointer policy remain centralized in the dispatcher.
+Lua and overlay roots can use the existing pointer dispatcher where they conform to its supported `gui.View` contract. The dispatcher remains the sole owner of active state, visibility, frames, descendant order, clipping, and pointer-policy evaluation. Each dynamic value is evaluated at most once per root or descendant during one geometric-resolution pass.
 
 An exception while inspecting an applicable root produces `UNKNOWN`; it is not evidence of a miss.
 
@@ -189,6 +189,19 @@ The native hit tester traverses userdata directly and never converts the tree in
 - malformed ancestry, flags, or geometry on a recognized interactive widget produce `UNKNOWN`.
 
 Native hit testing must map recognized interactive native widget behavior onto the established generic pointer-policy outcomes. A widget obstructs `MAP_CLICK` only when Core has an educated, documented basis for treating that widget class or flag combination as normally interactive and resolution produces `TARGET` or `BLOCKED`; `PASS`, `NONE`, and `MISS` remain non-obstructing. An absent native widget root, an unrecognized widget variant, or occupied native geometry with no recognized interaction signal resolves as `MISS`. This is an intentionally approximate compatibility policy: Core does not inspect native game input logic and must not infer interaction from visibility alone.
+
+The initial native compatibility table is:
+
+| Native signal | Pointer classification | Rationale |
+| --- | --- | --- |
+| A visible, active button-family widget whose resolved rectangle contains the pointer | `TARGET` | Native definitions explicitly identify these as button controls. The initial family includes `widget_better_button`, `widget_interface_main_button`, `widget_interface_pets_livestock_button`, `widget_interface_small_button`, `widget_item_sheet_button`, `widget_job_details_button`, `widget_recenter_button`, `widget_sheet_button`, and `widget_unit_sheet_button`. |
+| A visible, active recognized selection or editing control whose resolved rectangle contains the pointer | `TARGET` | These controls normally own selection, navigation, scrolling, sorting, or text input. The initial family includes `widget_dropdown`, `widget_filter`, `widget_folder`, `widget_menu`, `widget_radio_rows`, `widget_scroll_rows`, `widget_table`, `widget_tabs`, `widget_textbox`, `widget_unit_list`, and recognized sort-widget families. |
+| A visible, active widget with `CAN_KEY_ACTIVATE` whose resolved rectangle contains the pointer | `TARGET` | This is the available native indication that the widget participates in activation, although Core cannot prove the exact mouse path. |
+| A recognized structural or presentation-only widget | `NONE` | Plain containers, layout containers, text, portraits, graphics switchers, and nine-slice decorations provide structure or rendering without an identified interaction signal. Descendants are still traversed. |
+| An unrecognized concrete widget type or recognized widget without an interaction signal | `MISS` | Core does not infer mouse interaction from visibility or occupied geometry alone. |
+| A recognized interactive widget whose activity, visibility, ancestry, rectangle, or clipping cannot be inspected | `UNKNOWN` | Core identified a likely input owner but cannot determine whether it contains the pointer. |
+
+This table is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
 
 ## Input Pipeline Impact
 
@@ -267,6 +280,7 @@ Add focused coverage for:
 - viewscreen-inapplicable overlays excluded;
 - focus-inapplicable overlays excluded;
 - applicable malformed overlays producing unknown;
+- dynamic overlay active and visible values evaluated exactly once by the pointer classifier;
 - native userdata delegated only to the native hit tester;
 - Lua and overlay views delegated only to the generic resolver;
 - `BLOCK` and `UNKNOWN` aggregation precedence;
@@ -284,6 +298,8 @@ Automation should establish independently that:
 - an overlay obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
 - a Lua-screen obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
 - a native-widget obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
+- representative recognized native button and selection controls suppress `MAP_CLICK` when hit;
+- representative visible structural or presentation-only native widgets do not suppress `MAP_CLICK`;
 - a visible DFHack element with `PASS` or `NONE` pointer policy emits both events;
 - a visible DFHack element with `TARGET` or `BLOCKED` pointer policy emits `RAW_CLICK` but not `MAP_CLICK`;
 - DFHack overlay consumption suppresses `MAP_CLICK` even when geometric resolution misses;
@@ -363,7 +379,7 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 5. Additional Core roots are the existing context roots and priority consumer root, tagged explicitly.
 6. Unknown dynamic UI state suppresses only the current `MAP_CLICK` and does not use an unhealthy threshold.
 7. `RAW_CLICK` consumption prevents predecessor invocation, subsequent `MAP_CLICK` delivery, and native game delegation. `MAP_CLICK` occurs only after DFHack overlays decline the input.
-8. Dynamic overlay applicability is evaluated once per root per input and reused by hit testing.
+8. Overlay viewscreen and focus applicability is resolved by the compatibility adapter, while the existing pointer classifier evaluates dynamic active and visible values exactly once during hit testing.
 9. Duplicate root objects are inspected once, with incompatible object-model kinds producing unknown.
 
 ## Acceptance Criteria

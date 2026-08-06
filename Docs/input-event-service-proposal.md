@@ -388,10 +388,11 @@ context-menu, or Input Event registration to obstruct the map. Visibility,
 activity, clipping, frame bounds, child order, and `PointerPolicy` retain their
 existing generic meanings.
 
-Obstruction is resolved before inherited input handling against the same
-pre-delegation UI state as the coordinate snapshot. Callback dispatch remains
-post-delegation and does not reclassify the click if inherited handling changes
-the current screen or widget tree.
+Obstruction is resolved before overlay and native input handling against the
+same pre-predecessor UI state as the coordinate snapshot. Callback dispatch
+then follows the staged RAW-interception, overlay-predecessor, RAW-observation,
+and MAP-delivery order defined above. Later UI mutations do not reclassify the
+captured click.
 
 Hook support and UI-resolution support are separate capabilities. A
 hook-supported surface can deliver a raw click even when a recognized UI root

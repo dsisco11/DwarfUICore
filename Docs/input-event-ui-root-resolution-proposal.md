@@ -154,22 +154,32 @@ PointerClassificationKind = {
 ---@class PointerObstructionClassifier
 PointerObstructionClassifier = {}
 
----Classifies one root at an immutable screen position.
+---Safely classifies one root at an immutable screen position.
 ---@param root unknown
 ---@param screen_position Position2D
 ---@return PointerClassification
-function PointerObstructionClassifier:classify(root, screen_position)
-    error('PointerObstructionClassifier:classify must be implemented')
+function PointerObstructionClassifier:invoke(root, screen_position)
+    -- validates, invokes _classify(), contains failures, and validates output
+end
+
+---Implements object-model-specific pointer classification.
+---@protected
+---@param root unknown
+---@param screen_position Position2D
+---@return PointerClassification
+function PointerObstructionClassifier:_classify(root, screen_position)
+    error('PointerObstructionClassifier:_classify must be implemented')
 end
 ```
 
 The base class owns the result contract and common validation only. It does not
-infer an object model from Lua runtime type. Callers never invoke an overridable
-classify() method directly. A shared non-throwing invoke() boundary validates
-arguments, contains subclass exceptions, validates the returned classification,
-records internal failure diagnostics, and returns UNKNOWN for every failure.
-Both the root-kind obstruction resolver and PointerDispatcher must use this
-boundary, ensuring identical failure transport.
+infer an object model from Lua runtime type. Callers never invoke the protected
+overridable `_classify()` method directly. The public final-style non-throwing
+`invoke()` boundary validates arguments, contains subclass exceptions, validates
+the returned classification, records internal failure diagnostics, and returns
+`UNKNOWN` for every failure. Both the root-kind obstruction resolver and
+`PointerDispatcher` must use this boundary, ensuring identical failure
+transport.
 
 Two initial subclasses implement the model-specific logic:
 
@@ -203,6 +213,12 @@ resolver fails closed for the current `MAP_CLICK`. Continuous
 the classification, preserves the previous target, and emits no enter, leave,
 or update callback. The next determinate sample compares against that preserved
 target normally.
+
+An unavailable or incomplete pointer sample does not reach classifier
+invocation and is not `UNKNOWN`. It produces a determinate `MISS`, clears the
+current target, and emits `on_pointer_leave` when a previous target exists,
+preserving existing continuous-pointer behavior. `UNKNOWN` is reserved for a
+failure after a valid root and `Position2D` reach `invoke()`.
 
 ## Root Discovery
 
@@ -359,12 +375,14 @@ Add focused coverage for:
 - applicable malformed overlays producing unknown;
 - dynamic overlay active and visible values evaluated exactly once by the pointer classifier;
 - the classifier base contract and canonical immutable result validation;
-- subclass exceptions and invalid results converted to UNKNOWN by the shared invocation boundary;
-- TARGET and BLOCKED carrying subject, with only TARGET carrying local_position;
+- subclass exceptions and invalid results converted to `UNKNOWN` by the shared invocation boundary;
+- `TARGET` and `BLOCKED` carrying `subject`, with only `TARGET` carrying `local_position`;
 - GUI-view and native roots dispatched to their explicit classifier subclasses;
 - `PointerDispatcher.resolve()` delegating to the GUI-view classifier;
 - `PointerDispatcher.sample()` retaining enter, leave, and update lifecycle behavior after extraction;
 - `PointerDispatcher.sample()` preserving its current target and emitting no lifecycle transition for `UNKNOWN`;
+- unavailable or incomplete pointer samples producing `MISS` and the existing leave transition;
+- callers using public `invoke()` and subclasses overriding only protected `_classify()`;
 - canonical immutable `local_position` replacing result `x` and `y` fields;
 - retirement of `PointerResultKind` in favor of `PointerClassificationKind`;
 - no duplicate GUI-view obstruction implementation remaining in `PointerDispatcher`;
@@ -475,8 +493,9 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 9. Duplicate root objects are inspected once, with incompatible object-model kinds producing unknown.
 10. One `PointerObstructionClassifier` contract governs GUI-view and native classification; `PointerDispatcher` retains sampling and lifecycle responsibilities but delegates GUI-view obstruction classification.
 11. All direct resolver consumers use the canonical classification enum, neutral subject, and immutable local position; no legacy result shape remains.
-12. Classifier exceptions and invalid results are contained by the shared invocation boundary and become UNKNOWN for both obstruction and continuous sampling.
+12. Classifier exceptions and invalid results are contained by the shared invocation boundary and become `UNKNOWN` for both obstruction and continuous sampling.
 13. An indeterminate continuous sample preserves the current pointer target and emits no lifecycle transition, while an indeterminate obstruction decision suppresses only the current `MAP_CLICK`.
+14. An unavailable pointer sample remains a determinate miss and preserves existing pointer-leave behavior.
 
 ## Acceptance Criteria
 
@@ -487,6 +506,8 @@ This direction is ready to merge into the parent proposal when:
 - GUI-view obstruction behavior has one implementation shared by the resolver and `PointerDispatcher`;
 - every direct pointer-resolution consumer uses PointerClassification with neutral subject and immutable local_position, without legacy enum or per-axis result fields;
 - every classifier call crosses the shared non-throwing invocation boundary;
+- unavailable pointer coordinates produce a determinate miss before classifier invocation;
+- classifier callers use public `invoke()` and subclasses override only protected `_classify()`;
 - `UNKNOWN` has explicit fail-closed map-obstruction behavior and non-transitioning continuous-pointer behavior;
 - root collection is shallow and never adapts descendants;
 - overlay applicability matches the actual current input context;

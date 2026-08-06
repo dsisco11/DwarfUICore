@@ -83,7 +83,7 @@ notification after the applicable interception stage.
 - Own exactly one process-wide pointer poller.
 - Sample screen and map coordinates at most once for each dispatched snapshot.
 - Store sampled coordinates only as immutable `Position2D` and
-  `MapTilePosition` values, never as separate per-axis snapshot or event
+  `Position3D` values, never as separate per-axis snapshot or event
   fields.
 - Allow tooltip, context menu, and UserPrompt to share input mechanics while
   retaining their existing semantics.
@@ -193,14 +193,14 @@ The proposed version 1 types are:
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field map_position dwarfuicore.MapTilePosition
+---@field map_position dwarfuicore.Position3D
 ---@field screen_position dwarfuicore.Position2D
 
 ---@class dwarfuicore.RawClickEvent
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field map_position dwarfuicore.MapTilePosition
+---@field map_position dwarfuicore.Position3D
 ---@field screen_position dwarfuicore.Position2D|nil
 
 ---@class dwarfuicore.MouseInput
@@ -249,7 +249,7 @@ table literals describe their members; implementation must construct them
 through DwarfUICore's existing immutable-enum helper. Every delivered event's
 `type` field equals the exact enum member used to select its subscription.
 
-`MapTilePosition` and `Position2D` are the existing validated copied public
+`Position3D` and `Position2D` are the existing validated copied public
 value types. `MouseInput` is an immutable copied value whose `key` is one exact
 host-provided mouse-input key. Each event's `mouse_inputs` field is a non-empty
 immutable array ordered by key. Delivered event values are retained by the
@@ -505,21 +505,22 @@ The canonical private snapshot shapes are:
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
 ---@field screen_position dwarfuicore.Position2D|nil
----@field map_position dwarfuicore.MapTilePosition|nil
+---@field map_position dwarfuicore.Position3D|nil
 
 ---@class dwarfuicore.PointerSample
 ---@field sequence integer
 ---@field screen_position dwarfuicore.Position2D|nil
----@field map_position dwarfuicore.MapTilePosition|nil
+---@field map_position dwarfuicore.Position3D|nil
 ```
 
 `Position2D` contains its immutable `x` and `y` fields.
-`MapTilePosition` contains its immutable `x`, `y`, and `z` fields. Input
+`Position3D` contains its immutable `x`, `y`, and `z` fields. Input
 snapshots, pointer samples, `MapClickedEvent`, and `RawClickEvent` must not
 also expose or store parallel `screen_x`, `screen_y`, `map_x`, `map_y`, or
-`map_z` fields. The position value's type intrinsically identifies its
-coordinate space; snapshots and events do not require a separate
-coordinate-space label.
+`map_z` fields. `Position2D` and `Position3D` identify dimensionality, not
+coordinate space. The containing field and its contract identify the space:
+`screen_position` is screen-space, `map_position` is map-space, and classifier
+`local_position` is target-local. No separate coordinate-space label is needed.
 
 Each intercepted input table creates exactly one `InputSnapshot` before private
 arbitration. Its `mouse_inputs` array is immutable, may be empty for non-mouse

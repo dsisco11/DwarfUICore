@@ -13,7 +13,6 @@ InputDispatchResult = InputDispatchResult
 
 local API_VERSION = 2
 local STATE_SLOT = 'input_event_input_hook'
-local LEGACY_STATE_SLOT = 'context_menu_input_hook'
 local NATIVE_METHOD = 'feed_viewscreen_widgets'
 local SCREEN_METHOD = 'onInput'
 
@@ -37,8 +36,7 @@ local PRIORITY_CONSUMER_FIELDS = {
 }
 
 dfhack.dwarfuicore = dfhack.dwarfuicore or {}
-local process_state = dfhack.dwarfuicore[STATE_SLOT] or
-    dfhack.dwarfuicore[LEGACY_STATE_SLOT]
+local process_state = dfhack.dwarfuicore[STATE_SLOT]
 local runtime_state = dfhack.dwarfuicore.service_provider_runtime
 local runtime_generation = runtime_state and runtime_state.generation or 0
 if process_state and process_state.api_version ~= API_VERSION then

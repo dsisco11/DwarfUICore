@@ -140,8 +140,8 @@ describe('context-menu targets and sessions', function()
             targets.ContextMenuAnchorDescriptor.new(anchor)
 
         target.registration_identity = identity(9)
-        anchor.screen_position.x = 9
-        anchor.map_position.x = 9
+        assert.has_error(function() anchor.screen_position.x = 9 end)
+        assert.has_error(function() anchor.map_position.x = 9 end)
         assert.equals(8, target_copy.registration_identity.local_identity)
         assert.same({x=4, y=5}, anchor_copy.screen_position)
         assert.same({x=1, y=2, z=3}, anchor_copy.map_position)
@@ -171,8 +171,8 @@ describe('context-menu targets and sessions', function()
         validated.title = 'Mutated'
         validated.entries[1].label = 'Mutated'
         target.registration_identity = identity(99)
-        anchor.screen_position.x = 99
-        anchor.map_position.x = 99
+        assert.has_error(function() anchor.screen_position.x = 99 end)
+        assert.has_error(function() anchor.map_position.x = 99 end)
         position.x = 99
 
         local session_definition = session:get_definition_snapshot()
@@ -186,7 +186,7 @@ describe('context-menu targets and sessions', function()
 
         session_definition.title = 'External mutation'
         session_target.registration_identity = identity(100)
-        session_anchor.map_position.x = 100
+        assert.has_error(function() session_anchor.map_position.x = 100 end)
         assert.equals('Actions', session:get_definition_snapshot().title)
         assert.equals(7,
             session:get_target_descriptor().registration_identity.local_identity)
@@ -194,8 +194,8 @@ describe('context-menu targets and sessions', function()
             session:get_anchor_descriptor().map_position.x)
 
         local context = assert(session:create_selection_context())
-        context.screen_position.x = 200
-        context.map_position.x = 200
+        assert.has_error(function() context.screen_position.x = 200 end)
+        assert.has_error(function() context.map_position.x = 200 end)
         assert.equals(4,
             session:create_selection_context().screen_position.x)
         assert.equals(10,
@@ -214,8 +214,8 @@ describe('context-menu targets and sessions', function()
         end, source, root, owner)
 
         local isolated = session:create_selection_context()
-        isolated.screen_position.x = 99
-        isolated.map_position.x = 99
+        assert.has_error(function() isolated.screen_position.x = 99 end)
+        assert.has_error(function() isolated.map_position.x = 99 end)
         assert.is_true(session:select(1))
         assert.is_false(session:select(1))
         assert.equals(1, #calls)

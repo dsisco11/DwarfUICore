@@ -128,11 +128,6 @@ local function load_environment()
                 ['dwarfuicore/context_menu/target']=targets,
             },
         })
-    local _, sample_module = module_loader.load(
-        repo_root, BASE .. 'context_menu/input_sample.lua', {
-            globals={dfhack=dfhack},
-            reqscript={['dwarfuicore/utils/numbers']=numbers},
-        })
     return {
         DetectionKind=detector_module.ContextMenuDetectionKind,
         AnchorKind=targets.ContextMenuAnchorKind,
@@ -142,7 +137,6 @@ local function load_environment()
             registrations=manager,
         },
         manager=manager,
-        samples=sample_module,
         state=state,
     }
 end
@@ -171,12 +165,14 @@ end
 ---@param y integer
 ---@param map_position? table
 ---@return dwarfui.ContextMenuInputSample
-local function sample(env, x, y, map_position)
-    return env.samples.ContextMenuInputSampler.new{
-        sample_screen_pointer=function() return x, y end,
-        sample_map_pointer=function() return map_position end,
-        has_map_demand=function() return map_position ~= nil end,
-    }:capture()
+local function sample(_, x, y, map_position)
+    return {
+        x=x,
+        y=y,
+        map_x=map_position and map_position.x or nil,
+        map_y=map_position and map_position.y or nil,
+        map_z=map_position and map_position.z or nil,
+    }
 end
 
 ---Makes one consumer eligible in a root.

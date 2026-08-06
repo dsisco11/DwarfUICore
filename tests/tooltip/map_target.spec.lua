@@ -129,12 +129,12 @@ end
 local function sample(sequence, x, y, map_x, map_y, map_z)
     return {
         sequence=sequence,
-        x=x,
-        y=y,
-        map_x=map_x,
-        map_y=map_y,
-        map_z=map_z,
-        coordinate_space='screen-cells',
+        screen_position=x ~= nil and y ~= nil and {x=x, y=y} or nil,
+        map_position=map_x ~= nil and map_y ~= nil and map_z ~= nil and {
+            x=map_x,
+            y=map_y,
+            z=map_z,
+        } or nil,
     }
 end
 

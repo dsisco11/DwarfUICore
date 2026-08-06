@@ -481,9 +481,9 @@ Completion criteria:
 
 ## Phase 11: Qualification and evidence
 
-Outcome: Distinct source, unit, integration, package, reload, and live-runtime
-evidence demonstrate the complete proposal contract without conflating proof
-boundaries.
+Outcome: Distinct source, unit, integration, package, reload, and DwarfSpec
+automation evidence demonstrate the complete proposal contract without
+conflating proof boundaries.
 
 - [ ] Run focused unit suites for snapshot/value behavior, hook ownership,
   arbitration, all consumer migrations, provider/handles, event derivation,
@@ -495,24 +495,26 @@ boundaries.
   modules.
 - [ ] Build the distributable package and verify exact expanded and archive
   contents.
-- [ ] Record live native-overlay input evidence for raw and unobstructed map
+- [ ] Run DwarfSpec native-overlay automation for raw and unobstructed map
   events, public consumption, inherited pass-through, UI obstruction, and
   private-consumer suppression.
-- [ ] Record live Lua-screen input evidence for the same supported contracts.
-- [ ] Record installed-runtime evidence separately from source-checkout evidence.
-- [ ] Record explicit reload evidence showing trampoline adoption, stale
+- [ ] Run DwarfSpec Lua-screen automation for the same supported contracts.
+- [ ] Run DwarfSpec installed-package automation separately from source-checkout
+  automation.
+- [ ] Run DwarfSpec reload automation showing trampoline adoption, stale
   generation rejection, one runtime, one hook chain, and one pointer poller.
-- [ ] Record cleanup evidence proving temporary subscriptions, test UI, hooks,
-  and runtime state are removed or returned to their intended inert state.
-- [ ] Do not claim a live behavior from unit, source, syntax, package, or static
-  evidence alone.
+- [ ] Record DwarfSpec cleanup evidence proving temporary subscriptions, test
+  UI, hooks, and runtime state are removed or returned to their intended inert
+  state.
+- [ ] Do not claim an automation behavior from unit, source, syntax, package, or
+  static evidence alone.
 
 Completion criteria:
 
 - [ ] Focused, regression, full-unit, syntax, source, and package validations all
   pass and are recorded as distinct results.
-- [ ] Native, Lua-screen, installed-runtime, reload, and cleanup evidence is
-  recorded independently with terminal results.
+- [ ] Native-overlay, Lua-screen, installed-package, reload, and cleanup
+  automation evidence is recorded independently with terminal results.
 - [ ] Any failed or unavailable evidence remains unchecked and is not presented
   as completion.
 
@@ -559,5 +561,5 @@ Completion criteria:
   map-coordinate polling does not occur without current map demand.
 - [ ] Every proposal requirement is implemented or explicitly deferred with a
   documented rationale approved against the source proposal.
-- [ ] Required source, unit, integration, package, live-runtime, reload, and
-  cleanup evidence is complete and recorded separately.
+- [ ] Required source, unit, integration, package, DwarfSpec automation, reload,
+  and cleanup evidence is complete and recorded separately.

@@ -297,10 +297,12 @@ describe('dwarfuicore command lifecycle', function()
         local dfhack, calls = dfhack_stub(loaded)
         local tooltip_namespace_registry = {}
         local user_prompt_service = {}
+        local input_event_input_hook = {}
         local unrelated_state = {}
         dfhack.dwarfuicore = {
             tooltip_namespace_registry=tooltip_namespace_registry,
             user_prompt_service=user_prompt_service,
+            input_event_input_hook=input_event_input_hook,
             unrelated_state=unrelated_state,
         }
         local events = {}
@@ -372,6 +374,7 @@ describe('dwarfuicore command lifecycle', function()
             'tooltip'}, events)
         assert.is_nil(dfhack.dwarfuicore.tooltip_namespace_registry)
         assert.is_nil(dfhack.dwarfuicore.user_prompt_service)
+        assert.is_nil(dfhack.dwarfuicore.input_event_input_hook)
         assert.is_equal(unrelated_state,
             dfhack.dwarfuicore.unrelated_state)
         assert.same({REGISTRY_NAME, 'dwarfuicore/alpha',

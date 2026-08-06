@@ -896,9 +896,9 @@ the following:
   public observers;
 - no duplicate process hook or pointer-poller chain remains after migration;
 - map-coordinate polling does not occur without current map demand; and
-- focused unit evidence, existing-service regressions, live native/Lua input
-  evidence, installed-runtime evidence, reload evidence, and cleanup evidence
-  are recorded as distinct results.
+- focused unit evidence, existing-service regressions, DwarfSpec native-overlay
+  and Lua-screen automation, installed-package automation, reload automation,
+  and cleanup evidence are recorded as distinct terminal results.
 
 ## Recommendation
 

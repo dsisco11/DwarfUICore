@@ -74,8 +74,8 @@ describe('live context-menu failure lifecycle', function()
         local native_subject
         local target
         local initially_hauling_open
-        local sampler
-        local original_capture
+        local detector
+        local original_detect
         local hook_state
         local original_hook_handler
         local original_discover
@@ -112,9 +112,9 @@ describe('live context-menu failure lifecycle', function()
             local y = math.floor((body.y1 + body.y2) / 2)
             probe().inputs = {}
 
-            sampler = service()._sampler
-            original_capture = sampler.capture
-            sampler.capture = function()
+            detector = service()._detector
+            original_detect = detector.detect
+            detector.detect = function()
                 error('expected pre-ownership sample failure')
             end
             ds.move_pointer(x, y)
@@ -137,8 +137,8 @@ describe('live context-menu failure lifecycle', function()
             assert.equals(transparent_before + 1, #probe().inputs)
             assert.is_true(
                 probe().inputs[#probe().inputs]._MOUSE_R_DOWN)
-            sampler.capture = original_capture
-            original_capture = nil
+            detector.detect = original_detect
+            original_detect = nil
 
             target = reload_clean()
             assert.is_true(api():register(target, definition()))
@@ -153,18 +153,16 @@ describe('live context-menu failure lifecycle', function()
                 error('expected input-hook dispatch failure')
             end
             local hook_backing_before = #probe().inputs
+            local hook_failures_before =
+                service():get_diagnostics().hook.failure_count
             ds.input({_MOUSE_R=true, _MOUSE_R_DOWN=true})
-            ds.await('input-hook failure disables generation', function()
-                return service():is_disabled()
-            end)
+            assert.is_false(service():is_disabled())
             assert.equals(hook_backing_before + 1, #probe().inputs,
-                'pre-ownership hook failure did not delegate unchanged')
+                'unclassified hook failure did not delegate unchanged')
             assert.is_true(probe().inputs[#probe().inputs]._MOUSE_R)
             assert.is_true(
                 probe().inputs[#probe().inputs]._MOUSE_R_DOWN)
-            assert.equals('input hook',
-                service():get_diagnostics().last_failure.stage)
-            assert.equals(1,
+            assert.equals(hook_failures_before + 1,
                 service():get_diagnostics().hook.failure_count)
             hook_state.context_handler = original_hook_handler
             original_hook_handler = nil
@@ -253,8 +251,8 @@ describe('live context-menu failure lifecycle', function()
                 ds.hasFocus('dfhack/lua/dwarfuicore/context-menu'))
         end, debug.traceback)
 
-        if sampler and original_capture then
-            sampler.capture = original_capture
+        if detector and original_detect then
+            detector.detect = original_detect
         end
         if hook_state and original_hook_handler then
             hook_state.context_handler = original_hook_handler

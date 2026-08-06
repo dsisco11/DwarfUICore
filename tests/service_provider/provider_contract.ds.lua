@@ -41,22 +41,25 @@ describe('live service-provider contract', function()
             end
         end
         table.sort(provider_names)
-        assert.same({'ContextMenuServiceProvider', 'TooltipServiceProvider',
-            'UserPromptServiceProvider'}, provider_names)
+        assert.same({'ContextMenuServiceProvider', 'InputEventServiceProvider',
+            'TooltipServiceProvider', 'UserPromptServiceProvider'}, provider_names)
         assert.is_nil(reqscript('dwarfuicore').services)
         assert.is_nil(services.get_diagnostics)
 
         local tooltip_provider = services.TooltipServiceProvider
         local context_provider = services.ContextMenuServiceProvider
         local prompt_provider = services.UserPromptServiceProvider
+        local input_event_provider = services.InputEventServiceProvider
         assert.same({}, keys(tooltip_provider))
         assert.same({}, keys(context_provider))
         assert.same({}, keys(prompt_provider))
+        assert.same({}, keys(input_event_provider))
 
         local tooltip_first = tooltip_provider:new(1, 'provider-live')
         local tooltip_second = tooltip_provider:new(1, 'provider-live')
         local context = context_provider:new(1, 'provider-live')
         local prompt = prompt_provider:new(1, 'provider-live')
+        local input_events = input_event_provider:new(1, 'provider-live')
         assert.is_true(tooltip_first ~= tooltip_second)
         assert.equals(1, tooltip_first:get_contract_version())
         assert.equals('provider-live', tooltip_first:get_namespace())
@@ -64,9 +67,12 @@ describe('live service-provider contract', function()
         assert.equals('provider-live', context:get_namespace())
         assert.equals(1, prompt:get_contract_version())
         assert.equals('provider-live', prompt:get_namespace())
+        assert.equals(1, input_events:get_contract_version())
+        assert.equals('provider-live', input_events:get_namespace())
         assert.is_nil(tooltip_first.get_diagnostics)
         assert.is_nil(context.close)
         assert.is_nil(prompt.get_diagnostics)
+        assert.is_nil(input_events.get_diagnostics)
         assert_methods(tooltip_first, {'get_contract_version', 'get_namespace',
             'register', 'unregister', 'register_map_tile', 'update_map_tile',
             'unregister_map_tile', 'clear_namespace'})
@@ -76,9 +82,13 @@ describe('live service-provider contract', function()
         assert_methods(prompt, {'get_contract_version', 'get_namespace',
             'prompt_map_location', 'cancel', 'is_active',
             'clear_namespace'})
+        assert_methods(input_events, {'get_contract_version', 'get_namespace',
+            'observe', 'intercept', 'unsubscribe', 'is_subscribed',
+            'clear_namespace'})
         assert.is_false(tooltip_first:clear_namespace())
         assert.is_false(context:clear_namespace())
         assert.is_false(prompt:clear_namespace())
+        assert.is_false(input_events:clear_namespace())
     end)
 
     it('keeps registrations alive after an API object is collected', function()

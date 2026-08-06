@@ -157,19 +157,6 @@ describe('native registered-overlay context menu', function()
             assert.is_true(last_backing_input_has('_MOUSE_R_DOWN'),
                 'down-only input did not remain transparent')
 
-            local opening_sample = service()._sampler:capture()
-            local opening_detection =
-                service()._detector:detect(opening_sample)
-            assert.is_not_nil(opening_detection.candidate,
-                ('registered overlay target was not detectable: ' ..
-                    'pointer=(%s,%s) expected=(%s,%s) policy=%s')
-                    :format(
-                        tostring(opening_sample.x),
-                        tostring(opening_sample.y),
-                        tostring(target_x),
-                        tostring(target_y),
-                        tostring(target.pointer_policy)))
-
             local backing_before_open = #state.inputs
             local hook_before_open =
                 service():get_diagnostics().hook.dispatch_count

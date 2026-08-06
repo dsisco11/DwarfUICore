@@ -156,7 +156,7 @@ local function load_context(settings)
             reqscript={
                 ['dwarfuicore/context_menu/service']={service=context_service},
                 ['dwarfuicore/context_menu/screen']={},
-                ['dwarfuicore/context_menu/input_hook']={manager=input_manager},
+                ['dwarfuicore/input_event/input_hook']={manager=input_manager},
                 ['dwarfuicore/input_event/types']={InputDispatchResult={PASS=1, CONSUME=2}},
                 ['dwarfuicore/view_root_resolver']={
                     resolver={is_presented=function() return true end},
@@ -253,7 +253,7 @@ describe('UserPrompt provider runtime', function()
         context.runtime.publish_facade(
             context.contracts.ServiceKind.CONTEXT_MENU, 1, context_facade)
         local input_owner, render_owner = {}, {}
-        context.process.dwarfuicore.context_menu_input_hook = input_owner
+        context.process.dwarfuicore.input_event_input_hook = input_owner
         context.process.dwarfuicore.tooltip_runtime = render_owner
 
         local first = context.provider:new(1, 'consumer')
@@ -281,7 +281,7 @@ describe('UserPrompt provider runtime', function()
         assert.equals(context_facade, context.state.facades[
             context.contracts.ServiceKind.CONTEXT_MENU][1])
         assert.is_equal(input_owner,
-            context.process.dwarfuicore.context_menu_input_hook)
+            context.process.dwarfuicore.input_event_input_hook)
         assert.is_equal(render_owner,
             context.process.dwarfuicore.tooltip_runtime)
         assert.same({}, (function()

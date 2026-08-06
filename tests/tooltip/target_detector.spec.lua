@@ -136,9 +136,7 @@ end
 local function sample(sequence, x, y)
     return {
         sequence=sequence,
-        x=x,
-        y=y,
-        coordinate_space='screen-cells',
+        screen_position=x ~= nil and y ~= nil and {x=x, y=y} or nil,
     }
 end
 

@@ -7,13 +7,13 @@ local TOOLTIP_RENDER_HOOK_SCRIPT = 'dwarfuicore/tooltip/render_hook'
 local CONTEXT_MENU_SERVICE_SCRIPT = 'dwarfuicore/context_menu/service'
 local CONTEXT_MENU_REGISTRATION_SCRIPT =
     'dwarfuicore/context_menu/registration'
-local CONTEXT_MENU_INPUT_HOOK_SCRIPT =
+local INPUT_EVENT_INPUT_HOOK_SCRIPT =
       'dwarfuicore/input_event/input_hook'
 local USER_PROMPT_SERVICE_SCRIPT = 'dwarfuicore/user_prompt/service'
 local USER_PROMPT_RUNTIME_SCRIPT = 'dwarfuicore/user_prompt/runtime'
 local PROCESS_OWNER_SLOTS = {'tooltip_map_target_registry', 'tooltip_service',
     'tooltip_namespace_registry', 'tooltip_registration_runtime', 'tooltip_runtime',
-    'context_menu_registration_manager', 'context_menu_input_hook',
+    'context_menu_registration_manager', 'input_event_input_hook',
     'context_menu_service', 'user_prompt_service'}
 
 ---Returns a loaded script environment without loading an absent script.
@@ -89,7 +89,7 @@ end
         registration.manager:shutdown()
     end
     local input_hook = find_loaded_script_environment(
-        CONTEXT_MENU_INPUT_HOOK_SCRIPT)
+        INPUT_EVENT_INPUT_HOOK_SCRIPT)
     if input_hook and input_hook.manager and
             type(input_hook.manager.shutdown) == 'function' then
         input_hook.manager:shutdown()

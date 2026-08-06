@@ -83,7 +83,7 @@ describe('live UserPrompt runtime reload', function()
             local presenter =
                 reqscript('dwarfuicore/tooltip/runtime').presenter
             local input_manager =
-                reqscript('dwarfuicore/context_menu/input_hook').manager
+                reqscript('dwarfuicore/input_event/input_hook').manager
             assert.is_false(service:get_diagnostics().active)
             assert.is_false(input_manager:get_diagnostics()
                 .priority_consumer_active)

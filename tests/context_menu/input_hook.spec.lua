@@ -124,18 +124,6 @@ describe('context-menu input hook', function()
         assert.same({'prompt', 'context', 'prompt'}, events)
     end)
 
-    it('adopts the legacy process state under Input Event ownership', function()
-        local legacy_state = {api_version=2, runtime_generation=0}
-        local process = {dwarfuicore={
-            context_menu_input_hook=legacy_state,
-        }}
-
-        load_hook(process, {feed_viewscreen_widgets=function() end})
-
-        assert.is_equal(legacy_state,
-            process.dwarfuicore.input_event_input_hook)
-    end)
-
     it('dispatches before native delegation with exact boundary values',
             function()
         local events = {}

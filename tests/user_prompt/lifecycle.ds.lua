@@ -43,7 +43,7 @@ describe('live UserPrompt lifecycle', function()
             prompt_module = reqscript('dwarfuicore/user_prompt/service')
             prompt_service = prompt_module.service
             input_manager =
-                reqscript('dwarfuicore/context_menu/input_hook').manager
+                reqscript('dwarfuicore/input_event/input_hook').manager
             presenter =
                 reqscript('dwarfuicore/tooltip/runtime').presenter
             indicator = assert(

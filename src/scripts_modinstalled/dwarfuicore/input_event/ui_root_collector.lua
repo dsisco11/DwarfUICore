@@ -29,9 +29,10 @@ function InputEventUiRootCollector.collect(current_root, additional_roots)
     local state = overlay.get_state()
     if type(state) ~= 'table' or type(state.db) ~= 'table' then return nil end
     for name, entry in pairs(state.db) do
-        if type(entry) ~= 'table' or entry.widget == nil or
-                not overlay.isOverlayEnabled(name) then return nil end
-        add(entry.widget)
+        if type(entry) ~= 'table' or entry.widget == nil then return nil end
+        if overlay.isOverlayEnabled(name) then
+            add(entry.widget)
+        end
     end
     for _, root in ipairs(additional_roots or {}) do add(root) end
     return roots

@@ -6,9 +6,7 @@ local context_menu = reqscript('dwarfuicore/services')
     .ContextMenuServiceProvider:new(1, 'test-context-map')
 local map_projection = reqscript('dwarfuicore/map_projection')
 local services = reqscript('dwarfuicore/context_menu/service')
-local DetectionKind =
-    reqscript('dwarfuicore/context_menu/target_detector').
-        ContextMenuDetectionKind
+local input_types = reqscript('dwarfuicore/input_event/types')
 
 local OVERLAY_SOURCE =
     'tests/context_menu/support/context_menu_overlay_registration.lua'
@@ -101,12 +99,15 @@ describe('native exact-map-tile context menu', function()
         local initial_pause
         local initial_view
         local initial_viewscreens
+        local input_events
         local selected = 0
         local selected_context
         local ok, failure = xpcall(function()
             ds.mountSaveGame('TestWorld 01')
             services.service:clear_world_state()
             native_subject = ds.mountNativeScreen()
+            input_events = reqscript('dwarfuicore/services')
+                .InputEventServiceProvider:new(1, 'test-input-event-native')
             initially_hauling_open = ds.hasFocus('dwarfmode/Hauling')
             if initially_hauling_open then
                 ds.input('LEAVESCREEN')
@@ -160,17 +161,47 @@ describe('native exact-map-tile context menu', function()
             ds.move_pointer(pos, ds.EPointerSpace.WORLD_TILE,
                 {recenter=false})
             local screen_x, screen_y = dfhack.screen.getMousePos()
-            local sample = services.service._sampler:capture()
-            assert.same(pos, {
-                x=sample.map_x,
-                y=sample.map_y,
-                z=sample.map_z,
-            }, 'world pointer sampler did not resolve the staged tile')
-            local detection = services.service._detector:detect(sample)
-            assert.equals(DetectionKind.TARGET, detection.kind,
-                'registered map tile did not win pointer arbitration')
-            assert.is_equal(handle, detection.candidate.source,
-                'registered map handle did not win tile precedence')
+            local raw_events = {}
+            local map_events = {}
+            input_events:observe(input_types.InputEventType.RAW_CLICK,
+                function(event) table.insert(raw_events, event) end)
+            input_events:observe(input_types.InputEventType.MAP_CLICK,
+                function(event) table.insert(map_events, event) end)
+
+            local backing_before_public = #probe.inputs
+            ds.input({_MOUSE_L=true, _MOUSE_L_DOWN=true})
+            assert.equals(1, #raw_events)
+            assert.equals(1, #map_events)
+            assert.equals(backing_before_public + 1, #probe.inputs,
+                'unconsumed map input did not reach its predecessor')
+            assert.same(pos, raw_events[1].map_position)
+            assert.same(pos, map_events[1].map_position)
+            assert.same({x=screen_x, y=screen_y},
+                map_events[1].screen_position)
+            assert.equals(raw_events[1].sequence, map_events[1].sequence)
+
+            local target_body = assert(target.frame_body,
+                'map-event obstruction target has no rendered bounds')
+            ds.move_pointer(
+                math.floor((target_body.x1 + target_body.x2) / 2),
+                math.floor((target_body.y1 + target_body.y2) / 2))
+            ds.input({_MOUSE_L=true, _MOUSE_L_DOWN=true})
+            assert.equals(2, #raw_events,
+                'UI-covered click did not publish its raw map event')
+            assert.equals(1, #map_events,
+                'UI-covered click incorrectly published a map click')
+
+            ds.move_pointer(pos, ds.EPointerSpace.WORLD_TILE,
+                {recenter=false})
+            local consumed = input_events:intercept(
+                input_types.InputEventType.MAP_CLICK, function()
+                    return input_types.InputEventDisposition.CONSUME
+                end)
+            local backing_before_consumed = #probe.inputs
+            ds.input({_MOUSE_L=true, _MOUSE_L_DOWN=true})
+            assert.equals(backing_before_consumed, #probe.inputs,
+                'consumed map event reached its predecessor')
+            assert.is_true(input_events:unsubscribe(consumed))
             local backing_before_open = #probe.inputs
             local hook_before_open =
                 services.service:get_diagnostics().hook
@@ -195,6 +226,10 @@ describe('native exact-map-tile context menu', function()
                         tostring(opening.last_error)))
             assert.equals(backing_before_open, #probe.inputs,
                 'owned map right-click reached backing overlay input')
+            assert.equals(3, #raw_events,
+                'private context-menu consumption published a raw event')
+            assert.equals(2, #map_events,
+                'private context-menu consumption published a map event')
             assert.is_true(
                 ds.hasFocus('dfhack/lua/dwarfuicore/context-menu'),
                 'opened map menu did not own context-menu focus')
@@ -368,6 +403,7 @@ describe('native exact-map-tile context menu', function()
         end, debug.traceback)
 
         if services.service:is_open() then services.service:close() end
+        if input_events then input_events:clear_namespace() end
         if handle then context_menu:unregister_map_tile(handle) end
         if owner then
             owner.visible = true

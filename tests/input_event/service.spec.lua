@@ -28,7 +28,15 @@ local function load_context()
             globals={dfhack=dfhack}, reqscript={
                 ['dwarfuicore/service_provider/contracts']=contracts,
                 ['dwarfuicore/service_provider/identity']=identity,
-                ['dwarfuicore/input_event/types']=types}})
+                ['dwarfuicore/input_event/types']=types,
+                ['dwarfuicore/input_event/event_deriver']={
+                    InputEventDeriver={derive=function() return {} end}},
+                ['dwarfuicore/input_event/ui_obstruction_resolver']={
+                    InputEventUiObstructionResolver={is_unobstructed=function()
+                        return false
+                    end}},
+                ['dwarfuicore/input_event/ui_root_collector']={
+                    InputEventUiRootCollector={collect=function() return {} end}}}})
     local demands = {}
     local manager = {acquire_subscription_demand=function(_, screen, map, ui)
             local handle = {screen=screen, map=map, ui=ui}
@@ -38,7 +46,11 @@ local function load_context()
         release_subscription_demand=function(_, handle)
             handle.released = true
             return true
-        end}
+        end,
+        set_public_deriver=function(self, callback)
+            self.deriver = callback
+        end,
+        get_additional_ui_roots=function() return {} end}
     return {contracts=contracts, demands=demands, manager=manager,
         service=service_module.InputEventService.new(1, manager), types=types}
 end

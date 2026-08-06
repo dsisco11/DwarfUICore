@@ -310,55 +310,55 @@ Completion criteria:
 Outcome: The runtime creates immutable event values with the exact approved raw
 and semantic eligibility guarantees for every host-classified mouse boundary.
 
-- [ ] Derive at most one `RawClickEvent` per qualifying intercepted input table
+- [x] Derive at most one `RawClickEvent` per qualifying intercepted input table
   after private arbitration.
-  - [ ] Require a hook-supported current input surface.
-  - [ ] Require at least one host-classified mouse key.
-  - [ ] Require that no private Core consumer consumed the table.
-  - [ ] Require one valid non-nil map position from the shared snapshot.
-  - [ ] Include the complete immutable sorted `mouse_inputs` collection,
+  - [x] Require a hook-supported current input surface.
+  - [x] Require at least one host-classified mouse key.
+  - [x] Require that no private Core consumer consumed the table.
+  - [x] Require one valid non-nil map position from the shared snapshot.
+  - [x] Include the complete immutable sorted `mouse_inputs` collection,
     sequence, map position, and optional screen position.
-- [ ] Treat every host-classified mouse key as eligible without requiring paired
+- [x] Treat every host-classified mouse key as eligible without requiring paired
   boundaries, a gesture latch, or a preceding down event.
-- [ ] Do not synthesize double-clicks or combine multiple keys tables into one
+- [x] Do not synthesize double-clicks or combine multiple keys tables into one
   gesture.
-- [ ] Suppress both public channels when the map position is nil or malformed.
-- [ ] Permit a raw event with nil screen position when its map position is valid.
-- [ ] Implement generic front-to-back UI obstruction resolution for semantic
+- [x] Suppress both public channels when the map position is nil or malformed.
+- [x] Permit a raw event with nil screen position when its map position is valid.
+- [x] Implement generic front-to-back UI obstruction resolution for semantic
   map events.
-  - [ ] Resolve the native viewscreen widget root, current Lua screen, active
+  - [x] Resolve the native viewscreen widget root, current Lua screen, active
     overlay roots, and every additional shared Core pointer root.
-  - [ ] Resolve duplicate roots once in effective front-to-back order.
-  - [ ] Preserve generic visibility, activity, clipping, frame, child-order, and
+  - [x] Resolve duplicate roots once in effective front-to-back order.
+  - [x] Preserve generic visibility, activity, clipping, frame, child-order, and
     `PointerPolicy` meanings.
-  - [ ] Treat `MISS`, `PASS`, and `NONE` as non-obstructing and continue to lower
+  - [x] Treat `MISS`, `PASS`, and `NONE` as non-obstructing and continue to lower
     roots.
-  - [ ] Treat `TARGET` and `BLOCKED` as obstructing.
-  - [ ] Treat unavailable screen coordinates, uninspectable roots, unresolved
+  - [x] Treat `TARGET` and `BLOCKED` as obstructing.
+  - [x] Treat unavailable screen coordinates, uninspectable roots, unresolved
     order, and unsupported UI-resolution surfaces as unable to prove
     unobstructed ownership.
-- [ ] Keep hook support distinct from UI-resolution support so an unresolved UI
+- [x] Keep hook support distinct from UI-resolution support so an unresolved UI
   surface can still publish an otherwise eligible raw event.
-- [ ] Perform root resolution only when the captured dispatch state contains an
+- [x] Perform root resolution only when the captured dispatch state contains an
   eligible semantic subscription or explicit private UI-resolution demand.
-- [ ] Derive at most one immutable `MapClickedEvent` when all raw conditions hold
+- [x] Derive at most one immutable `MapClickedEvent` when all raw conditions hold
   and complete root resolution proves the sampled screen position unobstructed.
-- [ ] Give paired raw and semantic events the same sequence, copied positions,
+- [x] Give paired raw and semantic events the same sequence, copied positions,
   and mouse-input collection.
-- [ ] Resolve eligibility against pre-delegation coordinates and UI state without
+- [x] Resolve eligibility against pre-delegation coordinates and UI state without
   reclassification after inherited handling.
-- [ ] Add focused matrix coverage for every mouse-key class, mixed key tables,
+- [x] Add focused matrix coverage for every mouse-key class, mixed key tables,
   off-map input, nil screen coordinates, each pointer policy, overlapping roots,
   duplicate roots, unknown/unsupported roots, UI obstruction, semantic demand,
   and paired event identity.
 
 Completion criteria:
 
-- [ ] Raw-event tests prove coordinate qualification without any unobstructed-map
+- [x] Raw-event tests prove coordinate qualification without any unobstructed-map
   claim.
-- [ ] Semantic-event tests prove complete unobstructed UI resolution and
+- [x] Semantic-event tests prove complete unobstructed UI resolution and
   conservative suppression when that proof is unavailable.
-- [ ] Press, release, wheel, and additional currently host-supported mouse keys
+- [x] Press, release, wheel, and additional currently host-supported mouse keys
   use the same per-input-table contract; future keys remain eligible by virtue
   of host classification without requiring tests for nonexistent events.
 

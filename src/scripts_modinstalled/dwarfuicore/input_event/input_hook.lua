@@ -57,6 +57,8 @@ if not process_state then
         generation=1,
         context_handler=nil,
         context_failure_handler=nil,
+        public_deriver=nil,
+        last_public_derivation=nil,
         snapshot_factory=snapshot_factory_module.SnapshotFactory.new{
             is_mouse_input=function(key)
                 return type(key) == 'string' and
@@ -336,7 +338,12 @@ local function dispatch(transport, owner, keys)
         end
     end
 
-    if not context_active then return false end
+    if not context_active then
+        if state.public_deriver then
+            state.last_public_derivation = state.public_deriver(snapshot, owner)
+        end
+        return false
+    end
     state.dispatch_count = state.dispatch_count + 1
     local ok, handled = call_private_consumer(state.context_handler,
         keys, snapshot)
@@ -358,6 +365,9 @@ local function dispatch(transport, owner, keys)
         return true
     end
     state.delegated_count = state.delegated_count + 1
+    if state.public_deriver then
+        state.last_public_derivation = state.public_deriver(snapshot, owner)
+    end
     return false
 end
 
@@ -451,6 +461,25 @@ function ContextMenuInputHookManager:set_context_consumer(handler, failure_handl
         return handled and InputDispatchResult.CONSUME or
             InputDispatchResult.PASS
     end, failure_handler)
+end
+
+---Installs the private post-arbitration Input Event derivation callback.
+---@param callback fun(snapshot: dwarfuicore.InputSnapshot, owner: any): dwarfuicore.InputEventDerivation|nil
+function ContextMenuInputHookManager:set_public_deriver(callback)
+    assert(callback == nil or type(callback) == 'function',
+        'DwarfUICore Input Event deriver must be a function.')
+    self._state.public_deriver = callback
+    self._state.last_public_derivation = nil
+end
+
+---Returns private Core roots that can obstruct a generic semantic map event.
+---@return table[] roots
+function ContextMenuInputHookManager:get_additional_ui_roots()
+    local roots = {}
+    for root in pairs(self._state.context_roots) do table.insert(roots, root) end
+    local priority = self._state.priority_consumer
+    if priority and priority.root then table.insert(roots, priority.root) end
+    return roots
 end
 
 ---Acquires private snapshot-demand contributions for one public subscription.

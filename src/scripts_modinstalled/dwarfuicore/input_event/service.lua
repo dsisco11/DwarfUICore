@@ -5,6 +5,10 @@
 local contracts = reqscript('dwarfuicore/service_provider/contracts')
 local identity = reqscript('dwarfuicore/service_provider/identity')
 local types = reqscript('dwarfuicore/input_event/types')
+local event_deriver = reqscript('dwarfuicore/input_event/event_deriver')
+local obstruction_resolver = reqscript(
+    'dwarfuicore/input_event/ui_obstruction_resolver')
+local root_collector = reqscript('dwarfuicore/input_event/ui_root_collector')
 
 ---@class dwarfuicore.InputEventSubscription
 
@@ -40,8 +44,13 @@ function InputEventService.new(generation, input_manager)
     assert(type(input_manager) == 'table' and
             type(input_manager.acquire_subscription_demand) == 'function',
         'DwarfUICore Input Event service requires the input manager.')
-    return setmetatable({_generation=generation, _input_manager=input_manager,
-        _subscriptions={}}, InputEventService)
+    local service = setmetatable({_generation=generation,
+        _input_manager=input_manager, _subscriptions={}}, InputEventService)
+    input_manager:set_public_deriver(function(snapshot, current_root)
+        return service:derive_current(snapshot, true, current_root,
+            input_manager:get_additional_ui_roots())
+    end)
+    return service
 end
 
 ---Registers one strongly retained callback and its snapshot-demand contribution.
@@ -119,4 +128,28 @@ function InputEventService:clear_namespace(consumer_namespace, contract_major)
         self:unsubscribe(consumer_namespace, contract_major, handle)
     end
     return #handles > 0
+end
+
+---Derives eligible event facts after private arbitration without dispatching them.
+---@param snapshot dwarfuicore.InputSnapshot
+---@param hook_supported boolean
+---@param roots table[]|nil
+---@return dwarfuicore.InputEventDerivation
+function InputEventService:derive(snapshot, hook_supported, roots)
+    return event_deriver.InputEventDeriver.derive(snapshot, hook_supported,
+        obstruction_resolver.InputEventUiObstructionResolver.is_unobstructed(
+            roots, snapshot.screen_position))
+end
+
+---Collects host and Core roots before deriving semantic event eligibility.
+---@param snapshot dwarfuicore.InputSnapshot
+---@param hook_supported boolean
+---@param current_root any
+---@param additional_roots? table
+---@return dwarfuicore.InputEventDerivation
+function InputEventService:derive_current(snapshot, hook_supported,
+        current_root, additional_roots)
+    return self:derive(snapshot, hook_supported,
+        root_collector.InputEventUiRootCollector.collect(current_root,
+            additional_roots))
 end

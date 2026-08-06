@@ -397,6 +397,16 @@ invocation boundary, which records failures and converts exceptions or invalid
 results to `UNKNOWN`. An unknown obstruction classification fails closed for
 `MAP_CLICK`, while an unknown continuous pointer sample preserves the current
 target without emitting a lifecycle transition.
+For determinate samples, only a `TARGET` classification assigns its subject as
+the lifecycle target; `BLOCKED` and `MISS` clear the target normally.
+
+`PointerPolicy` remains the configured view or native-registry behavior, while
+`PointerClassificationKind` is the resolved coordinate outcome. Canonical
+`TARGET` requires both `subject` and `local_position`; `BLOCKED` requires
+`subject` and forbids `local_position`; `MISS` and `UNKNOWN` forbid both fields.
+Any violation is an invalid result converted to `UNKNOWN` by the invocation
+boundary. Policy `PASS` and `NONE` resolve to `MISS` according to their distinct
+descendant-traversal rules rather than becoming classification kinds.
 
 The service uses generic UI hit testing only. A widget does not need a tooltip,
 context-menu, or Input Event registration to obstruct the map. Visibility,

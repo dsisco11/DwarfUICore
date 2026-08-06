@@ -172,6 +172,19 @@ function PointerObstructionClassifier:_classify(root, screen_position)
 end
 ```
 
+Canonical result invariants are exact:
+
+| Classification kind | `subject` | `local_position` |
+| --- | --- | --- |
+| `TARGET` | Required | Required |
+| `BLOCKED` | Required | Forbidden |
+| `MISS` | Forbidden | Forbidden |
+| `UNKNOWN` | Forbidden | Forbidden |
+
+Both classifier subclasses can derive target-local coordinates from resolved
+geometry. If a purported target cannot supply them, the result is invalid and
+`invoke()` converts it to `UNKNOWN`.
+
 The base class owns the result contract and common validation only. It does not
 infer an object model from Lua runtime type. Callers never invoke the protected
 overridable `_classify()` method directly. The public final-style non-throwing
@@ -213,6 +226,12 @@ resolver fails closed for the current `MAP_CLICK`. Continuous
 the classification, preserves the previous target, and emits no enter, leave,
 or update callback. The next determinate sample compares against that preserved
 target normally.
+
+For determinate continuous samples, only `TARGET` assigns
+`context.target = classification.subject`. `BLOCKED` and `MISS` clear the
+current lifecycle target and emit `on_pointer_leave` when applicable. A blocking
+subject is retained in the classification for diagnostics but never becomes a
+pointer lifecycle target.
 
 An unavailable or incomplete pointer sample does not reach classifier
 invocation and is not `UNKNOWN`. It produces a determinate `MISS`, clears the
@@ -283,18 +302,32 @@ The native hit tester traverses userdata directly and never converts the tree in
 
 Native hit testing must map recognized interactive native widget behavior onto the established generic pointer-policy outcomes. A widget obstructs `MAP_CLICK` only when Core has an educated, documented basis for treating that widget class or flag combination as normally interactive and resolution produces `TARGET` or `BLOCKED`; `PASS`, `NONE`, and `MISS` remain non-obstructing. An absent native widget root, an unrecognized widget variant, or occupied native geometry with no recognized interaction signal resolves as `MISS`. This is an intentionally approximate compatibility policy: Core does not inspect native game input logic and must not infer interaction from visibility alone.
 
+The native compatibility registry stores `PointerPolicy` values; it does not
+store `PointerClassificationKind`. Policy describes configured traversal and
+ownership behavior, while classification describes the outcome at one resolved
+coordinate. The native classifier applies the same policy semantics as the GUI
+classifier:
+
+- `TARGET` produces canonical `TARGET` only when the eligible widget contains
+  the pointer; otherwise it produces `MISS`;
+- `PASS` traverses eligible descendants and produces their result or `MISS`;
+- `BLOCK` traverses eligible descendants first, then produces `BLOCKED` when
+  the widget's blocking region contains the pointer, or `MISS` otherwise; and
+- `NONE` produces `MISS` without traversing descendants.
+
 The initial native compatibility table is:
 
-| Native signal | Pointer classification | Rationale |
+| Native signal | Registry policy or classification behavior | Rationale |
 | --- | --- | --- |
-| A visible, active button-family widget whose resolved rectangle contains the pointer | `TARGET` | Native definitions explicitly identify these as button controls. The initial family includes `widget_better_button`, `widget_interface_main_button`, `widget_interface_pets_livestock_button`, `widget_interface_small_button`, `widget_item_sheet_button`, `widget_job_details_button`, `widget_recenter_button`, `widget_sheet_button`, and `widget_unit_sheet_button`. |
-| A visible, active recognized selection or editing control whose resolved rectangle contains the pointer | `TARGET` | These controls normally own selection, navigation, scrolling, sorting, or text input. The initial exact-type set is `widget_dropdown`, `widget_filter`, `widget_folder`, `widget_menu`, `widget_radio_rows`, `widget_scroll_rows`, `widget_sort_widget`, `widget_table`, `widget_tabs`, `widget_textbox`, `widget_unit_list`, and `widget_unit_sort_widget`. |
-| A visible, active widget with `CAN_KEY_ACTIVATE` whose resolved rectangle contains the pointer | `TARGET` | This is the available native indication that the widget participates in activation, although Core cannot prove the exact mouse path. |
-| A recognized structural or presentation-only widget | `NONE` | The initial exact-type set is `widget`, `widget_container`, `widget_anchored_tile`, `widget_character`, `widget_columns_container`, `widget_creature_portrait`, `widget_graphics_switcher`, `widget_item_name`, `widget_item_portrait`, `widget_keybinding_display`, `widget_nineslice`, `widget_nineslice_horizontal`, `widget_params_container`, `widget_rows_container`, `widget_stack`, `widget_text`, `widget_text_multiline`, `widget_text_truncated`, `widget_unit_name`, and `widget_unit_portrait`. Containers still traverse their descendants. |
+| A button-family widget | `TARGET` | Native definitions explicitly identify these as button controls. The initial exact-type set is `widget_better_button`, `widget_interface_main_button`, `widget_interface_pets_livestock_button`, `widget_interface_small_button`, `widget_item_sheet_button`, `widget_job_details_button`, `widget_recenter_button`, `widget_sheet_button`, and `widget_unit_sheet_button`. |
+| A recognized selection or editing control | `TARGET` | These controls normally own selection, navigation, scrolling, sorting, or text input. The initial exact-type set is `widget_dropdown`, `widget_filter`, `widget_folder`, `widget_menu`, `widget_radio_rows`, `widget_scroll_rows`, `widget_sort_widget`, `widget_table`, `widget_tabs`, `widget_textbox`, `widget_unit_list`, and `widget_unit_sort_widget`. |
+| A widget with `CAN_KEY_ACTIVATE` and no exact registry entry | `TARGET` fallback policy | This is the available native indication that the widget participates in activation, although Core cannot prove the exact mouse path. |
+| A recognized structural container | `PASS` | The initial exact-type set is `widget_container`, `widget_columns_container`, `widget_params_container`, `widget_rows_container`, and `widget_stack`. These widgets do not claim the pointer, but their descendants remain eligible. |
+| A recognized presentation-only widget | `NONE` | The initial exact-type set is `widget`, `widget_anchored_tile`, `widget_character`, `widget_creature_portrait`, `widget_graphics_switcher`, `widget_item_name`, `widget_item_portrait`, `widget_keybinding_display`, `widget_nineslice`, `widget_nineslice_horizontal`, `widget_text`, `widget_text_multiline`, `widget_text_truncated`, `widget_unit_name`, and `widget_unit_portrait`. These widgets neither claim the pointer nor expose eligible descendants. |
 | An unrecognized concrete widget type or recognized widget without an interaction signal | `MISS` | Core does not infer mouse interaction from visibility or occupied geometry alone. |
 | A recognized interactive widget whose activity, visibility, ancestry, rectangle, or clipping cannot be inspected | `UNKNOWN` | Core identified a likely input owner but cannot determine whether it contains the pointer. |
 
-This table is implemented as an immutable exact-concrete-type registry whose values are pointer-policy outcomes. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted. Types absent from the registry and lacking that flag resolve as `MISS`. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
+This table is implemented as an immutable exact-concrete-type registry whose values are `PointerPolicy` members. Exact-type lookup runs before the separate `CAN_KEY_ACTIVATE` fallback rule. No inheritance or name-pattern matching is permitted. Types absent from the registry and lacking that flag resolve directly as canonical `MISS`. `UNKNOWN` is produced by failed inspection, not stored in the registry. The registry is an isolated compatibility policy, not a claim about exact native game logic. New native widget types remain `MISS` until source evidence or native automation justifies adding them. Changes to the table require focused unit coverage and representative DwarfSpec automation.
 
 ## Input Pipeline Impact
 
@@ -375,12 +408,17 @@ Add focused coverage for:
 - applicable malformed overlays producing unknown;
 - dynamic overlay active and visible values evaluated exactly once by the pointer classifier;
 - the classifier base contract and canonical immutable result validation;
+- exact canonical `subject` and `local_position` invariants for every classification kind;
+- native registry policy values mapped to canonical classification outcomes;
+- structural `PASS` traversal remaining distinct from presentation-only `NONE`;
 - subclass exceptions and invalid results converted to `UNKNOWN` by the shared invocation boundary;
 - `TARGET` and `BLOCKED` carrying `subject`, with only `TARGET` carrying `local_position`;
 - GUI-view and native roots dispatched to their explicit classifier subclasses;
 - `PointerDispatcher.resolve()` delegating to the GUI-view classifier;
 - `PointerDispatcher.sample()` retaining enter, leave, and update lifecycle behavior after extraction;
 - `PointerDispatcher.sample()` preserving its current target and emitting no lifecycle transition for `UNKNOWN`;
+- only `TARGET` assigning the classification subject as the lifecycle target;
+- `BLOCKED` and `MISS` clearing the lifecycle target normally;
 - unavailable or incomplete pointer samples producing `MISS` and the existing leave transition;
 - callers using public `invoke()` and subclasses overriding only protected `_classify()`;
 - canonical immutable `local_position` replacing result `x` and `y` fields;
@@ -496,6 +534,7 @@ Rejected because existing evidence shows hook placement is not the obstruction-c
 12. Classifier exceptions and invalid results are contained by the shared invocation boundary and become `UNKNOWN` for both obstruction and continuous sampling.
 13. An indeterminate continuous sample preserves the current pointer target and emits no lifecycle transition, while an indeterminate obstruction decision suppresses only the current `MAP_CLICK`.
 14. An unavailable pointer sample remains a determinate miss and preserves existing pointer-leave behavior.
+15. Only a `TARGET` subject becomes the continuous lifecycle target; blocking subjects remain diagnostic classification data.
 
 ## Acceptance Criteria
 

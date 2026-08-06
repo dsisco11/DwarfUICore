@@ -8,7 +8,7 @@ The parent proposal remains authoritative for externally observable behavior. On
 
 ## Problem Statement
 
-`RAW_CLICK` can be produced whenever a mouse input has a DFHack-reported map coordinate. Producing `MAP_CLICK` additionally requires evidence that no supported UI element obstructed the pointer.
+`RAW_CLICK` can be produced whenever a mouse input has a DFHack-reported map coordinate. DFHack's `getMousePos()` projects the pointer and validates the resulting world tile; it does not establish that native game UI or DFHack UI is absent from that screen position. Producing `MAP_CLICK` therefore additionally requires evidence that no supported UI element obstructed the pointer and that DFHack's overlay input path did not consume the input.
 
 The provisional collector treated all discovered roots as though they shared the `gui.View` model. Native viewscreen widgets are DF userdata with different traversal, visibility, geometry, and positioning rules. Adapting them into synthetic `gui.View`-shaped tables inside root collection caused several problems:
 
@@ -27,6 +27,7 @@ The table-versus-userdata test failure was therefore a symptom of an incorrect r
 - Identify only UI roots applicable to the current input context.
 - Preserve each root's object model and classify it explicitly.
 - Resolve obstruction through a strategy appropriate to each root kind.
+- Traverse native widgets with an explicit, test-backed positioning assumption.
 - Keep root discovery shallow and recursive traversal in dedicated hit testers.
 - Make unsupported or malformed UI state diagnosable internally.
 - Allow tooltip, context-menu, prompt, and future systems to share one obstruction decision.
@@ -49,6 +50,14 @@ The collector identifies applicable root surfaces. It does not recursively scan 
 ### Root Kinds Are Explicit
 
 Every root carries a closed discriminator describing its object model. Runtime Lua type checks validate descriptors but do not select production behavior.
+
+### Native Positioning Is an Explicit Compatibility Assumption
+
+DFHack's data definitions expose a native widget `parent`, `rect`, and `flag`, including `GLOBAL_POSITIONING`, but do not document the positioning algorithm further. Core interprets `GLOBAL_POSITIONING=true` as an absolute screen-space rectangle and otherwise treats the rectangle as parent-relative. This assumption is isolated in the native hit tester and protected by native automation.
+
+### Delegation Results Supplement Geometry
+
+Geometric hit testing determines whether visible UI occupies the pointer position, including pass-through UI. The existing overlay feed return separately establishes whether DFHack consumed the input. Neither signal replaces the other.
 
 ### Applicability Precedes Inspection
 
@@ -114,7 +123,7 @@ Aggregation is deterministic: any `BLOCK` wins, otherwise any `UNKNOWN` wins, an
 
 ### Native Viewscreen Root
 
-Collect the current viewscreen's native widget container when one exists. Return it as `NATIVE_WIDGET_TREE` without traversal or adaptation.
+Collect the current viewscreen's native widget container as `NATIVE_WIDGET_TREE` without adapting it into a synthetic `gui.View`.
 
 Missing native-widget support on a viewscreen is not automatically an error. A malformed root advertised as present is unknown and fails closed.
 
@@ -126,7 +135,7 @@ If the screen exists but Core cannot identify a supported root boundary, collect
 
 ### Active Overlay Roots
 
-The overlay definition database is not an active-root list. Overlay roots must satisfy the same applicability conditions as DFHack overlay input dispatch:
+The overlay definition database is not an active-root list. DFHack's authoritative `active_viewscreen_widgets` mapping is private to `plugins.overlay`; `get_state()` exposes only the complete definition database. Core therefore uses one isolated compatibility adapter. Overlay roots must satisfy the same applicability conditions as DFHack overlay input dispatch:
 
 - enabled state;
 - current viewscreen applicability;
@@ -134,13 +143,15 @@ The overlay definition database is not an active-root list. Overlay roots must s
 - active state;
 - visible state where visibility can safely be evaluated during collection.
 
-The preferred implementation obtains roots from an authoritative active-overlay boundary. If DFHack exposes no such boundary, Core may use one isolated compatibility adapter that reproduces DFHack's predicates. That adapter requires contract tests across representative viewscreen and focus transitions.
+The adapter receives the same `vs_name` and native viewscreen supplied to `feed_viewscreen_widgets`, starts from enabled definitions, applies viewscreen and focus matching, and evaluates dynamic `active` and `visible` values with DFHack-compatible semantics. It requires contract tests across representative viewscreen and focus transitions.
+
+This filtering is required for correctness, not optimization. A globally enabled overlay can target another viewscreen or focus mode. Treating it as current UI can execute dynamic state outside its valid context, falsely suppress `MAP_CLICK`, or raise an error such as the observed caravan overlay failure when no caravan exists.
 
 Errors evaluating a context-inapplicable overlay do not affect the result because it should already have been excluded. Errors evaluating an applicable overlay produce unknown.
 
 ### Core-Registered Roots
 
-Core-owned surfaces not represented by the current Lua screen or overlay roots should be registered explicitly. Registration carries a root kind and follows existing generation and reload ownership rules.
+Core-owned surfaces not represented by the current Lua screen or overlay roots are registered explicitly. The current integration sources are the input manager's context roots and the priority consumer's optional root. Registration carries `CORE_REGISTERED_VIEW` and follows existing generation and reload ownership rules.
 
 This remains an internal integration surface unless an external consumer requirement is demonstrated.
 
@@ -157,26 +168,36 @@ An exception while inspecting an applicable root produces `UNKNOWN`; it is not e
 Native traversal belongs in a dedicated hit tester. It must account for:
 
 - `widget_container` child traversal and display order;
-- native active and visible flags;
+- native active and visible flags, including ancestor visibility;
 - widget rectangles;
-- global versus parent-relative positioning;
 - clipping or containment semantics exposed by DFHack;
-- elements occupying screen space without accepting input;
 - malformed or newly introduced widget variants.
 
-The native hit tester traverses userdata directly and never converts the tree into synthetic `gui.View` objects. Its initial implementation must document which native properties establish obstruction. Unsupported semantics produce `UNKNOWN`, not an assumed miss.
+The native hit tester traverses userdata directly and never converts the tree into synthetic `gui.View` objects. It computes absolute geometry as follows:
+
+- a root begins in absolute screen space;
+- `GLOBAL_POSITIONING=true` makes that widget's `rect` absolute screen space;
+- otherwise, the widget's `rect` origin is relative to its parent's resolved absolute origin;
+- malformed ancestry, flags, or geometry produce `UNKNOWN`.
+
+Visible occupied geometry counts as UI obstruction whether or not the widget would consume input. Native widget metadata exposes no general mouse-interactivity discriminator, and the `MAP_CLICK` contract concerns UI being in the way rather than only clickable controls.
 
 ## Input Pipeline Impact
 
 The existing hook continues to capture each mouse input once and construct one immutable snapshot. Root resolution consumes that snapshot's immutable screen position.
 
-The decision remains:
+The trampoline captures root descriptors and geometric obstruction before invoking its predecessor so input-driven UI mutations cannot change the meaning of the current snapshot. The decision is:
 
 1. Non-mouse input produces neither click event.
 2. A mouse input without a DFHack-reported map coordinate produces neither click event.
-3. Otherwise, produce `RAW_CLICK` according to the parent interception and observation contract.
-4. Resolve UI obstruction from the same snapshot.
-5. Produce `MAP_CLICK` only when the aggregate result is unobstructed.
+3. Capture applicable roots and resolve geometric obstruction from the immutable snapshot.
+4. Dispatch `RAW_CLICK` according to the parent interception and observation contract.
+5. If a `RAW_CLICK` interceptor consumes the input, stop: do not invoke the predecessor, dispatch `MAP_CLICK`, or delegate to the native game.
+6. Invoke the existing overlay-feed predecessor once and retain its consumed result.
+7. If the predecessor consumed the input, suppress `MAP_CLICK` and return consumed to DFHack.
+8. If geometric resolution is `BLOCK` or `UNKNOWN`, suppress `MAP_CLICK` and preserve the predecessor's pass result.
+9. Otherwise, dispatch `MAP_CLICK` interception and observation.
+10. Return consumed if a `MAP_CLICK` interceptor consumed; otherwise return pass so DFHack can delegate to the native game.
 
 No second mouse-position or map-position lookup is permitted during resolution.
 
@@ -189,9 +210,15 @@ api:intercept(event_type, callback)
 api:observe(event_type, callback)
 ```
 
-The design introduces no event-specific methods. `RAW_CLICK` and `MAP_CLICK` remain distinct deliveries derived from one physical mouse input.
+The design introduces no event-specific methods. `RAW_CLICK` and `MAP_CLICK` remain distinct deliveries derived from one physical mouse input and are dispatched in that order.
 
-The parent proposal must remain explicit about whether a `RAW_CLICK` interceptor prevents subsequent `MAP_CLICK` delivery or only downstream host input. This sub-proposal does not redefine that ordering.
+Consuming `RAW_CLICK` consumes the physical input as a whole: later `RAW_CLICK` interceptors, all `MAP_CLICK` interceptors and observers, the overlay predecessor, and native game delegation are skipped. This prevents the confusing result where a consumed raw input still appears as a semantic map click.
+
+If `RAW_CLICK` is not consumed, the overlay predecessor runs before `MAP_CLICK` delivery so Core can use its consumed result. Therefore `MAP_CLICK` interception cannot prevent DFHack overlays from seeing the input; it occurs only after those overlays have declined to consume it. A `MAP_CLICK` interceptor can still prevent subsequent native game delegation. Consuming `MAP_CLICK` cannot retroactively affect completed `RAW_CLICK` delivery or the predecessor call.
+
+No second trampoline is required. The existing trampoline performs pre-delegation snapshot and `RAW_CLICK` work, invokes its predecessor exactly once, then performs post-delegation `MAP_CLICK` work.
+
+`RAW_CLICK` observers run after either raw consumption or predecessor completion and before any `MAP_CLICK` callbacks. `MAP_CLICK` observers run after its interceptor decision. Since native game `feed()` executes in C++ only after the Lua trampoline returns, observation is post-Core and post-DFHack-overlay processing, not post-native-game processing. The public documentation must state this boundary explicitly.
 
 ## Failure and Diagnostics Impact
 
@@ -200,13 +227,13 @@ Internal diagnostics should distinguish:
 - root collection failure;
 - unsupported root kind;
 - overlay applicability failure;
-- native traversal failure;
+- native traversal or positioning failure;
 - Lua-view traversal failure;
 - positive obstruction.
 
 Diagnostics may include root kind and stable identity. They must not retain mutable UI objects or expose root descriptors through public callbacks.
 
-A single unknown decision suppresses that `MAP_CLICK`. Whether repeated unknown decisions affect service health must follow an explicit parent service-health rule rather than emerge accidentally from hit testing.
+A single unknown root-resolution decision suppresses only that input's `MAP_CLICK`. Dynamic host UI state does not transition the service to unhealthy and no failure-count threshold is used. Service health changes remain reserved for structural service failures already defined by the parent contract.
 
 ## Reload and Lifecycle Impact
 
@@ -224,6 +251,9 @@ Add focused coverage for:
 
 - tagged native, Lua, overlay, and Core descriptors;
 - no recursive traversal during collection;
+- `GLOBAL_POSITIONING` rectangles resolved as absolute;
+- other native rectangles accumulated from parent origins;
+- malformed native ancestry or geometry producing unknown;
 - disabled overlays excluded;
 - viewscreen-inapplicable overlays excluded;
 - focus-inapplicable overlays excluded;
@@ -245,8 +275,12 @@ Automation should establish independently that:
 - an overlay obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
 - a Lua-screen obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
 - a native-widget obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
+- a pass-through visible DFHack obstruction emits `RAW_CLICK` but not `MAP_CLICK`;
+- DFHack overlay consumption suppresses `MAP_CLICK` even when geometric resolution misses;
 - mouse inputs other than left and right buttons follow the same contract;
 - interception and observation ordering remains consistent;
+- consuming `RAW_CLICK` prevents `MAP_CLICK` delivery and host delegation;
+- consuming `MAP_CLICK` prevents native game delegation after overlays have declined the input;
 - cleanup is confirmed.
 
 No tests are required for nonexistent event types.
@@ -264,21 +298,34 @@ If Core must reproduce DFHack overlay applicability predicates, tests cover repr
 
 ## Migration
 
-1. Remove native-to-generic-view adaptation.
-2. Introduce immutable root-kind and obstruction-result enums.
-3. Return shallow tagged descriptors plus explicit collection status.
-4. Place existing Lua resolution behind a kind-based obstruction resolver.
-5. Implement native traversal as a separate hit tester.
-6. Replace global overlay-database scanning with authoritative active-root discovery or one isolated compatibility adapter.
-7. Add explicit Core-root registration only where another domain does not already expose the root.
-8. Update unit and DwarfSpec coverage.
-9. Reconcile accepted decisions into the parent proposal and todo.
+1. Keep native-to-generic-view adaptation removed.
+2. Implement fail-closed native traversal with the isolated `GLOBAL_POSITIONING` assumption.
+3. Introduce immutable root-kind and obstruction-result enums.
+4. Return shallow tagged descriptors plus explicit collection status.
+5. Place existing Lua resolution behind a kind-based obstruction resolver.
+6. Replace indiscriminate overlay-database scanning with one isolated compatibility adapter matching DFHack's feed predicates.
+7. Tag existing context and priority-consumer roots as explicit Core roots.
+8. Split the existing trampoline into pre-predecessor and post-predecessor processing without adding another hook.
+9. Update unit and DwarfSpec coverage, including predecessor-consumption and click-consumption ordering.
+10. Reconcile accepted decisions into the parent proposal and todo.
 
 ## Alternatives Rejected
 
 ### Adapt Native Widgets into Generic Views
 
 Rejected because it erases object-model boundaries, approximates native semantics, and obscures failures.
+
+### Use Map Viewport Containment for Native UI
+
+Rejected because native game UI and DFHack UI can render over the gameplay map. Viewport containment does not establish that no UI element is in the way.
+
+### Use Overlay Consumption as the Only Occlusion Signal
+
+Rejected because visible pass-through UI can cover a map tile without consuming input. The predecessor result supplements geometric hit testing rather than replacing it.
+
+### Add a Second Post-Input Trampoline
+
+Rejected because one wrapper can perform work before and after its predecessor call. A second hook would add ownership and reload complexity without exposing native game consumption, which occurs later in C++.
 
 ### Treat Every Enabled Overlay as Active
 
@@ -296,15 +343,15 @@ Rejected as the primary contract because userdata-versus-table checks make test 
 
 Rejected because existing evidence shows hook placement is not the obstruction-classification failure. Root discovery and hit testing can be corrected independently.
 
-## Open Questions
+## Resolved Questions
 
-1. Does DFHack expose an authoritative supported list of overlays participating in current input dispatch, or must Core maintain a compatibility adapter?
-2. Which native widget flags and rectangle rules distinguish visible obstruction from non-interactive layout structure?
-3. How are native global-positioning and parent-relative rectangles normalized for nested containers?
-4. Can every current Lua-screen root be obtained through one supported API?
-5. Which Core-owned roots, if any, are not already reachable through the Lua-screen or overlay domains?
-6. Should repeated applicable-root inspection failures affect service health, and at what threshold?
-7. What is the exact parent-contract ordering when a `RAW_CLICK` interceptor consumes the physical input before potential `MAP_CLICK` delivery?
+1. DFHack does not expose its private active-overlay mapping, so Core uses one compatibility adapter matching the overlay feed predicates.
+2. Native widget interactivity cannot be inferred generically; visible occupied geometry counts as obstruction.
+3. `GLOBAL_POSITIONING` is treated as absolute screen space and other widget origins are accumulated from their parents.
+4. The current Lua-screen root is the hooked `Screen:onInput` receiver; no separate global lookup is required.
+5. Additional Core roots are the existing context roots and priority consumer root, tagged explicitly.
+6. Unknown dynamic UI state suppresses only the current `MAP_CLICK` and does not use an unhealthy threshold.
+7. `RAW_CLICK` consumption prevents predecessor invocation, subsequent `MAP_CLICK` delivery, and native game delegation. `MAP_CLICK` occurs only after DFHack overlays decline the input.
 
 ## Acceptance Criteria
 
@@ -313,7 +360,7 @@ This direction is ready to merge into the parent proposal when:
 - every supported UI domain has an explicit root kind;
 - root collection is shallow and never adapts descendants;
 - overlay applicability matches the actual current input context;
-- native widgets have a dedicated documented hit-testing contract;
+- native positioning follows the isolated `GLOBAL_POSITIONING` compatibility contract;
 - unknown applicable state fails closed without allowing inapplicable roots to interfere;
 - event payload, interception, observation, reload, and hook contracts remain unchanged;
 - open questions affecting observable behavior are resolved in the parent proposal.

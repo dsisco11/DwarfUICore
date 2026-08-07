@@ -22,8 +22,7 @@ ContextMenuDetectionKind = immutable_enum.define({
 ---@field target? dwarfuicore.ContextMenuTargetDescriptor
 ---@field anchor? dwarfuicore.ContextMenuAnchorDescriptor
 ---@field root? any
----@field local_x? integer
----@field local_y? integer
+---@field local_position? dwarfuicore.Position2D
 
 ---@class dwarfuicore.ContextMenuTargetDetectorOptions
 ---@field registrations dwarfuicore.ContextMenuRegistrationManager

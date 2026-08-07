@@ -302,14 +302,18 @@ function TooltipService:accept_pointer_observation(observation)
     local previous_adapter = state.target_adapter
     if previous_identity ~= identity then
         if previous_adapter then previous_adapter:on_pointer_leave() end
+        local local_position = observation.local_position
         if target then
             target:on_pointer_enter(
-                observation.local_x, observation.local_y)
+                local_position and local_position.x,
+                local_position and local_position.y)
         end
     end
     if target then
+        local local_position = observation.local_position
         target:on_pointer_update(
-            observation.local_x, observation.local_y)
+            local_position and local_position.x,
+            local_position and local_position.y)
     end
     state.target = identity
     state.target_adapter = target

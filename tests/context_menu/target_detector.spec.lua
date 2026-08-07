@@ -223,7 +223,10 @@ describe('DwarfUICore context-menu target detector', function()
         env.manager:unregister(other)
         result = env.detector:detect(sample(env, 3, 3))
         assert.is_equal(upper, result.candidate.source)
-        assert.same({1, 1}, {result.local_x, result.local_y})
+        assert.same({1, 1}, {
+            result.local_position.x,
+            result.local_position.y,
+        })
     end)
 
     it('respects clipping and lets a widget target beat another root blocker',

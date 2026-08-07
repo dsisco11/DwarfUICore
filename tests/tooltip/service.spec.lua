@@ -70,8 +70,10 @@ local function observation(sequence, kind, target, root, x, y)
         pointer_x=x,
         pointer_y=y,
         target=target,
-        local_x=x and x - 10 or nil,
-        local_y=y and y - 5 or nil,
+        local_position=(x and y) and identities.Position2D.new({
+            x=x - 10,
+            y=y - 5,
+        }) or nil,
         root=root,
     }
 end

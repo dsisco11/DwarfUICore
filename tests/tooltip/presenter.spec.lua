@@ -210,8 +210,7 @@ local function observation(sequence, target_widget, root, x, y)
         pointer_x=x,
         pointer_y=y,
         target=target_widget,
-        local_x=0,
-        local_y=0,
+        local_position=identities.Position2D.new({x=0, y=0}),
         root=root,
     }
 end

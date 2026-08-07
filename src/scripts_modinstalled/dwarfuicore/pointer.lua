@@ -381,6 +381,3 @@ function PointerDispatcher.sample(context, ...)
     context.result = result
     return result
 end
-
--- Backward-compatible migration support.
-PointerResultKind = PointerClassificationKind

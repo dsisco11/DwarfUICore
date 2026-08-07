@@ -123,21 +123,21 @@ Completion criteria:
 
 Outcome: No service depends on the legacy result enum or per-axis result shape.
 
-- [ ] Migrate tooltip target detection to canonical classifications.
-- [ ] Migrate context-menu target detection to canonical classifications.
-- [ ] Migrate Input Event UI-obstruction resolution to canonical
+- [x] Migrate tooltip target detection to canonical classifications.
+- [x] Migrate context-menu target detection to canonical classifications.
+- [x] Migrate Input Event UI-obstruction resolution to canonical
   classifications.
-- [ ] Update pointer and service-specific tests to use `kind`, `subject`, and
+- [x] Update pointer and service-specific tests to use `kind`, `subject`, and
   immutable `local_position`.
-- [ ] Retire `PointerResultKind` and legacy result `x` and `y` fields after all
+- [x] Retire `PointerResultKind` and legacy result `x` and `y` fields after all
   direct consumers are migrated.
-- [ ] Confirm every direct classifier caller uses public `invoke()`.
+- [x] Confirm every direct classifier caller uses public `invoke()`.
 
 Completion criteria:
 
-- [ ] No production consumer references `PointerResultKind` or legacy result
+- [x] No production consumer references `PointerResultKind` or legacy result
   coordinates.
-- [ ] Tooltip and context-menu behavior remains unchanged for determinate GUI
+- [x] Tooltip and context-menu behavior remains unchanged for determinate GUI
   classifications.
 
 ## Phase 5: Implement native UI obstruction classification

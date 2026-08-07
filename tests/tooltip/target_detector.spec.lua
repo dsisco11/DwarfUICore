@@ -336,7 +336,7 @@ describe('DwarfUICore tooltip target detector', function()
         assert.equals(env.ObservationKind.TARGET, result.kind)
         assert.is_equal(front, result.target)
         assert.same({4, 3}, {result.pointer_x, result.pointer_y})
-        assert.same({2, 1}, {result.local_x, result.local_y})
+        assert.same({2, 1}, {result.local_position.x, result.local_position.y})
         assert.is_equal(root, result.root)
     end)
 

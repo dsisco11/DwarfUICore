@@ -145,48 +145,48 @@ Completion criteria:
 Outcome: Native widget userdata is classified directly through an isolated,
 source-informed compatibility policy without pretending it is a `gui.View`.
 
-- [ ] Add `NativeUiPointerObstructionClassifier` as a
+- [x] Add `NativeUiPointerObstructionClassifier` as a
   `PointerObstructionClassifier` subclass.
-- [ ] Implement native widget ancestry, visibility, activity, rectangle,
+- [x] Implement native widget ancestry, visibility, activity, rectangle,
   clipping, and child traversal against userdata.
-  - [ ] Treat `GLOBAL_POSITIONING=true` origins as absolute screen coordinates.
-  - [ ] Accumulate all other supported origins from parent-relative geometry.
-  - [ ] Traverse supported container children in display order.
-- [ ] Add an immutable exact-concrete-type registry whose values are existing
+- [x] Treat `GLOBAL_POSITIONING=true` origins as absolute screen coordinates.
+- [x] Accumulate all other supported origins from parent-relative geometry.
+- [x] Traverse supported container children in display order.
+- [x] Add an immutable exact-concrete-type registry whose values are existing
   `PointerPolicy` members.
-  - [ ] Register the approved native button family as `TARGET`.
-  - [ ] Register the approved selection/editing family as `TARGET`.
-  - [ ] Register `widget_container`, `widget_columns_container`,
+- [x] Register the approved native button family as `TARGET`.
+- [x] Register the approved selection/editing family as `TARGET`.
+- [x] Register `widget_container`, `widget_columns_container`,
     `widget_params_container`, `widget_rows_container`, and `widget_stack` as
     `PASS`.
-  - [ ] Register the approved presentation-only family as `NONE`.
-- [ ] Apply exact-type policy before the separate `CAN_KEY_ACTIVATE` `TARGET`
+- [x] Register the approved presentation-only family as `NONE`.
+- [x] Apply exact-type policy before the separate `CAN_KEY_ACTIVATE` `TARGET`
   fallback; do not use inheritance or name-pattern matching for self-policy.
-- [ ] For an unregistered object without activation fallback, resolve self as
+- [x] For an unregistered object without activation fallback, resolve self as
   `MISS` while traversing descendants only when it exposes the supported
   `widget_container` child interface.
-- [ ] Keep exact `TARGET` and `NONE` policies and activation fallback terminal.
-- [ ] Map policy and geometry to canonical results.
-  - [ ] `TARGET` returns `TARGET` with widget subject and local position only
+- [x] Keep exact `TARGET` and `NONE` policies and activation fallback terminal.
+- [x] Map policy and geometry to canonical results.
+  - [x] `TARGET` returns `TARGET` with widget subject and local position only
     when eligible and hit; otherwise `MISS`.
-  - [ ] `PASS` traverses children and otherwise returns `MISS`.
-  - [ ] `BLOCK` traverses children first, then returns `BLOCKED` with subject
+  - [x] `PASS` traverses children and otherwise returns `MISS`.
+  - [x] `BLOCK` traverses children first, then returns `BLOCKED` with subject
     when its blocking region is hit, otherwise `MISS`.
-  - [ ] `NONE` returns `MISS` without descendant traversal.
-- [ ] Return `UNKNOWN` when a recognized interactive widget cannot be
+- [x] `NONE` returns `MISS` without descendant traversal.
+- [x] Return `UNKNOWN` when a recognized interactive widget cannot be
   inspected; do not turn unrecognized or merely visible native geometry into
   an obstruction.
-- [ ] Add focused tests for absolute and parent-relative positioning, clipping,
+- [x] Add focused tests for absolute and parent-relative positioning, clipping,
   exact registry precedence, activation fallback, every policy mapping,
   `PASS` versus `NONE`, unregistered-container descendants, malformed
   recognized widgets, and unrecognized occupied geometry.
 
 Completion criteria:
 
-- [ ] Native userdata is never adapted to a generic view.
-- [ ] Recognized interactive native controls obstruct when hit, while
+- [x] Native userdata is never adapted to a generic view.
+- [x] Recognized interactive native controls obstruct when hit, while
   unrecognized and presentation-only geometry does not become a false hit.
-- [ ] Native inspection uncertainty fails closed only for recognized
+- [x] Native inspection uncertainty fails closed only for recognized
   interactive widgets.
 
 ## Phase 6: Replace UI-root collection with explicit shallow descriptors

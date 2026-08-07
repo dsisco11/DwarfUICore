@@ -4,6 +4,8 @@
 
 local overlay = require('plugins.overlay')
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
+local overlay_compatibility = reqscript(
+    'dwarfuicore/input_event/overlay_feed_compatibility')
 
 ---@class dwarfuicore.InputEventUiRootCollector
 InputEventUiRootCollector = {}
@@ -169,9 +171,12 @@ function InputEventUiRootCollector.collect(current_root, additional_roots)
                 'collection_failure', entry)
             return nil
         end
-        if overlay.isOverlayEnabled(name) and add(entry.widget,
-                UiRootKind.OVERLAY_VIEW, name) == false then
-            return nil
+        if overlay.isOverlayEnabled(name) and
+                overlay_compatibility.is_applicable_overlay_root(name,
+                    entry.widget) then
+            if add(entry.widget, UiRootKind.OVERLAY_VIEW, name) == false then
+                return nil
+            end
         end
     end
     if additional_roots ~= nil and type(additional_roots) ~= 'table' then

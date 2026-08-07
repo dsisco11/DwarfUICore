@@ -257,25 +257,25 @@ Completion criteria:
 Outcome: Root collection includes only overlays applicable to the current input
 context while leaving dynamic pointer state to the shared GUI classifier.
 
-- [ ] Add one isolated adapter matching DFHack's overlay-feed viewscreen,
+  - [x] Add one isolated adapter matching DFHack's overlay-feed viewscreen,
   focus, and enabled predicates.
-- [ ] Exclude disabled, viewscreen-inapplicable, and focus-inapplicable overlays
+  - [x] Exclude disabled, viewscreen-inapplicable, and focus-inapplicable overlays
   during root collection.
-- [ ] Leave dynamic active, visible, geometry, clipping, traversal, and pointer
+  - [x] Leave dynamic active, visible, geometry, clipping, traversal, and pointer
   policy evaluation to `GuiViewPointerObstructionClassifier`.
-- [ ] Ensure the classifier captures each dynamic active and visible value once
+  - [x] Ensure the classifier captures each dynamic active and visible value once
   for the current classification; do not reuse that capture when the overlay
   predecessor independently executes later.
-- [ ] Treat failure to inspect an otherwise applicable supported overlay as
+  - [x] Treat failure to inspect an otherwise applicable supported overlay as
   `UNKNOWN`; do not let inapplicable overlays interfere.
-- [ ] Add focused compatibility tests for enabled state and representative
+  - [x] Add focused compatibility tests for enabled state and representative
   viewscreen/focus transitions, plus malformed applicable overlays.
 
 Completion criteria:
 
-- [ ] Collected overlays match the current feed context closely enough that
+  - [x] Collected overlays match the current feed context closely enough that
   inactive contexts neither obstruct nor produce false `UNKNOWN` results.
-- [ ] Overlay applicability and pointer classification have separate,
+  - [x] Overlay applicability and pointer classification have separate,
   non-duplicated responsibilities.
 
 ## Phase 9: Integrate classification with the existing input trampoline

@@ -7,12 +7,23 @@ local repo_root = require('support.repo_root')
 local function load_collector(state)
     state = state or {}
     local overlay = {get_state=function() return state.overlay_state end,
-        isOverlayEnabled=function(name) return state.enabled[name] end}
+        isOverlayEnabled=function(name) return state.enabled[name] end,
+        normalize_list=function(values)
+            if type(values) == 'string' then return {values} end
+            if type(values) == 'table' then return values end
+            return {}
+        end,
+        simplify_viewscreen_name=function(value) return value end}
     local _, collector_module = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/input_event/ui_root_collector.lua', {
             globals={dfhack={gui={getDFViewscreen=function()
                     return state.native
-                end}}}, require_modules={['plugins.overlay']=overlay},
+                end, matchFocusString=function(focus, current)
+                    local current_focus = current and current.focus or
+                        state.overlay_focus
+                    return focus == current_focus
+                end}}},
+            require_modules={['plugins.overlay']=overlay},
             reqscript={}})
     return collector_module.InputEventUiRootCollector
 end
@@ -21,7 +32,8 @@ describe('Input Event UI root collection', function()
     it('deduplicates native, current, overlay, and Core roots', function()
         local native, overlay_root, current, extra = {}, {}, {}, {}
         local collector = load_collector({native={widgets=native},
-            enabled={one=true}, overlay_state={db={one={widget=overlay_root}}}})
+            enabled={one=true}, overlay_state={db={one={widget=overlay_root,
+                viewscreens={'all'}}}})
         local roots = collector.collect(current, {overlay_root, extra, current,
             extra})
         assert.equals(4, #roots)
@@ -36,7 +48,8 @@ describe('Input Event UI root collection', function()
     it('deduplicates generic roots by declared-kind precedence', function()
         local native, shared = {}, {}
         local collector = load_collector({native={widgets=native},
-            enabled={overlay=true}, overlay_state={db={overlay={widget=shared}}}})
+            enabled={overlay=true},
+            overlay_state={db={overlay={widget=shared, viewscreens={'all'}}}})
         local roots = collector.collect(shared, {shared})
         assert.equals(2, #roots)
         assert.equals(collector.OVERLAY_VIEW_KIND, roots[2].kind)
@@ -66,11 +79,46 @@ describe('Input Event UI root collection', function()
         local native, current, enabled_root, disabled_root = {}, {}, {}, {}
         local collector = load_collector({native={widgets=native},
             enabled={enabled=true, disabled=false}, overlay_state={db={
-                enabled={widget=enabled_root},
-                disabled={widget=disabled_root},
+                enabled={widget=enabled_root, viewscreens={'all'}},
+                disabled={widget=disabled_root, viewscreens={'all'}},
             }}})
         local roots = collector.collect(current, {})
         assert.equals(3, #roots)
         assert.equals(enabled_root, roots[3].root)
+    end)
+
+    it('collects only applicable overlays for current focus context', function()
+        local native, current, applicable, excluded = {}, {}, {}, {}
+        local state = {
+            native={widgets=native},
+            overlay_focus='target',
+            enabled={applicable=true, excluded=true},
+            overlay_state={db={
+                applicable={widget=applicable, viewscreens={'target'}},
+                excluded={widget=excluded, viewscreens={'other'}},
+            }}}
+        local collector = load_collector(state)
+        local roots = collector.collect(current, {})
+        assert.equals(3, #roots)
+        assert.equals(applicable, roots[3].root)
+        state.overlay_focus = 'other'
+        roots = collector.collect(current, {})
+        assert.equals(2, #roots)
+        assert.equals(state.native.widgets, roots[1].root)
+    end)
+
+    it('skips malformed overlay entries while collecting other overlays', function()
+        local native, current, good_overlay, malformed_overlay = {}, {}, {}, {}
+        local collector = load_collector({
+            native={widgets=native},
+            enabled={good=true, malformed=true},
+            overlay_focus='target',
+            overlay_state={db={
+                good={widget=good_overlay, viewscreens={'target'}},
+                malformed={widget=malformed_overlay, viewscreens=7},
+            }}})
+        local roots = collector.collect(current, {})
+        assert.equals(3, #roots)
+        assert.equals(good_overlay, roots[3].root)
     end)
 end)

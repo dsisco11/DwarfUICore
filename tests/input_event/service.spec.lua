@@ -190,6 +190,108 @@ describe('Input Event subscription service', function()
         assert.equals(2, #context.service._failures)
     end)
 
+    it('stages RAW callbacks before MAP callbacks and preserves callback boundaries',
+            function()
+        local context = load_context()
+        local calls = {}
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'intercept', function()
+                table.insert(calls, 'raw intercept')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'intercept', function()
+                table.insert(calls, 'map intercept')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'observe', function()
+                table.insert(calls, 'raw observe')
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'observe', function()
+                table.insert(calls, 'map observe')
+            end)
+        local dispatch = context.service:begin_dispatch({
+            raw={type=context.types.InputEventType.RAW_CLICK, sequence=1,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}},
+            map={type=context.types.InputEventType.MAP_CLICK, sequence=1,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}}})
+        assert.same({'raw intercept'}, calls)
+        context.service:complete_dispatch(dispatch, false)
+        assert.same({'raw intercept', 'raw observe', 'map intercept', 'map observe'},
+            calls)
+    end)
+
+    it('suppresses map callbacks when the predecessor reports consumed input',
+            function()
+        local context = load_context()
+        local calls = {}
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'intercept', function()
+                table.insert(calls, 'raw intercept')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'intercept', function()
+                table.insert(calls, 'map intercept')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'observe', function()
+                table.insert(calls, 'raw observe')
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'observe', function()
+                table.insert(calls, 'map observe')
+            end)
+        local derivation = {
+            raw={type=context.types.InputEventType.RAW_CLICK, sequence=2,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}},
+            map={type=context.types.InputEventType.MAP_CLICK, sequence=2,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}}}
+        local dispatch = context.service:begin_dispatch(derivation)
+        context.service:complete_dispatch(dispatch, true)
+        assert.same({'raw intercept', 'raw observe'}, calls)
+    end)
+
+    it('keeps map interception and observation consumed only after raw delivery',
+            function()
+        local context = load_context()
+        local calls = {}
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'intercept', function()
+                table.insert(calls, 'raw intercept')
+                return context.types.InputEventDisposition.PASS
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'intercept', function()
+                table.insert(calls, 'map consume')
+                return context.types.InputEventDisposition.CONSUME
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.RAW_CLICK, 'observe', function()
+                table.insert(calls, 'raw observe')
+            end)
+        context.service:subscribe('alpha', 1,
+            context.types.InputEventType.MAP_CLICK, 'observe', function()
+                table.insert(calls, 'map observe')
+            end)
+        local dispatch = context.service:begin_dispatch({
+            raw={type=context.types.InputEventType.RAW_CLICK, sequence=3,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}},
+            map={type=context.types.InputEventType.MAP_CLICK, sequence=3,
+                mouse_inputs={{key='_MOUSE_L'}}, map_position={x=1, y=2, z=3},
+                screen_position={x=1, y=2}}})
+        assert.is_true(context.service:complete_dispatch(dispatch, false))
+        assert.same({'raw intercept', 'raw observe', 'map consume'}, calls)
+    end)
+
     it('retires delivery, releases demand, and exposes callback-free diagnostics', function()
         local context = load_context()
         context.service:subscribe('alpha', 1, context.types.InputEventType.RAW_CLICK,

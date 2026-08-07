@@ -49,13 +49,17 @@ end
 ---@param service dwarfuicore.InputEventService
 ---@param derivation dwarfuicore.InputEventDerivation
 ---@param channel string
+---@param event_type dwarfuicore.InputEventType
 ---@return table[] candidates
-local function capture_candidates(service, derivation, channel)
+local function capture_candidates(service, derivation, channel, event_type)
     local candidates = {}
     for handle, record in pairs(service._subscriptions) do
-        local event = event_for_type(derivation, record.event_type)
-        if record.channel == channel and event ~= nil then
-            table.insert(candidates, {handle=handle, record=record, event=event})
+        if record.channel == channel and record.event_type == event_type then
+            local event = event_for_type(derivation, record.event_type)
+            if event ~= nil then
+                table.insert(candidates, {handle=handle, record=record,
+                    event=event})
+            end
         end
     end
     table.sort(candidates, function(left, right)
@@ -92,7 +96,9 @@ function InputEventService.new(generation, input_manager)
             input_manager:get_additional_ui_roots())
         local dispatch = service:begin_dispatch(derivation)
         return {derivation=derivation, consumed=dispatch.consumed,
-            complete=function() service:complete_dispatch(dispatch) end}
+            complete=function(predecessor_consumed)
+                return service:complete_dispatch(dispatch, predecessor_consumed)
+            end}
     end)
     dfhack.dwarfuicore.input_event_service = service
     return service
@@ -174,9 +180,17 @@ function InputEventService:begin_dispatch(derivation)
     assert(type(derivation) == 'table',
         'DwarfUICore Input Event dispatch requires a derivation.')
     local dispatch = {consumed=false,
-        interceptors=capture_candidates(self, derivation, 'intercept'),
-        observers=capture_candidates(self, derivation, 'observe')}
-    for _, candidate in ipairs(dispatch.interceptors) do
+        raw=derivation.raw,
+        map=derivation.map,
+        raw_interceptors=capture_candidates(self, derivation, 'intercept',
+            types.InputEventType.RAW_CLICK),
+        map_interceptors=capture_candidates(self, derivation, 'intercept',
+            types.InputEventType.MAP_CLICK),
+        raw_observers=capture_candidates(self, derivation, 'observe',
+            types.InputEventType.RAW_CLICK),
+        map_observers=capture_candidates(self, derivation, 'observe',
+            types.InputEventType.MAP_CLICK)}
+    for _, candidate in ipairs(dispatch.raw_interceptors) do
         if self._subscriptions[candidate.handle] == candidate.record then
             local ok, result = pcall(candidate.record.callback, candidate.event)
             if not ok then
@@ -197,15 +211,42 @@ end
 
 ---Runs pre-captured eligible observers after delegation or public consumption.
 ---@param dispatch table
-function InputEventService:complete_dispatch(dispatch)
-    assert(type(dispatch) == 'table' and type(dispatch.observers) == 'table',
+---@param predecessor_consumed boolean|nil
+function InputEventService:complete_dispatch(dispatch, predecessor_consumed)
+    assert(type(dispatch) == 'table' and type(dispatch.raw_observers) == 'table',
         'DwarfUICore Input Event dispatch record is invalid.')
-    for _, candidate in ipairs(dispatch.observers) do
+    for _, candidate in ipairs(dispatch.raw_observers) do
         if self._subscriptions[candidate.handle] == candidate.record then
             local ok, message = pcall(candidate.record.callback, candidate.event)
             if not ok then self:_record_failure(candidate.record, message) end
         end
     end
+    if predecessor_consumed == true or dispatch.map == nil then
+        return dispatch.consumed
+    end
+    for _, candidate in ipairs(dispatch.map_interceptors) do
+        if self._subscriptions[candidate.handle] == candidate.record then
+            local ok, result = pcall(candidate.record.callback, dispatch.map)
+            if not ok then
+                self:_record_failure(candidate.record, result)
+            elseif result == types.InputEventDisposition.PASS then
+                -- Continue through the immutable pre-captured candidate list.
+            elseif result == types.InputEventDisposition.CONSUME then
+                dispatch.consumed = true
+                return true
+            else
+                self:_record_failure(candidate.record,
+                    'Input Event interceptor must return Disposition.PASS or Disposition.CONSUME.')
+            end
+        end
+    end
+    for _, candidate in ipairs(dispatch.map_observers) do
+        if self._subscriptions[candidate.handle] == candidate.record then
+            local ok, message = pcall(candidate.record.callback, dispatch.map)
+            if not ok then self:_record_failure(candidate.record, message) end
+        end
+    end
+    return dispatch.consumed
 end
 
 ---Removes one recognized same-domain active subscription.

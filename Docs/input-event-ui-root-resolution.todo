@@ -283,40 +283,40 @@ Completion criteria:
 Outcome: One captured input snapshot and one hook enforce approved RAW,
 predecessor, and MAP ordering without resampling or changing public APIs.
 
-- [ ] Capture applicable root descriptors and geometric obstruction once from
+- [x] Capture applicable root descriptors and geometric obstruction once from
   the immutable pre-predecessor `screen_position`.
-- [ ] Do not perform a second screen-position or map-position lookup during
+- [x] Do not perform a second screen-position or map-position lookup during
   obstruction resolution or after predecessor invocation.
-- [ ] Preserve private Core-consumer arbitration before public click delivery.
-- [ ] Dispatch eligible `RAW_CLICK` interceptors before the predecessor.
-  - [ ] On raw consumption, stop later raw interceptors, notify eligible raw
+- [x] Preserve private Core-consumer arbitration before public click delivery.
+- [x] Dispatch eligible `RAW_CLICK` interceptors before the predecessor.
+  - [x] On raw consumption, stop later raw interceptors, notify eligible raw
     observers, skip predecessor and every MAP callback, and return consumed.
-- [ ] Invoke the existing overlay-feed predecessor exactly once when raw input
+- [x] Invoke the existing overlay-feed predecessor exactly once when raw input
   passes and retain its consumed result.
-- [ ] Dispatch eligible `RAW_CLICK` observers after predecessor completion and
+- [x] Dispatch eligible `RAW_CLICK` observers after predecessor completion and
   before any MAP callbacks.
-- [ ] Suppress every `MAP_CLICK` callback when the predecessor consumed input or
+- [x] Suppress every `MAP_CLICK` callback when the predecessor consumed input or
   geometric aggregation is obstructed or `UNKNOWN`.
-- [ ] When predecessor and geometry both pass, dispatch `MAP_CLICK`
+- [x] When predecessor and geometry both pass, dispatch `MAP_CLICK`
   interceptors and then observers.
-  - [ ] A MAP interceptor may prevent native game delegation but cannot affect
-    completed RAW delivery or predecessor processing.
-- [ ] Preserve the parent proposal's registration ordering, callback snapshot,
+- [x] A MAP interceptor may prevent native game delegation but cannot affect
+  completed RAW delivery or predecessor processing.
+- [x] Preserve the parent proposal's registration ordering, callback snapshot,
   mutation, recursion, failure containment, and immutable event guarantees.
-- [ ] Ensure obstruction uncertainty suppresses only the current `MAP_CLICK`
+- [x] Ensure obstruction uncertainty suppresses only the current `MAP_CLICK`
   and does not make the service unhealthy or suppress an eligible `RAW_CLICK`.
-- [ ] Add focused tests for exact ordering, predecessor consumption, RAW and MAP
+- [x] Add focused tests for exact ordering, predecessor consumption, RAW and MAP
   consumption, all-mouse-input eligibility, obstruction aggregation, no
   resampling, observer timing, inherited return behavior, and failure
   isolation.
 
 Completion criteria:
 
-- [ ] One physical mouse-input boundary produces the approved RAW/predecessor/
+- [x] One physical mouse-input boundary produces the approved RAW/predecessor/
   MAP sequence through the existing trampoline.
-- [ ] RAW consumption prevents MAP and all later host handling; MAP consumption
+- [x] RAW consumption prevents MAP and all later host handling; MAP consumption
   occurs only after overlays decline input and prevents native delegation.
-- [ ] Root resolution never changes otherwise eligible RAW delivery.
+- [x] Root resolution never changes otherwise eligible RAW delivery.
 
 ## Phase 10: Complete reload, registry, packaging, and documentation migration
 

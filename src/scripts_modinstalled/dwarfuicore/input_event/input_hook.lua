@@ -339,9 +339,19 @@ local function dispatch(transport, owner, keys)
     if not context_active then
         local public = state.public_deriver and
             state.public_deriver(snapshot, owner) or nil
+        if public and public.consumed then
+            if public.complete then public.complete(false) end
+            return {consumed=true, public=nil}
+        end
         return {consumed=public and public.consumed == true, public=public}
     end
     state.dispatch_count = state.dispatch_count + 1
+    local public = state.public_deriver and
+        state.public_deriver(snapshot, owner) or nil
+    if public and public.consumed then
+        if public.complete then public.complete(false) end
+        return {consumed=true, public=nil}
+    end
     local ok, handled = call_private_consumer(state.context_handler,
         keys, snapshot)
     if not ok then
@@ -359,10 +369,10 @@ local function dispatch(transport, owner, keys)
     end
     if handled == InputDispatchResult.CONSUME then
         state.handled_count = state.handled_count + 1
+        if public and public.complete then public.complete(true) end
         return {consumed=true, public=nil}
     end
     state.delegated_count = state.delegated_count + 1
-    local public = state.public_deriver and state.public_deriver(snapshot, owner) or nil
     return {consumed=public and public.consumed == true, public=public}
 end
 
@@ -379,11 +389,15 @@ local function make_native_trampoline(owner, predecessor)
             record.active_trampoline == trampoline and
             dispatch(ContextMenuInputTransport.NATIVE, owner, keys) or nil
         if result and result.consumed then
-            if result.public and result.public.complete then result.public.complete() end
             return true
         end
         local inherited = table.pack(predecessor(viewscreen_name, viewscreen, keys, ...))
-        if result and result.public and result.public.complete then result.public.complete() end
+        local predecessor_consumed = inherited.n > 0 and inherited[1] == true
+        if result and result.public and result.public.complete then
+            local public_consumed = result.public.complete(
+                predecessor_consumed)
+            if public_consumed then return true end
+        end
         return unpack_returns(inherited)
     end
     return trampoline
@@ -403,11 +417,15 @@ local function make_screen_trampoline(owner_ref, predecessor)
             record.active_trampoline == trampoline and
             dispatch(ContextMenuInputTransport.SCREEN, owner, keys) or nil
         if result and result.consumed then
-            if result.public and result.public.complete then result.public.complete() end
             return true
         end
         local inherited = table.pack(predecessor(self, keys, ...))
-        if result and result.public and result.public.complete then result.public.complete() end
+        local predecessor_consumed = inherited.n > 0 and inherited[1] == true
+        if result and result.public and result.public.complete then
+            local public_consumed = result.public.complete(
+                predecessor_consumed)
+            if public_consumed then return true end
+        end
         return unpack_returns(inherited)
     end
     return trampoline

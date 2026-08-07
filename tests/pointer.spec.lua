@@ -413,6 +413,87 @@ describe('DwarfUICore pointer dispatcher', function()
         assert.is.equal(target,
             pointer.PointerDispatcher.resolve(root, 2, 2).target)
     end)
+
+    local function make_classifier(pointer, classify)
+        local classifier = setmetatable({}, {__index=pointer.PointerObstructionClassifier})
+        if classify then
+            classifier._classify = classify
+        end
+        return classifier
+    end
+
+    it('invokes classifiers only through invoke()', function()
+        local pointer = load_pointer()
+        local classifier = make_classifier(pointer, function(_, _, screen_position)
+            return {kind=Kind.TARGET, subject='leaf',
+                local_position={x=screen_position.x, y=screen_position.y}}
+        end)
+
+        local result = pointer.PointerObstructionClassifier.invoke(
+            classifier, {}, {x=3, y=4})
+        assert.equals(Kind.TARGET, result.kind)
+        assert.equals('leaf', result.subject)
+        assert.same({3, 4}, {result.local_position.x, result.local_position.y})
+        assert.is_nil(pointer.PointerObstructionClassifier.get_diagnostic(classifier))
+    end)
+
+    it('records validation diagnostics without throwing for malformed invocation inputs', function()
+        local pointer = load_pointer()
+        local classifier = make_classifier(pointer, function()
+            return {kind=Kind.MISS}
+        end)
+
+        local result = pointer.PointerObstructionClassifier.invoke(classifier, 42, {x=1, y=2})
+        assert.equals(Kind.UNKNOWN, result.kind)
+        local diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
+        assert.equals('validation', diagnostic.kind)
+        assert.truthy(diagnostic.message)
+        assert.is_nil(result.local_position)
+
+        result = pointer.PointerObstructionClassifier.invoke(classifier, {}, {x=1.5, y=2})
+        assert.equals(Kind.UNKNOWN, result.kind)
+        diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
+        assert.equals('validation', diagnostic.kind)
+        assert.equals('invalid screen_position', diagnostic.message)
+    end)
+
+    it('contains classifier exceptions as unknown obstruction', function()
+        local pointer = load_pointer()
+        local classifier = make_classifier(pointer, function()
+            error('broken classifier')
+        end)
+
+        local result = pointer.PointerObstructionClassifier.invoke(classifier, {}, {x=1, y=2})
+        assert.equals(Kind.UNKNOWN, result.kind)
+        local diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
+        assert.equals('invocation', diagnostic.kind)
+        assert.match('broken classifier', diagnostic.message)
+    end)
+
+    it('contains malformed classifier results as unknown obstruction', function()
+        local pointer = load_pointer()
+        local classifier = make_classifier(pointer, function()
+            return {kind=Kind.TARGET}
+        end)
+
+        local result = pointer.PointerObstructionClassifier.invoke(classifier, {}, {x=1, y=2})
+        assert.equals(Kind.UNKNOWN, result.kind)
+        local diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
+        assert.equals('malformed', diagnostic.kind)
+        assert.match('local_position', diagnostic.message)
+        assert.is_nil(diagnostic.root)
+    end)
+
+    it('returns unknown when implementation is missing _classify', function()
+        local pointer = load_pointer()
+        local classifier = make_classifier(pointer)
+
+        local result = pointer.PointerObstructionClassifier.invoke(classifier, {}, {x=1, y=2})
+        assert.equals(Kind.UNKNOWN, result.kind)
+        local diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
+        assert.equals('validation', diagnostic.kind)
+        assert.equals('classifier implementation is missing _classify', diagnostic.message)
+    end)
 end)
 
 

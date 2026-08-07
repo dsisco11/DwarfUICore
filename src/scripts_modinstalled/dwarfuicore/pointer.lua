@@ -21,6 +21,22 @@ PointerClassificationKind = immutable_enum.define({
     UNKNOWN=4,
 }, 'PointerClassificationKind')
 
+---Returns one immutable copy of a diagnostic record.
+---@param kind string
+---@param message string|nil
+---@return table
+local function new_diagnostic(kind, message)
+    return setmetatable({
+        kind = kind,
+        message = message,
+    }, {
+        __newindex=function()
+            error('DwarfUICore pointer diagnostics are immutable.', 2)
+        end,
+        __metatable=false,
+    })
+end
+
 ---Returns a read-only pointer-classification payload.
 ---@param values table
 ---@return dwarfuicore.PointerClassification result
@@ -81,6 +97,94 @@ local function classification(kind, subject, local_position)
         subject=nil,
         local_position=nil,
     })
+end
+
+---@class dwarfuicore.PointerObstructionClassifier
+PointerObstructionClassifier = {}
+PointerObstructionClassifier.__index = PointerObstructionClassifier
+
+---Returns true when a value is an integer number.
+---@param value any
+---@return boolean
+local function is_integer(value)
+    return type(value) == 'number' and math.type(value) == 'integer'
+end
+
+---Copies an immutable diagnostic object to this classifier instance.
+---@param self dwarfuicore.PointerObstructionClassifier
+---@param message table|nil
+local function set_diagnostic(self, message)
+    self._diagnostic = message
+end
+
+---Normalizes and validates one classifier result as canonical classification output.
+---@param result any
+---@return dwarfuicore.PointerClassification|nil result
+---@return string|nil reason
+local function normalize_result(result)
+    if type(result) ~= 'table' then
+        return nil, 'classifier returned non-table result'
+    end
+    local ok, normalized = pcall(classification, result.kind,
+        result.subject, result.local_position)
+    if not ok then
+        return nil, tostring(normalized)
+    end
+    return normalized, nil
+end
+
+---Returns a non-throwing, validated classifier invocation.
+---@param self dwarfuicore.PointerObstructionClassifier
+---@param root table|userdata
+---@param screen_position dwarfuicore.Position2D
+---@return dwarfuicore.PointerClassification
+function PointerObstructionClassifier.invoke(self, root, screen_position)
+    if type(self) ~= 'table' then
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    if type(root) ~= 'table' and type(root) ~= 'userdata' then
+        set_diagnostic(self, new_diagnostic(
+            'validation', 'invalid root'))
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    if type(screen_position) ~= 'table' or
+            not is_integer(screen_position.x) or
+            not is_integer(screen_position.y) then
+        set_diagnostic(self, new_diagnostic(
+            'validation', 'invalid screen_position'))
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    if type(self._classify) ~= 'function' then
+        set_diagnostic(self, new_diagnostic(
+            'validation', 'classifier implementation is missing _classify'))
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    set_diagnostic(self, nil)
+    local ok, result = pcall(self._classify, self, root, screen_position)
+    if not ok then
+        set_diagnostic(self, new_diagnostic('invocation', tostring(result)))
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    local normalized, reason = normalize_result(result)
+    if not normalized then
+        set_diagnostic(self, new_diagnostic('malformed', reason))
+        return classification(PointerClassificationKind.UNKNOWN)
+    end
+
+    set_diagnostic(self, nil)
+    return normalized
+end
+
+---Returns the latest immutable diagnostic for this classifier.
+---@param self dwarfuicore.PointerObstructionClassifier
+---@return table|nil
+function PointerObstructionClassifier.get_diagnostic(self)
+    return type(self) == 'table' and self._diagnostic or nil
 end
 
 local function getval(value)

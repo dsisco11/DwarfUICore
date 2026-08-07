@@ -65,23 +65,23 @@ Completion criteria:
 Outcome: GUI and native classifiers share one non-throwing, result-validating
 entry point with consistent diagnostics and `UNKNOWN` fallback behavior.
 
-- [ ] Add the `PointerObstructionClassifier` base class.
-  - [ ] Expose the public final-style `invoke(root, screen_position)` method.
-  - [ ] Define protected `_classify(root, screen_position)` for subclasses.
-  - [ ] Validate inputs before invoking subclass behavior.
-  - [ ] Catch classifier exceptions, record private diagnostics, and return a
+- [x] Add the `PointerObstructionClassifier` base class.
+  - [x] Expose the public final-style `invoke(root, screen_position)` method.
+  - [x] Define protected `_classify(root, screen_position)` for subclasses.
+  - [x] Validate inputs before invoking subclass behavior.
+  - [x] Catch classifier exceptions, record private diagnostics, and return a
     canonical immutable `UNKNOWN` result.
-  - [ ] Validate subclass results and convert malformed results to `UNKNOWN`.
-- [ ] Ensure diagnostics distinguish invocation failure from a valid positive
+  - [x] Validate subclass results and convert malformed results to `UNKNOWN`.
+- [x] Ensure diagnostics distinguish invocation failure from a valid positive
   obstruction without retaining mutable roots.
-- [ ] Add focused tests for valid results, input validation, exception
+- [x] Add focused tests for valid results, input validation, exception
   containment, malformed-result conversion, and diagnostic recording.
 
 Completion criteria:
 
-- [ ] Every classifier failure is contained at `invoke()` and represented as
+- [x] Every classifier failure is contained at `invoke()` and represented as
   canonical `UNKNOWN`.
-- [ ] Callers can rely on one immutable result contract and never call
+- [x] Callers can rely on one immutable result contract and never call
   `_classify()` directly.
 
 ## Phase 3: Extract GUI-view classification from PointerDispatcher

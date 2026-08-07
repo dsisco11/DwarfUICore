@@ -63,8 +63,18 @@ namespace.
 
 Event values, their positions, and their sorted `mouse_inputs` collections are
 immutable. `screen_position` is optional; `map_position` is exact when present.
-Positions are immutable `ScreenPosition` and `MapTilePosition` values rather
-than independent coordinate axes.
+Positions are immutable `Position2D` and `Position3D` values rather than
+independent coordinate axes.
+
+`MAP_CLICK` is only produced when current input roots can be reduced to one of:
+`LUA_VIEW`, `OVERLAY_VIEW`, `CORE_REGISTERED_VIEW`, or
+`NATIVE_WIDGET_TREE`. Unsupported or incompatible roots are evaluated with fail-
+closed semantics and suppress the map event.
+
+Native roots are classified by `NativeUiPointerObstructionClassifier`, which uses
+an isolated exact-type compatibility policy and explicit positional handling.
+Lua and overlay roots use `GuiViewPointerObstructionClassifier` through the root
+descriptor path in one classifier resolution step.
 
 Interceptor exceptions and invalid dispositions are contained, recorded
 privately, and treated as `PASS`. Observer exceptions are also contained and do

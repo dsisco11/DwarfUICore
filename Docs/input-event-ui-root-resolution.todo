@@ -323,29 +323,29 @@ Completion criteria:
 Outcome: The redesigned modules participate correctly in reload/package
 boundaries and the retired adaptation/result contracts are absent.
 
-- [ ] Register new production modules in `dwarfuicore/module_registry.lua` in
+- [x] Register new production modules in `dwarfuicore/module_registry.lua` in
   dependency order and update registry/package declaration tests.
-- [ ] Ensure classifier modules and root descriptors follow generation and
+- [x] Ensure classifier modules and root descriptors follow generation and
   reload ownership while per-input descriptors never survive reload.
-- [ ] Preserve the established service generation, hook adoption, stale-handle,
+- [x] Preserve the established service generation, hook adoption, stale-handle,
   and owned-cleanup behavior.
-- [ ] Remove the provisional native-to-generic-view workaround and every
+- [x] Remove the provisional native-to-generic-view workaround and every
   superseded UI-root adaptation path.
-- [ ] Remove obsolete legacy pointer-result declarations and compatibility
+- [x] Remove obsolete legacy pointer-result declarations and compatibility
   exports after consumers are migrated.
-- [ ] Update contributor documentation with supported root kinds, classifier
+- [x] Update contributor documentation with supported root kinds, classifier
   extension rules, native compatibility-policy requirements, and fail-closed
   behavior.
-- [ ] Keep public documentation focused on event semantics, including RAW's
+- [x] Keep public documentation focused on event semantics, including RAW's
   lack of UI guarantee and MAP's post-overlay/pre-native boundary.
-- [ ] Update exact expanded/archive package expectations for all added and
+- [x] Update exact expanded/archive package expectations for all added and
   removed modules.
 
 Completion criteria:
 
-- [ ] Reload and packaging contain one current classifier/root-resolution
+ - [x] Reload and packaging contain one current classifier/root-resolution
   architecture with no adaptation workaround or legacy result shape.
-- [ ] Public API, hook ownership, and generation behavior remain unchanged.
+ - [x] Public API, hook ownership, and generation behavior remain unchanged.
 
 ## Phase 11: Focused and regression qualification
 

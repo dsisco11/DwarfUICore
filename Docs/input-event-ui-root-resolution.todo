@@ -194,23 +194,23 @@ Completion criteria:
 Outcome: Obstruction resolution logic is separated by type, loaded as immutable, focused
 classifier modules instead of residing in a monolithic pointer module.
 
-- [ ] Extract `GuiViewPointerObstructionClassifier` into `src/scripts_modinstalled/dwarfuicore/input_event/gui_view_pointer_obstruction_classifier.lua`
+- [x] Extract `GuiViewPointerObstructionClassifier` into `src/scripts_modinstalled/dwarfuicore/input_event/gui_view_pointer_obstruction_classifier.lua`
   with its policy and helper behavior unchanged.
-- [ ] Extract `NativeUiPointerObstructionClassifier` into
+- [x] Extract `NativeUiPointerObstructionClassifier` into
   `src/scripts_modinstalled/dwarfuicore/input_event/native_ui_pointer_obstruction_classifier.lua`
   with compatible classification semantics.
-- [ ] Move shared immutable enum/util/helper pieces used by multiple resolvers into a
+- [x] Move shared immutable enum/util/helper pieces used by multiple resolvers into a
   shared native-friendly module and keep each resolver boundary minimal.
-- [ ] Make `pointer.lua` dispatch by root kind with only classifier orchestration and
+- [x] Make `pointer.lua` dispatch by root kind with only classifier orchestration and
   module imports.
-- [ ] Ensure each resolver has focused unit coverage for classification contracts and
+- [x] Ensure each resolver has focused unit coverage for classification contracts and
   shared helpers have test coverage where practical.
 
 Completion criteria:
 
-- [ ] Resolvers are decoupled into separate modules with no duplicate resolution logic.
-- [ ] `pointer.lua` no longer defines resolver internals.
-- [ ] Module and test boundaries reflect one resolver per file.
+- [x] Resolvers are decoupled into separate modules with no duplicate resolution logic.
+- [x] `pointer.lua` no longer defines resolver internals.
+- [x] Module and test boundaries reflect one resolver per file.
 
 ## Phase 7: Replace UI-root collection with explicit shallow descriptors
 

@@ -192,6 +192,12 @@ local function getval(value)
     return value
 end
 
+---@class dwarfuicore.GuiViewPointerObstructionClassifier : dwarfuicore.PointerObstructionClassifier
+---@field _classify fun(self: dwarfuicore.GuiViewPointerObstructionClassifier, root: table|userdata, screen_position: dwarfuicore.Position2D): dwarfuicore.PointerClassification
+GuiViewPointerObstructionClassifier = {}
+setmetatable(GuiViewPointerObstructionClassifier, {__index = PointerObstructionClassifier})
+GuiViewPointerObstructionClassifier.__index = GuiViewPointerObstructionClassifier
+
 local function is_eligible(view)
     return view and getval(view.visible) and getval(view.active)
 end
@@ -238,6 +244,22 @@ local function targeted(view, x, y)
         y=local_y,
     })
     return classification(PointerClassificationKind.TARGET, view, local_position)
+end
+
+---@param root table|userdata
+---@param screen_position dwarfuicore.Position2D
+---@return dwarfuicore.PointerClassification
+function GuiViewPointerObstructionClassifier._classify(self, root, screen_position)
+    local x = screen_position.x
+    local y = screen_position.y
+    if not is_eligible(root) or not body_contains(root, x, y) then
+        return miss()
+    end
+    for index = #(root.subviews or {}), 1, -1 do
+        local result = resolve_view(root.subviews[index], x, y)
+        if result.kind ~= PointerClassificationKind.MISS then return result end
+    end
+    return miss()
 end
 
 ---Resolves one eligible view and its descendants at a screen coordinate.
@@ -308,14 +330,9 @@ PointerDispatcher = {}
 ---@param y integer
 ---@return dwarfuicore.PointerClassification
 function PointerDispatcher.resolve(root, x, y)
-    if not is_eligible(root) or not body_contains(root, x, y) then
-        return miss()
-    end
-    for index = #(root.subviews or {}), 1, -1 do
-        local result = resolve_view(root.subviews[index], x, y)
-        if result.kind ~= PointerClassificationKind.MISS then return result end
-    end
-    return miss()
+    return GuiViewPointerObstructionClassifier.invoke({
+        _classify=GuiViewPointerObstructionClassifier._classify,
+    }, root, {x=x, y=y})
 end
 
 ---@param context table
@@ -336,6 +353,12 @@ function PointerDispatcher.sample(context, ...)
     local result = x and y and
         PointerDispatcher.resolve(context.root, x, y) or miss()
     local previous = context.target
+
+    if result.kind == PointerClassificationKind.UNKNOWN then
+        context.result = result
+        return result
+    end
+
     local target = result.kind == PointerClassificationKind.TARGET and
         result.subject or nil
     local local_position = result.local_position

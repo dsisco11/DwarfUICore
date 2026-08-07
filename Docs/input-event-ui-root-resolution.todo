@@ -89,34 +89,34 @@ Completion criteria:
 Outcome: GUI-view obstruction policy has one implementation shared by
 continuous pointer lifecycle and Input Event obstruction resolution.
 
-- [ ] Add `GuiViewPointerObstructionClassifier` as a
+- [x] Add `GuiViewPointerObstructionClassifier` as a
   `PointerObstructionClassifier` subclass.
-- [ ] Move current `gui.View` activity, visibility, frame, clipping, child
+- [x] Move current `gui.View` activity, visibility, frame, clipping, child
   traversal, and `PointerPolicy` resolution out of `PointerDispatcher`.
-- [ ] Preserve front-to-back traversal and existing `TARGET`, `PASS`, `BLOCK`,
+- [x] Preserve front-to-back traversal and existing `TARGET`, `PASS`, `BLOCK`,
   and `NONE` meanings.
-- [ ] Evaluate dynamic active and visible values exactly once per root or
+- [x] Evaluate dynamic active and visible values exactly once per root or
   descendant in one classification.
-- [ ] Change `PointerDispatcher.resolve(root, screen_position)` to delegate to
+- [x] Change `PointerDispatcher.resolve(root, screen_position)` to delegate to
   the GUI classifier's public `invoke()` method.
-- [ ] Retain pointer sampling and enter, leave, and update lifecycle ownership
+- [x] Retain pointer sampling and enter, leave, and update lifecycle ownership
   in `PointerDispatcher.sample()`.
-  - [ ] `TARGET` assigns `classification.subject` and performs normal lifecycle
+  - [x] `TARGET` assigns `classification.subject` and performs normal lifecycle
     transitions.
-  - [ ] `BLOCKED` and `MISS` clear the target and perform the existing leave
+  - [x] `BLOCKED` and `MISS` clear the target and perform the existing leave
     behavior when applicable.
-  - [ ] `UNKNOWN` preserves the current target and emits no enter, leave, or
+  - [x] `UNKNOWN` preserves the current target and emits no enter, leave, or
     update transition.
-  - [ ] Missing or incomplete pointer coordinates bypass classifier invocation,
+  - [x] Missing or incomplete pointer coordinates bypass classifier invocation,
     resolve as `MISS`, and retain existing leave behavior.
-- [ ] Add focused tests for extracted policy parity, one-time dynamic
+- [x] Add focused tests for extracted policy parity, one-time dynamic
   evaluation, dispatcher delegation, lifecycle outcomes, and absence of
   duplicate GUI-view classification logic.
 
 Completion criteria:
 
-- [ ] GUI-view obstruction behavior exists only in the GUI classifier.
-- [ ] Existing determinate pointer lifecycle behavior is preserved and
+- [x] GUI-view obstruction behavior exists only in the GUI classifier.
+- [x] Existing determinate pointer lifecycle behavior is preserved and
   indeterminate samples are non-transitioning.
 
 ## Phase 4: Migrate all direct pointer-classification consumers

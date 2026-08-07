@@ -189,7 +189,30 @@ Completion criteria:
 - [x] Native inspection uncertainty fails closed only for recognized
   interactive widgets.
 
-## Phase 6: Replace UI-root collection with explicit shallow descriptors
+## Phase 6: Split obstruction resolvers into dedicated modules
+
+Outcome: Obstruction resolution logic is separated by type, loaded as immutable, focused
+classifier modules instead of residing in a monolithic pointer module.
+
+- [ ] Extract `GuiViewPointerObstructionClassifier` into `src/scripts_modinstalled/dwarfuicore/input_event/gui_view_pointer_obstruction_classifier.lua`
+  with its policy and helper behavior unchanged.
+- [ ] Extract `NativeUiPointerObstructionClassifier` into
+  `src/scripts_modinstalled/dwarfuicore/input_event/native_ui_pointer_obstruction_classifier.lua`
+  with compatible classification semantics.
+- [ ] Move shared immutable enum/util/helper pieces used by multiple resolvers into a
+  shared native-friendly module and keep each resolver boundary minimal.
+- [ ] Make `pointer.lua` dispatch by root kind with only classifier orchestration and
+  module imports.
+- [ ] Ensure each resolver has focused unit coverage for classification contracts and
+  shared helpers have test coverage where practical.
+
+Completion criteria:
+
+- [ ] Resolvers are decoupled into separate modules with no duplicate resolution logic.
+- [ ] `pointer.lua` no longer defines resolver internals.
+- [ ] Module and test boundaries reflect one resolver per file.
+
+## Phase 7: Replace UI-root collection with explicit shallow descriptors
 
 Outcome: Current roots are collected without traversal or runtime-type
 inference, deduplicated by identity, and dispatched to the correct classifier.
@@ -229,7 +252,7 @@ Completion criteria:
   classifier boundary.
 - [ ] Only a complete all-`MISS` result qualifies as unobstructed.
 
-## Phase 7: Implement the overlay applicability compatibility adapter
+## Phase 8: Implement the overlay applicability compatibility adapter
 
 Outcome: Root collection includes only overlays applicable to the current input
 context while leaving dynamic pointer state to the shared GUI classifier.
@@ -255,7 +278,7 @@ Completion criteria:
 - [ ] Overlay applicability and pointer classification have separate,
   non-duplicated responsibilities.
 
-## Phase 8: Integrate classification with the existing input trampoline
+## Phase 9: Integrate classification with the existing input trampoline
 
 Outcome: One captured input snapshot and one hook enforce approved RAW,
 predecessor, and MAP ordering without resampling or changing public APIs.
@@ -295,7 +318,7 @@ Completion criteria:
   occurs only after overlays decline input and prevents native delegation.
 - [ ] Root resolution never changes otherwise eligible RAW delivery.
 
-## Phase 9: Complete reload, registry, packaging, and documentation migration
+## Phase 10: Complete reload, registry, packaging, and documentation migration
 
 Outcome: The redesigned modules participate correctly in reload/package
 boundaries and the retired adaptation/result contracts are absent.
@@ -324,7 +347,7 @@ Completion criteria:
   architecture with no adaptation workaround or legacy result shape.
 - [ ] Public API, hook ownership, and generation behavior remain unchanged.
 
-## Phase 10: Focused and regression qualification
+## Phase 11: Focused and regression qualification
 
 Outcome: Source and unit evidence demonstrate the redesigned contracts without
 conflating them with native-runtime behavior.
@@ -349,7 +372,7 @@ Completion criteria:
 - [ ] Any failed or unavailable evidence remains unchecked and is not presented
   as runtime qualification.
 
-## Phase 11: DwarfSpec automation qualification
+## Phase 12: DwarfSpec automation qualification
 
 Outcome: Native runtime automation qualifies geometric classification,
 consumption ordering, reload behavior, and cleanup on supported input surfaces.

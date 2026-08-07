@@ -217,40 +217,40 @@ Completion criteria:
 Outcome: Current roots are collected without traversal or runtime-type
 inference, deduplicated by identity, and dispatched to the correct classifier.
 
-- [ ] Introduce immutable numeric `UiRootKind` members:
+- [x] Introduce immutable numeric `UiRootKind` members:
   `NATIVE_WIDGET_TREE`, `LUA_VIEW`, `OVERLAY_VIEW`, and
   `CORE_REGISTERED_VIEW`.
-- [ ] Introduce immutable tagged root descriptors that retain the original root
+- [x] Introduce immutable tagged root descriptors that retain the original root
   object and explicit kind only for the current input.
-- [ ] Collect the current native viewscreen widget root, hooked Lua-screen
+- [x] Collect the current native viewscreen widget root, hooked Lua-screen
   receiver, applicable overlay roots, and existing context/priority-consumer
   roots as explicit Core roots.
-- [ ] Keep collection shallow; do not classify or recursively traverse roots
+- [x] Keep collection shallow; do not classify or recursively traverse roots
   during collection.
-- [ ] Deduplicate roots by object identity.
-  - [ ] Resolve duplicate generic Lua kinds with precedence `OVERLAY_VIEW`, then
+- [x] Deduplicate roots by object identity.
+  - [x] Resolve duplicate generic Lua kinds with precedence `OVERLAY_VIEW`, then
     `LUA_VIEW`, then `CORE_REGISTERED_VIEW`.
-  - [ ] Treat one object reported under incompatible native and Lua kinds as a
+  - [x] Treat one object reported under incompatible native and Lua kinds as a
     collection-level `UNKNOWN`.
-- [ ] Route native descriptors only to the native classifier and all GUI-view
+- [x] Route native descriptors only to the native classifier and all GUI-view
   descriptor kinds only to the GUI classifier.
-- [ ] Aggregate root outcomes so `TARGET` or `BLOCKED` wins, then `UNKNOWN`,
+- [x] Aggregate root outcomes so `TARGET` or `BLOCKED` wins, then `UNKNOWN`,
   and only all-`MISS` proves unobstructed input.
-- [ ] Record distinct diagnostics for collection failure, unsupported kind,
+- [x] Record distinct diagnostics for collection failure, unsupported kind,
   classifier/traversal failure, applicability failure, and positive
   obstruction without exposing descriptors publicly.
-- [ ] Add focused tests for every descriptor kind, shallow collection,
+- [x] Add focused tests for every descriptor kind, shallow collection,
   identity deduplication, kind precedence, incompatible duplicates, explicit
   dispatch, aggregation precedence, immutable descriptors, and per-input
   lifetime.
 
 Completion criteria:
 
-- [ ] Test representation cannot alter root semantics because every root kind
+- [x] Test representation cannot alter root semantics because every root kind
   is explicit.
-- [ ] All supported roots are classified once through the appropriate public
+- [x] All supported roots are classified once through the appropriate public
   classifier boundary.
-- [ ] Only a complete all-`MISS` result qualifies as unobstructed.
+- [x] Only a complete all-`MISS` result qualifies as unobstructed.
 
 ## Phase 8: Implement the overlay applicability compatibility adapter
 

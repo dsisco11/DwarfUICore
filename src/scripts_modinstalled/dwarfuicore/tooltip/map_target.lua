@@ -132,7 +132,7 @@ end
 local function copy_mutable_state(options, label)
     assert(type(options) == 'table',
         ('DwarfUICore %s must be a table.'):format(label))
-    local position = identity.MapTilePosition.new(options.pos)
+    local position = identity.Position3D.new(options.pos)
     assert(options.tooltip == nil or type(options.tooltip) == 'string',
         ('DwarfUICore %s tooltip must be a string or nil.'):format(label))
     return position.x, position.y, position.z, options.tooltip
@@ -520,7 +520,7 @@ function TooltipMapTargetRegistry:get_diagnostics(consumer_namespace)
             table.insert(registrations, {
                 identity=identity.CompositeIdentity.new(record.identity),
                 contribution_sequence=record.sequence,
-                map_position=identity.MapTilePosition.new{
+                    map_position=identity.Position3D.new{
                     x=record.x, y=record.y, z=record.z},
             })
         end

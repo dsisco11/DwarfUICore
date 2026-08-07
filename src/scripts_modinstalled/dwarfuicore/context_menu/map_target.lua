@@ -221,7 +221,7 @@ function ContextMenuMapTargetRegistry:register(consumer_namespace, options,
     validate_fields(options, REGISTRATION_FIELDS, 'map-tile registration')
     assert(type(options.owner) == 'table',
         'DwarfUICore map-tile registration requires an owner.')
-    local position = identities.MapTilePosition.new(options.pos)
+    local position = identities.Position3D.new(options.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         options.definition)
 
@@ -274,7 +274,7 @@ function ContextMenuMapTargetRegistry:update(consumer_namespace, handle, update,
     assert(type(update) == 'table',
         'DwarfUICore map-tile update must be a table.')
     validate_fields(update, UPDATE_FIELDS, 'map-tile update')
-    local position = identities.MapTilePosition.new(update.pos)
+    local position = identities.Position3D.new(update.pos)
     local definition = definitions.ContextMenuDefinitionSlot.new(
         update.definition)
 
@@ -432,7 +432,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfuicore.ContextMenuMapCandidate|nil
 function ContextMenuMapTargetRegistry:detect(position)
-    local copied = identities.MapTilePosition.new(position)
+    local copied = identities.Position3D.new(position)
     self:_prune()
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     if not bucket then return nil end
@@ -451,7 +451,7 @@ end
 ---@param position {x: integer, y: integer, z: integer}
 ---@return dwarfuicore.ContextMenuMapCandidate[] candidates
 function ContextMenuMapTargetRegistry:detect_contributions(position)
-    local copied = identities.MapTilePosition.new(position)
+    local copied = identities.Position3D.new(position)
     self:_prune()
     local bucket = self._coordinate_index[pack_coordinate(copied)]
     local candidates = {}

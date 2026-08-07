@@ -3,6 +3,7 @@
 -- Generic pointer targeting deliberately has no tooltip dependency.
 
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
+local identities = reqscript('dwarfuicore/service_provider/identity')
 
 ---@enum dwarfuicore.PointerPolicy
 PointerPolicy = immutable_enum.define({
@@ -12,12 +13,75 @@ PointerPolicy = immutable_enum.define({
     NONE=4,
 }, 'PointerPolicy')
 
----@enum dwarfuicore.PointerResultKind
-PointerResultKind = immutable_enum.define({
+---@enum dwarfuicore.PointerClassificationKind
+PointerClassificationKind = immutable_enum.define({
     TARGET=1,
     BLOCKED=2,
     MISS=3,
-}, 'PointerResultKind')
+    UNKNOWN=4,
+}, 'PointerClassificationKind')
+
+---Returns a read-only pointer-classification payload.
+---@param values table
+---@return dwarfuicore.PointerClassification result
+local function immutable_result(values)
+    return setmetatable(values, {
+        __newindex=function()
+            error('DwarfUICore pointer classifications are immutable.', 2)
+        end,
+        __pairs=function()
+            return next, values, nil
+        end,
+        __metatable=false,
+    })
+end
+
+---Creates one pointer classification payload and validates required fields.
+---@param kind dwarfuicore.PointerClassificationKind
+---@param subject any
+---@param local_position dwarfuicore.Position2D|nil
+---@return dwarfuicore.PointerClassification result
+local function classification(kind, subject, local_position)
+    assert(kind == PointerClassificationKind.TARGET or
+            kind == PointerClassificationKind.BLOCKED or
+            kind == PointerClassificationKind.MISS or
+            kind == PointerClassificationKind.UNKNOWN,
+        'DwarfUICore pointer classification kind is invalid.')
+    if kind == PointerClassificationKind.TARGET then
+        assert(subject ~= nil,
+            'DwarfUICore pointer target classifications require a subject.')
+        assert(local_position ~= nil and
+                local_position.x ~= nil and local_position.y ~= nil and
+                math.type(local_position.x) == 'integer' and
+                math.type(local_position.y) == 'integer',
+            'DwarfUICore pointer target classifications require local_position.')
+        return immutable_result({
+            kind=kind,
+            subject=subject,
+            local_position=local_position,
+        })
+    end
+    if kind == PointerClassificationKind.BLOCKED then
+        assert(subject ~= nil,
+            'DwarfUICore pointer-blocked classifications require a subject.')
+        assert(local_position == nil,
+            'DwarfUICore pointer-blocked classifications forbid local_position.')
+        return immutable_result({
+            kind=kind,
+            subject=subject,
+            local_position=nil,
+        })
+    end
+    assert(subject == nil,
+        'DwarfUICore miss and unknown classifications require no subject.')
+    assert(local_position == nil,
+        'DwarfUICore miss and unknown classifications require no local_position.')
+    return immutable_result({
+        kind=kind,
+        subject=nil,
+        local_position=nil,
+    })
+end
 
 local function getval(value)
     if type(value) == 'function' then return value() end
@@ -45,39 +109,38 @@ local function frame_contains(view, x, y)
     return body_contains(view, x, y)
 end
 
----Returns a pointer miss result.
----@return dwarfuicore.PointerResult
+---Returns a pointer miss classification.
+---@return dwarfuicore.PointerClassification
 local function miss()
-    return {kind=PointerResultKind.MISS}
+    return classification(PointerClassificationKind.MISS)
 end
 
----Returns a pointer blocker result.
+---Returns a pointer blocked classification.
 ---@param view gui.View
----@return dwarfuicore.PointerResult
+---@return dwarfuicore.PointerClassification
 local function blocked(view)
-    return {kind=PointerResultKind.BLOCKED, blocker=view}
+    return classification(PointerClassificationKind.BLOCKED, view)
 end
 
----Returns a pointer target result with target-local coordinates.
+---Returns a pointer target classification with target-local coordinates.
 ---@param view gui.View
 ---@param x integer
 ---@param y integer
----@return dwarfuicore.PointerResult
+---@return dwarfuicore.PointerClassification
 local function targeted(view, x, y)
     local local_x, local_y = view.frame_body:localXY(x, y)
-    return {
-        kind=PointerResultKind.TARGET,
-        target=view,
+    local local_position = identities.Position2D.new({
         x=local_x,
         y=local_y,
-    }
+    })
+    return classification(PointerClassificationKind.TARGET, view, local_position)
 end
 
 ---Resolves one eligible view and its descendants at a screen coordinate.
 ---@param view gui.View
 ---@param x integer
 ---@param y integer
----@return dwarfuicore.PointerResult
+---@return dwarfuicore.PointerClassification
 local function resolve_view(view, x, y)
     if not is_eligible(view) then return miss() end
     local inside_body = body_contains(view, x, y)
@@ -104,7 +167,7 @@ local function resolve_view(view, x, y)
         local subviews = view.subviews or {}
         for index = #subviews, 1, -1 do
             local result = resolve_view(subviews[index], x, y)
-            if result.kind ~= PointerResultKind.MISS then return result end
+            if result.kind ~= PointerClassificationKind.MISS then return result end
         end
     end
 
@@ -117,19 +180,17 @@ end
 ---@class dwarfuicore.PointerContext
 ---@field root gui.View
 ---@field target gui.View|nil
----@field result table
+---@field result dwarfuicore.PointerClassification
 PointerContext = {}
 PointerContext.__index = PointerContext
 
----@class dwarfuicore.PointerResult
----@field kind dwarfuicore.PointerResultKind
----@field target? gui.View
----@field blocker? gui.View
----@field x? integer
----@field y? integer
+---@class dwarfuicore.PointerClassification
+---@field kind dwarfuicore.PointerClassificationKind
+---@field subject? any
+---@field local_position? dwarfuicore.Position2D
 
 ---@param root gui.View
----@return table
+---@return dwarfuicore.PointerContext
 function PointerContext.new(root)
     assert(root, 'DwarfUICore PointerContext requires a root view.')
     return setmetatable({root=root, target=nil, result=miss()}, PointerContext)
@@ -141,21 +202,21 @@ PointerDispatcher = {}
 ---@param root gui.View
 ---@param x integer
 ---@param y integer
----@return table
+---@return dwarfuicore.PointerClassification
 function PointerDispatcher.resolve(root, x, y)
     if not is_eligible(root) or not body_contains(root, x, y) then
         return miss()
     end
     for index = #(root.subviews or {}), 1, -1 do
         local result = resolve_view(root.subviews[index], x, y)
-        if result.kind ~= PointerResultKind.MISS then return result end
+        if result.kind ~= PointerClassificationKind.MISS then return result end
     end
     return miss()
 end
 
 ---@param context table
 ---@param ... integer Optional x and y coordinates. When omitted, samples once.
----@return table
+---@return dwarfuicore.PointerClassification
 function PointerDispatcher.sample(context, ...)
     assert(context and context.root,
         'DwarfUICore PointerDispatcher.sample requires a PointerContext.')
@@ -171,22 +232,28 @@ function PointerDispatcher.sample(context, ...)
     local result = x and y and
         PointerDispatcher.resolve(context.root, x, y) or miss()
     local previous = context.target
-    local target = result.kind == PointerResultKind.TARGET and
-        result.target or nil
+    local target = result.kind == PointerClassificationKind.TARGET and
+        result.subject or nil
+    local local_position = result.local_position
 
     if previous ~= target then
         if previous and previous.on_pointer_leave then
             previous.on_pointer_leave(previous)
         end
         if target and target.on_pointer_enter then
-            target.on_pointer_enter(target, result.x, result.y)
+            target.on_pointer_enter(target,
+                local_position and local_position.x, local_position and local_position.y)
         end
     end
     if target and target.on_pointer_update then
-        target.on_pointer_update(target, result.x, result.y)
+        target.on_pointer_update(target,
+            local_position and local_position.x, local_position and local_position.y)
     end
 
     context.target = target
     context.result = result
     return result
 end
+
+-- Backward-compatible migration support.
+PointerResultKind = PointerClassificationKind

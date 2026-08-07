@@ -25,16 +25,16 @@ describe('service-provider value copy constructors', function()
     it('copies and validates exact map and screen positions', function()
         local map_input = {x=10, y=-20, z=30}
         local screen_input = {x=4, y=5}
-        local map = identities.MapTilePosition.new(map_input)
-        local screen = identities.ScreenPosition.new(screen_input)
+        local map = identities.Position3D.new(map_input)
+        local screen = identities.Position2D.new(screen_input)
         map_input.x, screen_input.x = 99, 99
 
         assert.same({x=10, y=-20, z=30}, map)
         assert.same({x=4, y=5}, screen)
         assert.has_error(function()
-            identities.MapTilePosition.new{x=32768, y=0, z=0}
+            identities.Position3D.new{x=32768, y=0, z=0}
         end)
-        assert.has_error(function() identities.ScreenPosition.new{x=1.5, y=0} end)
+        assert.has_error(function() identities.Position2D.new{x=1.5, y=0} end)
         assert.has_error(function() map.x = 99 end,
             'DwarfUICore map tile positions are immutable.')
         assert.has_error(function() screen.x = 99 end,
@@ -65,3 +65,4 @@ describe('service-provider value copy constructors', function()
         end)
     end)
 end)
+

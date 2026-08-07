@@ -111,15 +111,15 @@ local function screen_fixture()
         end,
     }
     local projection = {position=nil}
-    local ScreenPosition = {}
-    ScreenPosition.__index = ScreenPosition
+    local Position2D = {}
+    Position2D.__index = Position2D
     local identities = {
-        ScreenPosition={
+        Position2D={
             new=function(position)
                 assert.equals('number', type(position.x))
                 assert.equals('number', type(position.y))
                 return setmetatable({x=position.x, y=position.y},
-                    ScreenPosition)
+                    Position2D)
             end,
         },
     }
@@ -190,7 +190,7 @@ local function screen_fixture()
         mouse=mouse,
         parent_inputs=parent_inputs,
         projection=projection,
-        ScreenPosition=ScreenPosition,
+        Position2D=Position2D,
         OverlayWidget=OverlayWidget,
     }
 end
@@ -426,7 +426,7 @@ describe('DwarfUICore context-menu screen', function()
         local anchor = fixture.screen:resolve_anchor()
         fixture.projection.position.x, fixture.projection.position.y = 9, 8
 
-        assert.equals(fixture.ScreenPosition, getmetatable(anchor))
+        assert.equals(fixture.Position2D, getmetatable(anchor))
         assert.same({x=7, y=4}, anchor)
     end)
 
@@ -480,3 +480,4 @@ describe('DwarfUICore context-menu screen', function()
         assert.is_true(fixture.screen:source_root_is_presented(root))
     end)
 end)
+

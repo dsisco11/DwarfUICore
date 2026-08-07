@@ -50,42 +50,42 @@ ProcessIdentityAllocator = {}
 ---@field local_identity integer
 CompositeIdentity = {}
 
----@class dwarfuicore.MapTilePosition
+---@class dwarfuicore.Position3D
 ---@field x integer
 ---@field y integer
 ---@field z integer
-MapTilePosition = {}
-MapTilePosition.__index = function(position, key)
+Position3D = {}
+Position3D.__index = function(position, key)
     local values = position_values[position]
     return values and values[key] or nil
 end
-MapTilePosition.__newindex = function()
-    error('DwarfUICore map tile positions are immutable.', 2)
+Position3D.__newindex = function()
+    error('DwarfUICore 3D positions are immutable.', 2)
 end
-MapTilePosition.__pairs = function(position)
+Position3D.__pairs = function(position)
     return next, position_values[position] or {}, nil
 end
-MapTilePosition.__metatable = false
+Position3D.__metatable = false
 
----@class dwarfuicore.ScreenPosition
+---@class dwarfuicore.Position2D
 ---@field x integer
 ---@field y integer
-ScreenPosition = {}
-ScreenPosition.__index = function(position, key)
+Position2D = {}
+Position2D.__index = function(position, key)
     local values = position_values[position]
     return values and values[key] or nil
 end
-ScreenPosition.__newindex = function()
-    error('DwarfUICore screen positions are immutable.', 2)
+Position2D.__newindex = function()
+    error('DwarfUICore 2D positions are immutable.', 2)
 end
-ScreenPosition.__pairs = function(position)
+Position2D.__pairs = function(position)
     return next, position_values[position] or {}, nil
 end
-ScreenPosition.__metatable = false
+Position2D.__metatable = false
 
 ---@class dwarfuicore.ContextMenuSelectionContext
----@field screen_position dwarfuicore.ScreenPosition
----@field map_position? dwarfuicore.MapTilePosition
+---@field screen_position dwarfuicore.Position2D
+---@field map_position? dwarfuicore.Position3D
 ---@field source gui.View|dwarfuicore.ContextMenuMapRegistration
 ---@field source_root dwarfuicore.PresentationOwner
 ---@field owner? dwarfuicore.PresentationOwner
@@ -102,31 +102,33 @@ local function is_positive_integer(value)
 end
 
 ---Copy-constructs and validates one exact fortress-map position.
+---Copy-constructs and validates one exact fortress 3D position.
 ---@param value any
----@return dwarfuicore.MapTilePosition position
-function MapTilePosition.new(value)
+---@return dwarfuicore.Position3D position
+function Position3D.new(value)
     local value_type = type(value)
     assert(value_type == 'table' or value_type == 'userdata',
-        'DwarfUICore map tile position must be a table or userdata.')
+        'DwarfUICore 3D position must be a table or userdata.')
     assert(math.type(value.x) == 'integer' and value.x >= MAP_COORDINATE_MIN and
             value.x <= MAP_COORDINATE_MAX and math.type(value.y) == 'integer' and
             value.y >= MAP_COORDINATE_MIN and value.y <= MAP_COORDINATE_MAX and
             math.type(value.z) == 'integer' and value.z >= MAP_COORDINATE_MIN and
             value.z <= MAP_COORDINATE_MAX,
-        'DwarfUICore map tile position requires signed 16-bit x, y, and z.')
-    local position = setmetatable({}, MapTilePosition)
+        'DwarfUICore 3D position requires signed 16-bit x, y, and z.')
+    local position = setmetatable({}, Position3D)
     position_values[position] = {x=value.x, y=value.y, z=value.z}
     return position
 end
 
 ---Copy-constructs and validates one exact interface-cell position.
+---Copy-constructs and validates one exact interface-cell position.
 ---@param value any
----@return dwarfuicore.ScreenPosition position
-function ScreenPosition.new(value)
+---@return dwarfuicore.Position2D position
+function Position2D.new(value)
     assert(type(value) == 'table' and math.type(value.x) == 'integer' and
             math.type(value.y) == 'integer',
-        'DwarfUICore screen position requires integer x and y.')
-    local position = setmetatable({}, ScreenPosition)
+        'DwarfUICore 2D position requires integer x and y.')
+    local position = setmetatable({}, Position2D)
     position_values[position] = {x=value.x, y=value.y}
     return position
 end
@@ -147,13 +149,13 @@ function ContextMenuSelectionContext.new(value)
     assert(value.source ~= nil and value.source_root ~= nil,
         'DwarfUICore context-menu selection context requires source and source root.')
     local context = {
-        screen_position=ScreenPosition.new(value.screen_position),
+        screen_position=Position2D.new(value.screen_position),
         source=value.source,
         source_root=value.source_root,
         owner=value.owner,
     }
     if value.map_position ~= nil then
-        context.map_position = MapTilePosition.new(value.map_position)
+        context.map_position = Position3D.new(value.map_position)
     end
     return setmetatable(context, ContextMenuSelectionContext)
 end

@@ -23,7 +23,7 @@ local function load_pointer(mouse_pos)
         reqscript={['dwarfuicore/utils/immutable_enum']=immutable_enum},
     })
     Policy = pointer.PointerPolicy
-    Kind = pointer.PointerResultKind
+    Kind = pointer.PointerClassificationKind
     return pointer
 end
 
@@ -68,15 +68,15 @@ describe('DwarfUICore pointer dispatcher', function()
         assert.equals('number', type(pointer.PointerPolicy.PASS))
         assert.equals('number', type(pointer.PointerPolicy.BLOCK))
         assert.equals('number', type(pointer.PointerPolicy.NONE))
-        assert.equals('number', type(pointer.PointerResultKind.TARGET))
-        assert.equals('number', type(pointer.PointerResultKind.BLOCKED))
-        assert.equals('number', type(pointer.PointerResultKind.MISS))
+        assert.equals('number', type(pointer.PointerClassificationKind.TARGET))
+        assert.equals('number', type(pointer.PointerClassificationKind.BLOCKED))
+        assert.equals('number', type(pointer.PointerClassificationKind.MISS))
         assert.has_error(function()
             pointer.PointerPolicy.TARGET = pointer.PointerPolicy.PASS
         end)
         assert.has_error(function()
-            pointer.PointerResultKind.MISS =
-                pointer.PointerResultKind.TARGET
+            pointer.PointerClassificationKind.MISS =
+                pointer.PointerClassificationKind.TARGET
         end)
     end)
 
@@ -99,15 +99,15 @@ describe('DwarfUICore pointer dispatcher', function()
 
         local result = pointer.PointerDispatcher.resolve(root, 4, 4)
         assert.equals(Kind.TARGET, result.kind)
-        assert.is.equal(upper, result.target)
-        assert.same({1, 1}, {result.x, result.y})
+        assert.is.equal(upper, result.subject)
+        assert.same({1, 1}, {result.local_position.x, result.local_position.y})
 
         result = pointer.PointerDispatcher.resolve(root, 1, 1)
         assert.same({kind=Kind.MISS}, result)
         panel.pointer_policy = Policy.BLOCK
         result = pointer.PointerDispatcher.resolve(root, 1, 1)
         assert.equals(Kind.BLOCKED, result.kind)
-        assert.is.equal(panel, result.blocker)
+        assert.is.equal(panel, result.subject)
     end)
 
     it('treats the root as a boundary instead of selecting it', function()
@@ -126,8 +126,8 @@ describe('DwarfUICore pointer dispatcher', function()
         local _, result = sample_target(pointer, root, 3, 3)
 
         assert.equals(Kind.TARGET, result.kind)
-        assert.is.equal(control, result.target)
-        assert.same({2, 2}, {result.x, result.y})
+        assert.is.equal(control, result.subject)
+        assert.same({2, 2}, {result.local_position.x, result.local_position.y})
     end)
 
     it('keeps pass containers transparent and none subtrees excluded', function()
@@ -142,9 +142,9 @@ describe('DwarfUICore pointer dispatcher', function()
             {behind, empty_panel, excluded})
 
         local result = pointer.PointerDispatcher.resolve(root, 2, 2)
-        assert.is.equal(behind, result.target)
+        assert.is.equal(behind, result.subject)
         result = pointer.PointerDispatcher.resolve(root, 11, 2)
-        assert.is.equal(behind, result.target)
+        assert.is.equal(behind, result.subject)
     end)
 
     it('respects clipped bodies for targets and the root', function()
@@ -177,12 +177,12 @@ describe('DwarfUICore pointer dispatcher', function()
             Policy.TARGET, 0, 0, 20, 20, {behind, window})
 
         local result = pointer.PointerDispatcher.resolve(root, 4, 4)
-        assert.is.equal(child, result.target)
+        assert.is.equal(child, result.subject)
         result = pointer.PointerDispatcher.resolve(root, 2, 2)
         assert.equals(Kind.BLOCKED, result.kind)
-        assert.is.equal(window, result.blocker)
+        assert.is.equal(window, result.subject)
         result = pointer.PointerDispatcher.resolve(root, 15, 15)
-        assert.is.equal(behind, result.target)
+        assert.is.equal(behind, result.subject)
     end)
 
     it('lets nested modal windows block only their own frames', function()
@@ -194,10 +194,10 @@ describe('DwarfUICore pointer dispatcher', function()
 
         local result = pointer.PointerDispatcher.resolve(root, 6, 6)
         assert.equals(Kind.BLOCKED, result.kind)
-        assert.is.equal(inner, result.blocker)
+        assert.is.equal(inner, result.subject)
         result = pointer.PointerDispatcher.resolve(root, 3, 3)
         assert.equals(Kind.BLOCKED, result.kind)
-        assert.is.equal(outer, result.blocker)
+        assert.is.equal(outer, result.subject)
         result = pointer.PointerDispatcher.resolve(root, 18, 18)
         assert.equals(Kind.MISS, result.kind)
     end)
@@ -414,3 +414,5 @@ describe('DwarfUICore pointer dispatcher', function()
             pointer.PointerDispatcher.resolve(root, 2, 2).target)
     end)
 end)
+
+

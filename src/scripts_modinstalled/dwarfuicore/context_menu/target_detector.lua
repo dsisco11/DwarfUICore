@@ -5,7 +5,7 @@
 local immutable_enum = reqscript('dwarfuicore/utils/immutable_enum')
 local pointer = reqscript('dwarfuicore/pointer')
 local targets = reqscript('dwarfuicore/context_menu/target')
-local PointerResultKind = pointer.PointerResultKind
+local PointerClassificationKind = pointer.PointerClassificationKind
 local TargetKind = targets.ContextMenuTargetKind
 
 ---@enum dwarfuicore.ContextMenuDetectionKind
@@ -27,11 +27,11 @@ ContextMenuDetectionKind = immutable_enum.define({
 
 ---@class dwarfuicore.ContextMenuTargetDetectorOptions
 ---@field registrations dwarfuicore.ContextMenuRegistrationManager
----@field resolve? fun(root: any, x: integer, y: integer): dwarfuicore.PointerResult
+---@field resolve? fun(root: any, x: integer, y: integer): dwarfuicore.PointerClassification
 
 ---@class dwarfuicore.ContextMenuTargetDetector
 ---@field _registrations dwarfuicore.ContextMenuRegistrationManager
----@field _resolve fun(root: any, x: integer, y: integer): dwarfuicore.PointerResult
+---@field _resolve fun(root: any, x: integer, y: integer): dwarfuicore.PointerClassification
 ContextMenuTargetDetector = {}
 ContextMenuTargetDetector.__index = ContextMenuTargetDetector
 
@@ -90,19 +90,18 @@ function ContextMenuTargetDetector:detect(sample)
     local blocked = false
     for root in pairs(self._registrations:get_detection_roots()) do
         local result = self._resolve(root, sample.x, sample.y)
-        if result.kind == PointerResultKind.TARGET then
+        if result.kind == PointerClassificationKind.TARGET then
             local candidate =
-                self._registrations:resolve_widget(result.target)
+                self._registrations:resolve_widget(result.subject)
             if candidate and candidate.root == root then
                 winner = prefer_later(winner, {
                     candidate=candidate,
-                    local_x=result.x,
-                    local_y=result.y,
+                    local_position=result.local_position,
                 })
             else
                 blocked = true
             end
-        elseif result.kind == PointerResultKind.BLOCKED then
+        elseif result.kind == PointerClassificationKind.BLOCKED then
             blocked = true
         end
     end
@@ -119,8 +118,7 @@ function ContextMenuTargetDetector:detect(sample)
             anchor=targets.ContextMenuAnchorDescriptor.screen_position(
                 sample.x, sample.y),
             root=winner.candidate.root,
-            local_x=winner.local_x,
-            local_y=winner.local_y,
+            local_position=winner.local_position,
         })
     end
     if blocked then

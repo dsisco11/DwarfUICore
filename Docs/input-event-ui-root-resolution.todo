@@ -36,29 +36,29 @@ that no supported interactive UI element obstructed the sampled screen point.
 Outcome: All pointer-resolution work can target one validated immutable result
 shape without introducing parallel coordinate or outcome types.
 
-- [ ] Rename the immutable `ScreenPosition` value type to `Position2D`.
-  - [ ] Update declarations, constructors, exports, and direct consumers.
-  - [ ] Preserve copied immutable `{x, y}` validation and behavior.
-- [ ] Rename the immutable `MapTilePosition` value type to `Position3D`.
-  - [ ] Update declarations, constructors, exports, and direct consumers.
-  - [ ] Preserve copied immutable `{x, y, z}` validation and behavior.
-- [ ] Ensure field names, not the generic value types, identify coordinate
+- [x] Rename the immutable `ScreenPosition` value type to `Position2D`.
+  - [x] Update declarations, constructors, exports, and direct consumers.
+  - [x] Preserve copied immutable `{x, y}` validation and behavior.
+- [x] Rename the immutable `MapTilePosition` value type to `Position3D`.
+  - [x] Update declarations, constructors, exports, and direct consumers.
+  - [x] Preserve copied immutable `{x, y, z}` validation and behavior.
+- [x] Ensure field names, not the generic value types, identify coordinate
   space: `screen_position`, `map_position`, and `local_position`.
-- [ ] Introduce immutable numeric `PointerClassificationKind` members:
+- [x] Introduce immutable numeric `PointerClassificationKind` members:
   `TARGET`, `BLOCKED`, `MISS`, and `UNKNOWN`.
-- [ ] Introduce the immutable canonical classification result with fields
+- [x] Introduce the immutable canonical classification result with fields
   `kind`, `subject`, and `local_position`.
-  - [ ] Require `subject` and `local_position` for `TARGET`.
-  - [ ] Require `subject` and forbid `local_position` for `BLOCKED`.
-  - [ ] Forbid both optional fields for `MISS` and `UNKNOWN`.
-- [ ] Add focused tests for generic position immutability, copied values,
+  - [x] Require `subject` and `local_position` for `TARGET`.
+  - [x] Require `subject` and forbid `local_position` for `BLOCKED`.
+  - [x] Forbid both optional fields for `MISS` and `UNKNOWN`.
+- [x] Add focused tests for generic position immutability, copied values,
   canonical result immutability, and every result invariant.
 
 Completion criteria:
 
-- [ ] Generic position and canonical classification contracts are available to
+- [x] Generic position and canonical classification contracts are available to
   later migrations without separate axis fields or coordinate-space labels.
-- [ ] Invalid canonical result shapes are rejected by focused tests.
+- [x] Invalid canonical result shapes are rejected by focused tests.
 
 ## Phase 2: Introduce the shared classifier invocation boundary
 

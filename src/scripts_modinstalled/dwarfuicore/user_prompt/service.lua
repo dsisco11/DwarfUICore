@@ -459,7 +459,7 @@ end
 
 ---Completes one idempotent terminal decision and dispatches one callback.
 ---@param cause dwarfuicore.UserPromptTerminalCause
----@param position? dwarfuicore.MapTilePosition
+---@param position? dwarfuicore.Position3D
 ---@return boolean changed
 function UserPromptService:_terminate(cause, position)
     assert(enum_contains(UserPromptTerminalCause, cause),
@@ -522,7 +522,7 @@ function UserPromptService:_terminate(cause, position)
 end
 
 ---Completes the active prompt with one detached map position or nil.
----@param position? dwarfuicore.MapTilePosition
+---@param position? dwarfuicore.Position3D
 ---@return boolean changed
 function UserPromptService:complete(position)
     return self:_terminate(UserPromptTerminalCause.LEFT_RELEASE, position)

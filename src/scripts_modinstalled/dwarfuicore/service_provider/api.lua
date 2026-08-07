@@ -43,7 +43,7 @@ local USER_PROMPT_UNHEALTHY_PREFIX =
 ---@class dwarfuicore.MapLocationPromptOptions
 ---@field title string
 ---@field message string
----@field on_select fun(position: dwarfuicore.MapTilePosition|nil)
+---@field on_select fun(position: dwarfuicore.Position3D|nil)
 ---@field on_cancel? fun()
 
 ---Opaque identity and lifetime handle for one map-location prompt.
@@ -59,13 +59,13 @@ local USER_PROMPT_UNHEALTHY_PREFIX =
 ---@field clear_namespace fun(self: dwarfuicore.UserPromptServiceApi): boolean changed
 
 ---An exact fortress-map coordinate copied at an API boundary.
----@class dwarfuicore.MapTilePosition
+---@class dwarfuicore.Position3D
 ---@field x integer
 ---@field y integer
 ---@field z integer
 
 ---A captured interface-cell coordinate copied for callback dispatch.
----@class dwarfuicore.ScreenPosition
+---@class dwarfuicore.Position2D
 ---@field x integer
 ---@field y integer
 
@@ -75,12 +75,12 @@ local USER_PROMPT_UNHEALTHY_PREFIX =
 ---Options for one exact map-tile tooltip registration.
 ---@class dwarfuicore.MapTileTooltipRegistrationOptions
 ---@field owner dwarfuicore.PresentationOwner
----@field pos dwarfuicore.MapTilePosition
+---@field pos dwarfuicore.Position3D
 ---@field tooltip? string
 
 ---Complete mutable replacement state for a map-tile tooltip registration.
 ---@class dwarfuicore.MapTileTooltipUpdate
----@field pos dwarfuicore.MapTilePosition
+---@field pos dwarfuicore.Position3D
 ---@field tooltip? string
 
 ---Opaque identity and lifetime handle for one map-tile tooltip registration.
@@ -103,12 +103,12 @@ local USER_PROMPT_UNHEALTHY_PREFIX =
 ---Options for one exact map-tile context-menu contribution.
 ---@class dwarfuicore.ContextMenuMapRegistrationOptions
 ---@field owner dwarfuicore.PresentationOwner
----@field pos dwarfuicore.MapTilePosition
+---@field pos dwarfuicore.Position3D
 ---@field definition dwarfuicore.ContextMenuDefinition
 
 ---Complete mutable replacement state for a map-tile menu contribution.
 ---@class dwarfuicore.ContextMenuMapRegistrationUpdate
----@field pos dwarfuicore.MapTilePosition
+---@field pos dwarfuicore.Position3D
 ---@field definition dwarfuicore.ContextMenuDefinition
 
 ---Opaque identity and lifetime handle for one map-tile menu contribution.
@@ -116,8 +116,8 @@ local USER_PROMPT_UNHEALTHY_PREFIX =
 
 ---Copied source context passed to exactly one contributing entry callback.
 ---@class dwarfuicore.ContextMenuSelectionContext
----@field screen_position dwarfuicore.ScreenPosition
----@field map_position? dwarfuicore.MapTilePosition
+---@field screen_position dwarfuicore.Position2D
+---@field map_position? dwarfuicore.Position3D
 ---@field source gui.View|dwarfuicore.ContextMenuMapRegistration
 ---@field source_root dwarfuicore.PresentationOwner
 ---@field owner? dwarfuicore.PresentationOwner

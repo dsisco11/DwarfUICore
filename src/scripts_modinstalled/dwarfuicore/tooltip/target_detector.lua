@@ -5,7 +5,7 @@
 -- queries a tooltip renderer, screen, or overlay host.
 
 local pointer = reqscript('dwarfuicore/pointer')
-local PointerResultKind = pointer.PointerResultKind
+local PointerClassificationKind = pointer.PointerClassificationKind
 local target_types = reqscript('dwarfuicore/tooltip/target')
 local ObservationKind = target_types.TooltipPointerObservationKind
 local ViewRootResolver =
@@ -17,8 +17,7 @@ local ViewRootResolver =
 ---@field pointer_x integer|nil
 ---@field pointer_y integer|nil
 ---@field target gui.View|nil
----@field local_x integer|nil
----@field local_y integer|nil
+---@field local_position? dwarfuicore.Position2D
 ---@field root gui.View|nil
 
 ---@class dwarfuicore.TooltipTargetDetectorOptions
@@ -31,8 +30,7 @@ local ViewRootResolver =
 ---@class dwarfuicore.TooltipTargetCandidate
 ---@field target gui.View
 ---@field root gui.View
----@field local_x integer
----@field local_y integer
+---@field local_position? dwarfuicore.Position2D
 ---@field sequence integer
 
 ---@class dwarfuicore.TooltipBlockedCandidate
@@ -60,8 +58,7 @@ local function observation(sample, kind, candidate)
         pointer_x=sample.screen_position and sample.screen_position.x,
         pointer_y=sample.screen_position and sample.screen_position.y,
         target=candidate.target,
-        local_x=candidate.local_x,
-        local_y=candidate.local_y,
+                        local_position=candidate.local_position,
         root=candidate.root,
     }
 end
@@ -145,22 +142,21 @@ function TooltipTargetDetector:detect(sample)
     local blocked
     for root, root_sequence in pairs(roots) do
         local result = self._resolve(root, position.x, position.y)
-        if result.kind == PointerResultKind.TARGET then
-            local registration = self._registrations[result.target]
+        if result.kind == PointerClassificationKind.TARGET then
+            local registration = self._registrations[result.subject]
             if registration then
                 winner = TooltipTargetDetector.prefer_later_registration(
-                    winner, {
-                        target=result.target,
+                winner, {
+                        target=result.subject,
                         root=root,
-                        local_x=result.x,
-                        local_y=result.y,
+                        local_position=result.local_position,
                         sequence=registration.sequence,
                     })
             else
                 blocked = TooltipTargetDetector.prefer_later_registration(
                     blocked, {root=root, sequence=root_sequence})
             end
-        elseif result.kind == PointerResultKind.BLOCKED then
+        elseif result.kind == PointerClassificationKind.BLOCKED then
             blocked = TooltipTargetDetector.prefer_later_registration(
                 blocked, {root=root, sequence=root_sequence})
         end

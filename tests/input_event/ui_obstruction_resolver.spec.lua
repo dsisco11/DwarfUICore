@@ -5,7 +5,7 @@ local repo_root = require('support.repo_root')
 ---@param outcomes table
 ---@return table resolver
 local function load_resolver(outcomes)
-    local pointer = {PointerResultKind={MISS=1, TARGET=2, BLOCKED=3},
+    local pointer = {PointerClassificationKind={MISS=1, TARGET=2, BLOCKED=3},
         PointerDispatcher={resolve=function(root)
             local result = outcomes[root]
             if result == 'error' then error('uninspectable root') end
@@ -38,3 +38,4 @@ describe('Input Event UI obstruction resolution', function()
         assert.is_false(resolver.is_unobstructed({first}, nil))
     end)
 end)
+

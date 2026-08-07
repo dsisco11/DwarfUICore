@@ -105,7 +105,7 @@ function ContextMenuScreen:resolve_anchor()
     end
     local projected = map_projection.project_visible(
         self.anchor.map_position)
-    return projected and identities.ScreenPosition.new(projected) or nil
+    return projected and identities.Position2D.new(projected) or nil
 end
 
 ---Returns whether the current pointer lies in the complete Window frame.

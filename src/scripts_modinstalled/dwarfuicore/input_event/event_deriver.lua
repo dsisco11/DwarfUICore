@@ -8,15 +8,15 @@ local types = reqscript('dwarfuicore/input_event/types')
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field map_position dwarfuicore.MapTilePosition
----@field screen_position dwarfuicore.ScreenPosition|nil
+---@field map_position dwarfuicore.Position3D
+---@field screen_position dwarfuicore.Position2D|nil
 
 ---@class dwarfuicore.MapClickedEvent
 ---@field type dwarfuicore.InputEventType
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field map_position dwarfuicore.MapTilePosition
----@field screen_position dwarfuicore.ScreenPosition
+---@field map_position dwarfuicore.Position3D
+---@field screen_position dwarfuicore.Position2D
 
 ---@alias dwarfuicore.InputEvent dwarfuicore.RawClickEvent|dwarfuicore.MapClickedEvent
 

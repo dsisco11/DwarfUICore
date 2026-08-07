@@ -102,14 +102,14 @@ function ContextMenuAnchorDescriptor.new(kind, options)
     assert(type(options) == 'table' and
             type(options.screen_position) == 'table',
         'DwarfUICore context-menu anchor requires a screen position.')
-    local screen_position = identities.ScreenPosition.new(
+    local screen_position = identities.Position2D.new(
         options.screen_position)
     local descriptor = {
         kind=kind,
         screen_position=screen_position,
     }
     if kind == ContextMenuAnchorKind.MAP_TILE then
-        descriptor.map_position = identities.MapTilePosition.new(
+        descriptor.map_position = identities.Position3D.new(
             options.map_position)
     else
         assert(options.map_position == nil,
@@ -138,7 +138,7 @@ function ContextMenuAnchorDescriptor.map_tile(position, screen_x, screen_y)
     return ContextMenuAnchorDescriptor.new(
         ContextMenuAnchorKind.MAP_TILE, {
         screen_position={x=screen_x, y=screen_y},
-        map_position=identities.MapTilePosition.new(position),
+        map_position=identities.Position3D.new(position),
     })
 end
 

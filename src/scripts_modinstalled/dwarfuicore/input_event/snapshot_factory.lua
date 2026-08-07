@@ -19,13 +19,13 @@ local demand_values = {
 ---@class dwarfuicore.InputSnapshot
 ---@field sequence integer
 ---@field mouse_inputs dwarfuicore.MouseInput[]
----@field screen_position dwarfuicore.ScreenPosition|nil
----@field map_position dwarfuicore.MapTilePosition|nil
+---@field screen_position dwarfuicore.Position2D|nil
+---@field map_position dwarfuicore.Position3D|nil
 
 ---@class dwarfuicore.PointerSample
 ---@field sequence integer
----@field screen_position dwarfuicore.ScreenPosition|nil
----@field map_position dwarfuicore.MapTilePosition|nil
+---@field screen_position dwarfuicore.Position2D|nil
+---@field map_position dwarfuicore.Position3D|nil
 
 ---@class dwarfuicore.InputSnapshotDemand
 ---@field screen_position boolean
@@ -96,17 +96,17 @@ end
 ---Copies one valid screen position or normalizes it to nil.
 ---@param x any
 ---@param y any
----@return dwarfuicore.ScreenPosition|nil
+---@return dwarfuicore.Position2D|nil
 local function copy_screen_position(x, y)
-    local ok, position = pcall(identities.ScreenPosition.new, {x=x, y=y})
+    local ok, position = pcall(identities.Position2D.new, {x=x, y=y})
     return ok and position or nil
 end
 
 ---Copies one valid map position or normalizes it to nil.
 ---@param value any
----@return dwarfuicore.MapTilePosition|nil
+---@return dwarfuicore.Position3D|nil
 local function copy_map_position(value)
-    local ok, position = pcall(identities.MapTilePosition.new, value)
+    local ok, position = pcall(identities.Position3D.new, value)
     return ok and position or nil
 end
 
@@ -228,8 +228,8 @@ end
 
 ---Copies the positions requested by one immutable demand snapshot.
 ---@param demand dwarfuicore.InputSnapshotDemand
----@return dwarfuicore.ScreenPosition|nil
----@return dwarfuicore.MapTilePosition|nil
+---@return dwarfuicore.Position2D|nil
+---@return dwarfuicore.Position3D|nil
 function SnapshotFactory:_capture_positions(demand)
     assert(type(demand) == 'table',
         'DwarfUICore Input Event snapshot demand must be a table.')

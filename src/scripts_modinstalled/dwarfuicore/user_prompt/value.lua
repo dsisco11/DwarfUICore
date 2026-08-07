@@ -12,7 +12,7 @@ local OPTION_FIELDS = {
 ---@class dwarfuicore.MapLocationPromptOptions
 ---@field title string
 ---@field message string
----@field on_select fun(position: dwarfuicore.MapTilePosition|nil)
+---@field on_select fun(position: dwarfuicore.Position3D|nil)
 ---@field on_cancel? fun()
 MapLocationPromptOptions = {}
 
@@ -20,7 +20,7 @@ MapLocationPromptOptions = {}
 ---@field namespace string
 ---@field title string
 ---@field message string
----@field on_select fun(position: dwarfuicore.MapTilePosition|nil)
+---@field on_select fun(position: dwarfuicore.Position3D|nil)
 ---@field on_cancel? fun()
 MapLocationPromptRequest = {}
 

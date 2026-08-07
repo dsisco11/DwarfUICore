@@ -207,7 +207,7 @@ describe('DwarfUICore tooltip target detector', function()
         local detector = env.new_detector(values, {
             resolve=function()
                 resolve_count = resolve_count + 1
-                return {kind=env.pointer.PointerResultKind.MISS}
+                return {kind=env.pointer.PointerClassificationKind.MISS}
             end,
         })
 
@@ -515,3 +515,4 @@ describe('DwarfUICore tooltip target detector', function()
         assert.is_nil(rawget(detector, 'screen'))
     end)
 end)
+

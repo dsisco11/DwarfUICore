@@ -158,9 +158,9 @@ describe('DwarfUICore pointer dispatcher', function()
             Policy.TARGET, 0, 0, 20, 20, {behind, clipped})
 
         assert.is.equal(clipped,
-            pointer.PointerDispatcher.resolve(root, 3, 2).target)
+            pointer.PointerDispatcher.resolve(root, 3, 2).subject)
         assert.is.equal(behind,
-            pointer.PointerDispatcher.resolve(root, 6, 2).target)
+            pointer.PointerDispatcher.resolve(root, 6, 2).subject)
 
         root.frame_body = widget_harness.rect(0, 0, 20, 20,
             {x1=0, y1=0, x2=5, y2=19})
@@ -221,7 +221,7 @@ describe('DwarfUICore pointer dispatcher', function()
         end
 
         assert.is.equal(target,
-            pointer.PointerDispatcher.resolve(root, 3, 3).target)
+            pointer.PointerDispatcher.resolve(root, 3, 3).subject)
         assert.equals(2, evaluations)
         visible = false
         assert.equals(Kind.MISS,
@@ -406,13 +406,13 @@ describe('DwarfUICore pointer dispatcher', function()
         local root = view(Policy.TARGET, 0, 0, 8, 8, {target})
 
         assert.is.equal(target,
-            pointer.PointerDispatcher.resolve(root, 2, 2).target)
+            pointer.PointerDispatcher.resolve(root, 2, 2).subject)
         target.tooltip = 'presentation data'
         assert.is.equal(target,
-            pointer.PointerDispatcher.resolve(root, 2, 2).target)
+            pointer.PointerDispatcher.resolve(root, 2, 2).subject)
         target.tooltip = nil
         assert.is.equal(target,
-            pointer.PointerDispatcher.resolve(root, 2, 2).target)
+            pointer.PointerDispatcher.resolve(root, 2, 2).subject)
     end)
 
     local function make_classifier(pointer, classify)
@@ -481,7 +481,7 @@ describe('DwarfUICore pointer dispatcher', function()
         assert.equals(Kind.UNKNOWN, result.kind)
         local diagnostic = pointer.PointerObstructionClassifier.get_diagnostic(classifier)
         assert.equals('malformed', diagnostic.kind)
-        assert.match('local_position', diagnostic.message)
+        assert.match('subject', diagnostic.message)
         assert.is_nil(diagnostic.root)
     end)
 

@@ -212,6 +212,28 @@ Completion criteria:
 - [x] `pointer.lua` no longer defines resolver internals.
 - [x] Module and test boundaries reflect one resolver per file.
 
+## Phase 6a: Split native and GUI obstruction resolvers into dedicated files
+
+Outcome: All obstruction-resolution implementations are isolated into explicit files
+so future resolver extensions do not reintroduce monolithic classifier logic.
+
+- [x] Confirm `GuiViewPointerObstructionClassifier` exists as a dedicated resolver
+  implementation file and owns only view-based policy behavior.
+- [x] Confirm `NativeUiPointerObstructionClassifier` exists as a dedicated resolver
+  implementation file and owns only native widget policy behavior.
+- [x] Verify all remaining obstruction-policy behavior in production is dispatched
+  from `pointer.lua` via one resolver module boundary.
+- [x] Keep resolver contracts stable by preserving the public `invoke()` entry point and
+  sharing result-shape validation through the base classifier.
+- [x] Preserve focused regression test ownership by keeping native and GUI obstruction
+  cases in resolver-specific specs.
+
+Completion criteria:
+
+- [x] No new obstruction resolver logic is added to the trampoline module.
+- [x] Resolver modules are independently loadable and test covered.
+- [x] No resolution behavior is duplicated across resolver modules.
+
 ## Phase 7: Replace UI-root collection with explicit shallow descriptors
 
 Outcome: Current roots are collected without traversal or runtime-type
@@ -352,17 +374,17 @@ Completion criteria:
 Outcome: Source and unit evidence demonstrate the redesigned contracts without
 conflating them with native-runtime behavior.
 
-- [ ] Run focused unit suites for positions, canonical results, classifier
+- [x] Run focused unit suites for positions, canonical results, classifier
   invocation, GUI extraction, dispatcher lifecycle, native policy, root
   collection, overlay compatibility, aggregation, and trampoline ordering.
-- [ ] Run tooltip, context-menu, UserPrompt, Input Event, provider, module
+- [x] Run tooltip, context-menu, UserPrompt, Input Event, provider, module
   registry, reload, and package regression suites.
-- [ ] Run the complete DwarfUICore unit suite.
-- [ ] Run Lua syntax and source-declaration validation for production and test
+- [x] Run the complete DwarfUICore unit suite.
+- [x] Run Lua syntax and source-declaration validation for production and test
   modules.
-- [ ] Build the distributable package and verify exact expanded and archive
+- [x] Build the distributable package and verify exact expanded and archive
   contents separately.
-- [ ] Record focused, regression, full-unit, syntax/source, and package results
+- [x] Record focused, regression, full-unit, syntax/source, and package results
   as distinct evidence.
 
 Completion criteria:

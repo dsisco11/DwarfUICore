@@ -36,9 +36,9 @@ describe('service-provider value copy constructors', function()
         end)
         assert.has_error(function() identities.Position2D.new{x=1.5, y=0} end)
         assert.has_error(function() map.x = 99 end,
-            'DwarfUICore map tile positions are immutable.')
+            'DwarfUICore 3D positions are immutable.')
         assert.has_error(function() screen.x = 99 end,
-            'DwarfUICore screen positions are immutable.')
+            'DwarfUICore 2D positions are immutable.')
     end)
 
     it('copies only the approved public callback-context fields', function()

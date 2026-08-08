@@ -29,8 +29,7 @@ function M.load(repo_root, relative_path, options)
         environment[key] = value
     end
 
-    -- reqscript is always controlled. A unit test must explicitly supply every
-    -- DFHack script dependency instead of accidentally reaching a live install.
+    -- Test modules must explicitly provide every DFHack script dependency.
     environment.reqscript = function(name)
         return lookup(options.reqscript, 'reqscript', name)
     end

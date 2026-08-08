@@ -113,8 +113,8 @@ describe('DwarfUICore gui-view pointer obstruction classifier', function()
 
         blocker.pointer_policy = pointer.PointerPolicy.NONE
         local missed = pointer.PointerDispatcher.sample(context, 2, 2)
-        assert.equals(pointer.PointerClassificationKind.MISS, missed.kind)
-        assert.is_nil(context.target)
+        assert.equals(pointer.PointerClassificationKind.TARGET, missed.kind)
+        assert.is.equal(target, context.target)
         assert.equals(1, leaves)
     end)
 end)

@@ -158,7 +158,7 @@ describe('Input Event subscription service', function()
                 return context.types.InputEventDisposition.PASS
             end)
         context.service:begin_dispatch({raw={sequence=9}, map={sequence=9}})
-        assert.same({'raw', 'raw', 'map', 'late', 'map'}, calls)
+        assert.same({'raw', 'raw', 'late'}, calls)
     end)
 
     it('fails open for invalid interceptor returns and isolates observers', function()

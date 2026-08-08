@@ -19,9 +19,11 @@ local function overlay_matches_current_viewscreen(root)
     local normalized = overlay.normalize_list(root.viewscreens)
     if type(normalized) ~= 'table' then return false end
     for _, focus in ipairs(normalized) do
-        if focus == 'all' or
-                dfhack.gui.matchFocusString(
-                    overlay.simplify_viewscreen_name(focus), current) then
+        if focus == 'all' then
+            return true
+        end
+        if dfhack.gui.matchFocusString(
+                overlay.simplify_viewscreen_name(focus), current) then
             return true
         end
     end

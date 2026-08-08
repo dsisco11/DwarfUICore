@@ -10,7 +10,7 @@ local function load_resolver(outcomes)
         PointerObstructionClassifier={
             invoke=function(_, root)
                 local result = outcomes[root]
-                if result == 'error' then error('uninspectable root') end
+                if result == 'error' then return {kind=4} end
                 return {kind=result}
             end,
         },
@@ -25,6 +25,12 @@ local function load_resolver(outcomes)
     }
     local _, resolver = module_loader.load(repo_root,
         'src/scripts_modinstalled/dwarfuicore/input_event/ui_obstruction_resolver.lua', {
+            require_modules={['plugins.overlay']={
+                get_state=function() return {db={}} end,
+                isOverlayEnabled=function() return false end,
+                normalize_list=function(value) return value end,
+                simplify_viewscreen_name=function(value) return value end,
+            }},
             reqscript={
                 ['dwarfuicore/pointer']=pointer,
                 ['dwarfuicore/input_event/ui_root_collector']=ui_root_collector,

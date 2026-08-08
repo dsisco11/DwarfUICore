@@ -169,7 +169,7 @@ function InputEventUiRootCollector.collect(current_root, additional_roots)
         if type(entry) ~= 'table' or entry.widget == nil then
             set_diagnostic('overlay state entry is malformed',
                 'collection_failure', entry)
-            return nil
+            goto continue_overlay
         end
         if overlay.isOverlayEnabled(name) and
                 overlay_compatibility.is_applicable_overlay_root(name,
@@ -178,6 +178,7 @@ function InputEventUiRootCollector.collect(current_root, additional_roots)
                 return nil
             end
         end
+        ::continue_overlay::
     end
     if additional_roots ~= nil and type(additional_roots) ~= 'table' then
         set_diagnostic('additional roots must be a table when provided',
@@ -196,6 +197,11 @@ end
 function InputEventUiRootCollector.get_diagnostic()
     return InputEventUiRootCollector._diagnostic
 end
+
+InputEventUiRootCollector.NATIVE_WIDGET_TREE_KIND = UiRootKind.NATIVE_WIDGET_TREE
+InputEventUiRootCollector.LUA_VIEW_KIND = UiRootKind.LUA_VIEW
+InputEventUiRootCollector.OVERLAY_VIEW_KIND = UiRootKind.OVERLAY_VIEW
+InputEventUiRootCollector.CORE_REGISTERED_VIEW_KIND = UiRootKind.CORE_REGISTERED_VIEW
 
 return {
     UiRootKind=UiRootKind,

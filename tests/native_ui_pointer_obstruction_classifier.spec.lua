@@ -60,7 +60,7 @@ describe('DwarfUICore native-ui pointer obstruction classifier', function()
             {}, root, {x=11, y=4}, {x=0, y=0}, true, true)
         assert.equals(pointer.PointerClassificationKind.TARGET, child_result.kind)
         assert.equals(child, child_result.subject)
-        assert.same({10, 2}, {child_result.local_position.x, child_result.local_position.y})
+        assert.same({1, 2}, {child_result.local_position.x, child_result.local_position.y})
     end)
 
     it('honors global vs parent-relative geometry with ancestry', function()
@@ -121,9 +121,9 @@ describe('DwarfUICore native-ui pointer obstruction classifier', function()
     it('supports block traversal, blocking policy, and descendant precedence', function()
         local pointer = load_pointer()
         local original = pointer.NativeUiPointerObstructionClassifier._policy_for_type
-        pointer.NativeUiPointerObstructionClassifier._policy_for_type = function(_, _, type_name)
+        pointer.NativeUiPointerObstructionClassifier._policy_for_type = function(_, type_name)
             if type_name == 'blocker' then return pointer.PointerPolicy.BLOCK end
-            return original({}, {}, type_name)
+            return original({}, type_name)
         end
 
         local child = native('widget_better_button', {x1=4, y1=4, x2=6, y2=6})

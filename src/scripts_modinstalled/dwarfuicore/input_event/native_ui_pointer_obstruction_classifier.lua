@@ -174,7 +174,7 @@ local function resolve_rect(widget, parent_origin)
         x2=origin_x + width,
         y2=origin_y + height,
     }
-    local raw_clip = resolved.clip or resolved.clip_rect
+    local raw_clip = raw.clip or raw.clip_rect
     local clip = as_rect(raw_clip)
     if clip then
         if is_global then
